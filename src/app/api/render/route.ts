@@ -27,9 +27,8 @@ async function getBundleUrl(): Promise<string> {
         alias: {
           ...config.resolve?.alias,
           '@remotion/studio': path.join(process.cwd(), 'src', 'remotion', 'empty-stub.ts'),
+          '@jridgewell/trace-mapping': require.resolve('@jridgewell/trace-mapping'),
         },
-        exportsFields: ['exports'],
-        conditionNames: ['import', 'require', 'node', 'default'],
       },
     }),
     onProgress: (progress: number) => {
