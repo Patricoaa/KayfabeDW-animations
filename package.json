@@ -11,14 +11,14 @@
     "render": "remotion render"
   },
   "dependencies": {
-    "@remotion/cli": "^4.0.0",
+    "@remotion/bundler": "^4.0.0",
     "@remotion/google-fonts": "^4.0.0",
     "@remotion/player": "^4.0.0",
+    "@remotion/renderer": "^4.0.0",
     "@remotion/tailwind-v4": "^4.0.0",
     "@supabase/supabase-js": "^2.112.3",
     "@vercel/blob": "^2.3.0",
     "clsx": "^2.1.1",
-    "dotenv": "^16.4.0",
     "next": "^16.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -27,9 +27,8 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@remotion/bundler": "^4.0.0",
+    "@remotion/cli": "^4.0.0",
     "@remotion/eslint-plugin": "^4.0.0",
-    "@remotion/renderer": "^4.0.0",
     "@tailwindcss/postcss": "^4.2.0",
     "@types/node": "^20",
     "@types/react": "^19",

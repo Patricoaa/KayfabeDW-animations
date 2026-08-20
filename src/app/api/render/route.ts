@@ -1,76 +1,26 @@
-import {spawn} from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import {put} from '@vercel/blob';
-// Force file tracer to include dotenv for the child process
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-require('dotenv');
 import {RenderRequest} from '../../../../types/schema';
 import {formatSSE, type RenderProgress} from './helpers';
 
 const ENTRY = path.join(process.cwd(), 'src', 'remotion', 'index.ts');
-const CLI_BIN = path.join(process.cwd(), 'node_modules', '@remotion', 'cli', 'remotion-cli.js');
 
-function runCommand(
-  args: string[],
-  cwd: string,
-  onData: (line: string) => void,
-): Promise<{code: number; stderr: string}> {
-  return new Promise((resolve) => {
-    const proc = spawn(process.execPath, [CLI_BIN, ...args], {
-      cwd,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: {...process.env, NODE_OPTIONS: '--no-experimental-require-module'},
-    });
+let cachedBundleUrl: string | null = null;
 
-    let stderr = '';
-
-    proc.stdout.on('data', (buf: Buffer) => {
-      const lines = buf.toString().split('\n').filter(Boolean);
-      lines.forEach(onData);
-    });
-
-    proc.stderr.on('data', (buf: Buffer) => {
-      stderr += buf.toString();
-      const lines = buf.toString().split('\n').filter(Boolean);
-      lines.forEach(onData);
-    });
-
-    proc.on('close', (code) => {
-      resolve({code: code ?? 1, stderr});
-    });
+async function getBundleUrl(): Promise<string> {
+  if (cachedBundleUrl) {
+    return cachedBundleUrl;
+  }
+  const {bundle} = await import('@remotion/bundler');
+  cachedBundleUrl = await bundle({
+    entryPoint: ENTRY,
+    onProgress: (progress: number) => {
+      console.log(`Bundling: ${progress}%`);
+    },
   });
-}
-
-function parseProgress(line: string): {phase: string; progress: number} | null {
-  const renderMatch = line.match(/Rendered (\d+)\/(\d+)/);
-  if (renderMatch) {
-    const current = parseInt(renderMatch[1], 10);
-    const total = parseInt(renderMatch[2], 10);
-    return {phase: 'Rendering video...', progress: 0.2 + (current / total) * 0.7};
-  }
-
-  if (line.includes('Bundling')) {
-    const pctMatch = line.match(/(\d+)%/);
-    const pct = pctMatch ? parseInt(pctMatch[1], 10) : 50;
-    return {phase: 'Bundling Remotion project...', progress: pct / 100 * 0.15};
-  }
-
-  if (line.includes('Getting composition')) {
-    return {phase: 'Finding compositions...', progress: 0.15};
-  }
-
-  if (line.includes('Encoded')) {
-    const pctMatch = line.match(/(\d+)\/(\d+)/);
-    if (pctMatch) {
-      const current = parseInt(pctMatch[1], 10);
-      const total = parseInt(pctMatch[2], 10);
-      return {phase: 'Encoding video...', progress: 0.9 + (current / total) * 0.05};
-    }
-  }
-
-  return null;
+  return cachedBundleUrl;
 }
 
 export async function POST(req: Request) {
@@ -95,39 +45,32 @@ export async function POST(req: Request) {
   const runRender = async () => {
     const tmpFile = path.join(os.tmpdir(), `render-${Date.now()}.mp4`);
     try {
-      await send({type: 'phase', phase: 'Rendering video...', progress: 0.05});
+      await send({type: 'phase', phase: 'Bundling project...', progress: 0.05});
 
-      const propsJson = JSON.stringify(body.inputProps);
-      const propsFile = path.join(os.tmpdir(), `props-${Date.now()}.json`);
-      fs.writeFileSync(propsFile, propsJson);
+      const bundleUrl = await getBundleUrl();
 
-      const {code, stderr} = await runCommand(
-        [
-          'render',
-          ENTRY,
-          body.compositionId,
-          tmpFile,
-          `--props=${propsFile}`,
-        ],
-        process.cwd(),
-        (line) => {
-          const progress = parseProgress(line);
-          if (progress) {
-            send({type: 'phase', phase: progress.phase, progress: progress.progress});
-          }
+      const {selectComposition, renderMedia} = await import('@remotion/renderer');
+
+      await send({type: 'phase', phase: 'Loading composition...', progress: 0.15});
+
+      const composition = await selectComposition({
+        serveUrl: bundleUrl,
+        id: body.compositionId,
+        inputProps: body.inputProps,
+      });
+
+      await send({type: 'phase', phase: 'Rendering video...', progress: 0.2});
+
+      await renderMedia({
+        composition,
+        serveUrl: bundleUrl,
+        codec: 'h264',
+        outputLocation: tmpFile,
+        inputProps: body.inputProps,
+        onProgress: ({progress}) => {
+          send({type: 'phase', phase: 'Rendering video...', progress: 0.2 + progress * 0.7});
         },
-      );
-
-      try { fs.unlinkSync(propsFile); } catch {}
-
-      if (code !== 0) {
-        const detail = stderr.slice(-2000);
-        throw new Error(`Remotion render failed (exit ${code}):\n${detail}`);
-      }
-
-      if (!fs.existsSync(tmpFile)) {
-        throw new Error('Render completed but output file not found');
-      }
+      });
 
       await send({type: 'phase', phase: 'Uploading video...', progress: 0.95});
 
