@@ -3,10 +3,16 @@ import fs from 'fs';
 import os from 'os';
 import chromium from '@sparticuz/chromium';
 import {put} from '@vercel/blob';
-import {RenderRequest} from '../../../remotion/types/schema';
+import {isValidCompId} from '@/remotion/generated/schema';
 import type {RenderProgress} from './helpers';
 
 export const maxDuration = 120;
+
+interface RenderBody {
+  compositionId: string;
+  inputProps: Record<string, unknown>;
+  durationInFrames?: number;
+}
 
 const ENTRY = path.join(process.cwd(), 'src', 'remotion', 'index.ts');
 
@@ -72,7 +78,15 @@ export async function POST(req: Request) {
   }
 
   const payload = await req.json();
-  const body = RenderRequest.parse(payload);
+  const body = payload as RenderBody;
+
+  if (!body.compositionId || !isValidCompId(body.compositionId)) {
+    return Response.json({type: 'error', message: `Invalid composition ID: ${body.compositionId}`}, {status: 400});
+  }
+  if (!body.inputProps || typeof body.inputProps !== 'object') {
+    return Response.json({type: 'error', message: 'inputProps is required'}, {status: 400});
+  }
+
   console.log(`[render] Request: composition=${body.compositionId}`);
 
   const progress: RenderProgress[] = [];

@@ -34,7 +34,6 @@ export const WinStreak: React.FC<WinStreakProps> = ({
   });
 
   const dotCount = Math.min(streakCount, 30);
-  const dotsPerRow = 10;
 
   return (
     <div

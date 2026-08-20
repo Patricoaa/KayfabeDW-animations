@@ -1,0 +1,30 @@
+{
+  "id": "win-streak",
+  "name": "Racha de Victorias",
+  "description": "Muestra una racha de victorias de un luchador",
+  "componentId": "WinStreak",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "defaultDuration": 10,
+  "dataOptions": [
+    {
+      "key": "wrestlerName",
+      "label": "Luchador",
+      "type": "text",
+      "default": "The Undertaker"
+    },
+    {
+      "key": "streakCount",
+      "label": "Racha",
+      "type": "number",
+      "default": 21
+    },
+    {
+      "key": "matchType",
+      "label": "Tipo de match",
+      "type": "text",
+      "default": "WrestleMania"
+    }
+  ]
+}

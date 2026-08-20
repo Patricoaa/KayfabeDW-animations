@@ -1,0 +1,30 @@
+{
+  "id": "ranking-barras",
+  "name": "Ranking de Reinados",
+  "description": "Gráfico de barras horizontal con ranking de estadísticas",
+  "componentId": "RankingBarras",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "defaultDuration": 10,
+  "dataOptions": [
+    {
+      "key": "type",
+      "label": "Tipo de datos",
+      "type": "select",
+      "options": [
+        { "value": "title_reigns", "label": "Reinados (DB)" },
+        { "value": "active_champs", "label": "Campeones Activos (DB)" }
+      ],
+      "default": "title_reigns"
+    },
+    {
+      "key": "limit",
+      "label": "Cantidad",
+      "type": "number",
+      "min": 1,
+      "max": 20,
+      "default": 8
+    }
+  ]
+}

@@ -7,3 +7,4 @@ out/
 *.tsbuildinfo
 .vercel
 .env*
+src/remotion/generated/

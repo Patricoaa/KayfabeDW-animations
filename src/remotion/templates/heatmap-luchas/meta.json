@@ -1,0 +1,18 @@
+{
+  "id": "heatmap-luchas",
+  "name": "Heatmap de Luchas",
+  "description": "Mapa de calor de luchas por categoría y período",
+  "componentId": "HeatmapLuchas",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "defaultDuration": 10,
+  "dataOptions": [
+    {
+      "key": "title",
+      "label": "Título",
+      "type": "text",
+      "default": "Luchas por Año y Promoción"
+    }
+  ]
+}

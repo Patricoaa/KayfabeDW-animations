@@ -1,14 +1,16 @@
 import {useCurrentFrame, useVideoConfig, interpolate, spring} from 'remotion';
 
+export type TimelineReign = {
+  start: string;
+  end: string | null;
+  days: number;
+  defenses: number;
+};
+
 export type TimelineReinadosProps = {
   championName: string;
   titleName: string;
-  reigns: {
-    start: string;
-    end: string | null;
-    days: number;
-    defenses: number;
-  }[];
+  reigns: TimelineReign[];
   promotionColor?: string;
 };
 

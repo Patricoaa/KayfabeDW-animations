@@ -1,0 +1,24 @@
+{
+  "id": "timeline-reinados",
+  "name": "Timeline de Reinados",
+  "description": "Línea de tiempo de reignos de un campeón",
+  "componentId": "TimelineReinados",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "defaultDuration": 10,
+  "dataOptions": [
+    {
+      "key": "champion",
+      "label": "Nombre del campeón",
+      "type": "text",
+      "required": true
+    },
+    {
+      "key": "titleId",
+      "label": "ID del título (opcional)",
+      "type": "number",
+      "required": false
+    }
+  ]
+}

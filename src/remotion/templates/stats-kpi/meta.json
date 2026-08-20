@@ -1,0 +1,36 @@
+{
+  "id": "stats-kpi",
+  "name": "KPI / Estadística",
+  "description": "Un solo número grande con label y descripción",
+  "componentId": "StatsKpi",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "defaultDuration": 10,
+  "dataOptions": [
+    {
+      "key": "label",
+      "label": "Label",
+      "type": "text",
+      "default": "Total de Eventos"
+    },
+    {
+      "key": "value",
+      "label": "Valor",
+      "type": "number",
+      "default": 2847
+    },
+    {
+      "key": "suffix",
+      "label": "Sufijo",
+      "type": "text",
+      "default": ""
+    },
+    {
+      "key": "description",
+      "label": "Descripción",
+      "type": "text",
+      "default": ""
+    }
+  ]
+}

@@ -1,42 +1,29 @@
 'use client';
 
 import {Player} from '@remotion/player';
-import {useCallback, useEffect, useState} from 'react';
-import {RankingBarras} from '../remotion/templates/RankingBarras';
-import {HeadToHead} from '../remotion/templates/HeadToHead';
-import {TimelineReinados} from '../remotion/templates/TimelineReinados';
-import {StatsKpi} from '../remotion/templates/StatsKpi';
-import {WinStreak} from '../remotion/templates/WinStreak';
-import {
-  COMP_NAME,
-  COMP_HEAD_TO_HEAD,
-  COMP_TIMELINE,
-  COMP_STATS_KPI,
-  COMP_WIN_STREAK,
-  defaultRankingBarrasProps,
-  defaultHeadToHeadProps,
-  defaultTimelineProps,
-  defaultStatsKpiProps,
-  defaultWinStreakProps,
-  DURATION_IN_FRAMES,
-  VIDEO_FPS,
-  VIDEO_HEIGHT,
-  VIDEO_WIDTH,
-} from '../remotion/types/constants';
-import type {RankingBarrasProps} from '../remotion/types/constants';
-import type {HeadToHeadProps} from '../remotion/types/constants';
-import type {TimelineReinadosProps} from '../remotion/types/constants';
-import type {StatsKpiProps} from '../remotion/types/constants';
-import type {WinStreakProps} from '../remotion/types/constants';
+import React, {useCallback, useEffect, useState} from 'react';
 
-type Template = 'ranking' | 'head-to-head' | 'timeline' | 'stats-kpi' | 'win-streak';
+type DataOption = {
+  key: string;
+  label: string;
+  type: 'text' | 'number' | 'select';
+  default?: unknown;
+  required?: boolean;
+  min?: number;
+  max?: number;
+  options?: {value: string; label: string}[];
+};
 
-const TEMPLATE_LABELS: Record<Template, string> = {
-  'ranking': 'Ranking',
-  'head-to-head': 'Head to Head',
-  'timeline': 'Timeline',
-  'stats-kpi': 'KPI',
-  'win-streak': 'Racha',
+type TemplateSummary = {
+  id: string;
+  name: string;
+  description: string;
+  componentId: string;
+  width: number;
+  height: number;
+  fps: number;
+  defaultDuration: number;
+  dataOptions: DataOption[];
 };
 
 type RenderState =
@@ -45,79 +32,144 @@ type RenderState =
   | {status: 'done'; url: string; size: number}
   | {status: 'error'; message: string};
 
-export default function AnimationsPage() {
-  const [template, setTemplate] = useState<Template>('ranking');
-  const [renderState, setRenderState] = useState<RenderState>({status: 'idle'});
-  const [mounted, setMounted] = useState(false);
+type ViewState =
+  | {view: 'list'}
+  | {view: 'editor'; template: TemplateSummary};
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const TEMPLATE_COMPONENTS: Record<string, React.LazyExoticComponent<React.FC<any>>> = {
+  'ranking-barras': React.lazy(() =>
+    import('../remotion/templates/ranking-barras').then((m) => ({default: m.RankingBarras})),
+  ),
+  'head-to-head': React.lazy(() =>
+    import('../remotion/templates/head-to-head').then((m) => ({default: m.HeadToHead})),
+  ),
+  'timeline-reinados': React.lazy(() =>
+    import('../remotion/templates/timeline-reinados').then((m) => ({default: m.TimelineReinados})),
+  ),
+  'stats-kpi': React.lazy(() =>
+    import('../remotion/templates/stats-kpi').then((m) => ({default: m.StatsKpi})),
+  ),
+  'win-streak': React.lazy(() =>
+    import('../remotion/templates/win-streak').then((m) => ({default: m.WinStreak})),
+  ),
+  'heatmap-luchas': React.lazy(() =>
+    import('../remotion/templates/heatmap-luchas').then((m) => ({default: m.HeatmapLuchas})),
+  ),
+};
+
+export default function AnimationsPage() {
+  const [templates, setTemplates] = useState<TemplateSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [state, setState] = useState<ViewState>({view: 'list'});
+
+  useEffect(() => {
+    fetch('/api/templates')
+      .then((r) => r.json())
+      .then((data) => {
+        setTemplates(data);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen p-8 flex items-center justify-center">
+        <div className="text-zinc-400">Cargando templates...</div>
+      </div>
+    );
+  }
+
+  if (state.view === 'editor') {
+    return (
+      <TemplateEditor
+        template={state.template}
+        onBack={() => setState({view: 'list'})}
+      />
+    );
+  }
+
+  return (
+    <div className="min-h-screen p-8">
+      <h1 className="text-3xl font-bold mb-8">Generador de Videos</h1>
+
+      {templates.length === 0 ? (
+        <div className="text-zinc-400">No hay templates disponibles.</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {templates.map((tpl) => (
+            <button
+              key={tpl.id}
+              onClick={() => setState({view: 'editor', template: tpl})}
+              className="text-left p-6 bg-zinc-900 border border-zinc-800 rounded-xl hover:border-zinc-600 transition-colors"
+            >
+              <div className="text-lg font-semibold text-white mb-2">{tpl.name}</div>
+              <div className="text-sm text-zinc-400 mb-3">{tpl.description}</div>
+              <div className="text-xs text-zinc-500">
+                {tpl.width}x{tpl.height} · {tpl.fps}fps · {tpl.defaultDuration}s
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TemplateEditor({template, onBack}: {template: TemplateSummary; onBack: () => void}) {
+  const [options, setOptions] = useState<Record<string, unknown>>(() => {
+    const initial: Record<string, unknown> = {};
+    for (const opt of template.dataOptions) {
+      if (opt.default !== undefined) initial[opt.key] = opt.default;
+    }
+    return initial;
+  });
+  const [props, setProps] = useState<Record<string, unknown> | null>(null);
+  const [loadingData, setLoadingData] = useState(false);
+  const [dataError, setDataError] = useState<string | null>(null);
+  const [renderState, setRenderState] = useState<RenderState>({status: 'idle'});
+  const [durationSec, setDurationSec] = useState(template.defaultDuration);
+  const [mounted, setMounted] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR-safety: mount guard for Remotion Player
   useEffect(() => setMounted(true), []);
 
-  const [rankingProps, setRankingProps] = useState<RankingBarrasProps>(defaultRankingBarrasProps);
-  const [h2hProps, setH2hProps] = useState<HeadToHeadProps>(defaultHeadToHeadProps);
-  const [timelineProps, setTimelineProps] = useState<TimelineReinadosProps>(defaultTimelineProps);
-  const [kpiProps, setKpiProps] = useState<StatsKpiProps>(defaultStatsKpiProps);
-  const [streakProps, setStreakProps] = useState<WinStreakProps>(defaultWinStreakProps);
-
-  const [dataSource, setDataSource] = useState<'demo' | 'live'>('demo');
-  const [durationSec, setDurationSec] = useState(10);
-
-  const getActiveProps = () => {
-    switch (template) {
-      case 'ranking': return rankingProps;
-      case 'head-to-head': return h2hProps;
-      case 'timeline': return timelineProps;
-      case 'stats-kpi': return kpiProps;
-      case 'win-streak': return streakProps;
-    }
-  };
-
-  const getCompId = () => {
-    switch (template) {
-      case 'ranking': return COMP_NAME;
-      case 'head-to-head': return COMP_HEAD_TO_HEAD;
-      case 'timeline': return COMP_TIMELINE;
-      case 'stats-kpi': return COMP_STATS_KPI;
-      case 'win-streak': return COMP_WIN_STREAK;
-    }
-  };
-
-  const loadLiveData = useCallback(async (type: string) => {
-    try {
-      const res = await fetch(`/api/data/ranking?type=${type}&limit=8`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setRankingProps({title: data.title, items: data.items, maxValue: data.maxValue});
-      setDataSource('live');
-    } catch (err) {
-      console.error('Failed to load live data:', err);
-    }
+  const updateOption = useCallback((key: string, value: unknown) => {
+    setOptions((prev) => ({...prev, [key]: value}));
   }, []);
 
-  const loadTimelineData = useCallback(async (champion: string) => {
+  const loadData = useCallback(async () => {
+    setLoadingData(true);
+    setDataError(null);
     try {
-      const res = await fetch(`/api/data/timeline?champion=${encodeURIComponent(champion)}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const res = await fetch(`/api/templates/${template.id}/data`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({options}),
+      });
       const data = await res.json();
-      setTimelineProps(data);
-      setDataSource('live');
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setProps(data.props);
     } catch (err) {
-      console.error('Failed to load timeline data:', err);
+      setDataError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoadingData(false);
     }
-  }, []);
+  }, [template.id, options]);
 
   const handleRender = useCallback(async () => {
+    if (!props) return;
     setRenderState({status: 'rendering', phase: 'Starting...', progress: 0});
     try {
       const res = await fetch('/api/render', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-          compositionId: getCompId(),
-          inputProps: getActiveProps(),
-          durationInFrames: durationSec * VIDEO_FPS,
+          compositionId: template.componentId,
+          inputProps: props,
+          durationInFrames: durationSec * template.fps,
         }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (data.type === 'done') {
         setRenderState({status: 'done', url: data.url, size: data.size});
@@ -129,332 +181,167 @@ export default function AnimationsPage() {
     } catch (err) {
       setRenderState({status: 'error', message: (err as Error).message});
     }
-  }, [template, rankingProps, h2hProps, timelineProps, kpiProps, streakProps, durationSec]);
+  }, [props, template.componentId, template.fps, durationSec]);
+
+  const Comp = TEMPLATE_COMPONENTS[template.id];
 
   return (
     <div className="min-h-screen p-8">
-      <h1 className="text-3xl font-bold mb-8">Generador de Videos</h1>
+      <button onClick={onBack} className="text-sm text-zinc-400 hover:text-white mb-6">
+        &larr; Volver a templates
+      </button>
 
-      <div className="flex gap-2 mb-6">
-        {(Object.keys(TEMPLATE_LABELS) as Template[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTemplate(t)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              template === t ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
-            }`}
-          >
-            {TEMPLATE_LABELS[t]}
-          </button>
-        ))}
-      </div>
+      <h1 className="text-2xl font-bold mb-6">{template.name}</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Preview */}
         <div>
-          <h2 className="text-xl font-semibold mb-4">Preview</h2>
+          <h2 className="text-lg font-semibold mb-3">Preview</h2>
           <div className="rounded-lg overflow-hidden border border-zinc-800 min-h-[360px]">
-            {mounted && template === 'ranking' && (
-              <Player component={RankingBarras} inputProps={rankingProps}
-                durationInFrames={DURATION_IN_FRAMES} fps={VIDEO_FPS}
-                compositionWidth={VIDEO_WIDTH} compositionHeight={VIDEO_HEIGHT}
-                style={{width: '100%'}} controls acknowledgeRemotionLicense />
+            {mounted && props && Comp && (
+              <React.Suspense fallback={<div className="p-8 text-zinc-500">Cargando...</div>}>
+                <Player
+                  component={Comp}
+                  inputProps={props}
+                  durationInFrames={durationSec * template.fps}
+                  fps={template.fps}
+                  compositionWidth={template.width}
+                  compositionHeight={template.height}
+                  style={{width: '100%'}}
+                  controls
+                  acknowledgeRemotionLicense
+                />
+              </React.Suspense>
             )}
-            {mounted && template === 'head-to-head' && (
-              <Player component={HeadToHead} inputProps={h2hProps}
-                durationInFrames={DURATION_IN_FRAMES} fps={VIDEO_FPS}
-                compositionWidth={VIDEO_WIDTH} compositionHeight={VIDEO_HEIGHT}
-                style={{width: '100%'}} controls acknowledgeRemotionLicense />
-            )}
-            {mounted && template === 'timeline' && (
-              <Player component={TimelineReinados} inputProps={timelineProps}
-                durationInFrames={DURATION_IN_FRAMES} fps={VIDEO_FPS}
-                compositionWidth={VIDEO_WIDTH} compositionHeight={VIDEO_HEIGHT}
-                style={{width: '100%'}} controls acknowledgeRemotionLicense />
-            )}
-            {mounted && template === 'stats-kpi' && (
-              <Player component={StatsKpi} inputProps={kpiProps}
-                durationInFrames={DURATION_IN_FRAMES} fps={VIDEO_FPS}
-                compositionWidth={VIDEO_WIDTH} compositionHeight={VIDEO_HEIGHT}
-                style={{width: '100%'}} controls acknowledgeRemotionLicense />
-            )}
-            {mounted && template === 'win-streak' && (
-              <Player component={WinStreak} inputProps={streakProps}
-                durationInFrames={DURATION_IN_FRAMES} fps={VIDEO_FPS}
-                compositionWidth={VIDEO_WIDTH} compositionHeight={VIDEO_HEIGHT}
-                style={{width: '100%'}} controls acknowledgeRemotionLicense />
+            {!props && (
+              <div className="flex items-center justify-center h-[360px] text-zinc-500 text-sm">
+                Configura los datos y haz clic en &quot;Cargar datos&quot; para ver la preview
+              </div>
             )}
           </div>
         </div>
 
+        {/* Configuration */}
         <div>
-          <h2 className="text-xl font-semibold mb-4">Configuración</h2>
+          <h2 className="text-lg font-semibold mb-3">Configuración</h2>
 
-          <div className="mb-6">
+          {/* Duration */}
+          <div className="mb-4">
             <label className="block text-sm font-medium mb-1">Duración (segundos)</label>
             <div className="flex items-center gap-3">
-              <input type="range" min={1} max={20} value={durationSec}
+              <input
+                type="range"
+                min={1}
+                max={20}
+                value={durationSec}
                 onChange={(e) => setDurationSec(Number(e.target.value))}
-                className="flex-1 accent-blue-500" />
-              <span className="text-sm text-zinc-300 w-16 text-right">{durationSec}s ({durationSec * VIDEO_FPS} frames)</span>
+                className="flex-1 accent-blue-500"
+              />
+              <span className="text-sm text-zinc-300 w-20 text-right">
+                {durationSec}s ({durationSec * template.fps} frames)
+              </span>
             </div>
           </div>
 
-          {template === 'ranking' && (
-            <RankingEditor props={rankingProps} onChange={setRankingProps}
-              onLoadLiveData={loadLiveData} dataSource={dataSource} />
-          )}
-          {template === 'head-to-head' && (
-            <HeadToHeadEditor props={h2hProps} onChange={setH2hProps} />
-          )}
-          {template === 'timeline' && (
-            <TimelineEditor props={timelineProps} onChange={setTimelineProps}
-              onLoadData={loadTimelineData} />
-          )}
-          {template === 'stats-kpi' && (
-            <KpiEditor props={kpiProps} onChange={setKpiProps} />
-          )}
-          {template === 'win-streak' && (
-            <WinStreakEditor props={streakProps} onChange={setStreakProps} />
+          {/* Data options */}
+          <div className="space-y-3 mb-4">
+            {template.dataOptions.map((opt) => (
+              <div key={opt.key}>
+                <label className="block text-sm font-medium mb-1">{opt.label}</label>
+                {opt.type === 'select' && opt.options ? (
+                  <select
+                    value={String(options[opt.key] ?? opt.default ?? '')}
+                    onChange={(e) => updateOption(opt.key, e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+                  >
+                    {opt.options.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : opt.type === 'number' ? (
+                  <input
+                    type="number"
+                    value={Number(options[opt.key] ?? opt.default ?? 0)}
+                    min={opt.min}
+                    max={opt.max}
+                    onChange={(e) => updateOption(opt.key, Number(e.target.value))}
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    value={String(options[opt.key] ?? opt.default ?? '')}
+                    onChange={(e) => updateOption(opt.key, e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Load data button */}
+          <button
+            onClick={loadData}
+            disabled={loadingData}
+            className="w-full bg-green-600 hover:bg-green-700 disabled:bg-zinc-700 text-white font-medium py-2 rounded-lg transition-colors mb-4"
+          >
+            {loadingData ? 'Cargando...' : 'Cargar datos'}
+          </button>
+
+          {dataError && (
+            <div className="p-3 bg-red-900/20 border border-red-800 rounded-lg text-red-400 text-sm mb-4">
+              {dataError}
+            </div>
           )}
 
+          {/* Render button */}
           <button
             onClick={handleRender}
-            disabled={renderState.status === 'rendering'}
-            className="w-full mt-6 bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-700 text-white font-medium py-3 rounded-lg transition-colors"
+            disabled={!props || renderState.status === 'rendering'}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-700 text-white font-medium py-3 rounded-lg transition-colors"
           >
             {renderState.status === 'rendering' ? 'Renderizando...' : 'Generar Video'}
           </button>
 
+          {/* Render progress */}
           {renderState.status === 'rendering' && (
             <div className="mt-4">
               <div className="text-sm text-zinc-400 mb-1">{renderState.phase}</div>
               <div className="w-full bg-zinc-800 rounded-full h-2">
-                <div className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                  style={{width: `${renderState.progress * 100}%`}} />
+                <div
+                  className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                  style={{width: `${renderState.progress * 100}%`}}
+                />
               </div>
             </div>
           )}
 
+          {/* Render done */}
           {renderState.status === 'done' && (
             <div className="mt-4 p-4 bg-green-900/20 border border-green-800 rounded-lg">
               <p className="text-green-400 text-sm mb-2">
                 Video generado ({(renderState.size / 1024 / 1024).toFixed(1)} MB)
               </p>
-              <a href={renderState.url} target="_blank" rel="noopener noreferrer"
-                className="text-blue-400 hover:underline text-sm">
+              <a
+                href={renderState.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-400 hover:underline text-sm"
+              >
                 Descargar video
               </a>
             </div>
           )}
 
+          {/* Render error */}
           {renderState.status === 'error' && (
             <div className="mt-4 p-4 bg-red-900/20 border border-red-800 rounded-lg">
               <p className="text-red-400 text-sm">{renderState.message}</p>
             </div>
           )}
         </div>
-      </div>
-    </div>
-  );
-}
-
-// --- Editors ---
-
-function RankingEditor({props, onChange, onLoadLiveData, dataSource}: {
-  props: RankingBarrasProps;
-  onChange: (p: RankingBarrasProps) => void;
-  onLoadLiveData: (type: string) => void;
-  dataSource: 'demo' | 'live';
-}) {
-  return (
-    <div className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium mb-1">Título</label>
-        <input type="text" value={props.title}
-          onChange={(e) => onChange({...props, title: e.target.value})}
-          className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm" />
-      </div>
-      <div>
-        <label className="block text-sm font-medium mb-2">Cargar datos</label>
-        <div className="flex gap-2">
-          <button onClick={() => onLoadLiveData('title_reigns')}
-            className={`px-3 py-1.5 rounded text-xs font-medium ${dataSource === 'live' ? 'bg-green-600 text-white' : 'bg-zinc-800 text-zinc-300'}`}>
-            Reinados (DB)
-          </button>
-          <button onClick={() => onLoadLiveData('active_champs')}
-            className={`px-3 py-1.5 rounded text-xs font-medium ${dataSource === 'live' ? 'bg-green-600 text-white' : 'bg-zinc-800 text-zinc-300'}`}>
-            Campeones Activos (DB)
-          </button>
-        </div>
-      </div>
-      <div>
-        <label className="block text-sm font-medium mb-2">Items</label>
-        {props.items.map((item, i) => (
-          <div key={i} className="flex gap-2 mb-2">
-            <input type="text" value={item.label}
-              onChange={(e) => {const items = [...props.items]; items[i] = {...items[i], label: e.target.value}; onChange({...props, items});}}
-              className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm" />
-            <input type="number" value={item.value}
-              onChange={(e) => {const items = [...props.items]; items[i] = {...items[i], value: Number(e.target.value)}; onChange({...props, items});}}
-              className="w-24 bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm" />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function HeadToHeadEditor({props, onChange}: {props: HeadToHeadProps; onChange: (p: HeadToHeadProps) => void}) {
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">Luchador A</label>
-          <input type="text" value={props.wrestlerA}
-            onChange={(e) => onChange({...props, wrestlerA: e.target.value})}
-            className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm" />
-          <input type="text" value={props.titleA ?? ''} placeholder="Título"
-            onChange={(e) => onChange({...props, titleA: e.target.value || undefined})}
-            className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm mt-2" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Luchador B</label>
-          <input type="text" value={props.wrestlerB}
-            onChange={(e) => onChange({...props, wrestlerB: e.target.value})}
-            className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm" />
-          <input type="text" value={props.titleB ?? ''} placeholder="Título"
-            onChange={(e) => onChange({...props, titleB: e.target.value || undefined})}
-            className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm mt-2" />
-        </div>
-      </div>
-      <div className="grid grid-cols-3 gap-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">Victorias A</label>
-          <input type="number" value={props.winsA}
-            onChange={(e) => onChange({...props, winsA: Number(e.target.value)})}
-            className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Victorias B</label>
-          <input type="number" value={props.winsB}
-            onChange={(e) => onChange({...props, winsB: Number(e.target.value)})}
-            className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Empates</label>
-          <input type="number" value={props.draws ?? 0}
-            onChange={(e) => onChange({...props, draws: Number(e.target.value)})}
-            className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TimelineEditor({props, onChange, onLoadData}: {
-  props: TimelineReinadosProps;
-  onChange: (p: TimelineReinadosProps) => void;
-  onLoadData: (champion: string) => void;
-}) {
-  const [searchName, setSearchName] = useState(props.championName);
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">Campeón</label>
-          <input type="text" value={searchName}
-            onChange={(e) => setSearchName(e.target.value)}
-            className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Título</label>
-          <input type="text" value={props.titleName}
-            onChange={(e) => onChange({...props, titleName: e.target.value})}
-            className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm" />
-        </div>
-      </div>
-      <button onClick={() => onLoadData(searchName)}
-        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-medium">
-        Cargar desde DB
-      </button>
-      <div>
-        <label className="block text-sm font-medium mb-2">Reinados</label>
-        {props.reigns.map((reign, i) => (
-          <div key={i} className="grid grid-cols-4 gap-2 mb-2">
-            <input type="text" value={reign.start} placeholder="Inicio"
-              onChange={(e) => {const reigns = [...props.reigns]; reigns[i] = {...reigns[i], start: e.target.value}; onChange({...props, reigns});}}
-              className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-xs" />
-            <input type="text" value={reign.end ?? ''} placeholder="Fin"
-              onChange={(e) => {const reigns = [...props.reigns]; reigns[i] = {...reigns[i], end: e.target.value || null}; onChange({...props, reigns});}}
-              className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-xs" />
-            <input type="number" value={reign.days} placeholder="Días"
-              onChange={(e) => {const reigns = [...props.reigns]; reigns[i] = {...reigns[i], days: Number(e.target.value)}; onChange({...props, reigns});}}
-              className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-xs" />
-            <input type="number" value={reign.defenses} placeholder="Defensas"
-              onChange={(e) => {const reigns = [...props.reigns]; reigns[i] = {...reigns[i], defenses: Number(e.target.value)}; onChange({...props, reigns});}}
-              className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-xs" />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function KpiEditor({props, onChange}: {props: StatsKpiProps; onChange: (p: StatsKpiProps) => void}) {
-  return (
-    <div className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium mb-1">Label</label>
-        <input type="text" value={props.label}
-          onChange={(e) => onChange({...props, label: e.target.value})}
-          className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm" />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">Valor</label>
-          <input type="number" value={props.value}
-            onChange={(e) => onChange({...props, value: Number(e.target.value)})}
-            className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Sufijo</label>
-          <input type="text" value={props.suffix ?? ''}
-            onChange={(e) => onChange({...props, suffix: e.target.value || undefined})}
-            className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm" placeholder="ej: %" />
-        </div>
-      </div>
-      <div>
-        <label className="block text-sm font-medium mb-1">Descripción</label>
-        <input type="text" value={props.description ?? ''}
-          onChange={(e) => onChange({...props, description: e.target.value || undefined})}
-          className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm" />
-      </div>
-    </div>
-  );
-}
-
-function WinStreakEditor({props, onChange}: {props: WinStreakProps; onChange: (p: WinStreakProps) => void}) {
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">Luchador</label>
-          <input type="text" value={props.wrestlerName}
-            onChange={(e) => onChange({...props, wrestlerName: e.target.value})}
-            className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Racha</label>
-          <input type="number" value={props.streakCount}
-            onChange={(e) => onChange({...props, streakCount: Number(e.target.value)})}
-            className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm" />
-        </div>
-      </div>
-      <div>
-        <label className="block text-sm font-medium mb-1">Tipo de match</label>
-        <input type="text" value={props.matchType ?? ''}
-          onChange={(e) => onChange({...props, matchType: e.target.value || undefined})}
-          className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm" />
       </div>
     </div>
   );

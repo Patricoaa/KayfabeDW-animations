@@ -1,0 +1,24 @@
+{
+  "id": "head-to-head",
+  "name": "Head to Head",
+  "description": "Comparación cara a cara entre dos luchadores",
+  "componentId": "HeadToHead",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "defaultDuration": 10,
+  "dataOptions": [
+    {
+      "key": "wrestlerA",
+      "label": "Luchador A",
+      "type": "text",
+      "required": true
+    },
+    {
+      "key": "wrestlerB",
+      "label": "Luchador B",
+      "type": "text",
+      "required": true
+    }
+  ]
+}

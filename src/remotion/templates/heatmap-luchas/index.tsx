@@ -53,7 +53,6 @@ export const HeatmapLuchas: React.FC<HeatmapLuchasProps> = ({
 
   const cellSize = 120;
   const labelWidth = 160;
-  const topPadding = 60;
   const leftPadding = 80;
 
   return (
@@ -84,7 +83,6 @@ export const HeatmapLuchas: React.FC<HeatmapLuchasProps> = ({
       </div>
 
       <div style={{opacity: gridOp, display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-        {/* Column headers */}
         <div style={{display: 'flex', marginBottom: 12, paddingLeft: leftPadding}}>
           {cols.map((col, ci) => {
             const colDelay = 20 + ci * 5;
@@ -110,7 +108,6 @@ export const HeatmapLuchas: React.FC<HeatmapLuchasProps> = ({
           })}
         </div>
 
-        {/* Rows */}
         {rows.map((row, ri) => {
           const rowDelay = 25 + ri * 8;
           const rowOp = interpolate(frame - rowDelay, [0, 12], [0, 1], {
@@ -182,7 +179,6 @@ export const HeatmapLuchas: React.FC<HeatmapLuchasProps> = ({
           );
         })}
 
-        {/* Legend */}
         <div style={{display: 'flex', alignItems: 'center', gap: 12, marginTop: 32}}>
           <span style={{fontSize: 14, color: '#64748b'}}>0</span>
           <div
