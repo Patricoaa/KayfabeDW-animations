@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
-import {execSync} from 'child_process';
+import AdmZip from 'adm-zip';
 import {put} from '@vercel/blob';
 import {RenderRequest} from '../../../remotion/types/schema';
 import {formatSSE, type RenderProgress} from './helpers';
@@ -70,7 +70,8 @@ async function ensureChrome(): Promise<string> {
   const buffer = Buffer.from(await res.arrayBuffer());
   fs.writeFileSync(zipPath, buffer);
 
-  execSync(`unzip -o "${zipPath}" -d "${chromeDir}"`, {stdio: 'inherit'});
+  const zip = new AdmZip(zipPath);
+  zip.extractAllTo(chromeDir, true);
 
   // The zip contains chrome-headless-shell-linux64/chrome — rename to chrome-headless-shell
   const extractedBin = path.join(chromeDir, 'chrome-headless-shell-linux64', 'chrome');
