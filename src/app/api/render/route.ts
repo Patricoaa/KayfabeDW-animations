@@ -28,7 +28,7 @@ async function getBundleUrl(): Promise<string> {
         ...config.resolve,
         alias: {
           ...config.resolve?.alias,
-          'zod': require.resolve('zod'),
+          'zod': path.join(process.cwd(), 'node_modules', 'zod', 'index.cjs'),
           'mediabunny': path.join(process.cwd(), 'src', 'remotion', 'mediabunny-stub.ts'),
           '@mediabunny/aac-encoder': path.join(process.cwd(), 'src', 'remotion', 'empty-stub.ts'),
           '@mediabunny/flac-encoder': path.join(process.cwd(), 'src', 'remotion', 'empty-stub.ts'),
