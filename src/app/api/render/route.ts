@@ -20,6 +20,14 @@ async function getBundleUrl(): Promise<string> {
   const {bundle} = await import('@remotion/bundler');
   cachedBundleUrl = await bundle({
     entryPoint: ENTRY,
+    webpackOverride: (config) => ({
+      ...config,
+      resolve: {
+        ...config.resolve,
+        exportsFields: ['exports'],
+        conditionNames: ['import', 'require', 'node', 'default'],
+      },
+    }),
     onProgress: (progress: number) => {
       console.log(`Bundling: ${progress}%`);
     },
