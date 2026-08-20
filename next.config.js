@@ -16,6 +16,7 @@ const nextConfig = {
     '@rspack/binding-linux-x64-musl',
     '@rspack/binding-linux-arm64-gnu',
     '@rspack/binding-linux-arm64-musl',
+    '@sparticuz/chromium',
   ],
   outputFileTracingIncludes: {
     "/api/render": [
@@ -23,6 +24,7 @@ const nextConfig = {
       "./node_modules/remotion/**/*",
       "./node_modules/@remotion/**/*",
       "./node_modules/@rspack/**/*",
+      "./node_modules/@sparticuz/chromium/**/*",
     ],
   },
 };
