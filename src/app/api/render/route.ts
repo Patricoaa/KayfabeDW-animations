@@ -34,10 +34,6 @@ async function getBundleUrl(): Promise<string> {
             'dist', 'trace-mapping.umd.js',
           ),
         },
-        fallback: {
-          ...config.resolve?.fallback,
-          events: require.resolve('events/'),
-        },
       },
     }),
     onProgress: (progress: number) => {
