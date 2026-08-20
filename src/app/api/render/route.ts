@@ -73,8 +73,8 @@ async function ensureChrome(): Promise<string> {
   const zip = new AdmZip(zipPath);
   zip.extractAllTo(chromeDir, true);
 
-  // The zip contains chrome-headless-shell-linux64/chrome — rename to chrome-headless-shell
-  const extractedBin = path.join(chromeDir, 'chrome-headless-shell-linux64', 'chrome');
+  // The zip contains chrome-headless-shell-linux64/chrome-headless-shell — move to chromeDir
+  const extractedBin = path.join(chromeDir, 'chrome-headless-shell-linux64', 'chrome-headless-shell');
   if (fs.existsSync(extractedBin)) {
     fs.renameSync(extractedBin, chromeBin);
   }
