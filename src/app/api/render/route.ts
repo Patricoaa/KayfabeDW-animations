@@ -2,7 +2,7 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import {put} from '@vercel/blob';
-import {RenderRequest} from '../../../../types/schema';
+import {RenderRequest} from '../../../remotion/types/schema';
 import {formatSSE, type RenderProgress} from './helpers';
 
 const ENTRY = path.join(process.cwd(), 'src', 'remotion', 'index.ts');

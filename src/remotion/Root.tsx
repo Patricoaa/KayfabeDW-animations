@@ -16,7 +16,7 @@ import {
   VIDEO_FPS,
   VIDEO_HEIGHT,
   VIDEO_WIDTH,
-} from '../../types/constants';
+} from './types/constants';
 import {RankingBarras} from './templates/RankingBarras';
 import {HeadToHead} from './templates/HeadToHead';
 import {TimelineReinados} from './templates/TimelineReinados';

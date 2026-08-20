@@ -1,5 +1,5 @@
 import {useCurrentFrame, useVideoConfig, interpolate, Easing, spring} from 'remotion';
-import type {RankingBarrasProps} from '../../../types/constants';
+import type {RankingBarrasProps} from '../types/constants';
 
 export const RankingBarras: React.FC<RankingBarrasProps> = ({
   title,

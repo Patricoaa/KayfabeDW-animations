@@ -22,12 +22,12 @@ import {
   VIDEO_FPS,
   VIDEO_HEIGHT,
   VIDEO_WIDTH,
-} from '../../types/constants';
-import type {RankingBarrasProps} from '../../types/constants';
-import type {HeadToHeadProps} from '../../types/constants';
-import type {TimelineReinadosProps} from '../../types/constants';
-import type {StatsKpiProps} from '../../types/constants';
-import type {WinStreakProps} from '../../types/constants';
+} from '../remotion/types/constants';
+import type {RankingBarrasProps} from '../remotion/types/constants';
+import type {HeadToHeadProps} from '../remotion/types/constants';
+import type {TimelineReinadosProps} from '../remotion/types/constants';
+import type {StatsKpiProps} from '../remotion/types/constants';
+import type {WinStreakProps} from '../remotion/types/constants';
 
 type Template = 'ranking' | 'head-to-head' | 'timeline' | 'stats-kpi' | 'win-streak';
 
