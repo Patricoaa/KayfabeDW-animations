@@ -1,5 +1,3 @@
-import {bundle} from '@remotion/bundler';
-import {renderMedia, getCompositions} from '@remotion/renderer';
 import {put} from '@vercel/blob';
 import path from 'path';
 import fs from 'fs';
@@ -10,10 +8,11 @@ import {formatSSE, type RenderProgress} from './helpers';
 let cachedBundleDir: string | null = null;
 
 async function getBundleDir(): Promise<string> {
-  if (cachedBundleDir && fs.existsSync(cachedBundleDir)) {
+  if (cachedBundleDir && fs.existsSync(/*turbopackIgnore: true*/ cachedBundleDir)) {
     return cachedBundleDir;
   }
 
+  const {bundle} = await import('@remotion/bundler');
   const entryPoint = path.join(process.cwd(), 'src', 'remotion', 'index.ts');
   cachedBundleDir = await bundle({
     entryPoint,
@@ -46,6 +45,8 @@ export async function POST(req: Request) {
     try {
       await send({type: 'phase', phase: 'Bundling Remotion project...', progress: 0});
       const bundleDir = await getBundleDir();
+
+      const {renderMedia, getCompositions} = await import('@remotion/renderer');
 
       await send({type: 'phase', phase: 'Finding compositions...', progress: 0.1});
       const compositions = await getCompositions(bundleDir, {
