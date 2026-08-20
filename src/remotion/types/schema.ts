@@ -71,6 +71,7 @@ export const RenderRequest = z.object({
     WinStreakProps,
     HeatmapLuchasProps,
   ]),
+  durationInFrames: z.number().min(1).max(600).optional(),
 });
 
 export type RenderResponse =

@@ -100,6 +100,11 @@ export async function POST(req: Request) {
     });
     console.log(`[render] Composition loaded: ${composition.width}x${composition.height} @ ${composition.fps}fps, ${composition.durationInFrames} frames`);
 
+    if (body.durationInFrames) {
+      console.log(`[render] Overriding duration: ${composition.durationInFrames} → ${body.durationInFrames} frames`);
+      composition.durationInFrames = body.durationInFrames;
+    }
+
     const tmpFile = path.join(os.tmpdir(), `render-${Date.now()}.mp4`);
     console.log(`[render] Starting renderMedia to ${tmpFile}...`);
     await send({type: 'phase', phase: 'Rendering video...', progress: 0.2});

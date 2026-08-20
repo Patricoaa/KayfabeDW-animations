@@ -59,6 +59,7 @@ export default function AnimationsPage() {
   const [streakProps, setStreakProps] = useState<WinStreakProps>(defaultWinStreakProps);
 
   const [dataSource, setDataSource] = useState<'demo' | 'live'>('demo');
+  const [durationSec, setDurationSec] = useState(10);
 
   const getActiveProps = () => {
     switch (template) {
@@ -110,7 +111,11 @@ export default function AnimationsPage() {
       const res = await fetch('/api/render', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({compositionId: getCompId(), inputProps: getActiveProps()}),
+        body: JSON.stringify({
+          compositionId: getCompId(),
+          inputProps: getActiveProps(),
+          durationInFrames: durationSec * VIDEO_FPS,
+        }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -124,7 +129,7 @@ export default function AnimationsPage() {
     } catch (err) {
       setRenderState({status: 'error', message: (err as Error).message});
     }
-  }, [template, rankingProps, h2hProps, timelineProps, kpiProps, streakProps]);
+  }, [template, rankingProps, h2hProps, timelineProps, kpiProps, streakProps, durationSec]);
 
   return (
     <div className="min-h-screen p-8">
@@ -183,6 +188,16 @@ export default function AnimationsPage() {
 
         <div>
           <h2 className="text-xl font-semibold mb-4">Configuración</h2>
+
+          <div className="mb-6">
+            <label className="block text-sm font-medium mb-1">Duración (segundos)</label>
+            <div className="flex items-center gap-3">
+              <input type="range" min={1} max={20} value={durationSec}
+                onChange={(e) => setDurationSec(Number(e.target.value))}
+                className="flex-1 accent-blue-500" />
+              <span className="text-sm text-zinc-300 w-16 text-right">{durationSec}s ({durationSec * VIDEO_FPS} frames)</span>
+            </div>
+          </div>
 
           {template === 'ranking' && (
             <RankingEditor props={rankingProps} onChange={setRankingProps}
