@@ -9,7 +9,6 @@ const nextConfig = {
       "./src/remotion/**/*",
     ],
   },
-  serverExternalPackages: ['@remotion/renderer', '@remotion/bundler'],
 };
 
 module.exports = nextConfig;
