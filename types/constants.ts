@@ -5,6 +5,7 @@ export const COMP_HEAD_TO_HEAD = 'HeadToHead';
 export const COMP_TIMELINE = 'TimelineReinados';
 export const COMP_STATS_KPI = 'StatsKpi';
 export const COMP_WIN_STREAK = 'WinStreak';
+export const COMP_HEATMAP = 'HeatmapLuchas';
 
 export const VIDEO_WIDTH = 1920;
 export const VIDEO_HEIGHT = 1080;
@@ -135,7 +136,51 @@ export const defaultWinStreakProps: WinStreakProps = {
     'WM IX vs Giant Gonzalez',
     'WM XI vs King Kong Bundy',
     'WM XII vs Diesel',
-    'WM 13 vs Sycho Sid',
   ],
   promotionColor: '#FFD700',
+};
+
+// --- HeatmapLuchas ---
+export const HeatmapCell = z.object({
+  row: z.string(),
+  col: z.string(),
+  value: z.number(),
+});
+
+export const HeatmapLuchasProps = z.object({
+  title: z.string(),
+  rows: z.array(z.string()),
+  cols: z.array(z.string()),
+  cells: z.array(HeatmapCell),
+  colorScale: z.tuple([z.string(), z.string()]).optional(),
+});
+
+export type HeatmapLuchasProps = z.infer<typeof HeatmapLuchasProps>;
+
+export const defaultHeatmapProps: HeatmapLuchasProps = {
+  title: 'Luchas por Año y Promoción',
+  rows: ['WWE', 'AEW', 'TNA', 'NJPW'],
+  cols: ['2020', '2021', '2022', '2023', '2024'],
+  cells: [
+    {row: 'WWE', col: '2020', value: 42},
+    {row: 'WWE', col: '2021', value: 56},
+    {row: 'WWE', col: '2022', value: 61},
+    {row: 'WWE', col: '2023', value: 58},
+    {row: 'WWE', col: '2024', value: 65},
+    {row: 'AEW', col: '2020', value: 28},
+    {row: 'AEW', col: '2021', value: 45},
+    {row: 'AEW', col: '2022', value: 52},
+    {row: 'AEW', col: '2023', value: 48},
+    {row: 'AEW', col: '2024', value: 55},
+    {row: 'TNA', col: '2020', value: 12},
+    {row: 'TNA', col: '2021', value: 18},
+    {row: 'TNA', col: '2022', value: 22},
+    {row: 'TNA', col: '2023', value: 25},
+    {row: 'TNA', col: '2024', value: 20},
+    {row: 'NJPW', col: '2020', value: 15},
+    {row: 'NJPW', col: '2021', value: 20},
+    {row: 'NJPW', col: '2022', value: 28},
+    {row: 'NJPW', col: '2023', value: 32},
+    {row: 'NJPW', col: '2024', value: 30},
+  ],
 };

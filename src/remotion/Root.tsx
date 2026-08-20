@@ -5,11 +5,13 @@ import {
   COMP_TIMELINE,
   COMP_STATS_KPI,
   COMP_WIN_STREAK,
+  COMP_HEATMAP,
   defaultRankingBarrasProps,
   defaultHeadToHeadProps,
   defaultTimelineProps,
   defaultStatsKpiProps,
   defaultWinStreakProps,
+  defaultHeatmapProps,
   DURATION_IN_FRAMES,
   VIDEO_FPS,
   VIDEO_HEIGHT,
@@ -20,6 +22,7 @@ import {HeadToHead} from './templates/HeadToHead';
 import {TimelineReinados} from './templates/TimelineReinados';
 import {StatsKpi} from './templates/StatsKpi';
 import {WinStreak} from './templates/WinStreak';
+import {HeatmapLuchas} from './templates/HeatmapLuchas';
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -68,6 +71,15 @@ export const RemotionRoot: React.FC = () => {
         width={VIDEO_WIDTH}
         height={VIDEO_HEIGHT}
         defaultProps={defaultWinStreakProps}
+      />
+      <Composition
+        id={COMP_HEATMAP}
+        component={HeatmapLuchas}
+        durationInFrames={DURATION_IN_FRAMES}
+        fps={VIDEO_FPS}
+        width={VIDEO_WIDTH}
+        height={VIDEO_HEIGHT}
+        defaultProps={defaultHeatmapProps}
       />
     </>
   );

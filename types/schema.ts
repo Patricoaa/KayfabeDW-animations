@@ -5,6 +5,7 @@ import {
   TimelineReinadosProps,
   StatsKpiProps,
   WinStreakProps,
+  HeatmapLuchasProps,
 } from './constants';
 
 export const RenderRequest = z.object({
@@ -15,6 +16,7 @@ export const RenderRequest = z.object({
     TimelineReinadosProps,
     StatsKpiProps,
     WinStreakProps,
+    HeatmapLuchasProps,
   ]),
 });
 
