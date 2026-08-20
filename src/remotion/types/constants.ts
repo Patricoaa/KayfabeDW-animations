@@ -1,5 +1,3 @@
-import {z} from 'zod';
-
 export const COMP_NAME = 'RankingBarras';
 export const COMP_HEAD_TO_HEAD = 'HeadToHead';
 export const COMP_TIMELINE = 'TimelineReinados';
@@ -13,19 +11,17 @@ export const VIDEO_FPS = 30;
 export const DURATION_IN_FRAMES = 300;
 
 // --- RankingBarras ---
-export const RankingBarrasItem = z.object({
-  label: z.string(),
-  value: z.number(),
-  color: z.string().optional(),
-});
+export type RankingBarrasItem = {
+  label: string;
+  value: number;
+  color?: string;
+};
 
-export const RankingBarrasProps = z.object({
-  title: z.string(),
-  items: z.array(RankingBarrasItem),
-  maxValue: z.number().optional(),
-});
-
-export type RankingBarrasProps = z.infer<typeof RankingBarrasProps>;
+export type RankingBarrasProps = {
+  title: string;
+  items: RankingBarrasItem[];
+  maxValue?: number;
+};
 
 export const defaultRankingBarrasProps: RankingBarrasProps = {
   title: 'Top Reinados Más Largos',
@@ -39,17 +35,15 @@ export const defaultRankingBarrasProps: RankingBarrasProps = {
 };
 
 // --- HeadToHead ---
-export const HeadToHeadProps = z.object({
-  wrestlerA: z.string(),
-  wrestlerB: z.string(),
-  winsA: z.number(),
-  winsB: z.number(),
-  draws: z.number().optional(),
-  titleA: z.string().optional(),
-  titleB: z.string().optional(),
-});
-
-export type HeadToHeadProps = z.infer<typeof HeadToHeadProps>;
+export type HeadToHeadProps = {
+  wrestlerA: string;
+  wrestlerB: string;
+  winsA: number;
+  winsB: number;
+  draws?: number;
+  titleA?: string;
+  titleB?: string;
+};
 
 export const defaultHeadToHeadProps: HeadToHeadProps = {
   wrestlerA: 'The Rock',
@@ -62,21 +56,19 @@ export const defaultHeadToHeadProps: HeadToHeadProps = {
 };
 
 // --- TimelineReinados ---
-export const TimelineReign = z.object({
-  start: z.string(),
-  end: z.string().nullable(),
-  days: z.number(),
-  defenses: z.number(),
-});
+export type TimelineReign = {
+  start: string;
+  end: string | null;
+  days: number;
+  defenses: number;
+};
 
-export const TimelineReinadosProps = z.object({
-  championName: z.string(),
-  titleName: z.string(),
-  reigns: z.array(TimelineReign),
-  promotionColor: z.string().optional(),
-});
-
-export type TimelineReinadosProps = z.infer<typeof TimelineReinadosProps>;
+export type TimelineReinadosProps = {
+  championName: string;
+  titleName: string;
+  reigns: TimelineReign[];
+  promotionColor?: string;
+};
 
 export const defaultTimelineProps: TimelineReinadosProps = {
   championName: 'John Cena',
@@ -97,16 +89,14 @@ export const defaultTimelineProps: TimelineReinadosProps = {
 };
 
 // --- StatsKpi ---
-export const StatsKpiProps = z.object({
-  label: z.string(),
-  value: z.number(),
-  suffix: z.string().optional(),
-  prefix: z.string().optional(),
-  description: z.string().optional(),
-  color: z.string().optional(),
-});
-
-export type StatsKpiProps = z.infer<typeof StatsKpiProps>;
+export type StatsKpiProps = {
+  label: string;
+  value: number;
+  suffix?: string;
+  prefix?: string;
+  description?: string;
+  color?: string;
+};
 
 export const defaultStatsKpiProps: StatsKpiProps = {
   label: 'Total de Eventos',
@@ -116,15 +106,13 @@ export const defaultStatsKpiProps: StatsKpiProps = {
 };
 
 // --- WinStreak ---
-export const WinStreakProps = z.object({
-  wrestlerName: z.string(),
-  streakCount: z.number(),
-  matchType: z.string().optional(),
-  events: z.array(z.string()).optional(),
-  promotionColor: z.string().optional(),
-});
-
-export type WinStreakProps = z.infer<typeof WinStreakProps>;
+export type WinStreakProps = {
+  wrestlerName: string;
+  streakCount: number;
+  matchType?: string;
+  events?: string[];
+  promotionColor?: string;
+};
 
 export const defaultWinStreakProps: WinStreakProps = {
   wrestlerName: 'The Undertaker',
@@ -141,21 +129,19 @@ export const defaultWinStreakProps: WinStreakProps = {
 };
 
 // --- HeatmapLuchas ---
-export const HeatmapCell = z.object({
-  row: z.string(),
-  col: z.string(),
-  value: z.number(),
-});
+export type HeatmapCell = {
+  row: string;
+  col: string;
+  value: number;
+};
 
-export const HeatmapLuchasProps = z.object({
-  title: z.string(),
-  rows: z.array(z.string()),
-  cols: z.array(z.string()),
-  cells: z.array(HeatmapCell),
-  colorScale: z.tuple([z.string(), z.string()]).optional(),
-});
-
-export type HeatmapLuchasProps = z.infer<typeof HeatmapLuchasProps>;
+export type HeatmapLuchasProps = {
+  title: string;
+  rows: string[];
+  cols: string[];
+  cells: HeatmapCell[];
+  colorScale?: [string, string];
+};
 
 export const defaultHeatmapProps: HeatmapLuchasProps = {
   title: 'Luchas por Año y Promoción',
