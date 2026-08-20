@@ -24,8 +24,9 @@ async function getBundleUrl(): Promise<string> {
       ...config,
       resolve: {
         ...config.resolve,
-        exportsFields: ['exports'],
-        conditionNames: ['import', 'require', 'node', 'default'],
+        exportsFields: [],
+        conditionNames: [],
+        mainFields: ['module', 'main', 'browser'],
       },
     }),
     onProgress: (progress: number) => {
