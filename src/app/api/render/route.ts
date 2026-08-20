@@ -1,4 +1,4 @@
-import {spawn, type ChildProcess} from 'child_process';
+import {spawn} from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -7,15 +7,19 @@ import {RenderRequest} from '../../../../types/schema';
 import {formatSSE, type RenderProgress} from './helpers';
 
 const ENTRY = path.join(process.cwd(), 'src', 'remotion', 'index.ts');
+const CLI_BIN = path.join(process.cwd(), 'node_modules', '@remotion', 'cli', 'remotion-cli.js');
 
 function runCommand(
-  cmd: string,
   args: string[],
   cwd: string,
   onData: (line: string) => void,
 ): Promise<{code: number; stderr: string}> {
   return new Promise((resolve) => {
-    const proc = spawn(cmd, args, {cwd, stdio: ['ignore', 'pipe', 'pipe']});
+    const proc = spawn(process.execPath, [CLI_BIN, ...args], {
+      cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: {...process.env, NODE_OPTIONS: '--no-experimental-require-module'},
+    });
 
     let stderr = '';
 
@@ -94,10 +98,9 @@ export async function POST(req: Request) {
       const propsFile = path.join(os.tmpdir(), `props-${Date.now()}.json`);
       fs.writeFileSync(propsFile, propsJson);
 
-      const {code} = await runCommand(
-        'npx',
+      const {code, stderr} = await runCommand(
         [
-          'remotion', 'render',
+          'render',
           ENTRY,
           body.compositionId,
           tmpFile,
@@ -112,10 +115,11 @@ export async function POST(req: Request) {
         },
       );
 
-      fs.unlinkSync(propsFile);
+      try { fs.unlinkSync(propsFile); } catch {}
 
       if (code !== 0) {
-        throw new Error(`Remotion render failed with exit code ${code}`);
+        const detail = stderr.slice(-2000);
+        throw new Error(`Remotion render failed (exit ${code}):\n${detail}`);
       }
 
       if (!fs.existsSync(tmpFile)) {
