@@ -26,6 +26,10 @@ async function getBundleUrl(): Promise<string> {
         ...config.resolve,
         alias: {
           ...config.resolve?.alias,
+          'mediabunny': path.join(process.cwd(), 'src', 'remotion', 'empty-stub.ts'),
+          '@mediabunny/aac-encoder': path.join(process.cwd(), 'src', 'remotion', 'empty-stub.ts'),
+          '@mediabunny/flac-encoder': path.join(process.cwd(), 'src', 'remotion', 'empty-stub.ts'),
+          '@mediabunny/mp3-encoder': path.join(process.cwd(), 'src', 'remotion', 'empty-stub.ts'),
           '@remotion/studio': path.join(process.cwd(), 'src', 'remotion', 'empty-stub.ts'),
           '@jridgewell/trace-mapping': path.join(
             process.cwd(), 'node_modules', '@jridgewell', 'trace-mapping',
