@@ -113,18 +113,13 @@ export default function AnimationsPage() {
         body: JSON.stringify({compositionId: getCompId(), inputProps: getActiveProps()}),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const reader = res.body!.getReader();
-      const decoder = new TextDecoder();
-      while (true) {
-        const {done, value} = await reader.read();
-        if (done) break;
-        const text = decoder.decode(value);
-        const lines = text.split('\n').filter((l) => l.startsWith('data: '));
-        for (const line of lines) {
-          const data = JSON.parse(line.slice(6));
-          setRenderState(data);
-          if (data.type === 'done' || data.type === 'error') return;
-        }
+      const data = await res.json();
+      if (data.type === 'done') {
+        setRenderState({status: 'done', url: data.url, size: data.size});
+      } else if (data.type === 'error') {
+        setRenderState({status: 'error', message: data.message});
+      } else {
+        setRenderState({status: 'error', message: 'Unexpected response'});
       }
     } catch (err) {
       setRenderState({status: 'error', message: (err as Error).message});
