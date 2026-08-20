@@ -1,7 +1,7 @@
 'use client';
 
 import {Player} from '@remotion/player';
-import {useCallback, useState} from 'react';
+import {useCallback, useEffect, useState} from 'react';
 import {RankingBarras} from '../remotion/templates/RankingBarras';
 import {HeadToHead} from '../remotion/templates/HeadToHead';
 import {TimelineReinados} from '../remotion/templates/TimelineReinados';
@@ -48,6 +48,9 @@ type RenderState =
 export default function AnimationsPage() {
   const [template, setTemplate] = useState<Template>('ranking');
   const [renderState, setRenderState] = useState<RenderState>({status: 'idle'});
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   const [rankingProps, setRankingProps] = useState<RankingBarrasProps>(defaultRankingBarrasProps);
   const [h2hProps, setH2hProps] = useState<HeadToHeadProps>(defaultHeadToHeadProps);
@@ -149,32 +152,32 @@ export default function AnimationsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div>
           <h2 className="text-xl font-semibold mb-4">Preview</h2>
-          <div className="rounded-lg overflow-hidden border border-zinc-800">
-            {template === 'ranking' && (
+          <div className="rounded-lg overflow-hidden border border-zinc-800 min-h-[360px]">
+            {mounted && template === 'ranking' && (
               <Player component={RankingBarras} inputProps={rankingProps}
                 durationInFrames={DURATION_IN_FRAMES} fps={VIDEO_FPS}
                 compositionWidth={VIDEO_WIDTH} compositionHeight={VIDEO_HEIGHT}
                 style={{width: '100%'}} controls acknowledgeRemotionLicense />
             )}
-            {template === 'head-to-head' && (
+            {mounted && template === 'head-to-head' && (
               <Player component={HeadToHead} inputProps={h2hProps}
                 durationInFrames={DURATION_IN_FRAMES} fps={VIDEO_FPS}
                 compositionWidth={VIDEO_WIDTH} compositionHeight={VIDEO_HEIGHT}
                 style={{width: '100%'}} controls acknowledgeRemotionLicense />
             )}
-            {template === 'timeline' && (
+            {mounted && template === 'timeline' && (
               <Player component={TimelineReinados} inputProps={timelineProps}
                 durationInFrames={DURATION_IN_FRAMES} fps={VIDEO_FPS}
                 compositionWidth={VIDEO_WIDTH} compositionHeight={VIDEO_HEIGHT}
                 style={{width: '100%'}} controls acknowledgeRemotionLicense />
             )}
-            {template === 'stats-kpi' && (
+            {mounted && template === 'stats-kpi' && (
               <Player component={StatsKpi} inputProps={kpiProps}
                 durationInFrames={DURATION_IN_FRAMES} fps={VIDEO_FPS}
                 compositionWidth={VIDEO_WIDTH} compositionHeight={VIDEO_HEIGHT}
                 style={{width: '100%'}} controls acknowledgeRemotionLicense />
             )}
-            {template === 'win-streak' && (
+            {mounted && template === 'win-streak' && (
               <Player component={WinStreak} inputProps={streakProps}
                 durationInFrames={DURATION_IN_FRAMES} fps={VIDEO_FPS}
                 compositionWidth={VIDEO_WIDTH} compositionHeight={VIDEO_HEIGHT}

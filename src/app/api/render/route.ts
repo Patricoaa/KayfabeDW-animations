@@ -7,6 +7,10 @@ import {formatSSE, type RenderProgress} from './helpers';
 
 const ENTRY = path.join(process.cwd(), 'src', 'remotion', 'index.ts');
 
+// Vercel serverless is read-only except /tmp — point webpack/rspack cache there
+process.env.WEBPACK_CACHE_DIRECTORY = path.join(os.tmpdir(), 'webpack-cache');
+process.env.NODE_OPTIONS = (process.env.NODE_OPTIONS || '') + ' --no-experimental-require-module';
+
 let cachedBundleUrl: string | null = null;
 
 async function getBundleUrl(): Promise<string> {
