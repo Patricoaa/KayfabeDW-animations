@@ -1,6 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import {execSync} from 'child_process';
 import {put} from '@vercel/blob';
 import {RenderRequest} from '../../../remotion/types/schema';
 import {formatSSE, type RenderProgress} from './helpers';
@@ -12,6 +13,7 @@ process.env.WEBPACK_CACHE_DIRECTORY = path.join(os.tmpdir(), 'webpack-cache');
 process.env.NODE_OPTIONS = (process.env.NODE_OPTIONS || '') + ' --no-experimental-require-module';
 
 let cachedBundleUrl: string | null = null;
+let cachedChromePath: string | null = null;
 
 async function getBundleUrl(): Promise<string> {
   if (cachedBundleUrl) {
@@ -32,6 +34,10 @@ async function getBundleUrl(): Promise<string> {
             'dist', 'trace-mapping.umd.js',
           ),
         },
+        fallback: {
+          ...config.resolve?.fallback,
+          events: require.resolve('events/'),
+        },
       },
     }),
     onProgress: (progress: number) => {
@@ -39,6 +45,49 @@ async function getBundleUrl(): Promise<string> {
     },
   });
   return cachedBundleUrl;
+}
+
+async function ensureChrome(): Promise<string> {
+  if (cachedChromePath && fs.existsSync(cachedChromePath)) {
+    return cachedChromePath;
+  }
+
+  const chromeDir = path.join(os.tmpdir(), 'chrome-headless-shell');
+  const chromeBin = path.join(chromeDir, 'chrome-headless-shell');
+
+  if (fs.existsSync(chromeBin)) {
+    cachedChromePath = chromeBin;
+    return chromeBin;
+  }
+
+  console.log('Downloading Chrome Headless Shell to /tmp...');
+  fs.mkdirSync(chromeDir, {recursive: true});
+
+  const zipPath = path.join(os.tmpdir(), 'chrome.zip');
+  const url = 'https://remotion.media/chromium-headless-shell-linux-x64-149.0.7790.0.zip?clear';
+
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Failed to download Chrome: ${res.status} ${res.statusText}`);
+  }
+
+  const buffer = Buffer.from(await res.arrayBuffer());
+  fs.writeFileSync(zipPath, buffer);
+
+  execSync(`unzip -o "${zipPath}" -d "${chromeDir}"`, {stdio: 'inherit'});
+
+  // The zip contains chrome-headless-shell-linux64/chrome — rename to chrome-headless-shell
+  const extractedBin = path.join(chromeDir, 'chrome-headless-shell-linux64', 'chrome');
+  if (fs.existsSync(extractedBin)) {
+    fs.renameSync(extractedBin, chromeBin);
+  }
+
+  fs.chmodSync(chromeBin, 0o755);
+  try { fs.unlinkSync(zipPath); } catch {}
+
+  cachedChromePath = chromeBin;
+  console.log('Chrome Headless Shell ready at', chromeBin);
+  return chromeBin;
 }
 
 export async function POST(req: Request) {
@@ -69,12 +118,16 @@ export async function POST(req: Request) {
 
       const {selectComposition, renderMedia} = await import('@remotion/renderer');
 
+      await send({type: 'phase', phase: 'Downloading Chrome...', progress: 0.1});
+      const chromePath = await ensureChrome();
+
       await send({type: 'phase', phase: 'Loading composition...', progress: 0.15});
 
       const composition = await selectComposition({
         serveUrl: bundleUrl,
         id: body.compositionId,
         inputProps: body.inputProps,
+        browserExecutable: chromePath,
       });
 
       await send({type: 'phase', phase: 'Rendering video...', progress: 0.2});
@@ -85,6 +138,7 @@ export async function POST(req: Request) {
         codec: 'h264',
         outputLocation: tmpFile,
         inputProps: body.inputProps,
+        browserExecutable: chromePath,
         onProgress: ({progress}) => {
           send({type: 'phase', phase: 'Rendering video...', progress: 0.2 + progress * 0.7});
         },
