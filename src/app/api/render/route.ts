@@ -24,9 +24,12 @@ async function getBundleUrl(): Promise<string> {
       ...config,
       resolve: {
         ...config.resolve,
-        exportsFields: [],
-        conditionNames: [],
-        mainFields: ['module', 'main', 'browser'],
+        alias: {
+          ...config.resolve?.alias,
+          '@remotion/studio': path.join(process.cwd(), 'src', 'remotion', 'empty-stub.ts'),
+        },
+        exportsFields: ['exports'],
+        conditionNames: ['import', 'require', 'node', 'default'],
       },
     }),
     onProgress: (progress: number) => {
