@@ -3,6 +3,9 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import {put} from '@vercel/blob';
+// Force file tracer to include dotenv for the child process
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+require('dotenv');
 import {RenderRequest} from '../../../../types/schema';
 import {formatSSE, type RenderProgress} from './helpers';
 

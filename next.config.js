@@ -7,6 +7,8 @@ const nextConfig = {
   outputFileTracingIncludes: {
     "/api/render": [
       "./src/remotion/**/*",
+      "./node_modules/dotenv/**/*",
+      "./node_modules/@remotion/cli/**/*",
     ],
   },
 };
