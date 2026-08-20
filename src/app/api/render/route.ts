@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
-import AdmZip from 'adm-zip';
+import chromium from '@sparticuz/chromium';
 import {put} from '@vercel/blob';
 import {RenderRequest} from '../../../remotion/types/schema';
 import {formatSSE, type RenderProgress} from './helpers';
@@ -47,44 +47,9 @@ async function ensureChrome(): Promise<string> {
   if (cachedChromePath && fs.existsSync(cachedChromePath)) {
     return cachedChromePath;
   }
-
-  const chromeDir = path.join(os.tmpdir(), 'chrome-headless-shell');
-  const chromeBin = path.join(chromeDir, 'chrome-headless-shell');
-
-  if (fs.existsSync(chromeBin)) {
-    cachedChromePath = chromeBin;
-    return chromeBin;
-  }
-
-  console.log('Downloading Chrome Headless Shell to /tmp...');
-  fs.mkdirSync(chromeDir, {recursive: true});
-
-  const zipPath = path.join(os.tmpdir(), 'chrome.zip');
-  const url = 'https://remotion.media/chromium-headless-shell-linux-x64-149.0.7790.0.zip?clear';
-
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`Failed to download Chrome: ${res.status} ${res.statusText}`);
-  }
-
-  const buffer = Buffer.from(await res.arrayBuffer());
-  fs.writeFileSync(zipPath, buffer);
-
-  const zip = new AdmZip(zipPath);
-  zip.extractAllTo(chromeDir, true);
-
-  // The zip contains chrome-headless-shell-linux64/chrome-headless-shell — move to chromeDir
-  const extractedBin = path.join(chromeDir, 'chrome-headless-shell-linux64', 'chrome-headless-shell');
-  if (fs.existsSync(extractedBin)) {
-    fs.renameSync(extractedBin, chromeBin);
-  }
-
-  fs.chmodSync(chromeBin, 0o755);
-  try { fs.unlinkSync(zipPath); } catch {}
-
-  cachedChromePath = chromeBin;
-  console.log('Chrome Headless Shell ready at', chromeBin);
-  return chromeBin;
+  const execPath = await chromium.executablePath();
+  cachedChromePath = execPath;
+  return execPath;
 }
 
 export async function POST(req: Request) {
