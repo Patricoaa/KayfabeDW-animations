@@ -30,7 +30,7 @@ export async function getSchemaMetadata(): Promise<SchemaMetadata> {
 
   const res = await fetch('/api/schema-metadata');
   if (!res.ok) throw new Error(`Failed to fetch schema metadata: ${res.status}`);
-  cached = await res.json();
+  cached = (await res.json()) as SchemaMetadata;
   return cached;
 }
 

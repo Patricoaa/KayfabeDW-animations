@@ -3,7 +3,7 @@
 import {useCallback, useEffect, useState} from 'react';
 import type {SchemaMetadata, TableInfo} from '@/lib/schema-metadata';
 import {getSchemaMetadata, isNumericType, isDateType} from '@/lib/schema-metadata';
-import type {QuerySpec, SelectField, FilterRule, JoinClause, OrderClause} from '@/lib/query-spec';
+import type {QuerySpec, SelectField, AggregateFunction, FilterRule, FilterLogic, JoinClause, OrderClause} from '@/lib/query-spec';
 import {defaultQuerySpec, describeQuerySpec} from '@/lib/query-spec';
 
 type DataPanelProps = {
@@ -212,7 +212,7 @@ function SelectColumns({
               </select>
               <select
                 value={s.aggregate ?? ''}
-                onChange={(e) => updateColumn(idx, {aggregate: e.target.value || undefined})}
+                onChange={(e) => updateColumn(idx, {aggregate: (e.target.value || undefined) as AggregateFunction | undefined})}
                 className="w-24 bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs"
               >
                 <option value="">sin agg</option>
