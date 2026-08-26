@@ -1,7 +1,14 @@
 import {NextRequest, NextResponse} from 'next/server';
-import {getSupabaseServer} from '@/lib/supabase';
+import {createClient} from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
+
+function getClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) throw new Error('Missing env vars');
+  return createClient(url, key);
+}
 
 export async function GET(
   _request: NextRequest,
@@ -9,7 +16,7 @@ export async function GET(
 ) {
   try {
     const {id} = await params;
-    const supabase = getSupabaseServer();
+    const supabase = getClient();
     const {data, error} = await supabase
       .from('viz_spec')
       .select('*')
@@ -30,7 +37,7 @@ export async function PUT(
   try {
     const {id} = await params;
     const body = await request.json();
-    const supabase = getSupabaseServer();
+    const supabase = getClient();
     const {data, error} = await supabase
       .from('viz_spec')
       .update({
@@ -57,7 +64,7 @@ export async function DELETE(
 ) {
   try {
     const {id} = await params;
-    const supabase = getSupabaseServer();
+    const supabase = getClient();
     const {error} = await supabase.from('viz_spec').delete().eq('id', id);
     if (error) throw error;
     return NextResponse.json({ok: true});
