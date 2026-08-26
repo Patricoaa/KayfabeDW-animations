@@ -92,7 +92,15 @@ export default function AnimationsPage() {
 
   return (
     <div className="min-h-screen p-8">
-      <h1 className="text-3xl font-bold mb-8">Generador de Videos</h1>
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-3xl font-bold">Generador de Videos</h1>
+        <a
+          href="/builder"
+          className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded text-sm transition-colors"
+        >
+          Visual Builder
+        </a>
+      </div>
 
       {templates.length === 0 ? (
         <div className="text-zinc-400">No hay templates disponibles.</div>
