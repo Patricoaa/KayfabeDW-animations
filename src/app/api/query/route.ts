@@ -1,5 +1,5 @@
 import {NextRequest, NextResponse} from 'next/server';
-import {getSupabase} from '@/lib/supabase';
+import {createClient} from '@supabase/supabase-js';
 import type {QuerySpec} from '@/lib/query-spec';
 
 export const dynamic = 'force-dynamic';
@@ -13,9 +13,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({error: 'spec.table is required'}, {status: 400});
     }
 
-    const supabase = getSupabase();
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) {
+      return NextResponse.json({error: 'Missing env vars'}, {status: 500});
+    }
+
+    const supabase = createClient(url, key);
     const {data, error} = await supabase.rpc('query_builder', {spec});
-    if (error) throw error;
+    if (error) {
+      return NextResponse.json({error: error.message, code: error.code}, {status: 500});
+    }
 
     return NextResponse.json({data: data ?? []});
   } catch (err) {
