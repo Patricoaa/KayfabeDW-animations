@@ -11,6 +11,7 @@ import {DataPanel} from '@/components/builder/data-panel';
 import {FilterBar} from '@/components/builder/filter-bar';
 import {ChartConfigPanel} from '@/components/builder/chart-config-panel';
 import {ChartPreview} from '@/components/charts/chart-preview';
+import {AnimationPanel} from '@/components/builder/animation-panel';
 
 type VizSpec = {
   id?: string;
@@ -29,7 +30,7 @@ export default function BuilderPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [sideTab, setSideTab] = useState<'data' | 'chart' | 'filters'>('data');
+  const [sideTab, setSideTab] = useState<'data' | 'chart' | 'filters' | 'animation'>('data');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const executeQuery = useCallback(async (q: QuerySpec) => {
@@ -129,7 +130,7 @@ export default function BuilderPage() {
         {/* Left sidebar — config */}
         <aside className="w-80 border-r border-zinc-800 flex flex-col overflow-hidden">
           <div className="flex border-b border-zinc-800">
-            {(['data', 'chart', 'filters'] as const).map((tab) => (
+            {(['data', 'chart', 'filters', 'animation'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setSideTab(tab)}
@@ -139,7 +140,7 @@ export default function BuilderPage() {
                     : 'text-zinc-500 hover:text-zinc-300'
                 }`}
               >
-                {tab === 'data' ? 'Datos' : tab === 'chart' ? 'Gráfico' : 'Filtros'}
+                {tab === 'data' ? 'Datos' : tab === 'chart' ? 'Gráfico' : tab === 'filters' ? 'Filtros' : 'Animación'}
               </button>
             ))}
           </div>
@@ -159,6 +160,13 @@ export default function BuilderPage() {
                 specTable={spec.table}
                 filters={spec.filters ?? []}
                 onChange={(filters) => handleSpecChange({...spec, filters})}
+              />
+            )}
+            {sideTab === 'animation' && (
+              <AnimationPanel
+                data={data}
+                config={chartConfig}
+                spec={spec}
               />
             )}
           </div>
