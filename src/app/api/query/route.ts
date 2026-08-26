@@ -22,10 +22,22 @@ export async function POST(request: NextRequest) {
     const supabase = createClient(url, key);
     const {data, error} = await supabase.rpc('query_builder', {spec});
     if (error) {
-      return NextResponse.json({error: error.message, code: error.code}, {status: 500});
+      return NextResponse.json({error: error.message, code: error.code, details: error.details}, {status: 500});
     }
 
-    return NextResponse.json({data: data ?? []});
+    // PostgREST wraps SETOF jsonb as [{query_builder: {...}}, ...]
+    // Unwrap to flat array: [{...}, ...]
+    let rows: Record<string, unknown>[] = [];
+    if (Array.isArray(data)) {
+      rows = data.map((row: Record<string, unknown>) => {
+        if (row && typeof row === 'object' && 'query_builder' in row) {
+          return (row as Record<string, unknown>).query_builder as Record<string, unknown>;
+        }
+        return row;
+      });
+    }
+
+    return NextResponse.json({data: rows});
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({error: message}, {status: 500});
