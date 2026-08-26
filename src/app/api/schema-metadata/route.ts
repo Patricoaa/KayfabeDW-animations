@@ -1,11 +1,11 @@
 import {NextResponse} from 'next/server';
-import {getSupabaseServer} from '@/lib/supabase';
+import {getSupabase} from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const supabase = getSupabaseServer();
+    const supabase = getSupabase();
     const {data, error} = await supabase.rpc('get_schema_metadata');
     if (error) throw error;
     return NextResponse.json(data);

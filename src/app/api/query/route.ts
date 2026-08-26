@@ -1,5 +1,5 @@
 import {NextRequest, NextResponse} from 'next/server';
-import {getSupabaseServer} from '@/lib/supabase';
+import {getSupabase} from '@/lib/supabase';
 import type {QuerySpec} from '@/lib/query-spec';
 
 export const dynamic = 'force-dynamic';
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({error: 'spec.table is required'}, {status: 400});
     }
 
-    const supabase = getSupabaseServer();
+    const supabase = getSupabase();
     const {data, error} = await supabase.rpc('query_builder', {spec});
     if (error) throw error;
 
