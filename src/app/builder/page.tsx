@@ -12,6 +12,7 @@ import {FilterBar} from '@/components/builder/filter-bar';
 import {ChartConfigPanel} from '@/components/builder/chart-config-panel';
 import {ChartPreview} from '@/components/charts/chart-preview';
 import {AnimationPanel} from '@/components/builder/animation-panel';
+import {BuilderNav} from '@/components/builder/builder-nav';
 
 type VizSpec = {
   id?: string;
@@ -97,10 +98,7 @@ export default function BuilderPage() {
       {/* Top bar */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
         <div className="flex items-center gap-3">
-          <Link href="/" className="text-zinc-500 hover:text-white transition-colors text-sm">
-            ← Animations
-          </Link>
-          <h1 className="text-lg font-semibold">Visual Builder</h1>
+          <BuilderNav />
         </div>
         <div className="flex items-center gap-3">
           <input
