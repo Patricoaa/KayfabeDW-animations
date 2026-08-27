@@ -155,6 +155,13 @@ function TableProperties({
     [spec, onSpecChange],
   );
 
+  const updateLimit = useCallback(
+    (limit: number) => {
+      onSpecChange({...spec, limit});
+    },
+    [spec, onSpecChange],
+  );
+
   return (
     <div className="space-y-4">
       <div>
@@ -270,6 +277,18 @@ function TableProperties({
             </div>
           );
         })}
+      </div>
+
+      <div>
+        <label className="text-xs font-medium text-zinc-400 mb-1 block">LÍMITE</label>
+        <input
+          type="number"
+          min={1}
+          max={5000}
+          value={spec.limit ?? 100}
+          onChange={(e) => updateLimit(Number(e.target.value))}
+          className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-[10px]"
+        />
       </div>
     </div>
   );

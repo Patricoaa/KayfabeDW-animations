@@ -457,8 +457,15 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
   const selectedNode = selectedNodeId
     ? nodes.find((n) => n.id === selectedNodeId)
     : null;
-  const selectedNodeData = selectedNode
-    ? (selectedNode.data as TableNodeData)
+
+  // Right panel defaults to the primary table when no node/edge is selected,
+  // so the full controls (columns, filters, etc.) are always available.
+  const panelNode =
+    selectedNode ??
+    nodes.find((n) => (n.data as TableNodeData)?.primary) ??
+    null;
+  const panelNodeData = panelNode
+    ? (panelNode.data as TableNodeData)
     : null;
 
   const selectedEdge = selectedEdgeId
@@ -567,8 +574,8 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
         <PropertiesPanel
           spec={spec}
           meta={meta}
-          selectedTable={selectedNodeData?.table?.name ?? null}
-          selectedColumns={selectedNodeData?.selectedColumns ?? []}
+          selectedTable={panelNodeData?.table?.name ?? null}
+          selectedColumns={panelNodeData?.selectedColumns ?? []}
           selectedEdge={
             selectedEdge && edgeSourceTarget
               ? {
