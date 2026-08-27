@@ -6,12 +6,14 @@ import type {QuerySpec} from '@/lib/query-spec';
 import {defaultQuerySpec} from '@/lib/query-spec';
 import type {ChartConfig} from '@/lib/chart-config';
 import {DEFAULT_CHART_CONFIG} from '@/lib/chart-config';
-import type {SchemaMetadata, TableInfo} from '@/lib/schema-metadata';
+import type {SchemaMetadata} from '@/lib/schema-metadata';
 import {getSchemaMetadata} from '@/lib/schema-metadata';
+import {suggestBestTemplate} from '@/lib/viz-to-remotion';
 import dynamic from 'next/dynamic';
 import {ChartConfigPanel} from '@/components/builder/chart-config-panel';
 import {ChartPreview} from '@/components/charts/chart-preview';
-import {AnimationPanel} from '@/components/builder/animation-panel';
+import {TemplatePicker} from '@/components/builder/template-picker';
+import {AnimationPreview} from '@/components/builder/animation-preview';
 import {BuilderNav} from '@/components/builder/builder-nav';
 
 const QueryCanvas = dynamic(
@@ -22,13 +24,6 @@ const QueryCanvas = dynamic(
     </div>
   )},
 );
-
-type VizSpec = {
-  id?: string;
-  name: string;
-  query_spec: QuerySpec;
-  chart_config: ChartConfig;
-};
 
 type OutputMode = 'static' | 'animated';
 
@@ -43,6 +38,7 @@ export default function BuilderPage() {
   const [saved, setSaved] = useState(false);
   const [sideTab, setSideTab] = useState<'data' | 'preview'>('data');
   const [outputMode, setOutputMode] = useState<OutputMode>('static');
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [meta, setMeta] = useState<SchemaMetadata | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -111,6 +107,13 @@ export default function BuilderPage() {
 
   const columns = data.length > 0 ? Object.keys(data[0]) : [];
 
+  // Auto-select best template when switching to animation mode
+  const bestTemplate = outputMode === 'animated' && data.length > 0
+    ? suggestBestTemplate(chartConfig, data)
+    : null;
+
+  const activeTemplate = selectedTemplate ?? bestTemplate;
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Top bar */}
@@ -143,7 +146,7 @@ export default function BuilderPage() {
 
       {/* Main layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left sidebar — 2 tabs */}
+        {/* Left sidebar */}
         <aside className="w-80 border-r border-zinc-800 flex flex-col overflow-hidden">
           <div className="flex border-b border-zinc-800">
             {(['data', 'preview'] as const).map((tab) => (
@@ -179,7 +182,9 @@ export default function BuilderPage() {
               <div className="space-y-4">
                 {/* Output mode toggle */}
                 <div>
-                  <label className="text-xs font-medium text-zinc-400 mb-2 block">Modo de salida</label>
+                  <label className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider mb-2 block">
+                    Modo de salida
+                  </label>
                   <div className="grid grid-cols-2 gap-1">
                     <button
                       onClick={() => setOutputMode('static')}
@@ -212,10 +217,11 @@ export default function BuilderPage() {
                   />
                 )}
                 {outputMode === 'animated' && (
-                  <AnimationPanel
+                  <TemplatePicker
                     data={data}
                     config={chartConfig}
-                    spec={spec}
+                    selectedTemplate={activeTemplate}
+                    onSelect={setSelectedTemplate}
                   />
                 )}
               </div>
@@ -235,22 +241,27 @@ export default function BuilderPage() {
           </div>
 
           {/* Preview area */}
-          <div className="flex-1 flex items-center justify-center p-8 overflow-auto">
-            <div className="w-full max-w-3xl">
-              {chartConfig.title && (
-                <h2 className="text-center text-lg font-semibold mb-4">{chartConfig.title}</h2>
-              )}
-              {outputMode === 'static' ? (
+          {outputMode === 'static' ? (
+            <div className="flex-1 flex items-center justify-center p-8 overflow-auto">
+              <div className="w-full max-w-3xl">
+                {chartConfig.title && (
+                  <h2 className="text-center text-lg font-semibold mb-4">{chartConfig.title}</h2>
+                )}
                 <ChartPreview data={data} config={chartConfig} />
-              ) : (
-                <AnimationPanel
-                  data={data}
-                  config={chartConfig}
-                  spec={spec}
-                />
-              )}
+              </div>
             </div>
-          </div>
+          ) : activeTemplate ? (
+            <AnimationPreview
+              templateId={activeTemplate}
+              data={data}
+              config={chartConfig}
+              spec={spec}
+            />
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-zinc-600 text-sm">
+              Selecciona un template para previsualizar
+            </div>
+          )}
         </main>
       </div>
     </div>
