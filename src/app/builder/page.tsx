@@ -3,6 +3,7 @@
 import {Suspense, useCallback, useEffect, useRef, useState} from 'react';
 import Link from 'next/link';
 import {useSearchParams} from 'next/navigation';
+import {BarChart3, Film} from 'lucide-react';
 import type {QuerySpec} from '@/lib/query-spec';
 import {defaultQuerySpec} from '@/lib/query-spec';
 import type {ChartConfig} from '@/lib/chart-config';
@@ -366,7 +367,8 @@ function BuilderContent() {
                           : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
                       }`}
                     >
-                      📊 Estático
+                      <BarChart3 size={14} className="inline mr-1" />
+                      Estático
                     </button>
                     <button
                       onClick={() => setOutputMode('animated')}
@@ -376,7 +378,8 @@ function BuilderContent() {
                           : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
                       }`}
                     >
-                      🎬 Animación
+                      <Film size={14} className="inline mr-1" />
+                      Animación
                     </button>
                   </div>
                 </div>

@@ -22,10 +22,11 @@ export type ChartConfig = {
 export const DEFAULT_CHART_CONFIG: ChartConfig = {
   type: 'bar',
   title: '',
+  // V7: Colorblind-friendly palette (Wong 2011 + adapted)
   colors: [
-    '#6366f1', '#8b5cf6', '#a855f7', '#d946ef',
-    '#ec4899', '#f43f5e', '#f97316', '#eab308',
-    '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6',
+    '#0072B2', '#E69F00', '#009E73', '#F0E442',
+    '#56B4E9', '#D55E00', '#CC79A7', '#999999',
+    '#332288', '#88CCEE', '#44AA99', '#117733',
   ],
   showGrid: true,
   showLegend: true,

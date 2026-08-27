@@ -4,14 +4,15 @@ import {useCallback, useEffect, useMemo, useState} from 'react';
 import Link from 'next/link';
 import {useRouter} from 'next/navigation';
 import {useToast} from '@/components/ui/toast';
+import {BarChart3, TrendingUp, TrendingDown, PieChart, Zap, Table, Search, ArrowUpDown, Copy, Trash2} from 'lucide-react';
 
-const CHART_ICONS: Record<string, string> = {
-  bar: '📊',
-  line: '📈',
-  area: '📉',
-  pie: '🥧',
-  scatter: '⚡',
-  table: '📋',
+const CHART_ICONS: Record<string, React.ComponentType<{size?: number; className?: string}>> = {
+  bar: BarChart3,
+  line: TrendingUp,
+  area: TrendingDown,
+  pie: PieChart,
+  scatter: Zap,
+  table: Table,
 };
 
 const CHART_COLORS: Record<string, string> = {
@@ -208,7 +209,7 @@ export default function GalleryPage() {
                     : 'text-zinc-500 hover:text-zinc-300'
                 }`}
               >
-                {CHART_ICONS[t] ?? '📊'}
+                {(() => { const Icon = CHART_ICONS[t]; return Icon ? <Icon size={14} /> : <BarChart3 size={14} />; })()}
               </button>
             ))}
           </div>
@@ -239,7 +240,13 @@ export default function GalleryPage() {
           {specs.length === 0 ? (
             <>
               <p className="text-lg mb-2">No hay visualizaciones guardadas</p>
-              <p className="text-sm">Crea tu primera visualización en el Builder</p>
+              <p className="text-sm mb-4">Crea tu primera visualización en el Builder</p>
+              <Link
+                href="/builder"
+                className="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded text-sm text-white transition-colors"
+              >
+                Ir al Builder
+              </Link>
             </>
           ) : (
             <>
@@ -252,7 +259,7 @@ export default function GalleryPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredSpecs.map((spec) => {
             const chartType = spec.chart_config?.type ?? 'bar';
-            const icon = CHART_ICONS[chartType] ?? '📊';
+            const Icon = CHART_ICONS[chartType] ?? BarChart3;
             const accentColor = CHART_COLORS[chartType] ?? '#6366f1';
             return (
               <div
@@ -268,7 +275,7 @@ export default function GalleryPage() {
                 <div className="p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-xl">{icon}</span>
+                      <Icon size={20} />
                       <h3 className="font-medium truncate">{spec.name}</h3>
                     </div>
                     <span className="text-[10px] text-zinc-500 px-1.5 py-0.5 bg-zinc-800 rounded">
@@ -298,14 +305,14 @@ export default function GalleryPage() {
                       title="Duplicar visualización"
                       className="px-3 py-1.5 text-zinc-600 hover:text-blue-400 hover:bg-zinc-800 rounded text-xs transition-colors"
                     >
-                      {duplicating === spec.id ? '...' : '⧉'}
+                      {duplicating === spec.id ? '...' : <Copy size={14} />}
                     </button>
                     <button
                       onClick={() => handleDelete(spec.id)}
                       disabled={deleting === spec.id}
                       className="px-3 py-1.5 text-zinc-600 hover:text-red-400 hover:bg-zinc-800 rounded text-xs transition-colors"
                     >
-                      {deleting === spec.id ? '...' : '✕'}
+                      {deleting === spec.id ? '...' : <Trash2 size={14} />}
                     </button>
                   </div>
                 </div>
