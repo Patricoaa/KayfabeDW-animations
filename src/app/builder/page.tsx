@@ -1,6 +1,6 @@
 'use client';
 
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {Suspense, useCallback, useEffect, useRef, useState} from 'react';
 import Link from 'next/link';
 import {useSearchParams} from 'next/navigation';
 import type {QuerySpec} from '@/lib/query-spec';
@@ -29,6 +29,18 @@ const QueryCanvas = dynamic(
 type OutputMode = 'static' | 'animated';
 
 export default function BuilderPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center text-zinc-500">
+        Cargando builder...
+      </div>
+    }>
+      <BuilderContent />
+    </Suspense>
+  );
+}
+
+function BuilderContent() {
   const searchParams = useSearchParams();
   const editId = searchParams.get('edit');
   const [spec, setSpec] = useState<QuerySpec>(defaultQuerySpec(''));
