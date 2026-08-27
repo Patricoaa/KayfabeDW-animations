@@ -122,7 +122,7 @@ export function AnimationPreview({
 
   if (!remotionProps) {
     return (
-      <div className="flex-1 flex items-center justify-center text-zinc-500 text-sm">
+      <div className="flex-1 flex items-center justify-center text-muted text-sm">
         {data.length === 0
           ? 'Selecciona columnas en el canvas para ver la preview'
           : 'No se pudieron generar las props para este template'}
@@ -135,14 +135,14 @@ export function AnimationPreview({
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Preview player */}
-      <div className="flex-1 flex items-center justify-center p-6 overflow-auto bg-zinc-950">
+      <div className="flex-1 flex items-center justify-center p-6 overflow-auto bg-card">
         <div className="w-full max-w-4xl">
-          <div className="border border-zinc-700 rounded-lg overflow-hidden shadow-2xl">
+          <div className="border border-border-default rounded-lg overflow-hidden">
             {!mounted && (
-              <div className="p-8 text-zinc-500 text-sm text-center">Cargando preview...</div>
+              <div className="p-8 text-muted text-sm text-center">Cargando preview...</div>
             )}
             {mounted && Comp && (
-              <React.Suspense fallback={<div className="p-8 text-zinc-500 text-sm text-center">Cargando template...</div>}>
+              <React.Suspense fallback={<div className="p-8 text-muted text-sm text-center">Cargando template...</div>}>
                 <Player
                   component={Comp}
                   inputProps={remotionProps}
@@ -161,10 +161,10 @@ export function AnimationPreview({
       </div>
 
       {/* Export bar */}
-      <div className="flex items-center gap-3 px-6 py-3 border-t border-zinc-800 bg-zinc-900">
+      <div className="flex items-center gap-3 px-6 py-3 border-t border-border-subtle bg-elevated">
         {/* Duration control */}
         <div className="flex items-center gap-2">
-          <label htmlFor="duration-slider" className="text-xs text-zinc-500">Duración:</label>
+          <label htmlFor="duration-slider" className="text-xs text-muted">Duración:</label>
           <input
             id="duration-slider"
             type="range"
@@ -172,10 +172,10 @@ export function AnimationPreview({
             max={20}
             value={duration}
             onChange={(e) => setDuration(Number(e.target.value))}
-            className="w-20 accent-blue-500"
+            className="w-20 accent-amber-500"
             aria-label="Duración de la animación en segundos"
           />
-          <span className="text-xs text-zinc-400 w-12 text-right">{duration}s</span>
+          <span className="text-xs text-secondary w-12 text-right">{duration}s</span>
         </div>
 
         <div className="flex-1" />
@@ -184,17 +184,17 @@ export function AnimationPreview({
         {renderState.status === 'rendering' && (
           <div className="flex items-center gap-3 flex-1">
             <div className="flex-1">
-              <div className="text-xs text-zinc-400 mb-1">{renderState.phase}</div>
-              <div className="w-full bg-zinc-800 rounded-full h-1.5">
+              <div className="text-xs text-secondary mb-1">{renderState.phase}</div>
+              <div className="w-full bg-border-subtle rounded-full h-1.5">
                 <div
-                  className="bg-blue-500 h-1.5 rounded-full transition-all duration-300"
+                  className="bg-amber-500 h-1.5 rounded-full transition-all duration-300"
                   style={{width: `${renderState.progress * 100}%`}}
                 />
               </div>
             </div>
             <button
               onClick={handleCancel}
-              className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 rounded text-zinc-300 text-xs transition-colors"
+              className="px-3 py-1.5 bg-card-hover hover:bg-border-default rounded text-secondary text-xs transition-colors"
             >
               Cancelar
             </button>
@@ -203,21 +203,21 @@ export function AnimationPreview({
 
         {renderState.status === 'done' && (
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-green-400">
+            <span className="text-emerald-500">
               Listo ({(renderState.size / 1024 / 1024).toFixed(1)} MB)
             </span>
             <a
               href={renderState.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-white font-medium transition-colors"
+              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 rounded text-black font-medium transition-colors"
               aria-label="Descargar video MP4"
             >
               Descargar MP4
             </a>
             <button
               onClick={() => setRenderState({status: 'idle'})}
-              className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 rounded text-zinc-300 transition-colors"
+              className="px-3 py-1.5 bg-card-hover hover:bg-border-default rounded text-secondary transition-colors"
               aria-label="Cerrar resultado del render"
             >
               Cerrar
@@ -227,10 +227,10 @@ export function AnimationPreview({
 
         {renderState.status === 'error' && (
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-red-400">{renderState.message}</span>
+            <span className="text-red-500">{renderState.message}</span>
             <button
               onClick={() => setRenderState({status: 'idle'})}
-              className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 rounded text-zinc-300 transition-colors"
+              className="px-3 py-1.5 bg-card-hover hover:bg-border-default rounded text-secondary transition-colors"
               aria-label="Reintentar render"
             >
               Reintentar
@@ -241,7 +241,7 @@ export function AnimationPreview({
         {renderState.status === 'idle' && (
           <button
             onClick={handleExport}
-            className="px-4 py-2 bg-green-600 hover:bg-green-500 rounded text-sm font-medium transition-colors"
+            className="px-4 py-2 bg-amber-500 hover:bg-amber-400 rounded text-sm font-semibold text-black transition-colors font-display"
             aria-label="Exportar animación como MP4"
           >
             Exportar MP4

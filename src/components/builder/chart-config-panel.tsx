@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import {BarChart3, PieChart, LineChart, AreaChart, ScatterChart, Table2} from 'lucide-react';
 import type {ChartConfig, ChartType, NumberFormat, SortBy, GroupMode} from '@/lib/chart-config';
 
 type ChartConfigPanelProps = {
@@ -9,13 +10,13 @@ type ChartConfigPanelProps = {
   columns: string[];
 };
 
-const CHART_TYPES: {type: ChartType; label: string; icon: string}[] = [
-  {type: 'bar', label: 'Barras', icon: '📊'},
-  {type: 'pie', label: 'Pie', icon: '🥧'},
-  {type: 'line', label: 'Líneas', icon: '📈'},
-  {type: 'area', label: 'Área', icon: '📉'},
-  {type: 'scatter', label: 'Dispersión', icon: '⚬'},
-  {type: 'table', label: 'Tabla', icon: '📋'},
+const CHART_TYPES: {type: ChartType; label: string; Icon: typeof BarChart3}[] = [
+  {type: 'bar', label: 'Barras', Icon: BarChart3},
+  {type: 'pie', label: 'Pie', Icon: PieChart},
+  {type: 'line', label: 'Líneas', Icon: LineChart},
+  {type: 'area', label: 'Área', Icon: AreaChart},
+  {type: 'scatter', label: 'Dispersión', Icon: ScatterChart},
+  {type: 'table', label: 'Tabla', Icon: Table2},
 ];
 
 const NUMBER_FORMATS: {value: NumberFormat; label: string}[] = [
@@ -41,7 +42,7 @@ export function ChartConfigPanel({config, onChange, columns}: ChartConfigPanelPr
     <div className="space-y-4">
       {/* Chart type selector */}
       <div>
-        <label className="text-sm font-medium mb-1 block">Tipo de gráfico</label>
+        <label className="text-sm font-medium mb-1 block font-display">Tipo de gráfico</label>
         <div className="grid grid-cols-3 gap-1">
           {CHART_TYPES.map((ct) => (
             <button
@@ -49,11 +50,11 @@ export function ChartConfigPanel({config, onChange, columns}: ChartConfigPanelPr
               onClick={() => update({type: ct.type})}
               className={`flex flex-col items-center gap-0.5 p-2 rounded text-xs transition-colors ${
                 config.type === ct.type
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                  ? 'bg-amber-500 text-black'
+                  : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
               }`}
             >
-              <span className="text-base">{ct.icon}</span>
+              <ct.Icon size={16} />
               {ct.label}
             </button>
           ))}
@@ -62,13 +63,13 @@ export function ChartConfigPanel({config, onChange, columns}: ChartConfigPanelPr
 
       {/* Title */}
       <div>
-        <label className="text-sm font-medium mb-1 block">Título</label>
+        <label className="text-sm font-medium mb-1 block font-display">Título</label>
         <input
           type="text"
           value={config.title ?? ''}
           onChange={(e) => update({title: e.target.value})}
           placeholder="Título del gráfico"
-          className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+          className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
         />
       </div>
 
@@ -113,8 +114,8 @@ export function ChartConfigPanel({config, onChange, columns}: ChartConfigPanelPr
               onClick={() => update({groupMode: m})}
               className={`px-2 py-1.5 rounded text-xs transition-colors ${
                 (config.groupMode ?? 'grouped') === m
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                  ? 'bg-amber-500 text-black'
+                  : 'bg-elevated text-secondary hover:bg-card-hover'
               }`}
             >
               {m === 'grouped' ? 'Agrupado' : 'Apuñado'}
@@ -135,7 +136,7 @@ export function ChartConfigPanel({config, onChange, columns}: ChartConfigPanelPr
           <select
             value={config.numberFormat ?? 'short'}
             onChange={(e) => update({numberFormat: e.target.value as NumberFormat})}
-            className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+            className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
           >
             {NUMBER_FORMATS.map((nf) => (
               <option key={nf.value} value={nf.value}>{nf.label}</option>
@@ -152,7 +153,7 @@ export function ChartConfigPanel({config, onChange, columns}: ChartConfigPanelPr
             <select
               value={config.sortBy ?? 'none'}
               onChange={(e) => update({sortBy: e.target.value as SortBy})}
-              className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+              className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
             >
               {SORTS.map((s) => (
                 <option key={s.value} value={s.value}>{s.label}</option>
@@ -168,7 +169,7 @@ export function ChartConfigPanel({config, onChange, columns}: ChartConfigPanelPr
               value={config.limit ?? ''}
               onChange={(e) => update({limit: e.target.value ? Number(e.target.value) : undefined})}
               placeholder="Sin límite"
-              className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+              className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
             />
           </div>
         </>
@@ -184,7 +185,7 @@ export function ChartConfigPanel({config, onChange, columns}: ChartConfigPanelPr
               value={config.xLabel ?? ''}
               onChange={(e) => update({xLabel: e.target.value})}
               placeholder="Eje X"
-              className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+              className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
             />
           </div>
           <div>
@@ -194,7 +195,7 @@ export function ChartConfigPanel({config, onChange, columns}: ChartConfigPanelPr
               value={config.yLabel ?? ''}
               onChange={(e) => update({yLabel: e.target.value})}
               placeholder="Eje Y"
-              className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+              className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
             />
           </div>
         </>
@@ -227,7 +228,7 @@ function FieldSelect({
         <select
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+          className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
         >
           {children}
         </select>
@@ -240,7 +241,7 @@ function FieldSelect({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+        className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
       >
         {optional && <option value="">Ninguno</option>}
         {columns.map((c) => (
@@ -261,18 +262,27 @@ function Toggle({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <label className="flex items-center justify-between cursor-pointer">
-      <span className="text-sm text-zinc-400">{label}</span>
-      <div
-        onClick={() => onChange(!checked)}
-        className={`relative w-8 h-4 rounded-full transition-colors ${checked ? 'bg-blue-600' : 'bg-zinc-700'}`}
+    <label className="flex items-center justify-between cursor-pointer select-none">
+      <span className="text-sm text-secondary">{label}</span>
+      <input
+        type="checkbox"
+        role="switch"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="peer sr-only"
+      />
+      <span
+        aria-hidden="true"
+        className={`relative w-9 h-5 rounded-full transition-colors ${
+          checked ? 'bg-amber-500' : 'bg-border-default'
+        }`}
       >
-        <div
-          className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
-            checked ? 'translate-x-4' : 'translate-x-0.5'
+        <span
+          className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+            checked ? 'translate-x-4' : ''
           }`}
         />
-      </div>
+      </span>
     </label>
   );
 }

@@ -15,7 +15,7 @@ export function BarChart({data, config}: Props) {
 
   if (prepared.items.length === 0) {
     return (
-      <div className="flex items-center justify-center h-48 text-zinc-500 text-sm">
+      <div className="flex items-center justify-center h-48 text-muted text-sm">
         {data.length > 0 ? 'No se encontraron valores numéricos para este gráfico' : 'Sin datos numéricos'}
       </div>
     );

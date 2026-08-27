@@ -3,7 +3,22 @@
 import {Suspense, useCallback, useEffect, useRef, useState} from 'react';
 import Link from 'next/link';
 import {useSearchParams} from 'next/navigation';
-import {BarChart3, Film, Image, FileDown} from 'lucide-react';
+import {
+  BarChart3,
+  Film,
+  Image,
+  FileDown,
+  Play,
+  Share2,
+  Save,
+  Check,
+  Table2,
+  SlidersHorizontal,
+  Clapperboard,
+  ChevronRight,
+  Database,
+  ChartSpline,
+} from 'lucide-react';
 import type {QuerySpec} from '@/lib/query-spec';
 import {defaultQuerySpec} from '@/lib/query-spec';
 import type {ChartConfig} from '@/lib/chart-config';
@@ -26,18 +41,25 @@ import {useToast} from '@/components/ui/toast';
 const QueryCanvas = dynamic(
   () => import('@/components/canvas/query-canvas').then((m) => m.QueryCanvas),
   {ssr: false, loading: () => (
-    <div className="flex-1 flex items-center justify-center text-zinc-500 text-sm">
+    <div className="h-full flex items-center justify-center text-muted text-sm font-body">
       Cargando canvas...
     </div>
   )},
 );
 
 type OutputMode = 'static' | 'animated';
+type View = 'data' | 'result';
+
+const STEPS = [
+  {n: 1, label: 'Datos', icon: Database},
+  {n: 2, label: 'Configurar', icon: SlidersHorizontal},
+  {n: 3, label: 'Exportar', icon: Clapperboard},
+] as const;
 
 export default function BuilderPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center text-zinc-500">
+      <div className="min-h-screen flex items-center justify-center text-muted font-body">
         Cargando builder...
       </div>
     }>
@@ -62,7 +84,8 @@ function BuilderContent() {
   const [resultTruncated, setResultTruncated] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [sideTab, setSideTab] = useState<'data' | 'preview'>('data');
+  const [view, setView] = useState<View>('data');
+  const [resultStep, setResultStep] = useState<2 | 3>(2);
   const [outputMode, setOutputMode] = useState<OutputMode>(
     templateParam ? 'animated' : 'static',
   );
@@ -390,10 +413,32 @@ function BuilderContent() {
 
   const columns = data.length > 0 ? Object.keys(data[0]) : [];
 
+  // Stepper derived state — honest active/done per step
+  const stepDone = (n: number) => {
+    if (n === 1) return !!spec.table && (spec.select?.length ?? 0) > 0;
+    if (n === 2) return data.length > 0 && !!chartConfig.type;
+    return outputMode === 'static' ? data.length > 0 : !!activeTemplate;
+  };
+  const stepActive = (n: number) =>
+    n === 1 ? view === 'data' : view === 'result' && resultStep === n;
+
+  const statusText = !spec.table
+    ? 'Arrastrá una tabla desde la lista al canvas'
+    : data.length === 0
+      ? 'Elegí columnas y presioná Ejecutar'
+      : view === 'data'
+        ? 'Datos listos → avanzá a Configurar'
+        : 'Revisá y exportá tu visualización';
+
+  const goResult = (n: 2 | 3) => {
+    setResultStep(n);
+    setView('result');
+  };
+
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col h-screen overflow-hidden">
       {/* Top bar */}
-      <header className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+      <header className="flex items-center justify-between px-4 h-14 border-b border-border-default bg-background shrink-0">
         <div className="flex items-center gap-3">
           <BuilderNav />
         </div>
@@ -402,29 +447,30 @@ function BuilderContent() {
             type="text"
             value={vizName}
             onChange={(e) => setVizName(e.target.value)}
-            className="bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5 text-sm w-32 md:w-64"
+            className="bg-elevated border border-border-default rounded-lg px-3 py-1.5 text-sm font-body focus:outline-none focus:ring-2 focus:ring-amber-500 w-40 md:w-64"
             aria-label="Nombre de la visualización"
           />
           {pendingQuery && (
             <button
               onClick={handleRunQuery}
-              className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 rounded text-sm transition-colors"
+              className="px-3 h-9 bg-amber-500 hover:bg-amber-400 text-black rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5"
               aria-label="Ejecutar consulta"
             >
-              ▶ Ejecutar
+              <Play size={14} /> Ejecutar
             </button>
           )}
           <button
             onClick={handleSave}
             disabled={saving || !spec.table}
-            className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 rounded text-sm transition-colors"
+            className="px-4 h-9 bg-amber-500 hover:bg-amber-400 disabled:bg-elevated disabled:text-muted rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5"
             aria-label={saving ? 'Guardando...' : saved ? 'Guardado' : 'Guardar visualización'}
           >
-            {saving ? 'Guardando...' : saved ? '✓ Guardado' : 'Guardar'}
+            <Save size={14} />
+            {saving ? 'Guardando...' : saved ? 'Guardado' : 'Guardar'}
           </button>
           <Link
             href="/builder/gallery"
-            className="px-4 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-sm transition-colors"
+            className="px-4 h-9 bg-elevated hover:bg-card-hover rounded-lg text-sm font-semibold transition-colors flex items-center"
             aria-label="Ir a la galería de visualizaciones"
           >
             Galería
@@ -437,300 +483,305 @@ function BuilderContent() {
               navigator.clipboard.writeText(url);
               addToast('Enlace copiado al portapapeles', 'success');
             }}
-            className="px-4 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-sm transition-colors"
+            className="px-3 h-9 bg-elevated hover:bg-card-hover rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5"
             aria-label="Copiar enlace para compartir"
           >
-            🔗 Compartir
+            <Share2 size={14} />
           </button>
         </div>
       </header>
 
-      {/* E2E: Guided flow stepper */}
-      <div className="flex items-center gap-1 px-6 py-2 border-b border-zinc-800 bg-zinc-950/60 text-[11px]">
-        {[
-          {n: 1, label: 'Datos', done: !!spec.table && (spec.select?.length ?? 0) > 0},
-          {n: 2, label: 'Configuración', done: data.length > 0 && !!chartConfig.type},
-          {n: 3, label: 'Exportar', done: outputMode === 'static' ? data.length > 0 : !!activeTemplate},
-        ].map((step, idx, arr) => {
-          const active = sideTab === 'data' && step.n === 1 || sideTab === 'preview' && step.n === 2;
+      {/* Stepper strip */}
+      <nav className="flex items-center gap-1 px-6 h-12 border-b border-border-default bg-card/60 text-micro shrink-0" aria-label="Progreso del builder">
+        {STEPS.map((step, idx) => {
+          const done = stepDone(step.n);
+          const active = stepActive(step.n);
+          const Icon = step.icon;
           return (
-            <div key={step.n} className="flex items-center gap-1">
+            <span key={step.n} className="flex items-center gap-1">
+              {idx > 0 && <ChevronRight size={14} className="text-muted" />}
               <button
-                onClick={() => setSideTab(step.n === 1 ? 'data' : 'preview')}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${
-                  active ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'
+                onClick={() => {
+                  if (step.n === 1) setView('data');
+                  else goResult(step.n as 2 | 3);
+                }}
+                aria-current={active ? 'step' : undefined}
+                className={`flex items-center gap-1.5 px-2.5 h-7 rounded-md transition-colors font-display font-semibold ${
+                  active
+                    ? 'bg-amber-500/15 text-amber-500'
+                    : done
+                      ? 'text-secondary hover:bg-card-hover'
+                      : 'text-muted hover:text-secondary hover:bg-card-hover'
                 }`}
               >
                 <span
-                  className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-semibold ${
-                    step.done ? 'bg-green-600 text-white' : 'bg-zinc-700 text-zinc-400'
+                  className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${
+                    done ? 'bg-amber-500 text-black' : active ? 'bg-amber-500/20 text-amber-500' : 'bg-elevated text-muted'
                   }`}
                 >
-                  {step.done ? '✓' : step.n}
+                  {done ? <Check size={9} /> : <Icon size={9} />}
                 </span>
                 {step.label}
               </button>
-              {idx < arr.length - 1 && <span className="text-zinc-700">→</span>}
-            </div>
+            </span>
           );
         })}
-        <span className="ml-auto hidden sm:block text-zinc-600">
-          {!spec.table
-            ? 'Comenzá: arrastrá una tabla al canvas'
-            : data.length === 0 && sideTab === 'data'
-              ? 'Elegí columnas y presioná Ejecutar'
-              : data.length > 0 && sideTab === 'data'
-                ? 'Datos listos → configurá tu gráfico en Preview'
-                : 'Configurá y exportá tu visualización'}
-        </span>
-      </div>
+        <span className="ml-auto hidden lg:block text-muted text-[10px] font-body">{statusText}</span>
+      </nav>
 
       {/* Main layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left sidebar — hidden on mobile */}
-        <aside className="hidden md:flex w-80 border-r border-zinc-800 flex-col overflow-hidden">
-          <div className="flex border-b border-zinc-800">
-            {(['data', 'preview'] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setSideTab(tab)}
-                className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
-                  sideTab === tab
-                    ? 'text-white border-b-2 border-blue-500'
-                    : 'text-zinc-500 hover:text-zinc-300'
-                }`}
-              >
-                {tab === 'data' ? 'Datos' : 'Preview'}
-              </button>
-            ))}
+        {/* Central area */}
+        <main className="flex-1 min-w-0 flex flex-col overflow-hidden bg-background">
+          {/* Status bar */}
+          <div className="flex items-center justify-between px-4 h-9 border-b border-border-default text-[11px] text-muted font-body shrink-0">
+            <span className="flex items-center gap-1.5">
+              {spec.table ? (
+                <>
+                  <Table2 size={12} className="text-amber-500" />
+                  {spec.table} → {data.length} filas
+                </>
+              ) : (
+                'Selecciona una tabla para comenzar'
+              )}
+            </span>
+            <div className="flex items-center gap-3">
+              {resultTruncated && <span className="text-amber-600">Resultados truncados a 1000 filas</span>}
+              {loading && <span className="text-amber-500">Consultando...</span>}
+              {error && <span className="text-red-500">{error}</span>}
+            </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {sideTab === 'data' && meta && (
-              <QueryCanvas
-                spec={spec}
-                onChange={handleSpecChange}
-                meta={meta.tables}
-              />
-            )}
-            {sideTab === 'data' && !meta && (
-              <div className="space-y-3 animate-pulse">
-                <div className="h-8 bg-zinc-800 rounded" />
-                <div className="h-8 bg-zinc-800 rounded" />
-                <div className="h-20 bg-zinc-800 rounded" />
-              </div>
-            )}
-            {sideTab === 'preview' && (
-              <div className="space-y-4">
-                {/* Output mode toggle */}
-                <div>
-                  <label className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider mb-2 block">
-                    Modo de salida
-                  </label>
-                  <div className="grid grid-cols-2 gap-1">
-                    <button
-                      onClick={() => {
-                        templateDeselectRef.current = true;
-                        setOutputMode('static');
-                      }}
-                      className={`px-3 py-2 rounded text-xs font-medium transition-colors ${
-                        outputMode === 'static'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-                      }`}
-                    >
-                      <BarChart3 size={14} className="inline mr-1" />
-                      Estático
-                    </button>
-                    <button
-                      onClick={() => setOutputMode('animated')}
-                      className={`px-3 py-2 rounded text-xs font-medium transition-colors ${
-                        outputMode === 'animated'
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-                      }`}
-                    >
-                      <Film size={14} className="inline mr-1" />
-                      Animación
-                    </button>
+
+          {/* Data canvas OR live result */}
+          <div className="flex-1 min-h-0 overflow-hidden">
+            {view === 'data' ? (
+              meta ? (
+                <QueryCanvas spec={spec} onChange={handleSpecChange} meta={meta.tables} />
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <div className="space-y-3 animate-pulse w-full max-w-sm px-6">
+                    <div className="h-8 bg-elevated rounded-lg" />
+                    <div className="h-8 bg-elevated rounded-lg" />
+                    <div className="h-20 bg-elevated rounded-lg" />
                   </div>
                 </div>
+              )
+            ) : outputMode === 'static' ? (
+              <div className="h-full flex flex-col">
+                <div className="flex-1 overflow-auto flex items-center justify-center p-8">
+                  <div ref={staticExportRef} className="w-full max-w-4xl">
+                    {data.length === 0 ? (
+                      <div className="text-center text-muted text-sm font-body">
+                        Cargá datos en el canvas para ver tu gráfico
+                      </div>
+                    ) : (
+                      <ChartPreview data={data} config={chartConfig} />
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center justify-center gap-2 px-6 py-3 border-t border-border-default bg-card shrink-0">
+                  <button
+                    onClick={() => handleStaticExport('svg')}
+                    disabled={staticExporting !== 'none' || data.length === 0}
+                    className="px-3 h-9 bg-elevated hover:bg-card-hover disabled:opacity-40 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
+                    aria-label="Exportar gráfico como SVG"
+                  >
+                    <FileDown size={14} /> SVG
+                  </button>
+                  <button
+                    onClick={() => handleStaticExport('png')}
+                    disabled={staticExporting !== 'none' || data.length === 0}
+                    className="px-3 h-9 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
+                    aria-label="Exportar gráfico como PNG"
+                  >
+                    <Image size={14} /> PNG
+                  </button>
+                  <span className="ml-2 text-[10px] text-muted font-body">
+                    {data.length === 0 ? 'Cargá datos para exportar' : `${data.length} filas`}
+                  </span>
+                </div>
+              </div>
+            ) : activeTemplate ? (
+              <AnimationPreview
+                templateId={activeTemplate}
+                data={data}
+                config={chartConfig}
+                spec={spec}
+                templateProps={templateProps}
+                duration={duration}
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center text-muted text-sm font-body">
+                Seleccioná un template para previsualizar
+              </div>
+            )}
+          </div>
+        </main>
 
-                {outputMode === 'static' && (
-                  <ChartConfigPanel
-                    config={chartConfig}
-                    onChange={setChartConfig}
-                    columns={columns}
-                  />
-                )}
-                {outputMode === 'animated' && (
-                  <>
-                    <TemplatePicker
-                      data={data}
-                      config={chartConfig}
-                      selectedTemplate={activeTemplate}
-                      onSelect={(id) => {
-                        templateDeselectRef.current = false;
-                        setSelectedTemplate(id);
-                      }}
-                    />
+        {/* Right config panel — always configuration */}
+        <aside className="fixed inset-x-0 bottom-12 z-10 mx-2 mb-2 h-[58vh] rounded-xl border border-border-default flex flex-col overflow-hidden bg-card md:static md:inset-auto md:mx-0 md:mb-0 md:h-auto md:w-[22rem] md:shrink-0 md:rounded-none md:border-x-0 md:border-b-0 md:border-t lg:md:w-96">
+          <div className="flex items-center gap-2 px-4 h-10 border-b border-border-default shrink-0">
+            <SlidersHorizontal size={14} className="text-amber-500" />
+            <span className="text-micro font-semibold text-secondary uppercase tracking-widest font-display">
+              Configuración
+            </span>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* Output mode toggle */}
+            <div>
+              <label className="text-micro font-semibold text-muted uppercase tracking-widest mb-2 block font-display">
+                Modo de salida
+              </label>
+              <div className="grid grid-cols-2 gap-1">
+                <button
+                  onClick={() => {
+                    templateDeselectRef.current = true;
+                    setOutputMode('static');
+                  }}
+                  aria-pressed={outputMode === 'static'}
+                  className={`px-3 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                    outputMode === 'static'
+                      ? 'bg-amber-500 text-black'
+                      : 'bg-elevated text-secondary hover:bg-card-hover'
+                  }`}
+                >
+                  <BarChart3 size={14} />
+                  Estático
+                </button>
+                <button
+                  onClick={() => setOutputMode('animated')}
+                  aria-pressed={outputMode === 'animated'}
+                  className={`px-3 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                    outputMode === 'animated'
+                      ? 'bg-amber-500 text-black'
+                      : 'bg-elevated text-secondary hover:bg-card-hover'
+                  }`}
+                >
+                  <Film size={14} />
+                  Animación
+                </button>
+              </div>
+            </div>
 
-                    {/* Template data options + duration */}
-                    {activeTemplate && templateEntry && (
-                      <div className="space-y-3 border-t border-zinc-700 pt-3">
-                        {!isGenericTemplate(activeTemplate) ? (
-                          <>
-                            <label className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider">
-                              Datos de plantilla
-                            </label>
+            {outputMode === 'static' && (
+              <ChartConfigPanel
+                config={chartConfig}
+                onChange={setChartConfig}
+                columns={columns}
+              />
+            )}
+            {outputMode === 'animated' && (
+              <>
+                <TemplatePicker
+                  data={data}
+                  config={chartConfig}
+                  selectedTemplate={activeTemplate}
+                  onSelect={(id) => {
+                    templateDeselectRef.current = false;
+                    setSelectedTemplate(id);
+                  }}
+                />
 
-                            {templateEntry.meta.dataOptions.length > 0 && (
-                              <DataOptionsForm
-                                options={templateEntry.meta.dataOptions}
-                                values={templateOptions}
-                                onChange={(key, val) => setTemplateOptions((prev) => ({...prev, [key]: val}))}
-                              />
-                            )}
+                {/* Template data options + duration */}
+                {activeTemplate && templateEntry && (
+                  <div className="space-y-3 border-t border-border-default pt-3">
+                    {!isGenericTemplate(activeTemplate) ? (
+                      <>
+                        <label className="text-micro font-semibold text-muted uppercase tracking-widest font-display">
+                          Datos de plantilla
+                        </label>
 
-                            <button
-                              onClick={loadTemplateData}
-                              disabled={templateLoading}
-                              className="w-full bg-green-600 hover:bg-green-700 disabled:bg-zinc-700 text-white font-medium py-2 rounded-lg transition-colors text-sm"
-                            >
-                              {templateLoading ? 'Cargando...' : 'Cargar datos de plantilla'}
-                            </button>
-
-                            {templateError && (
-                              <div className="p-2 bg-red-900/20 border border-red-800 rounded text-red-400 text-xs">
-                                {templateError}
-                              </div>
-                            )}
-
-                            {templateProps && (
-                              <div className="p-2 bg-green-900/20 border border-green-800 rounded text-green-400 text-xs">
-                                Datos cargados correctamente
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <p className="text-[10px] text-zinc-500">
-                            Este template usa los datos de tu consulta automáticamente.
-                            Configurá los campos en el panel de gráfico.
-                          </p>
+                        {templateEntry.meta.dataOptions.length > 0 && (
+                          <DataOptionsForm
+                            options={templateEntry.meta.dataOptions}
+                            values={templateOptions}
+                            onChange={(key, val) => setTemplateOptions((prev) => ({...prev, [key]: val}))}
+                          />
                         )}
 
-                        {/* Duration slider */}
-                        <div>
-                          <label className="text-sm font-medium mb-1 block">
-                            Duración (segundos)
-                          </label>
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="range"
-                              min={1}
-                              max={20}
-                              value={duration}
-                              onChange={(e) => setDuration(Number(e.target.value))}
-                              className="flex-1 accent-blue-500"
-                            />
-                            <span className="text-sm text-zinc-300 w-20 text-right">
-                              {duration}s ({duration * (templateEntry.meta.fps ?? 30)} frames)
-                            </span>
+                        <button
+                          onClick={loadTemplateData}
+                          disabled={templateLoading}
+                          className="w-full bg-amber-500 hover:bg-amber-400 disabled:bg-elevated disabled:text-muted text-black font-semibold py-2 rounded-lg transition-colors text-sm"
+                        >
+                          {templateLoading ? 'Cargando...' : 'Cargar datos de plantilla'}
+                        </button>
+
+                        {templateError && (
+                          <div className="p-2 bg-red-500/10 border border-red-500/30 rounded text-red-500 text-xs">
+                            {templateError}
                           </div>
-                        </div>
-                      </div>
+                        )}
+
+                        {templateProps && (
+                          <div className="p-2 bg-emerald-500/10 border border-emerald-500/30 rounded text-emerald-600 text-xs">
+                            Datos cargados correctamente
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-[10px] text-muted">
+                        Este template usa los datos de tu consulta automáticamente.
+                        Configurá los campos en el panel de gráfico.
+                      </p>
                     )}
-                  </>
+
+                    {/* Duration slider */}
+                    <div>
+                      <label htmlFor="duration-slider" className="text-sm font-medium mb-1 block font-body">
+                        Duración (segundos)
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          id="duration-slider"
+                          type="range"
+                          min={1}
+                          max={20}
+                          value={duration}
+                          onChange={(e) => setDuration(Number(e.target.value))}
+                          className="flex-1 accent-amber-500"
+                        />
+                        <span className="text-sm text-secondary w-20 text-right font-mono">
+                          {duration}s ({duration * (templateEntry.meta.fps ?? 30)} frames)
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 )}
-              </div>
+              </>
+            )}
+
+            {view === 'data' && data.length > 0 && (
+              <button
+                onClick={() => goResult(2)}
+                className="w-full bg-elevated hover:bg-card-hover py-2 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5"
+              >
+                <ChartSpline size={14} /> Ver resultado
+              </button>
             )}
           </div>
         </aside>
-
-        {/* Main canvas — preview */}
-        <main className="flex-1 flex flex-col overflow-hidden">
-          {/* Status bar */}
-          <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800 text-xs text-zinc-500">
-            <span>
-              {spec.table ? `${spec.table} → ${data.length} filas` : 'Selecciona una tabla para comenzar'}
-            </span>
-            {resultTruncated && (
-              <span className="text-amber-400">
-                ⚠ Resultados truncados a 1000 filas
-              </span>
-            )}
-            {loading && <span className="text-blue-400">Consultando...</span>}
-            {error && <span className="text-red-400">{error}</span>}
-          </div>
-
-          {/* Preview area */}
-          {outputMode === 'static' ? (
-            <div className="flex-1 flex flex-col overflow-auto">
-              <div className="flex-1 flex flex-col items-center justify-center p-8">
-                <div className="w-full max-w-3xl">
-                  {chartConfig.title && (
-                    <h2 className="text-center text-lg font-semibold mb-4">{chartConfig.title}</h2>
-                  )}
-                  <div ref={staticExportRef}>
-                    <ChartPreview data={data} config={chartConfig} />
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center justify-center gap-2 px-6 py-3 border-t border-zinc-800 bg-zinc-900">
-                <button
-                  onClick={() => handleStaticExport('svg')}
-                  disabled={staticExporting !== 'none' || data.length === 0}
-                  className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed rounded text-xs transition-colors flex items-center gap-1.5"
-                  aria-label="Exportar gráfico como SVG"
-                >
-                  <FileDown size={14} /> SVG
-                </button>
-                <button
-                  onClick={() => handleStaticExport('png')}
-                  disabled={staticExporting !== 'none' || data.length === 0}
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed rounded text-xs transition-colors flex items-center gap-1.5"
-                  aria-label="Exportar gráfico como PNG"
-                >
-                  <Image size={14} /> PNG
-                </button>
-                <span className="ml-2 text-[10px] text-zinc-600">
-                  {data.length === 0 ? 'Cargá datos para exportar' : `${data.length} filas`}
-                </span>
-              </div>
-            </div>
-          ) : activeTemplate ? (
-            <AnimationPreview
-              templateId={activeTemplate}
-              data={data}
-              config={chartConfig}
-              spec={spec}
-              templateProps={templateProps}
-              duration={duration}
-            />
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-zinc-600 text-sm">
-              Selecciona un template para previsualizar
-            </div>
-          )}
-        </main>
       </div>
 
       {/* Mobile bottom navigation */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 flex">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border-default flex z-20">
         <button
-          onClick={() => setSideTab('data')}
-          className={`flex-1 py-3 text-xs font-medium transition-colors ${
-            sideTab === 'data' ? 'text-blue-400' : 'text-zinc-500'
+          onClick={() => setView('data')}
+          aria-pressed={view === 'data'}
+          className={`flex-1 py-3 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+            view === 'data' ? 'text-amber-500' : 'text-muted'
           }`}
         >
-          📊 Datos
+          <Database size={14} /> Datos
         </button>
         <button
-          onClick={() => setSideTab('preview')}
-          className={`flex-1 py-3 text-xs font-medium transition-colors ${
-            sideTab === 'preview' ? 'text-purple-400' : 'text-zinc-500'
+          onClick={() => goResult(2)}
+          aria-pressed={view === 'result'}
+          className={`flex-1 py-3 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+            view === 'result' ? 'text-amber-500' : 'text-muted'
           }`}
         >
-          🎬 Preview
+          <BarChart3 size={14} /> Resultado
         </button>
       </div>
     </div>

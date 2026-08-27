@@ -18,6 +18,7 @@ import {
   type ReactFlowInstance,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import {RotateCcw, RotateCw, Eraser, Database, MousePointerClick, Plus} from 'lucide-react';
 import {useUndoRedo} from '@/hooks/use-undo-redo';
 
 import {TableNode} from './table-node';
@@ -490,34 +491,38 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
   return (
     <div className="flex h-full overflow-hidden -m-4">
       {/* Left sidebar — table list */}
-      <div className="w-56 border-r border-zinc-800 overflow-y-auto p-2">
+      <div className="w-56 border-r border-border-default overflow-y-auto p-2">
         <div className="flex items-center justify-between mb-2">
-          <label className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider">
+          <label className="text-micro font-semibold text-muted uppercase tracking-widest font-display">
             Tablas
           </label>
           <div className="flex items-center gap-1">
             <button
               onClick={handleUndo}
               disabled={!canUndo}
-              className="text-[9px] text-zinc-600 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-1 text-muted hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed rounded"
               title="Deshacer (Ctrl+Z)"
+              aria-label="Deshacer"
             >
-              ↶
+              <RotateCcw size={13} />
             </button>
             <button
               onClick={handleRedo}
               disabled={!canRedo}
-              className="text-[9px] text-zinc-600 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-1 text-muted hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed rounded"
               title="Rehacer (Ctrl+Shift+Z)"
+              aria-label="Rehacer"
             >
-              ↷
+              <RotateCw size={13} />
             </button>
             {nodes.length > 0 && (
               <button
                 onClick={clearCanvas}
-                className="text-[9px] text-zinc-600 hover:text-red-400"
+                className="p-1 text-muted hover:text-red-500 rounded"
+                title="Limpiar canvas"
+                aria-label="Limpiar canvas"
               >
-                Limpiar
+                <Eraser size={13} />
               </button>
             )}
           </div>
@@ -548,29 +553,37 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
           fitView
           snapToGrid
           snapGrid={[15, 15]}
-          className="bg-zinc-950"
         >
-          <Background gap={15} size={1} color="#27272a" />
-          <Controls className="!bg-zinc-800 !border-zinc-700 !rounded-lg" />
+          <Background gap={15} size={1} color="var(--border)" />
+          <Controls className="!bg-elevated !border-border-default !rounded-lg" />
           <MiniMap
-            className="!bg-zinc-900 !border-zinc-700"
-            nodeColor="#3b82f6"
+            className="!bg-card !border-border-default"
+            nodeColor="#f59e0b"
             maskColor="rgba(0,0,0,0.5)"
           />
         </ReactFlow>
 
         {nodes.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="text-center text-zinc-600">
-              <p className="text-sm mb-1">Arrastra una tabla desde la izquierda</p>
-              <p className="text-[10px]">o haz clic en + para agregar al canvas</p>
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-6">
+            <div className="max-w-sm text-center border border-dashed border-border-default rounded-xl bg-card/40 p-8">
+              <div className="w-10 h-10 mx-auto mb-3 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                <Database size={18} className="text-amber-500" />
+              </div>
+              <p className="text-sm font-semibold text-primary font-body mb-1">Comenzá a modelar tus datos</p>
+              <p className="text-xs text-muted mb-3 font-body">
+                Arrastrá una tabla desde la lista de la izquierda, o tocá el botón <span className="inline-flex items-center gap-0.5"><Plus size={10} className="text-amber-500" /> +</span> para agregarla al canvas.
+              </p>
+              <div className="flex items-center gap-1.5 justify-center text-[10px] text-muted font-body">
+                <MousePointerClick size={12} className="text-amber-500" />
+                Conectá tablas para armar JOINs
+              </div>
             </div>
           </div>
         )}
       </div>
 
       {/* Right panel — properties */}
-      <div className="w-64 border-l border-zinc-800 overflow-y-auto p-3">
+      <div className="w-64 border-l border-border-default overflow-y-auto p-3">
         <PropertiesPanel
           spec={spec}
           meta={meta}

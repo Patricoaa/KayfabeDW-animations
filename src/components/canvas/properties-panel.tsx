@@ -1,6 +1,7 @@
 'use client';
 
 import {useCallback} from 'react';
+import {X} from 'lucide-react';
 import type {TableInfo, ColumnInfo} from '@/lib/schema-metadata';
 import {isNumericType, isDateType, isBooleanType} from '@/lib/schema-metadata';
 import type {QuerySpec, FilterRule, OrderClause, SelectField} from '@/lib/query-spec';
@@ -182,7 +183,7 @@ function TableProperties({
   return (
     <div className="space-y-4">
       <div>
-        <label className="text-xs font-medium text-zinc-400 mb-2 block">
+        <label className="text-micro font-semibold text-secondary uppercase tracking-widest mb-2 block font-display">
           Columnas de {table.name}
         </label>
         <div className="space-y-0.5">
@@ -192,15 +193,15 @@ function TableProperties({
               <div
                 key={col.name}
                 className={`flex items-center gap-1.5 px-2 py-1 rounded text-[11px] cursor-pointer transition-colors ${
-                  isSelected ? 'bg-blue-600/20 text-blue-300' : 'text-zinc-400 hover:bg-zinc-800/50'
+                  isSelected ? 'bg-amber-500/15 text-amber-500' : 'text-secondary hover:bg-card-hover'
                 }`}
                 onClick={() => onToggleColumn(table.name, col.name)}
               >
                 <span className={`text-[9px] font-mono px-1 rounded ${
-                  isNumericType(col.type) ? 'bg-blue-900/50 text-blue-300' :
-                  isDateType(col.type) ? 'bg-purple-900/50 text-purple-300' :
-                  isBooleanType(col.type) ? 'bg-green-900/50 text-green-300' :
-                  'bg-zinc-800 text-zinc-400'
+                  isNumericType(col.type) ? 'bg-blue-500/15 text-blue-400' :
+                  isDateType(col.type) ? 'bg-purple-500/15 text-purple-400' :
+                  isBooleanType(col.type) ? 'bg-emerald-500/15 text-emerald-400' :
+                  'bg-elevated text-muted'
                 }`}>
                   {isNumericType(col.type) ? '#' : isDateType(col.type) ? '@' : 'T'}
                 </span>
@@ -210,7 +211,7 @@ function TableProperties({
                     value={getAggregate(col.name)}
                     onClick={(e) => e.stopPropagation()}
                     onChange={(e) => setAggregate(col.name, e.target.value as typeof AGGREGATES[number] | '')}
-                    className="bg-zinc-900 border border-zinc-700 rounded px-1 text-[9px]"
+                    className="bg-elevated border border-border-default rounded px-1 text-[9px] focus:ring-1 focus:ring-amber-500"
                     aria-label={`Agregación para ${col.name}`}
                   >
                     <option value="">—</option>
@@ -219,7 +220,7 @@ function TableProperties({
                     ))}
                   </select>
                 )}
-                <span className="text-[9px] text-zinc-600">{col.type}</span>
+                <span className="text-[9px] text-muted">{col.type}</span>
               </div>
             );
           })}
@@ -228,13 +229,13 @@ function TableProperties({
 
       <div>
         <div className="flex items-center justify-between mb-1">
-          <label className="text-xs font-medium text-zinc-400">Filtros</label>
-          <button onClick={addFilter} className="text-[10px] text-blue-400 hover:text-blue-300">
+          <label className="text-micro font-semibold text-secondary">Filtros</label>
+          <button onClick={addFilter} className="text-[10px] text-amber-500 hover:text-amber-400 font-semibold">
             + Agregar
           </button>
         </div>
         {tableFilters.length === 0 ? (
-          <p className="text-[10px] text-zinc-600">Sin filtros</p>
+          <p className="text-[10px] text-muted">Sin filtros</p>
         ) : (
           <div className="space-y-1">
             {tableFilters.map((f, idx) => {
@@ -254,7 +255,7 @@ function TableProperties({
       </div>
 
       <div>
-        <label className="text-xs font-medium text-zinc-400 mb-1 block">GROUP BY</label>
+        <label className="text-micro font-semibold text-secondary mb-1 block">GROUP BY</label>
         <div className="flex flex-wrap gap-1">
           {table.columns.map((col) => {
             const qualified = `${table.name}.${col.name}`;
@@ -264,7 +265,7 @@ function TableProperties({
                 key={col.name}
                 onClick={() => toggleGroupBy(col.name)}
                 className={`px-1.5 py-0.5 rounded text-[10px] transition-colors ${
-                  active ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-500 hover:bg-zinc-700'
+                  active ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover'
                 }`}
               >
                 {col.name}
@@ -276,8 +277,8 @@ function TableProperties({
 
       <div>
         <div className="flex items-center justify-between mb-1">
-          <label className="text-xs font-medium text-zinc-400">ORDER BY</label>
-          <button onClick={addOrderBy} className="text-[10px] text-blue-400 hover:text-blue-300">
+          <label className="text-micro font-semibold text-secondary">ORDER BY</label>
+          <button onClick={addOrderBy} className="text-[10px] text-amber-500 hover:text-amber-400 font-semibold">
             + Agregar
           </button>
         </div>
@@ -288,7 +289,7 @@ function TableProperties({
               <select
                 value={o.column}
                 onChange={(e) => updateOrderBy(realIdx, {column: e.target.value})}
-                className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-1.5 py-0.5 text-[10px]"
+                className="flex-1 bg-elevated border border-border-default rounded px-1.5 py-0.5 text-[10px] font-body"
               >
                 {table.columns.map((c) => (
                   <option key={c.name} value={c.name}>{c.name}</option>
@@ -297,13 +298,13 @@ function TableProperties({
               <select
                 value={o.direction ?? 'asc'}
                 onChange={(e) => updateOrderBy(realIdx, {direction: e.target.value as 'asc' | 'desc'})}
-                className="w-14 bg-zinc-900 border border-zinc-700 rounded px-1.5 py-0.5 text-[10px]"
+                className="w-14 bg-elevated border border-border-default rounded px-1.5 py-0.5 text-[10px] font-body"
               >
                 <option value="asc">ASC</option>
                 <option value="desc">DESC</option>
               </select>
-              <button onClick={() => removeOrderBy(realIdx)} className="text-zinc-600 hover:text-red-400 text-[10px]">
-                ✕
+              <button onClick={() => removeOrderBy(realIdx)} className="p-0.5 text-muted hover:text-red-500 rounded" aria-label="Quitar orden">
+                <X size={11} />
               </button>
             </div>
           );
@@ -311,14 +312,14 @@ function TableProperties({
       </div>
 
       <div>
-        <label className="text-xs font-medium text-zinc-400 mb-1 block">LÍMITE</label>
+        <label className="text-micro font-semibold text-secondary mb-1 block">LÍMITE</label>
         <input
           type="number"
           min={1}
           max={5000}
           value={spec.limit ?? 100}
           onChange={(e) => updateLimit(Number(e.target.value))}
-          className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-[10px]"
+          className="w-full bg-elevated border border-border-default rounded px-2 py-1 text-[10px] font-body focus:ring-1 focus:ring-amber-500"
         />
       </div>
     </div>
@@ -346,7 +347,7 @@ function FilterRow({
       <select
         value={filter.column}
         onChange={(e) => onUpdate({column: e.target.value})}
-        className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-1.5 py-0.5 text-[10px]"
+        className="flex-1 bg-elevated border border-border-default rounded px-1.5 py-0.5 text-[10px] font-body"
       >
         {table.columns.map((c) => (
           <option key={c.name} value={c.name}>{c.name}</option>
@@ -355,7 +356,7 @@ function FilterRow({
       <select
         value={filter.op}
         onChange={(e) => onUpdate({op: e.target.value as FilterRule['op']})}
-        className="w-14 bg-zinc-900 border border-zinc-700 rounded px-1.5 py-0.5 text-[10px]"
+        className="w-14 bg-elevated border border-border-default rounded px-1.5 py-0.5 text-[10px] font-mono"
       >
         {ops.map((o) => (
           <option key={o} value={o}>{o}</option>
@@ -367,27 +368,27 @@ function FilterRow({
             type="date"
             value={filter.value ?? ''}
             onChange={(e) => onUpdate({value: e.target.value})}
-            className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-1.5 py-0.5 text-[10px]"
+            className="flex-1 bg-elevated border border-border-default rounded px-1.5 py-0.5 text-[10px] font-body"
           />
         ) : isNumeric ? (
           <input
             type="number"
             value={filter.value ?? ''}
             onChange={(e) => onUpdate({value: e.target.value})}
-            className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-1.5 py-0.5 text-[10px]"
+            className="flex-1 bg-elevated border border-border-default rounded px-1.5 py-0.5 text-[10px] font-body"
           />
         ) : (
           <input
             type="text"
             value={filter.value ?? ''}
             onChange={(e) => onUpdate({value: e.target.value})}
-            className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-1.5 py-0.5 text-[10px]"
+            className="flex-1 bg-elevated border border-border-default rounded px-1.5 py-0.5 text-[10px] font-body"
             placeholder="valor"
           />
         )
       )}
-      <button onClick={onRemove} className="text-zinc-600 hover:text-red-400 text-[10px]">
-        ✕
+      <button onClick={onRemove} className="p-0.5 text-muted hover:text-red-500 rounded" aria-label="Quitar filtro">
+        <X size={11} />
       </button>
     </div>
   );
@@ -405,7 +406,7 @@ function EdgeProperties({
   return (
     <div className="space-y-4">
       <div>
-        <label className="text-xs font-medium text-zinc-400 mb-2 block">Tipo de JOIN</label>
+        <label className="text-micro font-semibold text-secondary uppercase tracking-widest mb-2 block font-display">Tipo de JOIN</label>
         <div className="grid grid-cols-2 gap-1">
           {(['INNER', 'LEFT', 'RIGHT', 'FULL'] as JoinType[]).map((jt) => (
             <button
@@ -413,8 +414,8 @@ function EdgeProperties({
               onClick={() => onUpdate(edge.id, jt, edge.condition)}
               className={`px-2 py-1 rounded text-[10px] font-mono transition-colors ${
                 edge.joinType === jt
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                  ? 'bg-amber-500 text-black'
+                  : 'bg-elevated text-secondary hover:bg-card-hover'
               }`}
             >
               {jt}
@@ -424,17 +425,17 @@ function EdgeProperties({
       </div>
 
       <div>
-        <label className="text-xs font-medium text-zinc-400 mb-1 block">Condición ON</label>
+        <label className="text-micro font-semibold text-secondary mb-1 block font-display">Condición ON</label>
         <input
           type="text"
           value={edge.condition}
           onChange={(e) => onUpdate(edge.id, edge.joinType, e.target.value)}
-          className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-[10px] font-mono"
+          className="w-full bg-elevated border border-border-default rounded px-2 py-1.5 text-[10px] font-mono focus:ring-1 focus:ring-amber-500"
           placeholder="table1.column = table2.column"
         />
       </div>
 
-      <div className="text-[10px] text-zinc-500 space-y-1">
+      <div className="text-[10px] text-muted space-y-1">
         <p>Origen: {edge.sourceTable}</p>
         <p>Destino: {edge.targetTable}</p>
       </div>
@@ -480,27 +481,27 @@ function SummaryPanel({spec, meta}: {spec: QuerySpec; meta: TableInfo[]}) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-2">
-        <div className="bg-zinc-800/50 rounded p-2 text-center">
-          <div className="text-lg font-bold text-white">{tableCount}</div>
-          <div className="text-[10px] text-zinc-500">Tablas</div>
+        <div className="bg-elevated rounded-lg p-2 text-center">
+          <div className="text-lg font-bold text-primary font-display">{tableCount}</div>
+          <div className="text-micro text-muted font-display uppercase tracking-widest">Tablas</div>
         </div>
-        <div className="bg-zinc-800/50 rounded p-2 text-center">
-          <div className="text-lg font-bold text-white">{colCount}</div>
-          <div className="text-[10px] text-zinc-500">Columnas</div>
+        <div className="bg-elevated rounded-lg p-2 text-center">
+          <div className="text-lg font-bold text-primary font-display">{colCount}</div>
+          <div className="text-micro text-muted font-display uppercase tracking-widest">Columnas</div>
         </div>
-        <div className="bg-zinc-800/50 rounded p-2 text-center">
-          <div className="text-lg font-bold text-white">{joinCount}</div>
-          <div className="text-[10px] text-zinc-500">JOINs</div>
+        <div className="bg-elevated rounded-lg p-2 text-center">
+          <div className="text-lg font-bold text-primary font-display">{joinCount}</div>
+          <div className="text-micro text-muted font-display uppercase tracking-widest">JOINs</div>
         </div>
-        <div className="bg-zinc-800/50 rounded p-2 text-center">
-          <div className="text-lg font-bold text-white">{filterCount}</div>
-          <div className="text-[10px] text-zinc-500">Filtros</div>
+        <div className="bg-elevated rounded-lg p-2 text-center">
+          <div className="text-lg font-bold text-primary font-display">{filterCount}</div>
+          <div className="text-micro text-muted font-display uppercase tracking-widest">Filtros</div>
         </div>
       </div>
 
       <div>
-        <label className="text-xs font-medium text-zinc-400 mb-1 block">SQL Generado</label>
-        <pre className="p-2 bg-zinc-950 border border-zinc-800 rounded text-[10px] text-zinc-300 overflow-x-auto max-h-[200px]">
+        <label className="text-micro font-semibold text-secondary mb-1 block font-display">SQL Generado</label>
+        <pre className="p-2 bg-elevated border border-border-default rounded-lg text-[10px] text-primary font-mono overflow-x-auto max-h-[200px]">
           {sqlParts.length > 0 ? sqlParts.join('\n') : '-- Selecciona una tabla para comenzar --'}
         </pre>
       </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import {useCallback, useState} from 'react';
+import {LayoutGrid, Eye, Link2, Plus, X, Circle} from 'lucide-react';
 import type {TableInfo} from '@/lib/schema-metadata';
 import {getRelatedTables} from '@/lib/schema-metadata';
 
@@ -42,20 +43,21 @@ export function TableSidebar({tables, canvasTables, onAddTable}: TableSidebarPro
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Buscar tabla..."
-        className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-xs"
+        className="w-full bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
       />
 
       {relatedToShow.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="text-[10px] font-medium text-blue-400 uppercase tracking-wider">
+            <label className="text-micro font-semibold text-amber-500 uppercase tracking-widest font-display">
               Relacionadas a {showRelated}
             </label>
             <button
               onClick={() => setShowRelated(null)}
-              className="text-[10px] text-zinc-500 hover:text-white"
+              className="p-0.5 text-muted hover:text-primary rounded"
+              aria-label="Cerrar relacionadas"
             >
-              ✕
+              <X size={11} />
             </button>
           </div>
           <div className="space-y-0.5">
@@ -65,11 +67,11 @@ export function TableSidebar({tables, canvasTables, onAddTable}: TableSidebarPro
                 draggable
                 onDragStart={(e) => handleDragStart(e, t)}
                 onClick={() => onAddTable(t)}
-                className="w-full text-left px-2 py-1 rounded text-[11px] text-blue-300 bg-blue-900/20 hover:bg-blue-900/40 transition-colors flex items-center gap-1.5"
+                className="w-full text-left px-2 py-1 rounded text-[11px] text-amber-500 bg-amber-500/10 hover:bg-amber-500/20 transition-colors flex items-center gap-1.5 font-mono"
               >
-                <span>{t.kind === 'view' ? '📋' : '🗄️'}</span>
+                {t.kind === 'view' ? <Eye size={11} /> : <LayoutGrid size={11} />}
                 {t.name}
-                <span className="ml-auto text-[9px] text-blue-500">
+                <span className="ml-auto text-[9px] text-amber-500/70">
                   {t.columns?.length ?? 0} cols
                 </span>
               </button>
@@ -80,7 +82,7 @@ export function TableSidebar({tables, canvasTables, onAddTable}: TableSidebarPro
 
       {tablesList.length > 0 && (
         <div>
-          <label className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider mb-1 block">
+          <label className="text-micro font-semibold text-muted uppercase tracking-widest mb-1 block font-display">
             Tablas ({tablesList.length})
           </label>
           <div className="space-y-0.5 max-h-[200px] overflow-y-auto">
@@ -100,7 +102,7 @@ export function TableSidebar({tables, canvasTables, onAddTable}: TableSidebarPro
 
       {viewsList.length > 0 && (
         <div>
-          <label className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider mb-1 block">
+          <label className="text-micro font-semibold text-muted uppercase tracking-widest mb-1 block font-display">
             Vistas ({viewsList.length})
           </label>
           <div className="space-y-0.5 max-h-[200px] overflow-y-auto">
@@ -140,11 +142,13 @@ function TableItem({
       onDragStart={(e) => !isInCanvas && onDragStart(e, table)}
       className={`flex items-center gap-1.5 px-2 py-1 rounded text-[11px] transition-colors ${
         isInCanvas
-          ? 'text-zinc-600 cursor-default'
-          : 'text-zinc-300 hover:bg-zinc-800 cursor-grab'
+          ? 'text-muted cursor-default'
+          : 'text-secondary hover:bg-card-hover cursor-grab'
       }`}
     >
-      <span className="text-xs">{table.kind === 'view' ? '📋' : '🗄️'}</span>
+      {table.kind === 'view'
+        ? <Eye size={12} className="text-muted shrink-0" />
+        : <LayoutGrid size={12} className="text-muted shrink-0" />}
       <span className="flex-1 truncate font-mono">{table.name}</span>
       {!isInCanvas && (
         <>
@@ -153,25 +157,27 @@ function TableItem({
               e.stopPropagation();
               onShowRelated(table.name);
             }}
-            className="text-[9px] text-zinc-600 hover:text-blue-400 px-1"
+            className="p-0.5 text-muted hover:text-amber-500 rounded"
             title="Ver tablas relacionadas"
+            aria-label={`Ver tablas relacionadas a ${table.name}`}
           >
-            🔗
+            <Link2 size={11} />
           </button>
           <button
             onClick={(e) => {
               e.stopPropagation();
               onAdd(table);
             }}
-            className="text-[9px] text-zinc-600 hover:text-green-400 px-1"
+            className="p-0.5 text-muted hover:text-amber-500 rounded"
             title="Agregar al canvas"
+            aria-label={`Agregar ${table.name} al canvas`}
           >
-            +
+            <Plus size={11} />
           </button>
         </>
       )}
       {isInCanvas && (
-        <span className="text-[9px] text-green-600">●</span>
+        <Circle size={6} className="text-emerald-500 fill-emerald-500 shrink-0" />
       )}
     </div>
   );

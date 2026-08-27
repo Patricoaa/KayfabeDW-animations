@@ -9,7 +9,7 @@ type Props = {
 
 export function TableView({data, config}: Props) {
   if (data.length === 0) {
-    return <div className="flex items-center justify-center h-48 text-zinc-500 text-sm">Sin datos</div>;
+    return <div className="flex items-center justify-center h-48 text-muted text-sm">Sin datos</div>;
   }
 
   const columns = Object.keys(data[0]);
@@ -18,9 +18,9 @@ export function TableView({data, config}: Props) {
     <div className="overflow-x-auto">
       <table className="w-full text-xs">
         <thead>
-          <tr className="border-b border-zinc-700">
+          <tr className="border-b border-border-default">
             {columns.map((col) => (
-              <th key={col} className="text-left px-3 py-2 text-zinc-400 font-medium whitespace-nowrap">
+              <th key={col} className="text-left px-3 py-2 text-secondary font-medium whitespace-nowrap">
                 {col}
               </th>
             ))}
@@ -28,9 +28,9 @@ export function TableView({data, config}: Props) {
         </thead>
         <tbody>
           {data.slice(0, 50).map((row, i) => (
-            <tr key={i} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+            <tr key={i} className="border-b border-border-subtle hover:bg-card-hover">
               {columns.map((col) => (
-                <td key={col} className="px-3 py-1.5 text-zinc-300 whitespace-nowrap">
+                <td key={col} className="px-3 py-1.5 text-primary whitespace-nowrap">
                   {formatCell(row[col])}
                 </td>
               ))}
@@ -39,7 +39,7 @@ export function TableView({data, config}: Props) {
         </tbody>
       </table>
       {data.length > 50 && (
-        <div className="text-xs text-zinc-500 mt-2 text-center">
+        <div className="text-xs text-muted mt-2 text-center">
           Mostrando 50 de {data.length} filas
         </div>
       )}

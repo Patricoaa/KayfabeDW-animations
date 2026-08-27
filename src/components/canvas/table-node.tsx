@@ -3,6 +3,7 @@
 import {memo, useCallback} from 'react';
 import {Handle, Position} from '@xyflow/react';
 import type {NodeProps} from '@xyflow/react';
+import {LayoutGrid, Eye} from 'lucide-react';
 import type {TableInfo, ColumnInfo} from '@/lib/schema-metadata';
 import {isNumericType, isDateType, isBooleanType} from '@/lib/schema-metadata';
 
@@ -14,10 +15,10 @@ export type TableNodeData = {
 };
 
 function columnTypeColor(type: string): string {
-  if (isNumericType(type)) return 'bg-blue-900/50 text-blue-300';
-  if (isDateType(type)) return 'bg-purple-900/50 text-purple-300';
-  if (isBooleanType(type)) return 'bg-green-900/50 text-green-300';
-  return 'bg-zinc-800 text-zinc-400';
+  if (isNumericType(type)) return 'bg-blue-500/15 text-blue-500';
+  if (isDateType(type)) return 'bg-purple-500/15 text-purple-500';
+  if (isBooleanType(type)) return 'bg-emerald-500/15 text-emerald-500';
+  return 'bg-elevated text-muted';
 }
 
 function columnTypeBadge(type: string): string {
@@ -46,8 +47,8 @@ function ColumnRow({
     <div
       className={`flex items-center gap-1.5 px-2 py-0.5 text-[11px] rounded cursor-pointer transition-colors ${
         isSelected
-          ? 'bg-blue-600/20 text-blue-300'
-          : 'text-zinc-400 hover:bg-zinc-800/50'
+          ? 'bg-amber-500/15 text-amber-500'
+          : 'text-secondary hover:bg-card-hover'
       }`}
       onClick={(e) => {
         e.stopPropagation();
@@ -58,13 +59,13 @@ function ColumnRow({
         type="source"
         position={Position.Right}
         id={col.name}
-        className="!w-2 !h-2 !bg-zinc-600 !border-0 !right-[-4px]"
+        className="!w-2 !h-2 !bg-muted !border-0 !right-[-4px]"
       />
       <Handle
         type="target"
         position={Position.Left}
         id={col.name}
-        className="!w-2 !h-2 !bg-zinc-600 !border-0 !left-[-4px]"
+        className="!w-2 !h-2 !bg-muted !border-0 !left-[-4px]"
       />
       <span
         className={`w-3.5 text-center text-[9px] font-mono rounded ${columnTypeColor(col.type)}`}
@@ -72,14 +73,14 @@ function ColumnRow({
       >
         {columnTypeBadge(col.type)}
       </span>
-      <span className="flex-1 truncate font-mono text-[10px]">{col.name}</span>
+      <span className="flex-1 truncate font-mono text-[10px] text-secondary">{col.name}</span>
       {isPK && (
-        <span className="text-[8px] px-1 py-0 rounded bg-yellow-900/50 text-yellow-400 font-bold">
+        <span className="text-[8px] px-1 py-0 rounded bg-yellow-500/15 text-yellow-500 font-bold">
           PK
         </span>
       )}
       {isFK && (
-        <span className="text-[8px] px-1 py-0 rounded bg-orange-900/50 text-orange-400 font-bold">
+        <span className="text-[8px] px-1 py-0 rounded bg-orange-500/15 text-orange-500 font-bold">
           FK
         </span>
       )}
@@ -87,7 +88,7 @@ function ColumnRow({
         type="checkbox"
         checked={isSelected}
         onChange={() => onToggle(tableName, col.name)}
-        className="w-3 h-3 accent-blue-500"
+        className="w-3 h-3 accent-amber-500"
         onClick={(e) => e.stopPropagation()}
       />
     </div>
@@ -106,11 +107,13 @@ function TableNodeComponent({data}: NodeProps) {
   );
 
   return (
-    <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl min-w-[200px] max-w-[260px] overflow-hidden">
-      <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800 border-b border-zinc-700">
-        <span className="text-xs">{table.kind === 'view' ? '📋' : '🗄️'}</span>
-        <span className="text-xs font-semibold text-white truncate">{table.name}</span>
-        <span className="text-[9px] text-zinc-500 ml-auto">
+    <div className="bg-card border border-border-default rounded-lg min-w-[200px] max-w-[260px] overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-1.5 bg-elevated border-b border-border-default">
+        {table.kind === 'view'
+          ? <Eye size={13} className="text-amber-500" />
+          : <LayoutGrid size={13} className="text-amber-500" />}
+        <span className="text-xs font-display font-semibold text-primary truncate">{table.name}</span>
+        <span className="text-[9px] text-muted ml-auto">
           {selectedColumns.length}/{table.columns?.length ?? 0}
         </span>
       </div>

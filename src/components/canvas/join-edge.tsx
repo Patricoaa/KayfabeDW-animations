@@ -13,8 +13,8 @@ export type JoinEdgeData = {
 };
 
 const JOIN_COLORS: Record<JoinType, string> = {
-  INNER: '#3b82f6',
-  LEFT: '#f97316',
+  INNER: '#f59e0b',
+  LEFT: '#3b82f6',
   RIGHT: '#22c55e',
   FULL: '#a855f7',
 };
@@ -31,7 +31,7 @@ function JoinEdgeComponent({
   style,
 }: EdgeProps) {
   const {joinType = 'INNER', condition = '', onEdit} = (data ?? {}) as JoinEdgeData;
-  const color = JOIN_COLORS[joinType] ?? '#3b82f6';
+  const color = JOIN_COLORS[joinType] ?? '#f59e0b';
 
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,

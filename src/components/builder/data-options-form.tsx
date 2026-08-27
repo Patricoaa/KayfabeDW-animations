@@ -14,12 +14,12 @@ export function DataOptionsForm({options, values, onChange}: DataOptionsFormProp
     <div className="space-y-3">
       {options.map((opt) => (
         <div key={opt.key}>
-          <label className="block text-sm font-medium mb-1">{opt.label}</label>
+          <label className="block text-sm font-medium mb-1 font-display">{opt.label}</label>
           {opt.type === 'select' && opt.options ? (
             <select
               value={String(values[opt.key] ?? opt.default ?? '')}
               onChange={(e) => onChange(opt.key, e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+              className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
             >
               {opt.options.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -34,14 +34,14 @@ export function DataOptionsForm({options, values, onChange}: DataOptionsFormProp
               min={opt.min}
               max={opt.max}
               onChange={(e) => onChange(opt.key, Number(e.target.value))}
-              className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+              className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
             />
           ) : (
             <input
               type="text"
               value={String(values[opt.key] ?? opt.default ?? '')}
               onChange={(e) => onChange(opt.key, e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+              className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
             />
           )}
         </div>

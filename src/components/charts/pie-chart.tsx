@@ -14,7 +14,7 @@ export function PieChart({data, config}: Props) {
 
   if (slices.length === 0) {
     return (
-      <div className="flex items-center justify-center h-48 text-zinc-500 text-sm">
+      <div className="flex items-center justify-center h-48 text-muted text-sm">
         {data.length > 0 ? 'No hay valores positivos para el gráfico de pie' : 'Sin datos'}
       </div>
     );
@@ -53,8 +53,8 @@ export function PieChart({data, config}: Props) {
               className="w-3 h-3 rounded-sm flex-shrink-0"
               style={{backgroundColor: s.color ?? pickColor(config.colors, i)}}
             />
-            <span className="text-zinc-400 truncate max-w-[120px]">{s.label}</span>
-            <span className="text-zinc-300">{Math.round((s.value / total) * 100)}%</span>
+            <span className="text-secondary truncate max-w-[120px]">{s.label}</span>
+            <span className="text-primary">{Math.round((s.value / total) * 100)}%</span>
           </div>
         ))}
       </div>

@@ -1,27 +1,62 @@
 @import 'tailwindcss';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #0a0a0a;
-  --foreground: #ededed;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f1f5f9;
+  --bg-elevated: #f1f5f9;
+  --border: #e2e8f0;
+  --border-subtle: #f1f5f9;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
 }
 
-html.light,
-html.light body {
-  --background: #ffffff;
-  --foreground: #171717;
+.dark {
+  --background: #0f1218;
+  --foreground: #f1f5f9;
+  --bg-card: #151a24;
+  --bg-card-hover: #1a2030;
+  --bg-elevated: #1e2636;
+  --border: #1e2636;
+  --border-subtle: #1a2030;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--bg-card);
+  --color-card-hover: var(--bg-card-hover);
+  --color-elevated: var(--bg-elevated);
+  --color-border-default: var(--border);
+  --color-border-subtle: var(--border-subtle);
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-muted: var(--text-muted);
+  --font-sans: var(--font-dm-sans);
+  --font-body: var(--font-dm-sans);
+  --font-display: var(--font-space-grotesk);
+  --font-mono: var(--font-jetbrains-mono);
+  --color-amber-300: #fcd34d;
+  --color-amber-400: #fbbf24;
+  --color-amber-500: #f59e0b;
+  --color-amber-600: #d97706;
+  --color-amber-900: #92400e;
+  --text-micro: 10px;
+  --text-micro--line-height: 1rem;
 }
 
 html,
 body {
   margin: 0;
   padding: 0;
+  min-height: 100%;
   background: var(--background);
   color: var(--foreground);
-  font-family:
-    'Inter',
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
 }

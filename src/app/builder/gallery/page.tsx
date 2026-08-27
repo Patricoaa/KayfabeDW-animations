@@ -4,7 +4,7 @@ import {useCallback, useEffect, useMemo, useState} from 'react';
 import Link from 'next/link';
 import {useRouter} from 'next/navigation';
 import {useToast} from '@/components/ui/toast';
-import {BarChart3, TrendingUp, TrendingDown, PieChart, Zap, Table, Search, ArrowUpDown, Copy, Trash2, Folder} from 'lucide-react';
+import {BarChart3, TrendingUp, TrendingDown, PieChart, Zap, Table, Search, ArrowUpDown, Copy, Trash2, Folder, ArrowLeft, Plus, X} from 'lucide-react';
 
 const CHART_ICONS: Record<string, React.ComponentType<{size?: number; className?: string}>> = {
   bar: BarChart3,
@@ -16,12 +16,12 @@ const CHART_ICONS: Record<string, React.ComponentType<{size?: number; className?
 };
 
 const CHART_COLORS: Record<string, string> = {
-  bar: '#6366f1',
+  bar: '#f59e0b',
   line: '#3b82f6',
   area: '#22c55e',
   pie: '#a855f7',
   scatter: '#f97316',
-  table: '#64748b',
+  table: '#94a3b8',
 };
 
 type VizSpec = {
@@ -167,7 +167,7 @@ export default function GalleryPage() {
     return (
       <div
         key={spec.id}
-        className="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden hover:border-zinc-600 transition-colors"
+        className="bg-card border border-border-default rounded-lg overflow-hidden hover:border-amber-500/50 transition-colors"
       >
         {/* U4: Color-coded header bar */}
         <div className="h-1.5" style={{backgroundColor: accentColor}} />
@@ -175,29 +175,29 @@ export default function GalleryPage() {
         <div className="p-4">
           <div className="flex items-start justify-between mb-2">
             <div className="flex items-center gap-2 min-w-0">
-              <Icon size={20} />
-              <h3 className="font-medium truncate">{spec.name}</h3>
+              <Icon size={20} className="text-amber-500 shrink-0" />
+              <h3 className="font-display font-semibold truncate">{spec.name}</h3>
             </div>
             <div className="flex items-center gap-1 shrink-0">
               {spec.is_draft && (
-                <span className="text-[9px] text-amber-300 px-1.5 py-0.5 bg-amber-900/30 border border-amber-700/40 rounded">
+                <span className="text-[9px] text-amber-500 px-1.5 py-0.5 bg-amber-500/10 border border-amber-500/40 rounded">
                   borrador
                 </span>
               )}
               {typeof spec.version === 'number' && spec.version > 1 && (
-                <span title={`Versión ${spec.version}`} className="text-[9px] text-zinc-400 px-1.5 py-0.5 bg-zinc-800 rounded">
+                <span title={`Versión ${spec.version}`} className="text-[9px] text-secondary px-1.5 py-0.5 bg-elevated border border-border-subtle rounded">
                   v{spec.version}
                 </span>
               )}
-              <span className="text-[10px] text-zinc-500 px-1.5 py-0.5 bg-zinc-800 rounded">
+              <span className="text-[10px] text-muted px-1.5 py-0.5 bg-elevated border border-border-subtle rounded">
                 {chartType}
               </span>
             </div>
           </div>
-          <p className="text-[11px] text-zinc-500 font-mono mb-1">
+          <p className="text-[11px] text-secondary font-mono mb-1">
             {getSummary(spec)}
           </p>
-          <p className="text-[10px] text-zinc-600">
+          <p className="text-[10px] text-muted">
             {new Date(spec.created_at).toLocaleDateString('es', {
               day: 'numeric',
               month: 'short',
@@ -207,7 +207,7 @@ export default function GalleryPage() {
           <div className="mt-3 flex gap-2">
             <Link
               href={`/builder?edit=${spec.id}`}
-              className="flex-1 text-center px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-xs transition-colors"
+              className="flex-1 text-center px-3 py-1.5 bg-amber-500 hover:bg-amber-400 rounded text-xs font-semibold text-black transition-colors font-display"
             >
               Editar
             </Link>
@@ -215,14 +215,14 @@ export default function GalleryPage() {
               onClick={() => handleDuplicate(spec)}
               disabled={duplicating === spec.id}
               title="Duplicar visualización"
-              className="px-3 py-1.5 text-zinc-600 hover:text-blue-400 hover:bg-zinc-800 rounded text-xs transition-colors"
+              className="px-3 py-1.5 text-muted hover:text-amber-500 hover:bg-card-hover rounded text-xs transition-colors"
             >
               {duplicating === spec.id ? '...' : <Copy size={14} />}
             </button>
             <button
               onClick={() => handleDelete(spec.id)}
               disabled={deleting === spec.id}
-              className="px-3 py-1.5 text-zinc-600 hover:text-red-400 hover:bg-zinc-800 rounded text-xs transition-colors"
+              className="px-3 py-1.5 text-muted hover:text-red-500 hover:bg-card-hover rounded text-xs transition-colors"
             >
               {deleting === spec.id ? '...' : <Trash2 size={14} />}
             </button>
@@ -249,30 +249,30 @@ export default function GalleryPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <Link href="/builder" className="text-zinc-500 hover:text-white transition-colors text-sm">
-            ← Builder
+          <Link href="/builder" className="flex items-center gap-1 text-muted hover:text-primary transition-colors text-sm">
+            <ArrowLeft size={14} /> Builder
           </Link>
-          <h1 className="text-2xl font-bold">Galería de Visualizaciones</h1>
-          <span className="text-xs text-zinc-500">{specs.length} total</span>
+          <h1 className="text-2xl font-display font-bold">Galería de Visualizaciones</h1>
+          <span className="text-xs text-muted">{specs.length} total</span>
         </div>
         <Link
           href="/builder"
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded text-sm transition-colors"
+          className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-400 rounded text-sm font-semibold text-black transition-colors font-display"
         >
-          + Nueva
+          <Plus size={16} /> Nueva
         </Link>
       </div>
 
       {/* U3: Search + Sort + Filter bar */}
       {specs.length > 0 && (
-        <div className="flex items-center gap-3 mb-6">
+        <div className="flex items-center gap-3 mb-6 flex-wrap">
           {/* Search */}
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por nombre o tabla..."
-            className="flex-1 max-w-xs bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5 text-sm"
+            className="flex-1 max-w-xs bg-elevated border border-border-default rounded-lg px-3 py-1.5 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
           />
 
           {/* Chart type filter */}
@@ -281,8 +281,8 @@ export default function GalleryPage() {
               onClick={() => setTypeFilter('all')}
               className={`px-2 py-1 rounded text-xs transition-colors ${
                 typeFilter === 'all'
-                  ? 'bg-zinc-700 text-white'
-                  : 'text-zinc-500 hover:text-zinc-300'
+                  ? 'bg-amber-500 text-black font-semibold'
+                  : 'text-muted hover:text-primary'
               }`}
             >
               Todos
@@ -294,8 +294,8 @@ export default function GalleryPage() {
                 title={t}
                 className={`px-2 py-1 rounded text-xs transition-colors ${
                   typeFilter === t
-                    ? 'bg-zinc-700 text-white'
-                    : 'text-zinc-500 hover:text-zinc-300'
+                    ? 'bg-amber-500 text-black'
+                    : 'text-muted hover:text-primary'
                 }`}
               >
                 {(() => { const Icon = CHART_ICONS[t]; return Icon ? <Icon size={14} /> : <BarChart3 size={14} />; })()}
@@ -307,7 +307,7 @@ export default function GalleryPage() {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortKey)}
-            className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-xs"
+            className="bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
           >
             <option value="newest">Más recientes</option>
             <option value="oldest">Más antiguos</option>
@@ -320,8 +320,8 @@ export default function GalleryPage() {
             onClick={() => setGroupByTable((v) => !v)}
             className={`px-3 py-1.5 rounded text-xs flex items-center gap-1.5 transition-colors ${
               groupByTable
-                ? 'bg-blue-600 text-white'
-                : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                ? 'bg-amber-500 text-black font-semibold'
+                : 'bg-card-hover text-secondary hover:bg-border-subtle'
             }`}
             aria-pressed={groupByTable}
           >
@@ -334,25 +334,25 @@ export default function GalleryPage() {
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-48 bg-zinc-900 rounded-lg animate-pulse" />
+            <div key={i} className="h-48 bg-elevated rounded-lg animate-pulse" />
           ))}
         </div>
       ) : filteredSpecs.length === 0 ? (
-        <div className="text-center py-20 text-zinc-500">
+        <div className="text-center py-20 text-muted">
           {specs.length === 0 ? (
             <>
-              <p className="text-lg mb-2">No hay visualizaciones guardadas</p>
+              <p className="text-lg mb-2 font-display text-primary">No hay visualizaciones guardadas</p>
               <p className="text-sm mb-4">Crea tu primera visualización en el Builder</p>
               <Link
                 href="/builder"
-                className="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded text-sm text-white transition-colors"
+                className="inline-block px-4 py-2 bg-amber-500 hover:bg-amber-400 rounded text-sm font-semibold text-black transition-colors font-display"
               >
                 Ir al Builder
               </Link>
             </>
           ) : (
             <>
-              <p className="text-lg mb-2">Sin resultados</p>
+              <p className="text-lg mb-2 font-display text-primary">Sin resultados</p>
               <p className="text-sm">Prueba con otros filtros de búsqueda</p>
             </>
           )}
@@ -362,10 +362,10 @@ export default function GalleryPage() {
           {grouped.map(([table, items]) => (
             <div key={table}>
               <div className="flex items-center gap-2 mb-3">
-                <Folder size={14} className="text-zinc-500" />
-                <h2 className="text-sm font-semibold text-zinc-300">{table}</h2>
-                <span className="text-[10px] text-zinc-500">{items.length}</span>
-                <div className="flex-1 h-px bg-zinc-800" />
+                <Folder size={14} className="text-amber-500" />
+                <h2 className="text-sm font-semibold text-primary font-display">{table}</h2>
+                <span className="text-[10px] text-muted">{items.length}</span>
+                <div className="flex-1 h-px bg-border-subtle" />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {items.map(renderCard)}
@@ -380,10 +380,10 @@ export default function GalleryPage() {
       )}
 
       {deleteError && (
-        <div className="fixed bottom-4 right-4 p-3 bg-red-900/20 border border-red-800 rounded-lg text-red-400 text-sm max-w-sm">
-          {deleteError}
-          <button onClick={() => setDeleteError(null)} className="ml-2 text-red-300 hover:text-white">
-            ✕
+        <div className="fixed bottom-4 right-4 p-3 bg-red-500/15 border border-red-500/40 rounded-lg text-red-500 text-sm max-w-sm flex items-center gap-2">
+          <span className="flex-1">{deleteError}</span>
+          <button onClick={() => setDeleteError(null)} className="text-red-500 hover:text-red-400 rounded p-0.5" aria-label="Cerrar error">
+            <X size={14} />
           </button>
         </div>
       )}

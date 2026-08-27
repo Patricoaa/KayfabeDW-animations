@@ -1,94 +1,83 @@
 # Design System — KayfabeDW Animations
 
-## Colors
+> Mirrors the parent KayfabeDW Editorial/amber system. "This is serious software." — Every design decision serves this.
 
-### Background
-- Dark: `#0a0a0a` (zinc-950)
-- Surface: `#18181b` (zinc-900)
-- Border: `#27272a` (zinc-800)
+## 1. Aesthetic Direction
 
-### Text
-- Primary: `#ededed` (zinc-100)
-- Secondary: `#a1a1aa` (zinc-400)
-- Muted: `#71717a` (zinc-500)
+**Editorial** — magazine-inspired, premium sports publication feel. Serious but not cold.
 
-### Accent
-- Blue: `#2563eb` (blue-600)
-- Purple: `#9333ea` (purple-600)
-- Green: `#16a34a` (green-600)
-- Amber: `#d97706` (amber-600)
-- Red: `#dc2626` (red-600)
+- Strong typography hierarchy — Space Grotesk for display, DM Sans for body, JetBrains Mono for data.
+- Amber accent (`#fbbf24`) as the primary color — warm, premium, championship-caliber.
+- Zero shadows: depth through background-color layering only (darker bg → lighter card → lightest content).
+- Dark-mode-first, with full light-mode support via `@custom-variant dark`.
 
-### Chart Colors (Colorblind-safe, Wong 2011)
-1. `#0072B2` (blue)
-2. `#E69F00` (orange)
-3. `#009E73` (green)
-4. `#F0E442` (yellow)
-5. `#56B4E9` (light blue)
-6. `#D55E00` (vermillion)
-7. `#CC79A7` (pink)
-8. `#999999` (gray)
-9. `#332288` (indigo)
-10. `#88CCEE` (cyan)
-11. `#44AA99` (teal)
-12. `#117733` (forest)
+## 2. Color System
 
-## Typography
+### Brand: Amber
 
-### Font Stack
-```css
-'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif
-```
+| Token | Hex | Usage |
+|-------|-----|-------|
+| `amber-300` | `#fcd34d` | Button hover (dark) |
+| `amber-400` | `#fbbf24` | Primary buttons (dark), accent text, section labels |
+| `amber-500` | `#f59e0b` | Primary CTA, focus ring, canvas accents |
+| `amber-600` | `#d97706` | Links, active states |
 
-### Sizes
-- xs: 12px
-- sm: 14px
-- base: 16px
-- lg: 18px
-- xl: 20px
+### Surfaces & Text (tokens, resolved in `styles/global.css`)
 
-## Spacing
+| Context | Dark | Light |
+|---------|------|-------|
+| Page background (`--background`) | `#0f1218` | `#f8fafc` |
+| Card (`--bg-card`) | `#151a24` | `#ffffff` |
+| Card hover (`--bg-card-hover`) | `#1a2030` | `#f1f5f9` |
+| Elevated (`--bg-elevated`) | `#1e2636` | `#f1f5f9` |
+| Border (`--border`) | `#1e2636` | `#e2e8f0` |
+| Subtle border (`--border-subtle`) | `#1a2030` | `#f1f5f9` |
+| Primary text (`--text-primary`) | `#f1f5f9` | `#0f172a` |
+| Secondary text (`--text-secondary`) | `#94a3b8` | `#475569` |
+| Muted text (`--text-muted`) | `#64748b` | `#94a3b8` |
 
-- 1: 4px
-- 2: 8px
-- 3: 12px
-- 4: 16px
-- 6: 24px
-- 8: 32px
+Tailwind mappings: `bg-card`, `bg-card-hover`, `bg-elevated`, `border-border-default`, `border-border-subtle`, `text-primary`, `text-secondary`, `text-muted`, plus the `amber-*` scale and `--text-micro` (`10px`).
 
-## Border Radius
+Semantic accents used in the builder (chart types, join types, column types) keep distinct functional hues — blue/purple/emerald/orange — but all neutral surfaces and the primary accent are amber.
 
-- sm: 4px
-- md: 6px
-- lg: 8px
-- xl: 12px
+## 3. Typography
 
-## Shadows
+| Token | Font | Usage |
+|-------|------|-------|
+| `font-display` | Space Grotesk | All headings, stat numbers, labels, buttons |
+| `font-body` | DM Sans | Body text, form fields, badges |
+| `font-mono` | JetBrains Mono | Query/SQL, data values, table/column names |
 
-- sm: `0 1px 2px rgba(0,0,0,0.3)`
-- md: `0 4px 6px rgba(0,0,0,0.4)`
-- lg: `0 10px 15px rgba(0,0,0,0.5)`
+Base type scale: body 14px, button 13px (600), badge 10px (600), `text-micro` section labels 10px uppercase with wide tracking on Space Grotesk.
 
-## Transitions
+## 4. Layout — Builder
 
-- Fast: 150ms
-- Normal: 200ms
-- Slow: 300ms
+- **Canvas-first**: the data canvas is the hero (main flex-1 area).
+- Right config panel (`w-[22rem]`/`w-96`): output mode + chart template config + duration.
+- Central area toggles between the data canvas (step Datos) and the live result (static chart or AnimationPreview player, steps Configurar/Exportar).
+- Honest 3-step stepper: Datos → Configurar → Exportar.
+- Mobile: right panel becomes a bottom sheet; bottom nav toggles Datos/Resultado.
 
-## Component Patterns
+## 5. Components
 
-### Button
-- Primary: `bg-blue-600 hover:bg-blue-500 text-white rounded px-4 py-1.5`
-- Secondary: `bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded px-4 py-1.5`
-- Danger: `bg-red-600 hover:bg-red-500 text-white rounded px-4 py-1.5`
+- **Buttons**: Primary = amber bg, dark text, `font-display` semibold. Secondary = `bg-card-hover`/`bg-elevated`, secondary text. Ghost = transparent, muted text. Radius 8px, min-height 36px.
+- **Inputs/selects**: `bg-elevated border-border-default rounded-lg`, amber focus ring.
+- **Toggle**: real `<input type="checkbox" role="switch">` styled as amber switch (a11y).
+- **Cards**: `bg-card border-border-default rounded-lg`, amber-tinted hover border.
+- **Empty states**: designed onboarding cards with amber icon, dashed border, guidance text.
+- **Badges**: amber bg at low opacity + amber text; semantic badges use their functional hue.
+- **Focus**: amber ring (`focus:ring-amber-500`).
+- **Icons**: Lucide throughout — no emoji.
 
-### Input
-- `bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5 text-sm`
+## 6. Motion
 
-### Card
-- `bg-zinc-900 border border-zinc-800 rounded-lg`
+Minimal-functional only. Hover/focus 150ms ease. No entrance or decorative animation.
 
-### Toast
-- Success: `bg-green-900/90 border-green-700 text-green-200`
-- Error: `bg-red-900/90 border-red-700 text-red-200`
-- Info: `bg-zinc-800/90 border-zinc-600 text-zinc-200`
+## 7. Migration Notes
+
+Migrated 2026-08-27 from the original Inter/zinc/blue system to Editorial/amber.
+- All `blue-*` primary accents → `amber-*`.
+- All `zinc-*` surfaces/text/borders → semantic tokens.
+- All emoji → Lucide icons.
+- Removed shadows (`shadow-xl`, `shadow-2xl`) in favor of layered backgrounds.
+- `div`-based toggles → real checkbox switches.

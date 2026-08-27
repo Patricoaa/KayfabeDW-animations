@@ -1,6 +1,7 @@
 'use client';
 
 import {createContext, useCallback, useContext, useState, useRef, useEffect} from 'react';
+import {X} from 'lucide-react';
 
 type Toast = {
   id: number;
@@ -62,20 +63,20 @@ export function ToastProvider({children}: {children: React.ReactNode}) {
             key={t.id}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm shadow-lg border animate-in slide-in-from-right ${
               t.type === 'success'
-                ? 'bg-green-900/90 border-green-700 text-green-200'
+                ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-500'
                 : t.type === 'error'
-                ? 'bg-red-900/90 border-red-700 text-red-200'
-                : 'bg-zinc-800/90 border-zinc-600 text-zinc-200'
+                ? 'bg-red-500/15 border-red-500/40 text-red-500'
+                : 'bg-elevated border-border-default text-secondary'
             }`}
             role="alert"
           >
             <span className="flex-1">{t.message}</span>
             <button
               onClick={() => removeToast(t.id)}
-              className="text-zinc-400 hover:text-white ml-1"
+              className="text-muted hover:text-primary ml-1 rounded p-0.5"
               aria-label="Cerrar notificación"
             >
-              ✕
+              <X size={14} />
             </button>
           </div>
         ))}
