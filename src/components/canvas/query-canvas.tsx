@@ -153,7 +153,7 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
     const seen = new Set<string>();
     const onCanvas = new Set(Object.keys(canvasTableMap));
     const idFor = (tableName: string) => canvasTableMap[tableName]?.nodeId;
-    const push = (s: string, t: string, keySrc: string, keyDst: string, data: RelationshipEdgeData) => {
+    const push = (s: string, t: string, keySrc: string, keyDst: string, data: RelationshipEdgeData, sourceHandle?: string, targetHandle?: string) => {
       const key = [keySrc, keyDst].sort().join('::');
       if (seen.has(key)) return;
       seen.add(key);
@@ -161,6 +161,8 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
         id: `rel-${key}`,
         source: s,
         target: t,
+        sourceHandle,
+        targetHandle,
         type: 'relationshipEdge',
         selectable: false,
         draggable: false,
@@ -170,6 +172,8 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
     };
 
     // FK relationships between any two tables present on the canvas.
+    // Anchor the edge to the exact related-column handles so the dot sits
+    // on the field, and label it with the field-to-field relation.
     for (const t of meta) {
       if (!onCanvas.has(t.name)) continue;
       for (const fk of t.foreignKeys ?? []) {
@@ -177,10 +181,15 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
         const s = idFor(t.name);
         const tt = idFor(fk.refTable);
         if (!s || !tt) continue;
-        push(s, tt, t.name, fk.refTable, {
-          kind: 'fk',
-          label: `${t.name}.${fk.column} → ${fk.refTable}.${fk.refColumn}`,
-        });
+        push(
+          s,
+          tt,
+          t.name,
+          fk.refTable,
+          {kind: 'fk', label: `${fk.column} → ${fk.refColumn}`},
+          fk.column,
+          fk.refColumn,
+        );
       }
     }
 
@@ -228,6 +237,20 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
     [],
   );
 
+  // Delete a table node and its join edges
+  const handleDeleteTable = useCallback(
+    (tableName: string) => {
+      const tableNodeId = nodes.find((n) => (n.data as TableNodeData)?.table?.name === tableName)?.id;
+      if (!tableNodeId) return;
+      if (selectedNodeId === tableNodeId) setSelectedNodeId(null);
+      setNodes((nds) => nds.filter((n) => n.id !== tableNodeId));
+      setEdges((eds) =>
+        eds.filter((e) => e.source !== tableNodeId && e.target !== tableNodeId),
+      );
+    },
+    [nodes, selectedNodeId, setNodes, setEdges, setSelectedNodeId],
+  );
+
   // Initialize canvas from spec (when loading a saved viz_spec)
   useEffect(() => {
     if (initialized || meta.length === 0) return;
@@ -265,7 +288,7 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
         id,
         type: 'tableNode',
         position: {x: 50, y: 50},
-        data: {table: mainTable, selectedColumns: tableColumns[spec.table] ?? [], primary: true, onToggleColumn: handleToggleColumn} as unknown as TableNodeData,
+        data: {table: mainTable, selectedColumns: tableColumns[spec.table] ?? [], primary: true, onToggleColumn: handleToggleColumn, onDeleteTable: handleDeleteTable} as unknown as TableNodeData,
       });
     }
 
@@ -280,7 +303,7 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
         id,
         type: 'tableNode',
         position: {x: 400, y: 50 + initNodes.length * 200},
-        data: {table: joinTable, selectedColumns: tableColumns[join.table] ?? [], onToggleColumn: handleToggleColumn} as unknown as TableNodeData,
+        data: {table: joinTable, selectedColumns: tableColumns[join.table] ?? [], onToggleColumn: handleToggleColumn, onDeleteTable: handleDeleteTable} as unknown as TableNodeData,
       });
     }
 
@@ -318,7 +341,7 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
       setEdges(initEdges);
     }
     setInitialized(true);
-  }, [spec, meta, initialized, handleToggleColumn, setNodes, setEdges]);
+  }, [spec, meta, initialized, handleToggleColumn, handleDeleteTable, setNodes, setEdges]);
 
   // Sync selected columns to QuerySpec select
   useEffect(() => {
@@ -465,13 +488,14 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
           table,
           selectedColumns: table.columns.slice(0, 3).map((c) => c.name),
           onToggleColumn: handleToggleColumn,
+          onDeleteTable: handleDeleteTable,
           primary: !specRef.current.table,
         } as unknown as TableNodeData,
       };
 
       setNodes((nds) => [...nds, newNode]);
     },
-    [reactFlowInstance, canvasTableMap, setNodes, handleToggleColumn],
+    [reactFlowInstance, canvasTableMap, setNodes, handleToggleColumn, handleDeleteTable],
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -496,13 +520,14 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
           table,
           selectedColumns: table.columns.slice(0, 3).map((c) => c.name),
           onToggleColumn: handleToggleColumn,
+          onDeleteTable: handleDeleteTable,
           primary: !specRef.current.table,
         } as unknown as TableNodeData,
       };
 
       setNodes((nds) => [...nds, newNode]);
     },
-    [canvasTableMap, reactFlowInstance, nodes.length, setNodes, handleToggleColumn],
+    [canvasTableMap, reactFlowInstance, nodes.length, setNodes, handleToggleColumn, handleDeleteTable],
   );
 
   const clearCanvas = useCallback(() => {
@@ -512,6 +537,7 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
     nodeIdCounterRef.current = 0;
     onChange(defaultQuerySpec(''));
   }, [setNodes, setEdges, onChange]);
+
 
   const selectedNode = selectedNodeId
     ? nodes.find((n) => n.id === selectedNodeId)
@@ -662,6 +688,13 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
           meta={meta}
           selectedTable={panelNodeData?.table?.name ?? null}
           selectedColumns={panelNodeData?.selectedColumns ?? []}
+          allSelected={nodes
+            .map((n) => {
+              const d = n.data as TableNodeData;
+              if (!d?.table) return null;
+              return {table: d.table, selectedColumns: d.selectedColumns ?? []};
+            })
+            .filter((x): x is {table: TableInfo; selectedColumns: string[]} => x !== null)}
           selectedEdge={
             selectedEdge && edgeSourceTarget
               ? {

@@ -3,7 +3,7 @@
 import {memo, useCallback} from 'react';
 import {Handle, Position} from '@xyflow/react';
 import type {NodeProps} from '@xyflow/react';
-import {LayoutGrid, Eye} from 'lucide-react';
+import {LayoutGrid, Eye, Trash2} from 'lucide-react';
 import type {TableInfo, ColumnInfo} from '@/lib/schema-metadata';
 import {isNumericType, isDateType, isBooleanType} from '@/lib/schema-metadata';
 
@@ -11,6 +11,7 @@ export type TableNodeData = {
   table: TableInfo;
   selectedColumns: string[];
   onToggleColumn: (tableName: string, columnName: string) => void;
+  onDeleteTable?: (tableName: string) => void;
   primary?: boolean;
 };
 
@@ -96,7 +97,7 @@ function ColumnRow({
 }
 
 function TableNodeComponent({data}: NodeProps) {
-  const {table, selectedColumns, onToggleColumn} = data as unknown as TableNodeData;
+  const {table, selectedColumns, onToggleColumn, onDeleteTable} = data as unknown as TableNodeData;
 
   const fkColumns = new Set((table.foreignKeys ?? []).map((fk) => fk.column));
   const pkColumns = new Set(table.primaryKey ?? []);
@@ -116,6 +117,19 @@ function TableNodeComponent({data}: NodeProps) {
         <span className="text-[9px] text-muted ml-auto">
           {selectedColumns.length}/{table.columns?.length ?? 0}
         </span>
+        {onDeleteTable && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDeleteTable(table.name);
+            }}
+            className="p-0.5 text-muted hover:text-red-500 rounded transition-colors"
+            title={`Eliminar ${table.name}`}
+            aria-label={`Eliminar ${table.name}`}
+          >
+            <Trash2 size={12} />
+          </button>
+        )}
       </div>
       <div className="max-h-[300px] overflow-y-auto py-1">
         {table.columns.map((col) => (

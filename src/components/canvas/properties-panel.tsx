@@ -1,7 +1,7 @@
 'use client';
 
 import {useCallback} from 'react';
-import {X} from 'lucide-react';
+import {X, Eye, LayoutGrid} from 'lucide-react';
 import type {TableInfo, ColumnInfo} from '@/lib/schema-metadata';
 import {isNumericType, isDateType, isBooleanType} from '@/lib/schema-metadata';
 import type {QuerySpec, FilterRule, OrderClause, SelectField} from '@/lib/query-spec';
@@ -12,6 +12,7 @@ type PropertiesPanelProps = {
   meta: TableInfo[];
   selectedTable: string | null;
   selectedColumns: string[];
+  allSelected?: {table: TableInfo; selectedColumns: string[]}[];
   selectedEdge: {
     id: string;
     joinType: JoinType;
@@ -29,6 +30,7 @@ export function PropertiesPanel({
   meta,
   selectedTable,
   selectedColumns,
+  allSelected,
   selectedEdge,
   onSpecChange,
   onEdgeUpdate,
@@ -59,7 +61,7 @@ export function PropertiesPanel({
     }
   }
 
-  return <SummaryPanel spec={spec} meta={meta} />;
+  return <CrossTablePanel spec={spec} allSelected={allSelected ?? []} onSpecChange={onSpecChange} />;
 }
 
 function TableProperties({
@@ -443,60 +445,213 @@ function EdgeProperties({
   );
 }
 
-function SummaryPanel({spec, meta}: {spec: QuerySpec; meta: TableInfo[]}) {
-  const tableCount = new Set([
-    spec.table,
-    ...(spec.joins?.map((j) => j.table) ?? []),
-  ]).size;
-
-  const colCount = spec.select?.length ?? 0;
-  const filterCount = spec.filters?.length ?? 0;
-  const joinCount = spec.joins?.length ?? 0;
-
-  const sqlParts: string[] = [];
-  if (spec.table) sqlParts.push(`FROM ${spec.table}`);
+function buildSql(spec: QuerySpec): string[] {
+  const parts: string[] = [];
+  if (spec.table) parts.push(`FROM ${spec.table}`);
   if (spec.select && spec.select.length > 0 && !(spec.select.length === 1 && spec.select[0].column === '*')) {
     const cols = spec.select.map((f) => {
       const agg = f.aggregate ? `${f.aggregate}(${f.column})` : f.column;
       return f.alias ? `${agg} AS ${f.alias}` : agg;
     });
-    sqlParts.push(`SELECT ${cols.join(', ')}`);
+    parts.push(`SELECT ${cols.join(', ')}`);
   }
   if (spec.joins && spec.joins.length > 0) {
-    spec.joins.forEach((j) => sqlParts.push(`${j.type ?? 'INNER'} JOIN ${j.table} ON ${j.on}`));
+    spec.joins.forEach((j) => parts.push(`${j.type ?? 'INNER'} JOIN ${j.table} ON ${j.on}`));
   }
   if (spec.filters && spec.filters.length > 0) {
     const filters = spec.filters.map((f) => `${f.table ?? spec.table}.${f.column} ${f.op} ${f.value ?? ''}`);
-    sqlParts.push(`WHERE ${filters.join(' AND ')}`);
+    parts.push(`WHERE ${filters.join(' AND ')}`);
   }
   if (spec.groupBy && spec.groupBy.length > 0) {
-    sqlParts.push(`GROUP BY ${spec.groupBy.join(', ')}`);
+    parts.push(`GROUP BY ${spec.groupBy.join(', ')}`);
   }
   if (spec.orderBy && spec.orderBy.length > 0) {
     const orders = spec.orderBy.map((o) => `${o.table ?? spec.table}.${o.column} ${(o.direction ?? 'asc').toUpperCase()}`);
-    sqlParts.push(`ORDER BY ${orders.join(', ')}`);
+    parts.push(`ORDER BY ${orders.join(', ')}`);
   }
-  if (spec.limit) sqlParts.push(`LIMIT ${spec.limit}`);
+  if (spec.limit) parts.push(`LIMIT ${spec.limit}`);
+  return parts;
+}
+
+function CrossTablePanel({
+  spec,
+  allSelected,
+  onSpecChange,
+}: {
+  spec: QuerySpec;
+  allSelected: {table: TableInfo; selectedColumns: string[]}[];
+  onSpecChange: (spec: QuerySpec) => void;
+}) {
+  const AGGREGATES = ['sum', 'avg', 'count', 'min', 'max', 'count_distinct'] as const;
+
+  const addFilter = (table: TableInfo, colName: string) => {
+    const newFilter: FilterRule = {column: colName, op: '=', value: '', table: table.name};
+    onSpecChange({...spec, filters: [...(spec.filters ?? []), newFilter]});
+  };
+  const updateFilter = (idx: number, patch: Partial<FilterRule>) => {
+    const filters = [...(spec.filters ?? [])];
+    filters[idx] = {...filters[idx], ...patch};
+    onSpecChange({...spec, filters});
+  };
+  const removeFilter = (idx: number) => {
+    onSpecChange({...spec, filters: (spec.filters ?? []).filter((_, i) => i !== idx)});
+  };
+  const setAggregate = (qualified: string, agg: (typeof AGGREGATES)[number] | '') => {
+    const select = [...(spec.select ?? [])];
+    const idx = select.findIndex((f) => f.column === qualified);
+    if (idx === -1) return;
+    select[idx] = {...select[idx], aggregate: agg === '' ? undefined : agg};
+    onSpecChange({...spec, select});
+  };
+  const toggleGroupBy = (qualified: string) => {
+    const exists = spec.groupBy?.includes(qualified);
+    onSpecChange({
+      ...spec,
+      groupBy: exists
+        ? (spec.groupBy ?? []).filter((g) => g !== qualified)
+        : [...(spec.groupBy ?? []), qualified],
+    });
+  };
+  const toggleOrderBy = (table: TableInfo, colName: string) => {
+    const q = `${table.name}.${colName}`;
+    const exists = spec.orderBy?.some((o) => (o.table ?? spec.table) === table.name && o.column === colName);
+    if (exists) {
+      onSpecChange({
+        ...spec,
+        orderBy: (spec.orderBy ?? []).filter(
+          (o) => !((o.table ?? spec.table) === table.name && o.column === colName),
+        ),
+      });
+    } else {
+      onSpecChange({...spec, orderBy: [...(spec.orderBy ?? []), {column: colName, direction: 'asc', table: table.name}]});
+    }
+  };
+
+  const sqlParts = buildSql(spec);
+
+  if (allSelected.length === 0) {
+    return (
+      <div className="space-y-4">
+        <div>
+          <label className="text-micro font-semibold text-secondary uppercase tracking-widest mb-1 block font-display">Drilldown</label>
+          <p className="text-[10px] text-muted">
+            Seleccioná columnas en las tablas del canvas para filtrar y agregar en todas ellas.
+          </p>
+        </div>
+        <div>
+          <label className="text-micro font-semibold text-secondary mb-1 block font-display">SQL Generado</label>
+          <pre className="p-2 bg-elevated border border-border-default rounded-lg text-[10px] text-primary font-mono overflow-x-auto max-h-[200px]">
+            {sqlParts.length > 0 ? sqlParts.join('\n') : '-- Selecciona una tabla para comenzar --'}
+          </pre>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-2">
-        <div className="bg-elevated rounded-lg p-2 text-center">
-          <div className="text-lg font-bold text-primary font-display">{tableCount}</div>
-          <div className="text-micro text-muted font-display uppercase tracking-widest">Tablas</div>
-        </div>
-        <div className="bg-elevated rounded-lg p-2 text-center">
-          <div className="text-lg font-bold text-primary font-display">{colCount}</div>
-          <div className="text-micro text-muted font-display uppercase tracking-widest">Columnas</div>
-        </div>
-        <div className="bg-elevated rounded-lg p-2 text-center">
-          <div className="text-lg font-bold text-primary font-display">{joinCount}</div>
-          <div className="text-micro text-muted font-display uppercase tracking-widest">JOINs</div>
-        </div>
-        <div className="bg-elevated rounded-lg p-2 text-center">
-          <div className="text-lg font-bold text-primary font-display">{filterCount}</div>
-          <div className="text-micro text-muted font-display uppercase tracking-widest">Filtros</div>
-        </div>
+    <div className="space-y-5">
+      <div>
+        <label className="text-micro font-semibold text-secondary uppercase tracking-widest mb-2 block font-display">
+          Drilldown · todas las columnas
+        </label>
+        {allSelected.map(({table, selectedColumns}) => (
+          <div key={table.name} className="mb-4">
+            <div className="flex items-center gap-1.5 mb-1">
+              {table.kind === 'view' ? <Eye size={11} className="text-amber-500" /> : <LayoutGrid size={11} className="text-amber-500" />}
+              <span className="text-[11px] font-semibold text-primary font-display truncate">{table.name}</span>
+              <span className="text-[9px] text-muted ml-auto">{selectedColumns.length} cols</span>
+            </div>
+            {selectedColumns.length === 0 ? (
+              <p className="text-[10px] text-muted pl-0.5">Sin columnas seleccionadas</p>
+            ) : (
+              <div className="space-y-1">
+                {selectedColumns.map((colName) => {
+                  const col = table.columns.find((c) => c.name === colName);
+                  const qualified = `${table.name}.${colName}`;
+                  const qAgg = col && isNumericType(col.type)
+                    ? (spec.select?.find((f) => f.column === qualified)?.aggregate ?? '')
+                    : '';
+                  const inGroup = spec.groupBy?.includes(qualified);
+                  const inOrder = spec.orderBy?.some((o) => (o.table ?? spec.table) === table.name && o.column === colName);
+                  const colFilters = (spec.filters ?? [])
+                    .map((f, idx) => ({f, idx}))
+                    .filter(({f}) => (f.table ?? spec.table) === table.name && f.column === colName);
+                  const numType = col ? isNumericType(col.type) : false;
+
+                  return (
+                    <div key={colName} className="rounded-md bg-elevated/60 border border-border-subtle px-2 py-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-[9px] font-mono px-1 rounded ${
+                          isNumericType(col?.type ?? '') ? 'bg-blue-500/15 text-blue-400' :
+                          isDateType(col?.type ?? '') ? 'bg-purple-500/15 text-purple-400' :
+                          isBooleanType(col?.type ?? '') ? 'bg-emerald-500/15 text-emerald-400' :
+                          'bg-elevated text-muted'
+                        }`}>
+                          {isNumericType(col?.type ?? '') ? '#' : isDateType(col?.type ?? '') ? '@' : 'T'}
+                        </span>
+                        <span className="flex-1 truncate font-mono text-[10px] text-secondary">{colName}</span>
+                        <button
+                          onClick={() => toggleGroupBy(qualified)}
+                          className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors ${
+                            inGroup ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover'
+                          }`}
+                          title="Agrupar por esta columna"
+                        >
+                          G
+                        </button>
+                        <button
+                          onClick={() => toggleOrderBy(table, colName)}
+                          className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors ${
+                            inOrder ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover'
+                          }`}
+                          title="Ordenar por esta columna"
+                        >
+                          O
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-1 mt-1">
+                        {numType && (
+                          <select
+                            value={qAgg}
+                            onChange={(e) => setAggregate(qualified, e.target.value as typeof AGGREGATES[number] | '')}
+                            className="flex-1 bg-elevated border border-border-default rounded px-1 py-0.5 text-[9px] focus:ring-1 focus:ring-amber-500"
+                            aria-label={`Agregación para ${table.name}.${colName}`}
+                          >
+                            <option value="">—</option>
+                            {AGGREGATES.map((a) => (
+                              <option key={a} value={a}>{a}</option>
+                            ))}
+                          </select>
+                        )}
+                        <button
+                          onClick={() => addFilter(table, colName)}
+                          className="ml-auto text-[9px] text-amber-500 hover:text-amber-400 font-semibold"
+                        >
+                          + Filtro
+                        </button>
+                      </div>
+
+                      {colFilters.length > 0 && (
+                        <div className="space-y-1 mt-1">
+                          {colFilters.map(({f, idx}) => (
+                            <FilterRow
+                              key={idx}
+                              filter={f}
+                              table={table}
+                              onUpdate={(patch) => updateFilter(idx, patch)}
+                              onRemove={() => removeFilter(idx)}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ))}
       </div>
 
       <div>
