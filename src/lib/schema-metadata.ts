@@ -50,6 +50,12 @@ export async function getSchemaMetadata(): Promise<SchemaMetadata> {
   const res = await fetch('/api/schema-metadata');
   if (!res.ok) throw new Error(`Failed to fetch schema metadata: ${res.status}`);
   cached = (await res.json()) as SchemaMetadata;
+  for (const t of cached.tables) {
+    t.foreignKeys ??= [];
+    t.referencedBy ??= [];
+    t.primaryKey ??= [];
+    t.columns ??= [];
+  }
   return cached;
 }
 

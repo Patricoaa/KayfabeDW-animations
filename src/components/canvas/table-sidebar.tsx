@@ -70,7 +70,7 @@ export function TableSidebar({tables, canvasTables, onAddTable}: TableSidebarPro
                 <span>{t.kind === 'view' ? '📋' : '🗄️'}</span>
                 {t.name}
                 <span className="ml-auto text-[9px] text-blue-500">
-                  {t.columns.length} cols
+                  {t.columns?.length ?? 0} cols
                 </span>
               </button>
             ))}

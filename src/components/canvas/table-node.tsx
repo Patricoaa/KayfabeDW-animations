@@ -96,8 +96,8 @@ function ColumnRow({
 function TableNodeComponent({data}: NodeProps) {
   const {table, selectedColumns, onToggleColumn} = data as unknown as TableNodeData;
 
-  const fkColumns = new Set(table.foreignKeys.map((fk) => fk.column));
-  const pkColumns = new Set(table.primaryKey);
+  const fkColumns = new Set((table.foreignKeys ?? []).map((fk) => fk.column));
+  const pkColumns = new Set(table.primaryKey ?? []);
 
   const toggleColumn = useCallback(
     (colName: string) => onToggleColumn(table.name, colName),
@@ -110,7 +110,7 @@ function TableNodeComponent({data}: NodeProps) {
         <span className="text-xs">{table.kind === 'view' ? '📋' : '🗄️'}</span>
         <span className="text-xs font-semibold text-white truncate">{table.name}</span>
         <span className="text-[9px] text-zinc-500 ml-auto">
-          {selectedColumns.length}/{table.columns.length}
+          {selectedColumns.length}/{table.columns?.length ?? 0}
         </span>
       </div>
       <div className="max-h-[300px] overflow-y-auto py-1">
