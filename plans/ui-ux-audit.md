@@ -1,7 +1,7 @@
 # UI/UX Audit — KayfabeDW Animations
 
 **Date**: 2026-08-27
-**Last updated**: 2026-08-27 (post-Round 6)
+**Last updated**: 2026-08-27 (post-Round 7)
 **Score**: ~8.5/10 usability, 5/10 accessibility, 7.5/10 visual consistency
 
 ---
@@ -18,9 +18,9 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 |----------|-------|-------|-----------|
 | Critical (C) | 17 | 16 | 1 |
 | Accessibility (A) | 6 | 6 | 0 |
-| UX Flow (U) | 16 | 14 | 2 |
+| UX Flow (U) | 16 | 15 | 1 |
 | Visual Design (V) | 7 | 1 | 6 |
-| **Total** | **46** | **37** | **9** |
+| **Total** | **46** | **38** | **8** |
 
 ---
 
@@ -98,7 +98,7 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 |---|---|---|---|
 | **U10** | **No undo/redo** — accidental canvas changes are permanent | Frustration | ✅ **FIXED** — undo/redo with history stack, keyboard shortcuts (Ctrl+Z/Ctrl+Shift+Z), buttons in sidebar |
 | **U11** | **Auto-executes query on every change** — complex queries feel slow | Perceived lag | ✅ **FIXED** — debounce increased to 800ms, manual "▶ Ejecutar" button shown when pending |
-| **U12** | **No query result count limit warning** — expensive queries have no guard | Performance risk | ❌ Open |
+| **U12** | **No query result count limit warning** — expensive queries have no guard | Performance risk | ✅ **FIXED** — results truncated at 1000 rows, amber warning shown in status bar |
 | **U13** | **Save validation too lenient** — saves even with empty column selection | Empty viz_specs | ✅ **FIXED** — validates `spec.select` before save, shows toast error if empty |
 
 ### Export & Preview
@@ -208,10 +208,20 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 
 **Progress**: 37/46 issues fixed (80%)
 
+## Round 7 Summary (post-Round 7)
+
+**1 issue fixed** (U12):
+
+| Issue | Fix |
+|-------|-----|
+| **U12** | Query result limit: truncates at 1000 rows, amber warning in status bar |
+
+**Progress**: 38/46 issues fixed (83%)
+
 ### Remaining Issues by Priority
 
 | Priority | Issues | Est. Effort |
 |----------|--------|-------------|
 | **High** | (none remaining) | — |
-| **Medium** | U12 (query result count limit) | 1-2h |
+| **Medium** | (none remaining) | — |
 | **Low** | V1-V7 (design tokens, icons, responsive, etc.) | 2+ weeks |

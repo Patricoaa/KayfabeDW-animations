@@ -56,6 +56,7 @@ function BuilderContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingQuery, setPendingQuery] = useState(false);
+  const [resultTruncated, setResultTruncated] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [sideTab, setSideTab] = useState<'data' | 'preview'>('data');
@@ -137,6 +138,7 @@ function BuilderContent() {
     if (!q.table) return;
     setLoading(true);
     setError(null);
+    setResultTruncated(false);
     try {
       const res = await fetch('/api/query', {
         method: 'POST',
@@ -145,7 +147,14 @@ function BuilderContent() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? 'Error executing query');
-      setData(json.data ?? []);
+      const rows = json.data ?? [];
+      // U12: Warn if result exceeds 1000 rows
+      if (rows.length >= 1000) {
+        setResultTruncated(true);
+        setData(rows.slice(0, 1000));
+      } else {
+        setData(rows);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -458,6 +467,11 @@ function BuilderContent() {
             <span>
               {spec.table ? `${spec.table} → ${data.length} filas` : 'Selecciona una tabla para comenzar'}
             </span>
+            {resultTruncated && (
+              <span className="text-amber-400">
+                ⚠ Resultados truncados a 1000 filas
+              </span>
+            )}
             {loading && <span className="text-blue-400">Consultando...</span>}
             {error && <span className="text-red-400">{error}</span>}
           </div>
