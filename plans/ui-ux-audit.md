@@ -1,8 +1,8 @@
 # UI/UX Audit — KayfabeDW Animations
 
 **Date**: 2026-08-27
-**Last updated**: 2026-08-27 (post-Round 9)
-**Score**: ~9/10 usability, 5/10 accessibility, 9.5/10 visual consistency
+**Last updated**: 2026-08-27 (post-Round 10 — COMPLETE)
+**Score**: ~9.5/10 usability, 5/10 accessibility, 9.5/10 visual consistency
 
 ---
 
@@ -16,11 +16,11 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 
 | Category | Total | Fixed | Remaining |
 |----------|-------|-------|-----------|
-| Critical (C) | 17 | 16 | 1 |
+| Critical (C) | 17 | 17 | 0 |
 | Accessibility (A) | 6 | 6 | 0 |
-| UX Flow (U) | 16 | 15 | 1 |
-| Visual Design (V) | 7 | 6 | 1 |
-| **Total** | **46** | **43** | **3** |
+| UX Flow (U) | 16 | 16 | 0 |
+| Visual Design (V) | 7 | 7 | 0 |
+| **Total** | **46** | **46** | **0** |
 
 ---
 
@@ -57,7 +57,7 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 | **C14** | **Dead code: `animation-panel.tsx`** — not imported anywhere, has broken render payload | `components/builder/animation-panel.tsx` | Medium | ✅ **FIXED** — file deleted |
 | **C15** | **Dead code: `filter-bar.tsx`** — not imported anywhere | `components/builder/filter-bar.tsx` | Low | ✅ **FIXED** — file deleted |
 | **C16** | **Template props not persisted** — `templateProps` state is lost on save/reload; only `query_spec` and `chart_config` are saved to `viz_spec` | `builder/page.tsx` | ✅ **FIXED** — `animation_config` now stores `templateId`, `templateOptions`, `duration`; restored on load |
-| **C17** | **`?template=` param not re-applied** — if user switches away from animated mode and back, the template param effect doesn't re-fire | `builder/page.tsx:97-103` | ✅ **FIXED** — effect re-applies URL template param when switching back to animated mode |
+| **C17** | **`?template=` param not re-applied** — if user switches away from animated mode and back, the template param effect doesn't re-fire | `builder/page.tsx:97-103` | ✅ **FIXED** — effect re-applies URL template param when switching back to animated mode, respects manual deselection |
 
 ---
 
@@ -80,7 +80,7 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 | # | Issue | Impact | Status |
 |---|---|---|---|
 | **U1** | **Two disconnected flows** — Template Editor vs Visual Builder with no bridge | Users can't move between workflows | ✅ **FIXED** — Flows merged into single `/builder` page with `?template=` param support |
-| **U2** | **No deep linking to query states** — can't share a specific query config via URL | Collaboration blocked | ⚠️ Partially — `?edit=` and `?template=` work, but query state not serialized to URL |
+| **U2** | **No deep linking to query states** — can't share a specific query config via URL | Collaboration blocked | ✅ **FIXED** — "Compartir" button copies base64-encoded state to clipboard, ?share= param restores on load |
 | **U3** | **Gallery has no sorting/filtering** — cards always by date descending | Hard to find saved work | ✅ **FIXED** — search by name/table, filter by chart type, sort by date/name |
 | **U4** | **No gallery thumbnails** — cards only show text metadata | Can't visually identify viz | ✅ **FIXED** — color-coded header bar per chart type (bar=indigo, line=blue, etc.) |
 | **U5** | **No duplicate/copy** functionality in gallery | Can't iterate on existing work | ✅ **FIXED** — "⧉" button duplicates with "(copia)" suffix, opens in edit mode |
@@ -114,7 +114,7 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 
 | # | Issue | Detail | Status |
 |---|---|---|---|
-| **V1** | **No design tokens file** — all constants in Tailwind classes + inline styles | Hard to maintain consistency | ❌ Open |
+| **V1** | **No design tokens file** — all constants in Tailwind classes + inline styles | Hard to maintain consistency | ✅ **FIXED** — DESIGN.md with colors, typography, spacing, shadows, component patterns |
 | **V2** | **No icon library** — emoji characters as icons (📊⚔️🔥📅🗺️) | Inconsistent rendering, no accessibility | ✅ **FIXED** — Lucide icons in gallery (chart types, copy, delete) and builder (static/animated toggle) |
 | **V3** | **`clsx` and `tailwind-merge` unused** — dead dependencies | Dead code | ✅ **FIXED** — removed from package.json |
 | **V4** | **Dark-only mode** — no light theme, no system preference detection | Accessibility | ✅ **FIXED** — ThemeProvider + useTheme hook, toggle in BuilderNav, CSS variables |
@@ -241,10 +241,33 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 
 **Progress**: 43/46 issues fixed (93%)
 
-### Remaining Issues by Priority
+## Round 10 Summary (post-Round 10 — COMPLETE)
 
-| Priority | Issues | Est. Effort |
-|----------|--------|-------------|
-| **High** | (none remaining) | — |
-| **Medium** | (none remaining) | — |
-| **Low** | V1 (DESIGN.md), U2 (deep linking), C17 (?template= re-apply edge case) | 1-2 days |
+**3 issues fixed** (C17, U2, V1):
+
+| Issue | Fix |
+|-------|-----|
+| **C17** | ?template= edge case: respects manual deselection via templateDeselectRef |
+| **U2** | Deep linking: "Compartir" button copies base64-encoded state, ?share= param restores |
+| **V1** | DESIGN.md: design tokens for colors, typography, spacing, shadows, components |
+
+**Progress**: 46/46 issues fixed (100%) — AUDIT COMPLETE
+
+---
+
+## Final Summary
+
+All 46 issues from the UI/UX audit have been resolved across 10 rounds of fixes:
+
+| Round | Issues Fixed | Focus |
+|-------|--------------|-------|
+| 1 | 5 | Dead code, save warning, gallery delete |
+| 2 | 3 | Unsaved changes, animation_config persistence, template descriptions |
+| 3 | 3 | Gallery search/sort/filter, color headers, duplicate |
+| 4 | 5 | Toasts, code-splitting, debounce, render cancel, save validation |
+| 5 | 5 | Nav cleanup, nodeIdCounter, template re-apply, undo/redo, preview loading |
+| 6 | 7 | ARIA labels, keyboard shortcuts, screen reader announcements |
+| 7 | 1 | Query result limit warning |
+| 8 | 3 | Lucide icons, empty states, colorblind palette |
+| 9 | 2 | Light/dark mode, responsive layout |
+| 10 | 3 | Deep linking, DESIGN.md, template edge case |

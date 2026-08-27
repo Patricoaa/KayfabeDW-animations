@@ -49,6 +49,7 @@ function BuilderContent() {
   const searchParams = useSearchParams();
   const editId = searchParams.get('edit');
   const templateParam = searchParams.get('template');
+  const shareParam = searchParams.get('share');
   const {addToast} = useToast();
   const [spec, setSpec] = useState<QuerySpec>(defaultQuerySpec(''));
   const [chartConfig, setChartConfig] = useState<ChartConfig>(DEFAULT_CHART_CONFIG);
@@ -78,6 +79,7 @@ function BuilderContent() {
   const editIdRef = useRef<string | null>(editId);
   editIdRef.current = editId;
   const durationLoadedRef = useRef(false);
+  const templateDeselectRef = useRef(false);
 
   // Derived template state (must be before effects that reference activeTemplate)
   const bestTemplate = outputMode === 'animated' && data.length > 0
@@ -118,6 +120,20 @@ function BuilderContent() {
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Error loading viz_spec'));
   }, [editId]);
+
+  // U2: Restore state from share URL param
+  useEffect(() => {
+    if (!shareParam) return;
+    try {
+      const decoded = JSON.parse(decodeURIComponent(atob(shareParam)));
+      if (decoded.spec) setSpec(decoded.spec);
+      if (decoded.chartConfig) setChartConfig(decoded.chartConfig);
+      // Clear the share param from URL
+      window.history.replaceState(null, '', '/builder');
+    } catch {
+      // Invalid share param, ignore
+    }
+  }, [shareParam]);
 
   // Initialize duration from template default when template changes
   useEffect(() => {
@@ -201,8 +217,9 @@ function BuilderContent() {
   }, [saved]);
 
   // C17: Re-apply URL template param when switching back to animated mode
+  // (only if user hasn't explicitly deselected a template)
   useEffect(() => {
-    if (outputMode === 'animated' && templateParam && !selectedTemplate) {
+    if (outputMode === 'animated' && templateParam && !selectedTemplate && !templateDeselectRef.current) {
       setSelectedTemplate(templateParam);
     }
   }, [outputMode, templateParam, selectedTemplate]);
@@ -314,6 +331,19 @@ function BuilderContent() {
           >
             Galería
           </Link>
+          <button
+            onClick={() => {
+              const state = JSON.stringify({spec, chartConfig});
+              const encoded = btoa(encodeURIComponent(state));
+              const url = `${window.location.origin}/builder?share=${encoded}`;
+              navigator.clipboard.writeText(url);
+              addToast('Enlace copiado al portapapeles', 'success');
+            }}
+            className="px-4 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-sm transition-colors"
+            aria-label="Copiar enlace para compartir"
+          >
+            🔗 Compartir
+          </button>
         </div>
       </header>
 
@@ -360,7 +390,10 @@ function BuilderContent() {
                   </label>
                   <div className="grid grid-cols-2 gap-1">
                     <button
-                      onClick={() => setOutputMode('static')}
+                      onClick={() => {
+                        templateDeselectRef.current = true;
+                        setOutputMode('static');
+                      }}
                       className={`px-3 py-2 rounded text-xs font-medium transition-colors ${
                         outputMode === 'static'
                           ? 'bg-blue-600 text-white'
@@ -397,7 +430,10 @@ function BuilderContent() {
                       data={data}
                       config={chartConfig}
                       selectedTemplate={activeTemplate}
-                      onSelect={setSelectedTemplate}
+                      onSelect={(id) => {
+                        templateDeselectRef.current = false;
+                        setSelectedTemplate(id);
+                      }}
                     />
 
                     {/* Template data options + duration */}
