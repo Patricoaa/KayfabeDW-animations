@@ -1,8 +1,8 @@
 # UI/UX Audit — KayfabeDW Animations
 
 **Date**: 2026-08-27
-**Last updated**: 2026-08-27 (post-Round 8)
-**Score**: ~9/10 usability, 5/10 accessibility, 9/10 visual consistency
+**Last updated**: 2026-08-27 (post-Round 9)
+**Score**: ~9/10 usability, 5/10 accessibility, 9.5/10 visual consistency
 
 ---
 
@@ -19,8 +19,8 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 | Critical (C) | 17 | 16 | 1 |
 | Accessibility (A) | 6 | 6 | 0 |
 | UX Flow (U) | 16 | 15 | 1 |
-| Visual Design (V) | 7 | 4 | 3 |
-| **Total** | **46** | **41** | **5** |
+| Visual Design (V) | 7 | 6 | 1 |
+| **Total** | **46** | **43** | **3** |
 
 ---
 
@@ -117,8 +117,8 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 | **V1** | **No design tokens file** — all constants in Tailwind classes + inline styles | Hard to maintain consistency | ❌ Open |
 | **V2** | **No icon library** — emoji characters as icons (📊⚔️🔥📅🗺️) | Inconsistent rendering, no accessibility | ✅ **FIXED** — Lucide icons in gallery (chart types, copy, delete) and builder (static/animated toggle) |
 | **V3** | **`clsx` and `tailwind-merge` unused** — dead dependencies | Dead code | ✅ **FIXED** — removed from package.json |
-| **V4** | **Dark-only mode** — no light theme, no system preference detection | Accessibility | ❌ Open |
-| **V5** | **Builder not responsive** — fixed w-80/w-64 sidebars, desktop-only | Mobile unusable | ❌ Open |
+| **V4** | **Dark-only mode** — no light theme, no system preference detection | Accessibility | ✅ **FIXED** — ThemeProvider + useTheme hook, toggle in BuilderNav, CSS variables |
+| **V5** | **Builder not responsive** — fixed w-80/w-64 sidebars, desktop-only | Mobile unusable | ✅ **FIXED** — sidebar hidden on mobile, bottom nav tabs, responsive header |
 | **V6** | **Inconsistent button styles** — some rounded, some rounded-lg, varying padding | Visual noise | ⚠️ Partially — empty states improved with consistent styling |
 | **V7** | **Chart colors are rainbow** — not colorblind-friendly | Accessibility | ✅ **FIXED** — Wong 2011 colorblind-safe palette in DEFAULT_CHART_CONFIG |
 
@@ -230,10 +230,21 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 
 **Progress**: 41/46 issues fixed (89%)
 
+## Round 9 Summary (post-Round 9)
+
+**2 issues fixed** (V4, V5):
+
+| Issue | Fix |
+|-------|-----|
+| **V4** | Light/dark mode: ThemeProvider + useTheme hook, toggle in BuilderNav, CSS variables |
+| **V5** | Responsive: sidebar hidden on mobile, bottom nav tabs, responsive header inputs |
+
+**Progress**: 43/46 issues fixed (93%)
+
 ### Remaining Issues by Priority
 
 | Priority | Issues | Est. Effort |
 |----------|--------|-------------|
 | **High** | (none remaining) | — |
 | **Medium** | (none remaining) | — |
-| **Low** | V1 (DESIGN.md), V4 (light/dark mode), V5 (responsive) | 1-2 weeks |
+| **Low** | V1 (DESIGN.md), U2 (deep linking), C17 (?template= re-apply edge case) | 1-2 days |

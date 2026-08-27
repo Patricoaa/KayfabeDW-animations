@@ -5,6 +5,12 @@
   --foreground: #ededed;
 }
 
+html.light,
+html.light body {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
 html,
 body {
   margin: 0;

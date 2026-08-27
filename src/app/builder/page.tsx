@@ -282,12 +282,12 @@ function BuilderContent() {
         <div className="flex items-center gap-3">
           <BuilderNav />
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3">
           <input
             type="text"
             value={vizName}
             onChange={(e) => setVizName(e.target.value)}
-            className="bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5 text-sm w-64"
+            className="bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5 text-sm w-32 md:w-64"
             aria-label="Nombre de la visualización"
           />
           {pendingQuery && (
@@ -319,8 +319,8 @@ function BuilderContent() {
 
       {/* Main layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left sidebar */}
-        <aside className="w-80 border-r border-zinc-800 flex flex-col overflow-hidden">
+        {/* Left sidebar — hidden on mobile */}
+        <aside className="hidden md:flex w-80 border-r border-zinc-800 flex-col overflow-hidden">
           <div className="flex border-b border-zinc-800">
             {(['data', 'preview'] as const).map((tab) => (
               <button
@@ -504,6 +504,26 @@ function BuilderContent() {
             </div>
           )}
         </main>
+      </div>
+
+      {/* Mobile bottom navigation */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 flex">
+        <button
+          onClick={() => setSideTab('data')}
+          className={`flex-1 py-3 text-xs font-medium transition-colors ${
+            sideTab === 'data' ? 'text-blue-400' : 'text-zinc-500'
+          }`}
+        >
+          📊 Datos
+        </button>
+        <button
+          onClick={() => setSideTab('preview')}
+          className={`flex-1 py-3 text-xs font-medium transition-colors ${
+            sideTab === 'preview' ? 'text-purple-400' : 'text-zinc-500'
+          }`}
+        >
+          🎬 Preview
+        </button>
       </div>
     </div>
   );
