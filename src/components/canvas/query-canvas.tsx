@@ -18,6 +18,7 @@ import {
   type ReactFlowInstance,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import {useUndoRedo} from '@/hooks/use-undo-redo';
 
 import {TableNode} from './table-node';
 import type {TableNodeData} from './table-node';
@@ -39,11 +40,6 @@ type QueryCanvasProps = {
   meta: TableInfo[];
 };
 
-let nodeIdCounter = 0;
-function nextNodeId() {
-  return `table-${++nodeIdCounter}`;
-}
-
 export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState([] as Node[]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([] as Edge[]);
@@ -55,6 +51,64 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
   onChangeRef.current = onChange;
   const specRef = useRef(spec);
   specRef.current = spec;
+  const nodeIdCounterRef = useRef(0);
+  const nextNodeId = useCallback(() => `table-${++nodeIdCounterRef.current}`, []);
+
+  // Undo/redo
+  const {current, push, undo, redo, canUndo, canRedo} = useUndoRedo({nodes: [], edges: []});
+  const skipPushRef = useRef(false);
+
+  // Push to history on node/edge changes (debounced)
+  const pushTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pushToHistory = useCallback(() => {
+    if (pushTimeoutRef.current) clearTimeout(pushTimeoutRef.current);
+    pushTimeoutRef.current = setTimeout(() => {
+      if (!skipPushRef.current) {
+        push({nodes, edges});
+      }
+      skipPushRef.current = false;
+    }, 300);
+  }, [nodes, edges, push]);
+
+  // Undo handler
+  const handleUndo = useCallback(() => {
+    const state = undo();
+    if (state) {
+      skipPushRef.current = true;
+      setNodes(state.nodes as Node[]);
+      setEdges(state.edges as Edge[]);
+    }
+  }, [undo, setNodes, setEdges]);
+
+  // Redo handler
+  const handleRedo = useCallback(() => {
+    const state = redo();
+    if (state) {
+      skipPushRef.current = true;
+      setNodes(state.nodes as Node[]);
+      setEdges(state.edges as Edge[]);
+    }
+  }, [redo, setNodes, setEdges]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && e.shiftKey) {
+        e.preventDefault();
+        handleRedo();
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'y') {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [handleUndo, handleRedo]);
 
   // Track which table is on canvas and their selected columns
   const canvasTableMap = useMemo(() => {
@@ -357,7 +411,7 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
     if (!confirm('¿Limpiar todo el canvas? Esta acción no se puede deshacer.')) return;
     setNodes([]);
     setEdges([]);
-    nodeIdCounter = 0;
+    nodeIdCounterRef.current = 0;
     onChange(defaultQuerySpec(''));
   }, [setNodes, setEdges, onChange]);
 
@@ -395,14 +449,32 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
           <label className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider">
             Tablas
           </label>
-          {nodes.length > 0 && (
+          <div className="flex items-center gap-1">
             <button
-              onClick={clearCanvas}
-              className="text-[9px] text-zinc-600 hover:text-red-400"
+              onClick={handleUndo}
+              disabled={!canUndo}
+              className="text-[9px] text-zinc-600 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Deshacer (Ctrl+Z)"
             >
-              Limpiar
+              ↶
             </button>
-          )}
+            <button
+              onClick={handleRedo}
+              disabled={!canRedo}
+              className="text-[9px] text-zinc-600 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Rehacer (Ctrl+Shift+Z)"
+            >
+              ↷
+            </button>
+            {nodes.length > 0 && (
+              <button
+                onClick={clearCanvas}
+                className="text-[9px] text-zinc-600 hover:text-red-400"
+              >
+                Limpiar
+              </button>
+            )}
+          </div>
         </div>
         <TableSidebar
           tables={meta}

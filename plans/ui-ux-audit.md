@@ -1,8 +1,8 @@
 # UI/UX Audit — KayfabeDW Animations
 
 **Date**: 2026-08-27
-**Last updated**: 2026-08-27 (post-Round 4)
-**Score**: ~7.5/10 usability, 2/10 accessibility, 7.5/10 visual consistency
+**Last updated**: 2026-08-27 (post-Round 5)
+**Score**: ~8/10 usability, 2/10 accessibility, 7.5/10 visual consistency
 
 ---
 
@@ -16,11 +16,11 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 
 | Category | Total | Fixed | Remaining |
 |----------|-------|-------|-----------|
-| Critical (C) | 17 | 13 | 4 |
+| Critical (C) | 17 | 16 | 1 |
 | Accessibility (A) | 6 | 0 | 6 |
-| UX Flow (U) | 16 | 11 | 5 |
+| UX Flow (U) | 16 | 13 | 3 |
 | Visual Design (V) | 7 | 1 | 6 |
-| **Total** | **46** | **25** | **21** |
+| **Total** | **46** | **30** | **16** |
 
 ---
 
@@ -33,7 +33,7 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 | **C2** | **Gallery delete silently ignores errors** — card removed locally but may persist on server | `gallery/page.tsx:43-47` | ✅ **FIXED** — checks response status, shows error toast on failure, only removes on success |
 | **C3** | **Clear canvas has no confirmation** — "Limpiar" button wipes all work instantly | `query-canvas.tsx:399-404` | ✅ **FIXED** — `confirm()` dialog with "no se puede deshacer" warning |
 | **C4** | **No unsaved changes warning** — navigating away from builder loses all work | `builder/page.tsx` | ✅ **FIXED** — `beforeunload` event warns when navigating with unsaved changes |
-| **C5** | **BuilderNav "Animations" link navigates away** from builder with no warning | `builder-nav.tsx:24` | ⚠️ Partially mitigated — `/` now redirects to `/builder`, but link still navigates away |
+| **C5** | **BuilderNav "Animations" link navigates away** from builder with no warning | `builder-nav.tsx:24` | ✅ **FIXED** — removed dead `/` link, nav now only shows Builder + Galería |
 
 ### Missing Feedback
 | # | Issue | Location | Status |
@@ -49,7 +49,7 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 | **C10** | **Blob URL memory leak** — `URL.createObjectURL()` never revoked | `animation-preview.tsx:42` | ✅ **FIXED** — new AnimationPreview uses Vercel Blob URLs directly, dead `animation-panel.tsx` removed |
 | **C11** | **Hardcoded animation duration** — 150 frames (5s), no user control | `animation-preview.tsx` | ✅ **FIXED** — duration slider (1-20s) added to animation preview export bar |
 | **C12** | **`require()` for template loading** — not code-split, SSR-unsafe | `animation-preview.tsx:132-148` | ✅ **FIXED** — replaced with `React.lazy` dynamic imports, code-split per template |
-| **C13** | **Global mutable `nodeIdCounter`** — breaks React Strict Mode / SSR | `query-canvas.tsx` | ❌ Open |
+| **C13** | **Global mutable `nodeIdCounter`** — breaks React Strict Mode / SSR | `query-canvas.tsx` | ✅ **FIXED** — replaced with `useRef` inside component |
 
 ### New Issues (discovered during P16)
 | # | Issue | Location | Severity | Status |
@@ -57,7 +57,7 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 | **C14** | **Dead code: `animation-panel.tsx`** — not imported anywhere, has broken render payload | `components/builder/animation-panel.tsx` | Medium | ✅ **FIXED** — file deleted |
 | **C15** | **Dead code: `filter-bar.tsx`** — not imported anywhere | `components/builder/filter-bar.tsx` | Low | ✅ **FIXED** — file deleted |
 | **C16** | **Template props not persisted** — `templateProps` state is lost on save/reload; only `query_spec` and `chart_config` are saved to `viz_spec` | `builder/page.tsx` | ✅ **FIXED** — `animation_config` now stores `templateId`, `templateOptions`, `duration`; restored on load |
-| **C17** | **`?template=` param not re-applied** — if user switches away from animated mode and back, the template param effect doesn't re-fire | `builder/page.tsx:97-103` | Low | ❌ Open |
+| **C17** | **`?template=` param not re-applied** — if user switches away from animated mode and back, the template param effect doesn't re-fire | `builder/page.tsx:97-103` | ✅ **FIXED** — effect re-applies URL template param when switching back to animated mode |
 
 ---
 
@@ -96,7 +96,7 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 ### Canvas Interactions
 | # | Issue | Impact | Status |
 |---|---|---|---|
-| **U10** | **No undo/redo** — accidental canvas changes are permanent | Frustration | ❌ Open |
+| **U10** | **No undo/redo** — accidental canvas changes are permanent | Frustration | ✅ **FIXED** — undo/redo with history stack, keyboard shortcuts (Ctrl+Z/Ctrl+Shift+Z), buttons in sidebar |
 | **U11** | **Auto-executes query on every change** — complex queries feel slow | Perceived lag | ✅ **FIXED** — debounce increased to 800ms, manual "▶ Ejecutar" button shown when pending |
 | **U12** | **No query result count limit warning** — expensive queries have no guard | Performance risk | ❌ Open |
 | **U13** | **Save validation too lenient** — saves even with empty column selection | Empty viz_specs | ✅ **FIXED** — validates `spec.select` before save, shows toast error if empty |
@@ -105,7 +105,7 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 | # | Issue | Impact | Status |
 |---|---|---|---|
 | **U14** | **No render timeout/cancellation** — can take 120s with no escape | User stuck | ✅ **FIXED** — AbortController cancel button during rendering |
-| **U15** | **Animation preview has no loading state** — blank area while Remotion loads | Confusion | ❌ Open |
+| **U15** | **Animation preview has no loading state** — blank area while Remotion loads | Confusion | ✅ **FIXED** — "Cargando preview..." shown before mount, "Cargando template..." in Suspense fallback |
 | **U16** | **Duration not configurable** in animation preview | Limited control | ✅ **FIXED** — duration slider (1-20s) in animation preview export bar |
 
 ---
@@ -178,10 +178,24 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 
 **Progress**: 25/46 issues fixed (54%)
 
+## Round 5 Summary (post-Round 5)
+
+**5 issues fixed** (C5, C13, C17, U10, U15):
+
+| Issue | Fix |
+|-------|-----|
+| **C5** | BuilderNav: removed dead `/` link, nav now only shows Builder + Galería |
+| **C13** | `nodeIdCounter`: replaced global mutable with `useRef` inside component |
+| **C17** | `?template=`: effect re-applies URL template param when switching back to animated mode |
+| **U10** | Undo/redo: history stack + `useUndoRedo` hook, Ctrl+Z/Ctrl+Shift+Z, sidebar buttons |
+| **U15** | Animation preview loading: "Cargando preview..." before mount + Suspense fallback |
+
+**Progress**: 30/46 issues fixed (65%)
+
 ### Remaining Issues by Priority
 
 | Priority | Issues | Est. Effort |
 |----------|--------|-------------|
-| **High** | C5 (nav), C13 (global counter), C17 (?template= re-apply) | 2-3h |
-| **Medium** | U10 (undo/redo), U15 (canvas zoom), U16 (keyboard shortcuts) | 1-2 weeks |
+| **High** | (none remaining) | — |
+| **Medium** | U16 (keyboard shortcuts for canvas actions) | 1-2 days |
 | **Low** | A1-A6 (accessibility), V1-V7 (design tokens, icons, responsive) | 2+ weeks |

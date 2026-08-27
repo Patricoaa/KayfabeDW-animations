@@ -4,7 +4,6 @@ import Link from 'next/link';
 import {usePathname} from 'next/navigation';
 
 const NAV_ITEMS = [
-  {href: '/', label: 'Animations'},
   {href: '/builder', label: 'Builder'},
   {href: '/builder/gallery', label: 'Galería'},
 ];

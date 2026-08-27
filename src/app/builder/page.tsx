@@ -190,6 +190,13 @@ function BuilderContent() {
     return () => window.removeEventListener('beforeunload', handler);
   }, [saved]);
 
+  // C17: Re-apply URL template param when switching back to animated mode
+  useEffect(() => {
+    if (outputMode === 'animated' && templateParam && !selectedTemplate) {
+      setSelectedTemplate(templateParam);
+    }
+  }, [outputMode, templateParam, selectedTemplate]);
+
   const loadTemplateData = useCallback(async () => {
     if (!activeTemplate) return;
     setTemplateLoading(true);

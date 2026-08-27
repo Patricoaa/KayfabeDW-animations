@@ -129,6 +129,9 @@ export function AnimationPreview({
       <div className="flex-1 flex items-center justify-center p-6 overflow-auto bg-zinc-950">
         <div className="w-full max-w-4xl">
           <div className="border border-zinc-700 rounded-lg overflow-hidden shadow-2xl">
+            {!mounted && (
+              <div className="p-8 text-zinc-500 text-sm text-center">Cargando preview...</div>
+            )}
             {mounted && Comp && (
               <React.Suspense fallback={<div className="p-8 text-zinc-500 text-sm text-center">Cargando template...</div>}>
                 <Player
