@@ -44,6 +44,15 @@ const LAZY_COMPONENTS: Record<string, React.LazyExoticComponent<React.FC<any>>> 
   'heatmap-luchas': React.lazy(() =>
     import('@/remotion/templates/heatmap-luchas').then((m) => ({default: m.HeatmapLuchas})),
   ),
+  'generic-bar': React.lazy(() =>
+    import('@/remotion/templates/generic-bar').then((m) => ({default: m.GenericBar})),
+  ),
+  'generic-line': React.lazy(() =>
+    import('@/remotion/templates/generic-line').then((m) => ({default: m.GenericLine})),
+  ),
+  'generic-kpi': React.lazy(() =>
+    import('@/remotion/templates/generic-kpi').then((m) => ({default: m.GenericKpi})),
+  ),
 };
 
 export function AnimationPreview({

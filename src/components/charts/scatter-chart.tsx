@@ -1,6 +1,7 @@
 'use client';
 
 import type {ChartConfig} from '@/lib/chart-config';
+import {formatValue, pickColor} from '@/lib/chart-data';
 
 type Props = {
   data: Record<string, unknown>[];
@@ -8,8 +9,8 @@ type Props = {
 };
 
 export function ScatterChart({data, config}: Props) {
-  const xField = config.xField ?? Object.keys(data[0] ?? {})[0] ?? '';
-  const yField = config.yField ?? Object.keys(data[0] ?? {})[1] ?? '';
+  const xField = config.xField ?? '';
+  const yField = config.yField ?? '';
 
   const points = data
     .map((d) => ({
@@ -20,21 +21,27 @@ export function ScatterChart({data, config}: Props) {
     .filter((d) => !isNaN(d.x) && !isNaN(d.y));
 
   if (points.length === 0) {
-    return <div className="flex items-center justify-center h-48 text-zinc-500 text-sm">Sin datos numéricos</div>;
+    return (
+      <div className="flex items-center justify-center h-48 text-zinc-500 text-sm">
+        {data.length > 0 ? 'Selecciona dos campos numéricos para el dispersión' : 'Sin datos numéricos'}
+      </div>
+    );
   }
 
   const maxX = Math.max(...points.map((d) => d.x), 1);
   const maxY = Math.max(...points.map((d) => d.y), 1);
   const width = 600;
-  const height = 350;
-  const margin = {top: 20, right: 20, bottom: 60, left: 60};
+  const height = 380;
+  const margin = {top: 24, right: 24, bottom: 66, left: 66};
   const plotW = width - margin.left - margin.right;
   const plotH = height - margin.top - margin.bottom;
 
   const toX = (v: number) => margin.left + (v / maxX) * plotW;
   const toY = (v: number) => margin.top + plotH - (v / maxY) * plotH;
 
-  const color = config.colors?.[0] ?? '#6366f1';
+  const numFmt = config.numberFormat ?? 'short';
+  const xLabel = config.xLabel ?? xField;
+  const yLabel = config.yLabel ?? yField;
 
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto">
@@ -44,6 +51,8 @@ export function ScatterChart({data, config}: Props) {
           <line x1={margin.left} y1={toY(frac * maxY)} x2={margin.left + plotW} y2={toY(frac * maxY)} stroke="#333" strokeWidth={1} />
         </g>
       ))}
+      <text x={margin.left - 8} y={margin.top + 4} textAnchor="end" fill="#888" fontSize={10}>{formatValue(maxY, numFmt)}</text>
+      <text x={margin.left + plotW} y={margin.top + plotH + 4} textAnchor="middle" fill="#888" fontSize={10}>{formatValue(maxX, numFmt)}</text>
 
       {points.map((p, i) => (
         <circle
@@ -51,15 +60,15 @@ export function ScatterChart({data, config}: Props) {
           cx={toX(p.x)}
           cy={toY(p.y)}
           r={6}
-          fill={color}
+          fill={pickColor(config.colors, i)}
           opacity={0.7}
           stroke="#111"
           strokeWidth={1}
         />
       ))}
 
-      <text x={width / 2} y={height - 8} textAnchor="middle" fill="#888" fontSize={11}>{xField}</text>
-      <text x={14} y={height / 2} textAnchor="middle" fill="#888" fontSize={11} transform={`rotate(-90, 14, ${height / 2})`}>{yField}</text>
+      <text x={width / 2} y={height - 8} textAnchor="middle" fill="#888" fontSize={11}>{xLabel}</text>
+      <text x={14} y={height / 2} textAnchor="middle" fill="#888" fontSize={11} transform={`rotate(-90, 14, ${height / 2})`}>{yLabel}</text>
     </svg>
   );
 }

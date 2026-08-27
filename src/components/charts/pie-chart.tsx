@@ -1,6 +1,7 @@
 'use client';
 
 import type {ChartConfig} from '@/lib/chart-config';
+import {prepareSeries, formatValue, pickColor} from '@/lib/chart-data';
 
 type Props = {
   data: Record<string, unknown>[];
@@ -8,15 +9,15 @@ type Props = {
 };
 
 export function PieChart({data, config}: Props) {
-  const labelField = config.xField ?? Object.keys(data[0] ?? {})[0] ?? '';
-  const valueField = config.yField ?? Object.keys(data[0] ?? {})[1] ?? '';
-
-  const slices = data
-    .map((d) => ({label: String(d[labelField] ?? ''), value: Number(d[valueField] ?? 0)}))
-    .filter((d) => d.value > 0);
+  const prepared = prepareSeries(data, config);
+  const slices = prepared.items.filter((d) => d.value > 0);
 
   if (slices.length === 0) {
-    return <div className="flex items-center justify-center h-48 text-zinc-500 text-sm">Sin datos</div>;
+    return (
+      <div className="flex items-center justify-center h-48 text-zinc-500 text-sm">
+        {data.length > 0 ? 'No hay valores positivos para el gráfico de pie' : 'Sin datos'}
+      </div>
+    );
   }
 
   const total = slices.reduce((s, d) => s + d.value, 0);
@@ -40,7 +41,7 @@ export function PieChart({data, config}: Props) {
           const y2 = cy + r * Math.sin(endAngle);
           const largeArc = angle > Math.PI ? 1 : 0;
           const path = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`;
-          const color = config.colors?.[i % (config.colors?.length ?? 12)] ?? '#6366f1';
+          const color = s.color ?? pickColor(config.colors, i);
           cumAngle = endAngle;
           return <path key={i} d={path} fill={color} opacity={0.9} />;
         })}
@@ -50,7 +51,7 @@ export function PieChart({data, config}: Props) {
           <div key={i} className="flex items-center gap-2 text-xs">
             <div
               className="w-3 h-3 rounded-sm flex-shrink-0"
-              style={{backgroundColor: config.colors?.[i % (config.colors?.length ?? 12)] ?? '#6366f1'}}
+              style={{backgroundColor: s.color ?? pickColor(config.colors, i)}}
             />
             <span className="text-zinc-400 truncate max-w-[120px]">{s.label}</span>
             <span className="text-zinc-300">{Math.round((s.value / total) * 100)}%</span>

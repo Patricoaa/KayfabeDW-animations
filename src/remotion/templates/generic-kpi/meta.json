@@ -1,0 +1,28 @@
+{
+  "id": "generic-kpi",
+  "name": "KPI Genérico",
+  "description": "Un número clave animado desde cualquier consulta",
+  "componentId": "GenericKpi",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "defaultDuration": 10,
+  "dataOptions": [
+    {
+      "key": "suffix",
+      "label": "Sufijo",
+      "type": "text",
+      "default": ""
+    }
+  ],
+  "dataProfile": {
+    "requiredColumns": ["label", "value"],
+    "columnHints": {
+      "label": ["text"],
+      "value": ["number"]
+    },
+    "minRows": 1,
+    "maxRows": 1,
+    "rowMatch": "exact"
+  }
+}

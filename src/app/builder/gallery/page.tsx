@@ -4,7 +4,7 @@ import {useCallback, useEffect, useMemo, useState} from 'react';
 import Link from 'next/link';
 import {useRouter} from 'next/navigation';
 import {useToast} from '@/components/ui/toast';
-import {BarChart3, TrendingUp, TrendingDown, PieChart, Zap, Table, Search, ArrowUpDown, Copy, Trash2} from 'lucide-react';
+import {BarChart3, TrendingUp, TrendingDown, PieChart, Zap, Table, Search, ArrowUpDown, Copy, Trash2, Folder} from 'lucide-react';
 
 const CHART_ICONS: Record<string, React.ComponentType<{size?: number; className?: string}>> = {
   bar: BarChart3,
@@ -30,6 +30,8 @@ type VizSpec = {
   query_spec: {table?: string; select?: {column: string}[]; joins?: {table: string}[]};
   chart_config: {type?: string; title?: string};
   animation_config?: {templateId?: string; templateOptions?: Record<string, unknown>; duration?: number} | null;
+  is_draft?: boolean;
+  version?: number;
   created_at: string;
   updated_at: string;
 };
@@ -49,6 +51,9 @@ export default function GalleryPage() {
   const [sortBy, setSortBy] = useState<SortKey>('newest');
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+
+  // Q4.B: Group cards by their source table ("folder" = data source)
+  const [groupByTable, setGroupByTable] = useState(false);
 
   useEffect(() => {
     fetch('/api/viz-specs')
@@ -155,6 +160,90 @@ export default function GalleryPage() {
     return parts.join(' · ');
   };
 
+  const renderCard = (spec: VizSpec) => {
+    const chartType = spec.chart_config?.type ?? 'bar';
+    const Icon = CHART_ICONS[chartType] ?? BarChart3;
+    const accentColor = CHART_COLORS[chartType] ?? '#6366f1';
+    return (
+      <div
+        key={spec.id}
+        className="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden hover:border-zinc-600 transition-colors"
+      >
+        {/* U4: Color-coded header bar */}
+        <div className="h-1.5" style={{backgroundColor: accentColor}} />
+
+        <div className="p-4">
+          <div className="flex items-start justify-between mb-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <Icon size={20} />
+              <h3 className="font-medium truncate">{spec.name}</h3>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              {spec.is_draft && (
+                <span className="text-[9px] text-amber-300 px-1.5 py-0.5 bg-amber-900/30 border border-amber-700/40 rounded">
+                  borrador
+                </span>
+              )}
+              {typeof spec.version === 'number' && spec.version > 1 && (
+                <span title={`Versión ${spec.version}`} className="text-[9px] text-zinc-400 px-1.5 py-0.5 bg-zinc-800 rounded">
+                  v{spec.version}
+                </span>
+              )}
+              <span className="text-[10px] text-zinc-500 px-1.5 py-0.5 bg-zinc-800 rounded">
+                {chartType}
+              </span>
+            </div>
+          </div>
+          <p className="text-[11px] text-zinc-500 font-mono mb-1">
+            {getSummary(spec)}
+          </p>
+          <p className="text-[10px] text-zinc-600">
+            {new Date(spec.created_at).toLocaleDateString('es', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+            })}
+          </p>
+          <div className="mt-3 flex gap-2">
+            <Link
+              href={`/builder?edit=${spec.id}`}
+              className="flex-1 text-center px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-xs transition-colors"
+            >
+              Editar
+            </Link>
+            <button
+              onClick={() => handleDuplicate(spec)}
+              disabled={duplicating === spec.id}
+              title="Duplicar visualización"
+              className="px-3 py-1.5 text-zinc-600 hover:text-blue-400 hover:bg-zinc-800 rounded text-xs transition-colors"
+            >
+              {duplicating === spec.id ? '...' : <Copy size={14} />}
+            </button>
+            <button
+              onClick={() => handleDelete(spec.id)}
+              disabled={deleting === spec.id}
+              className="px-3 py-1.5 text-zinc-600 hover:text-red-400 hover:bg-zinc-800 rounded text-xs transition-colors"
+            >
+              {deleting === spec.id ? '...' : <Trash2 size={14} />}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Q4.B: Group specs by their source table when grouping is enabled.
+  const grouped = useMemo(() => {
+    if (!groupByTable) return null;
+    const map = new Map<string, VizSpec[]>();
+    for (const spec of filteredSpecs) {
+      const table = spec.query_spec?.table ?? 'sin tabla';
+      if (!map.has(table)) map.set(table, []);
+      map.get(table)!.push(spec);
+    }
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [groupByTable, filteredSpecs]);
+
   return (
     <div className="min-h-screen p-8">
       {/* Header */}
@@ -225,6 +314,19 @@ export default function GalleryPage() {
             <option value="name-asc">Nombre A→Z</option>
             <option value="name-desc">Nombre Z→A</option>
           </select>
+
+          {/* Q4.B: Group by source table */}
+          <button
+            onClick={() => setGroupByTable((v) => !v)}
+            className={`px-3 py-1.5 rounded text-xs flex items-center gap-1.5 transition-colors ${
+              groupByTable
+                ? 'bg-blue-600 text-white'
+                : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+            }`}
+            aria-pressed={groupByTable}
+          >
+            <Folder size={14} /> Agrupar por tabla
+          </button>
         </div>
       )}
 
@@ -255,70 +357,25 @@ export default function GalleryPage() {
             </>
           )}
         </div>
+      ) : grouped ? (
+        <div className="space-y-8">
+          {grouped.map(([table, items]) => (
+            <div key={table}>
+              <div className="flex items-center gap-2 mb-3">
+                <Folder size={14} className="text-zinc-500" />
+                <h2 className="text-sm font-semibold text-zinc-300">{table}</h2>
+                <span className="text-[10px] text-zinc-500">{items.length}</span>
+                <div className="flex-1 h-px bg-zinc-800" />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {items.map(renderCard)}
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredSpecs.map((spec) => {
-            const chartType = spec.chart_config?.type ?? 'bar';
-            const Icon = CHART_ICONS[chartType] ?? BarChart3;
-            const accentColor = CHART_COLORS[chartType] ?? '#6366f1';
-            return (
-              <div
-                key={spec.id}
-                className="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden hover:border-zinc-600 transition-colors"
-              >
-                {/* U4: Color-coded header bar */}
-                <div
-                  className="h-1.5"
-                  style={{backgroundColor: accentColor}}
-                />
-
-                <div className="p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Icon size={20} />
-                      <h3 className="font-medium truncate">{spec.name}</h3>
-                    </div>
-                    <span className="text-[10px] text-zinc-500 px-1.5 py-0.5 bg-zinc-800 rounded">
-                      {chartType}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-zinc-500 font-mono mb-1">
-                    {getSummary(spec)}
-                  </p>
-                  <p className="text-[10px] text-zinc-600">
-                    {new Date(spec.created_at).toLocaleDateString('es', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                    })}
-                  </p>
-                  <div className="mt-3 flex gap-2">
-                    <Link
-                      href={`/builder?edit=${spec.id}`}
-                      className="flex-1 text-center px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-xs transition-colors"
-                    >
-                      Editar
-                    </Link>
-                    <button
-                      onClick={() => handleDuplicate(spec)}
-                      disabled={duplicating === spec.id}
-                      title="Duplicar visualización"
-                      className="px-3 py-1.5 text-zinc-600 hover:text-blue-400 hover:bg-zinc-800 rounded text-xs transition-colors"
-                    >
-                      {duplicating === spec.id ? '...' : <Copy size={14} />}
-                    </button>
-                    <button
-                      onClick={() => handleDelete(spec.id)}
-                      disabled={deleting === spec.id}
-                      className="px-3 py-1.5 text-zinc-600 hover:text-red-400 hover:bg-zinc-800 rounded text-xs transition-colors"
-                    >
-                      {deleting === spec.id ? '...' : <Trash2 size={14} />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          {filteredSpecs.map(renderCard)}
         </div>
       )}
 

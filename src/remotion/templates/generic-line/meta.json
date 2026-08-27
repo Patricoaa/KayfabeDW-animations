@@ -1,0 +1,34 @@
+{
+  "id": "generic-line",
+  "name": "Línea Genérico",
+  "description": "Gráfico de líneas animado desde cualquier consulta",
+  "componentId": "GenericLine",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "defaultDuration": 10,
+  "dataOptions": [
+    {
+      "key": "numberFormat",
+      "label": "Formato de números",
+      "type": "select",
+      "options": [
+        { "value": "short", "label": "Compacto" },
+        { "value": "none", "label": "Entero" },
+        { "value": "decimal", "label": "Decimal" },
+        { "value": "percent", "label": "Porcentaje" },
+        { "value": "currency", "label": "Moneda" }
+      ],
+      "default": "short"
+    }
+  ],
+  "dataProfile": {
+    "requiredColumns": ["label", "value"],
+    "columnHints": {
+      "label": ["text"],
+      "value": ["number"]
+    },
+    "minRows": 2,
+    "rowMatch": "at_least"
+  }
+}

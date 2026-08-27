@@ -162,6 +162,23 @@ function TableProperties({
     [spec, onSpecChange],
   );
 
+  const AGGREGATES = ['sum', 'avg', 'count', 'min', 'max', 'count_distinct'] as const;
+  const setAggregate = useCallback(
+    (colName: string, agg: (typeof AGGREGATES)[number] | '') => {
+      const select = [...(spec.select ?? [])];
+      const idx = select.findIndex((f) => f.column === colName || f.column === `${table.name}.${colName}`);
+      if (idx === -1) return;
+      select[idx] = {...select[idx], aggregate: agg === '' ? undefined : agg};
+      onSpecChange({...spec, select});
+    },
+    [spec, onSpecChange, table.name],
+  );
+
+  const getAggregate = (colName: string): string => {
+    const f = (spec.select ?? []).find((r) => r.column === colName || r.column === `${table.name}.${colName}`);
+    return f?.aggregate ?? '';
+  };
+
   return (
     <div className="space-y-4">
       <div>
@@ -188,6 +205,20 @@ function TableProperties({
                   {isNumericType(col.type) ? '#' : isDateType(col.type) ? '@' : 'T'}
                 </span>
                 <span className="flex-1 truncate font-mono">{col.name}</span>
+                {isSelected && isNumericType(col.type) && (
+                  <select
+                    value={getAggregate(col.name)}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => setAggregate(col.name, e.target.value as typeof AGGREGATES[number] | '')}
+                    className="bg-zinc-900 border border-zinc-700 rounded px-1 text-[9px]"
+                    aria-label={`Agregación para ${col.name}`}
+                  >
+                    <option value="">—</option>
+                    {AGGREGATES.map((a) => (
+                      <option key={a} value={a}>{a}</option>
+                    ))}
+                  </select>
+                )}
                 <span className="text-[9px] text-zinc-600">{col.type}</span>
               </div>
             );

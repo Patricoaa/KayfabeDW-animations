@@ -117,6 +117,45 @@ function convertHeatmapLuchas(data: Record<string, unknown>[], config: ChartConf
   };
 }
 
+function pickSeries(data: Record<string, unknown>[], config: ChartConfig): {label: string; value: number; color: string}[] {
+  const labelCol = config.xField ?? Object.keys(data[0] ?? {})[0];
+  const valueCol = config.yField ?? Object.keys(data[0] ?? {})[1];
+  const colorCol = config.colorField;
+  return data.map((d, i) => ({
+    label: String(d[labelCol] ?? ''),
+    value: Number(d[valueCol] ?? 0),
+    color: colorCol
+      ? String(d[colorCol] ?? config.colors?.[i % (config.colors?.length ?? 12)] ?? DEFAULT_COLORS[i % 12])
+      : config.colors?.[i % (config.colors?.length ?? 12)] ?? DEFAULT_COLORS[i % 12],
+  }));
+}
+
+function convertGenericBar(data: Record<string, unknown>[], config: ChartConfig): Record<string, unknown> {
+  return {
+    title: config.title ?? '',
+    series: pickSeries(data, config),
+    numberFormat: config.numberFormat ?? 'short',
+  };
+}
+
+function convertGenericLine(data: Record<string, unknown>[], config: ChartConfig): Record<string, unknown> {
+  return {
+    title: config.title ?? '',
+    series: pickSeries(data, config),
+    numberFormat: config.numberFormat ?? 'short',
+  };
+}
+
+function convertGenericKpi(data: Record<string, unknown>[], config: ChartConfig): Record<string, unknown> {
+  const labelCol = config.xField ?? Object.keys(data[0] ?? {})[0];
+  const valueCol = config.yField ?? Object.keys(data[0] ?? {})[1];
+  return {
+    title: config.title ?? String(data[0]?.[labelCol] ?? ''),
+    value: Number(data[0]?.[valueCol] ?? 0),
+    color: config.colors?.[0] ?? '#3b82f6',
+  };
+}
+
 const CONVERTERS: Record<string, (data: Record<string, unknown>[], config: ChartConfig) => Record<string, unknown>> = {
   'ranking-barras': convertRankingBarras,
   'head-to-head': convertHeadToHead,
@@ -124,7 +163,16 @@ const CONVERTERS: Record<string, (data: Record<string, unknown>[], config: Chart
   'win-streak': convertWinStreak,
   'timeline-reinados': convertTimelineReinados,
   'heatmap-luchas': convertHeatmapLuchas,
+  'generic-bar': convertGenericBar,
+  'generic-line': convertGenericLine,
+  'generic-kpi': convertGenericKpi,
 };
+
+const GENERIC_TEMPLATE_IDS = ['generic-bar', 'generic-line', 'generic-kpi'] as const;
+
+export function isGenericTemplate(templateId: string): boolean {
+  return (GENERIC_TEMPLATE_IDS as readonly string[]).includes(templateId);
+}
 
 export function getCompatibleTemplates(
   config: ChartConfig,
@@ -135,7 +183,7 @@ export function getCompatibleTemplates(
   const columns = Object.keys(data[0]);
   const matches = matchTemplates(columns, data);
 
-  return matches.map((m) => {
+  const result = matches.map((m) => {
     const entry = TEMPLATES[m.templateId];
     return {
       templateId: m.templateId,
@@ -143,6 +191,23 @@ export function getCompatibleTemplates(
       score: m.score,
     };
   });
+
+  // Always offer the generic animated templates when there's at least one
+  // numeric column and one label-ish column, so any query can be animated.
+  const hasNumeric = columns.some((c) =>
+    typeof data[0][c] === 'number' || (!isNaN(Number(data[0][c])) && data[0][c] !== ''),
+  );
+  if (hasNumeric) {
+    for (const id of GENERIC_TEMPLATE_IDS) {
+      const entry = TEMPLATES[id];
+      if (!entry) continue;
+      if (!result.some((r) => r.templateId === id)) {
+        result.push({templateId: id, label: entry.meta.name, score: 40});
+      }
+    }
+  }
+
+  return result;
 }
 
 export function convertToRemotionProps(

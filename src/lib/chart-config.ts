@@ -1,5 +1,13 @@
 export type ChartType = 'bar' | 'pie' | 'line' | 'area' | 'scatter' | 'table';
 
+export type NumberFormat = 'none' | 'short' | 'percent' | 'currency' | 'decimal';
+
+export type SortBy = 'none' | 'value-desc' | 'value-asc' | 'label';
+
+export type LegendPosition = 'top' | 'right' | 'bottom';
+
+export type GroupMode = 'grouped' | 'stacked';
+
 export type ChartConfig = {
   type: ChartType;
   title?: string;
@@ -17,7 +25,22 @@ export type ChartConfig = {
   animation?: boolean;
   width?: number;
   height?: number;
+  // E2E additions
+  xLabel?: string;
+  yLabel?: string;
+  legendPosition?: LegendPosition;
+  numberFormat?: NumberFormat;
+  sortBy?: SortBy;
+  limit?: number;
+  labelAngle?: number;
+  lineSmooth?: boolean;
+  showDataLabels?: boolean;
+  groupMode?: GroupMode;
+  aggregate?: 'sum' | 'avg' | 'count' | 'min' | 'max';
+  configVersion?: number;
 };
+
+export const CHART_CONFIG_VERSION = 2;
 
 export const DEFAULT_CHART_CONFIG: ChartConfig = {
   type: 'bar',
@@ -34,6 +57,14 @@ export const DEFAULT_CHART_CONFIG: ChartConfig = {
   horizontal: false,
   stacked: false,
   animation: true,
+  legendPosition: 'bottom',
+  numberFormat: 'short',
+  sortBy: 'none',
+  labelAngle: 0,
+  lineSmooth: false,
+  showDataLabels: true,
+  groupMode: 'grouped',
+  configVersion: CHART_CONFIG_VERSION,
 };
 
 export function applyChartDefaults(config: Partial<ChartConfig>): ChartConfig {

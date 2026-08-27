@@ -38,6 +38,21 @@ export async function PUT(
     const {id} = await params;
     const body = await request.json();
     const supabase = getClient();
+
+    // Read the existing row so we can bump the version on manual saves.
+    const {data: existing} = await supabase
+      .from('viz_spec')
+      .select('version, auto_saved_at')
+      .eq('id', id)
+      .single();
+
+    // Auto-saves (is_draft && was already a draft autosave) don't bump the
+    // manual version counter; manual saves do.
+    const bumpVersion = body.version_bump === true;
+    const nextVersion = bumpVersion
+      ? (existing?.version ?? 0) + 1
+      : existing?.version ?? 1;
+
     const {data, error} = await supabase
       .from('viz_spec')
       .update({
@@ -45,7 +60,11 @@ export async function PUT(
         query_spec: body.query_spec,
         chart_config: body.chart_config,
         animation_config: body.animation_config,
+        folder_id: body.folder_id ?? null,
+        thumbnail_url: body.thumbnail_url ?? undefined,
         is_draft: body.is_draft,
+        version: nextVersion,
+        auto_saved_at: body.is_draft ? new Date().toISOString() : null,
       })
       .eq('id', id)
       .select()

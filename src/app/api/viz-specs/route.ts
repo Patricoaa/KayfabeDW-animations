@@ -36,7 +36,9 @@ export async function POST(request: NextRequest) {
         query_spec: body.query_spec ?? {},
         chart_config: body.chart_config ?? {},
         animation_config: body.animation_config ?? null,
+        folder_id: body.folder_id ?? null,
         is_draft: body.is_draft ?? true,
+        version: 1,
       })
       .select()
       .single();
