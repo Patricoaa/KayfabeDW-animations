@@ -112,6 +112,22 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
     const initEdges: Edge[] = [];
     const seen = new Set<string>();
 
+    // Extract per-table selected columns from spec.select
+    const tableColumns: Record<string, string[]> = {};
+    for (const s of spec.select ?? []) {
+      if (s.column === '*') continue;
+      const dotIdx = s.column.indexOf('.');
+      if (dotIdx > 0) {
+        const tableName = s.column.slice(0, dotIdx);
+        const colName = s.column.slice(dotIdx + 1);
+        if (!tableColumns[tableName]) tableColumns[tableName] = [];
+        tableColumns[tableName].push(colName);
+      } else if (spec.table) {
+        if (!tableColumns[spec.table]) tableColumns[spec.table] = [];
+        tableColumns[spec.table].push(s.column);
+      }
+    }
+
     // Add main table
     const mainTable = meta.find((t) => t.name === spec.table);
     if (mainTable) {
@@ -121,7 +137,7 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
         id,
         type: 'tableNode',
         position: {x: 50, y: 50},
-        data: {table: mainTable, selectedColumns: [], onToggleColumn: handleToggleColumn} as unknown as TableNodeData,
+        data: {table: mainTable, selectedColumns: tableColumns[spec.table] ?? [], onToggleColumn: handleToggleColumn} as unknown as TableNodeData,
       });
     }
 
@@ -136,7 +152,7 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
         id,
         type: 'tableNode',
         position: {x: 400, y: 50 + initNodes.length * 200},
-        data: {table: joinTable, selectedColumns: [], onToggleColumn: handleToggleColumn} as unknown as TableNodeData,
+        data: {table: joinTable, selectedColumns: tableColumns[join.table] ?? [], onToggleColumn: handleToggleColumn} as unknown as TableNodeData,
       });
     }
 

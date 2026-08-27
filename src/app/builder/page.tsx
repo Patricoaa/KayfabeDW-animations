@@ -2,6 +2,7 @@
 
 import {useCallback, useEffect, useRef, useState} from 'react';
 import Link from 'next/link';
+import {useSearchParams} from 'next/navigation';
 import type {QuerySpec} from '@/lib/query-spec';
 import {defaultQuerySpec} from '@/lib/query-spec';
 import type {ChartConfig} from '@/lib/chart-config';
@@ -28,6 +29,8 @@ const QueryCanvas = dynamic(
 type OutputMode = 'static' | 'animated';
 
 export default function BuilderPage() {
+  const searchParams = useSearchParams();
+  const editId = searchParams.get('edit');
   const [spec, setSpec] = useState<QuerySpec>(defaultQuerySpec(''));
   const [chartConfig, setChartConfig] = useState<ChartConfig>(DEFAULT_CHART_CONFIG);
   const [vizName, setVizName] = useState('Nueva visualización');
@@ -41,12 +44,29 @@ export default function BuilderPage() {
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [meta, setMeta] = useState<SchemaMetadata | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const editIdRef = useRef<string | null>(editId);
+  editIdRef.current = editId;
 
+  // Load schema metadata
   useEffect(() => {
     getSchemaMetadata()
       .then(setMeta)
       .catch((e) => setError(e.message));
   }, []);
+
+  // Load saved viz_spec when editing
+  useEffect(() => {
+    if (!editId) return;
+    fetch(`/api/viz-specs/${editId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.query_spec) setSpec(data.query_spec);
+        if (data.chart_config) setChartConfig(data.chart_config);
+        if (data.name) setVizName(data.name);
+        setSaved(true);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : 'Error loading viz_spec'));
+  }, [editId]);
 
   const executeQuery = useCallback(async (q: QuerySpec) => {
     if (!q.table) return;
@@ -87,8 +107,11 @@ export default function BuilderPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const res = await fetch('/api/viz-specs', {
-        method: 'POST',
+      const isEdit = !!editIdRef.current;
+      const url = isEdit ? `/api/viz-specs/${editIdRef.current}` : '/api/viz-specs';
+      const method = isEdit ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method,
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
           name: vizName,
@@ -98,6 +121,14 @@ export default function BuilderPage() {
       });
       if (!res.ok) throw new Error('Error saving');
       setSaved(true);
+      // If newly created, update the URL to edit mode
+      if (!isEdit) {
+        const created = await res.json();
+        if (created?.id) {
+          editIdRef.current = created.id;
+          window.history.replaceState(null, '', `/builder?edit=${created.id}`);
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
