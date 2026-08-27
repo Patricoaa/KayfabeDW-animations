@@ -24,6 +24,7 @@ export type TableInfo = {
   primaryKey: string[];
   foreignKeys: ForeignKeyInfo[];
   referencedBy: ReverseForeignKeyInfo[];
+  viewRefs?: {table: string; kind?: 'table' | 'view'}[];
 };
 
 export type SchemaMetadata = {
@@ -95,6 +96,17 @@ export function getRelatedTables(tables: TableInfo[], tableName: string): TableI
 
   return Array.from(related)
     .map((name) => getTableByName(tables, name))
+    .filter((t): t is TableInfo => t !== undefined);
+}
+
+export function getViewSourceTables(
+  tables: TableInfo[],
+  viewName: string,
+): TableInfo[] {
+  const view = getTableByName(tables, viewName);
+  if (!view || view.kind !== 'view' || !view.viewRefs) return [];
+  return view.viewRefs
+    .map((ref) => getTableByName(tables, ref.table))
     .filter((t): t is TableInfo => t !== undefined);
 }
 

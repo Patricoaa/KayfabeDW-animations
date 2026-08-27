@@ -18,22 +18,24 @@ import {
   type ReactFlowInstance,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import {RotateCcw, RotateCw, Eraser, Database, MousePointerClick, Plus} from 'lucide-react';
+import {RotateCcw, RotateCw, Eraser, Database, MousePointerClick, Plus, Waypoints} from 'lucide-react';
 import {useUndoRedo} from '@/hooks/use-undo-redo';
 
 import {TableNode} from './table-node';
 import type {TableNodeData} from './table-node';
 import {JoinEdge} from './join-edge';
 import type {JoinEdgeData, JoinType} from './join-edge';
+import {RelationshipEdge} from './relationship-edge';
+import type {RelationshipEdgeData} from './relationship-edge';
 import {TableSidebar} from './table-sidebar';
 import {PropertiesPanel} from './properties-panel';
 import type {TableInfo} from '@/lib/schema-metadata';
-import {getSuggestedJoin} from '@/lib/schema-metadata';
+import {getSuggestedJoin, getViewSourceTables} from '@/lib/schema-metadata';
 import type {QuerySpec} from '@/lib/query-spec';
 import {defaultQuerySpec} from '@/lib/query-spec';
 
 const nodeTypes = {tableNode: TableNode};
-const edgeTypes = {joinEdge: JoinEdge};
+const edgeTypes = {joinEdge: JoinEdge, relationshipEdge: RelationshipEdge};
 
 type QueryCanvasProps = {
   spec: QuerySpec;
@@ -48,6 +50,7 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
   const [initialized, setInitialized] = useState(false);
+  const [showRelations, setShowRelations] = useState(true);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const specRef = useRef(spec);
@@ -140,6 +143,61 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
     }
     return map;
   }, [nodes]);
+
+  // Auto-derived schema-hint edges (read-only): FK relationships between
+  // on-canvas tables and view derivations (a view built from its source tables).
+  // Kept separate from the user's JOIN edges so they never sync into the query.
+  const relationEdges = useMemo(() => {
+    if (!showRelations) return [] as Edge[];
+    const result: Edge[] = [];
+    const seen = new Set<string>();
+    const onCanvas = new Set(Object.keys(canvasTableMap));
+    const idFor = (tableName: string) => canvasTableMap[tableName]?.nodeId;
+    const push = (s: string, t: string, keySrc: string, keyDst: string, data: RelationshipEdgeData) => {
+      const key = [keySrc, keyDst].sort().join('::');
+      if (seen.has(key)) return;
+      seen.add(key);
+      result.push({
+        id: `rel-${key}`,
+        source: s,
+        target: t,
+        type: 'relationshipEdge',
+        selectable: false,
+        draggable: false,
+        focusable: false,
+        data,
+      } as unknown as Edge);
+    };
+
+    // FK relationships between any two tables present on the canvas.
+    for (const t of meta) {
+      if (!onCanvas.has(t.name)) continue;
+      for (const fk of t.foreignKeys ?? []) {
+        if (!onCanvas.has(fk.refTable)) continue;
+        const s = idFor(t.name);
+        const tt = idFor(fk.refTable);
+        if (!s || !tt) continue;
+        push(s, tt, t.name, fk.refTable, {
+          kind: 'fk',
+          label: `${t.name}.${fk.column} → ${fk.refTable}.${fk.refColumn}`,
+        });
+      }
+    }
+
+    // View derivations: a view is built from its source tables.
+    for (const t of meta) {
+      if (t.kind !== 'view') continue;
+      const viewNode = idFor(t.name);
+      if (!viewNode) continue;
+      for (const src of getViewSourceTables(meta, t.name)) {
+        const srcNode = idFor(src.name);
+        if (!srcNode) continue;
+        push(srcNode, viewNode, src.name, t.name, {kind: 'view', label: 'deriva'});
+      }
+    }
+
+    return result;
+  }, [meta, canvasTableMap, showRelations]);
 
   // Column toggle handler
   const handleToggleColumn = useCallback(
@@ -527,6 +585,21 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
             )}
           </div>
         </div>
+        <div className="flex items-center gap-1 mb-2">
+          <button
+            onClick={() => setShowRelations((v) => !v)}
+            className={`flex items-center gap-1.5 px-2 py-1 rounded text-[11px] font-semibold transition-colors ${
+              showRelations
+                ? 'bg-amber-500/10 text-amber-500'
+                : 'text-muted hover:text-primary'
+            }`}
+            title="Mostrar/ocultar relaciones y derivaciones del esquema"
+            aria-pressed={showRelations}
+          >
+            <Waypoints size={12} />
+            Relaciones
+          </button>
+        </div>
         <TableSidebar
           tables={meta}
           canvasTables={Object.keys(canvasTableMap)}
@@ -538,7 +611,7 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
       <div className="flex-1 relative">
         <ReactFlow
           nodes={nodes}
-          edges={edges}
+          edges={[...edges, ...relationEdges]}
           onNodesChange={onNodesChange as OnNodesChange}
           onEdgesChange={onEdgesChange as OnEdgesChange}
           onConnect={handleConnect}

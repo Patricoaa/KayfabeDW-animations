@@ -17,7 +17,6 @@ import {
   Clapperboard,
   ChevronRight,
   Database,
-  ChartSpline,
 } from 'lucide-react';
 import type {QuerySpec} from '@/lib/query-spec';
 import {defaultQuerySpec} from '@/lib/query-spec';
@@ -618,7 +617,8 @@ function BuilderContent() {
           </div>
         </main>
 
-        {/* Right config panel — always configuration */}
+        {/* Right config panel — only shown in step 2 (Configurar) / step 3 (Exportar) */}
+        {view === 'result' && (
         <aside className="fixed inset-x-0 bottom-12 z-10 mx-2 mb-2 h-[58vh] rounded-xl border border-border-default flex flex-col overflow-hidden bg-card md:static md:inset-auto md:mx-0 md:mb-0 md:h-auto md:w-[22rem] md:shrink-0 md:rounded-none md:border-x-0 md:border-b-0 md:border-t lg:md:w-96">
           <div className="flex items-center gap-2 px-4 h-10 border-b border-border-default shrink-0">
             <SlidersHorizontal size={14} className="text-amber-500" />
@@ -750,17 +750,9 @@ function BuilderContent() {
                 )}
               </>
             )}
-
-            {view === 'data' && data.length > 0 && (
-              <button
-                onClick={() => goResult(2)}
-                className="w-full bg-elevated hover:bg-card-hover py-2 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5"
-              >
-                <ChartSpline size={14} /> Ver resultado
-              </button>
-            )}
           </div>
         </aside>
+        )}
       </div>
 
       {/* Mobile bottom navigation */}
