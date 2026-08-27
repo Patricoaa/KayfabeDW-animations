@@ -1,8 +1,8 @@
 # UI/UX Audit — KayfabeDW Animations
 
 **Date**: 2026-08-27
-**Last updated**: 2026-08-27 (post-Round 2)
-**Score**: ~6.5/10 usability, 2/10 accessibility, 7/10 visual consistency
+**Last updated**: 2026-08-27 (post-Round 3)
+**Score**: ~7/10 usability, 2/10 accessibility, 7.5/10 visual consistency
 
 ---
 
@@ -18,9 +18,9 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 |----------|-------|-------|-----------|
 | Critical (C) | 17 | 11 | 6 |
 | Accessibility (A) | 6 | 0 | 6 |
-| UX Flow (U) | 16 | 5 | 11 |
+| UX Flow (U) | 16 | 8 | 8 |
 | Visual Design (V) | 7 | 1 | 6 |
-| **Total** | **46** | **17** | **29** |
+| **Total** | **46** | **20** | **26** |
 
 ---
 
@@ -81,9 +81,9 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 |---|---|---|---|
 | **U1** | **Two disconnected flows** — Template Editor vs Visual Builder with no bridge | Users can't move between workflows | ✅ **FIXED** — Flows merged into single `/builder` page with `?template=` param support |
 | **U2** | **No deep linking to query states** — can't share a specific query config via URL | Collaboration blocked | ⚠️ Partially — `?edit=` and `?template=` work, but query state not serialized to URL |
-| **U3** | **Gallery has no sorting/filtering** — cards always by date descending | Hard to find saved work | ❌ Open |
-| **U4** | **No gallery thumbnails** — cards only show text metadata | Can't visually identify viz | ❌ Open |
-| **U5** | **No duplicate/copy** functionality in gallery | Can't iterate on existing work | ❌ Open |
+| **U3** | **Gallery has no sorting/filtering** — cards always by date descending | Hard to find saved work | ✅ **FIXED** — search by name/table, filter by chart type, sort by date/name |
+| **U4** | **No gallery thumbnails** — cards only show text metadata | Can't visually identify viz | ✅ **FIXED** — color-coded header bar per chart type (bar=indigo, line=blue, etc.) |
+| **U5** | **No duplicate/copy** functionality in gallery | Can't iterate on existing work | ✅ **FIXED** — "⧉" button duplicates with "(copia)" suffix, opens in edit mode |
 
 ### Guidance & Onboarding
 | # | Issue | Impact | Status |
@@ -141,9 +141,9 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 - P10: Add keyboard navigation → **A3** (open)
 - P11: Add undo/redo to canvas → **U10** (open)
 - P12: Add template picker tooltips → ✅ Partially done (U7, U9 — descriptions + score explanation added; JOIN/chart tooltips still missing)
-- P13: Add gallery thumbnails → **U4** (open)
-- P14: Add gallery sorting/filtering → **U3** (open)
-- P15: Add duplicate/copy in gallery → **U5** (open)
+- ~~P13: Add gallery thumbnails~~ → ✅ Done (U4 — color-coded header bars)
+- ~~P14: Add gallery sorting/filtering~~ → ✅ Done (U3 — search, type filter, sort)
+- ~~P15: Add duplicate/copy in gallery~~ → ✅ Done (U5)
 
 ### Tier 3: Architecture Improvements (1-2 weeks each)
 - ~~**P16: Merge/bridge flows**~~ → ✅ Done (U1)
