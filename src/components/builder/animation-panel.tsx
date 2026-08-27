@@ -1,6 +1,6 @@
 'use client';
 
-import {useState} from 'react';
+import {useState, useMemo} from 'react';
 import {Player} from '@remotion/player';
 import type {QuerySpec} from '@/lib/query-spec';
 import type {ChartConfig} from '@/lib/chart-config';
@@ -17,13 +17,14 @@ export function AnimationPanel({data, config, spec}: AnimationPanelProps) {
   const [rendering, setRendering] = useState(false);
   const [renderResult, setRenderResult] = useState<string | null>(null);
 
-  const templates = getCompatibleTemplates(config, data);
-  const bestTemplate = suggestBestTemplate(config, data);
+  const templates = useMemo(() => getCompatibleTemplates(config, data), [config, data]);
+  const bestTemplate = useMemo(() => suggestBestTemplate(config, data), [config, data]);
   const activeTemplate = selectedTemplate ?? bestTemplate;
 
-  const remotionProps = activeTemplate
-    ? convertToRemotionProps(config, data, spec, activeTemplate)
-    : null;
+  const remotionProps = useMemo(
+    () => activeTemplate ? convertToRemotionProps(config, data, spec, activeTemplate) : null,
+    [activeTemplate, config, data, spec],
+  );
 
   const handleExport = async () => {
     if (!activeTemplate || !remotionProps) return;
@@ -48,11 +49,20 @@ export function AnimationPanel({data, config, spec}: AnimationPanelProps) {
     }
   };
 
+  if (data.length === 0) {
+    return (
+      <div className="p-4 text-center text-zinc-500 text-sm">
+        <p>Sin datos para animación</p>
+        <p className="text-xs mt-1">Selecciona columnas en el canvas para generar datos</p>
+      </div>
+    );
+  }
+
   if (templates.length === 0) {
     return (
       <div className="p-4 text-center text-zinc-500 text-sm">
-        <p>No hay templates de animación compatibles</p>
-        <p className="text-xs mt-1">Los datos no coinciden con ningún template predefinido</p>
+        <p>No hay templates compatibles</p>
+        <p className="text-xs mt-1">Los datos no coinciden con ningún template</p>
       </div>
     );
   }
@@ -60,7 +70,7 @@ export function AnimationPanel({data, config, spec}: AnimationPanelProps) {
   return (
     <div className="space-y-4">
       <div>
-        <label className="text-sm font-medium mb-2 block">Template de animación</label>
+        <label className="text-xs font-medium text-zinc-400 mb-2 block">Template de animación</label>
         <div className="space-y-1">
           {templates.map((t) => (
             <button
@@ -72,9 +82,10 @@ export function AnimationPanel({data, config, spec}: AnimationPanelProps) {
                   : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
               }`}
             >
-              {t.label}
+              <span className="font-medium">{t.label}</span>
+              <span className="ml-2 opacity-60">score: {t.score}</span>
               {t.templateId === bestTemplate && (
-                <span className="ml-2 text-xs opacity-60">(recomendado)</span>
+                <span className="ml-2 text-[10px] opacity-60">(recomendado)</span>
               )}
             </button>
           ))}
@@ -83,7 +94,7 @@ export function AnimationPanel({data, config, spec}: AnimationPanelProps) {
 
       {remotionProps && (
         <div>
-          <label className="text-sm font-medium mb-2 block">Preview</label>
+          <label className="text-xs font-medium text-zinc-400 mb-2 block">Preview</label>
           <div className="border border-zinc-700 rounded overflow-hidden">
             <Player
               component={loadComponent(remotionProps.templateId)}
@@ -136,6 +147,8 @@ function loadComponent(templateId: string): React.FC<Record<string, unknown>> {
       return require('@/remotion/templates/win-streak').WinStreak;
     case 'timeline-reinados':
       return require('@/remotion/templates/timeline-reinados').TimelineReinados;
+    case 'heatmap-luchas':
+      return require('@/remotion/templates/heatmap-luchas').HeatmapLuchas;
     default:
       return require('@/remotion/templates/ranking-barras').RankingBarras;
   }

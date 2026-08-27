@@ -20,5 +20,15 @@
       "type": "number",
       "required": false
     }
-  ]
+  ],
+  "dataProfile": {
+    "requiredColumns": ["date", "value"],
+    "optionalColumns": ["label", "end"],
+    "columnHints": {
+      "label": ["text", "date"],
+      "value": ["number"]
+    },
+    "minRows": 1,
+    "rowMatch": "at_least"
+  }
 }

@@ -26,5 +26,16 @@
       "max": 20,
       "default": 8
     }
-  ]
+  ],
+  "dataProfile": {
+    "requiredColumns": ["label", "value"],
+    "optionalColumns": ["color"],
+    "columnHints": {
+      "label": ["text"],
+      "value": ["number"]
+    },
+    "minRows": 2,
+    "maxRows": 20,
+    "rowMatch": "range"
+  }
 }

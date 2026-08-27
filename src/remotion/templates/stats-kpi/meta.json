@@ -32,5 +32,15 @@
       "type": "text",
       "default": ""
     }
-  ]
+  ],
+  "dataProfile": {
+    "requiredColumns": ["label", "value"],
+    "columnHints": {
+      "label": ["text"],
+      "value": ["number"]
+    },
+    "minRows": 1,
+    "maxRows": 1,
+    "rowMatch": "exact"
+  }
 }

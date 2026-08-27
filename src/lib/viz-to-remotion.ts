@@ -1,16 +1,12 @@
 import type {ChartConfig} from './chart-config';
 import type {QuerySpec} from './query-spec';
+import {TEMPLATES} from '@/remotion/generated/registry';
+import type {TemplateId} from '@/remotion/generated/registry';
+import {matchTemplates} from './profile-matcher';
 
 export type RemotionInputProps = {
   templateId: string;
   props: Record<string, unknown>;
-};
-
-export type TemplateMapping = {
-  templateId: string;
-  label: string;
-  matches: (config: ChartConfig, data: Record<string, unknown>[]) => boolean;
-  convert: (config: ChartConfig, data: Record<string, unknown>[], spec: QuerySpec) => Record<string, unknown>;
 };
 
 const DEFAULT_COLORS = [
@@ -19,113 +15,148 @@ const DEFAULT_COLORS = [
   '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6',
 ];
 
-function takeN(data: Record<string, unknown>[], n: number): Record<string, unknown>[] {
-  return data.slice(0, n);
+function convertRankingBarras(data: Record<string, unknown>[], config: ChartConfig): Record<string, unknown> {
+  const labelCol = config.xField ?? Object.keys(data[0] ?? {})[0];
+  const valueCol = config.yField ?? Object.keys(data[0] ?? {})[1];
+  const items = data.slice(0, 15).map((d, i) => ({
+    label: String(d[labelCol] ?? ''),
+    value: Number(d[valueCol] ?? 0),
+    color: config.colors?.[i % (config.colors?.length ?? 12)] ?? DEFAULT_COLORS[i % 12],
+  }));
+  return {
+    title: config.title ?? '',
+    items,
+    maxValue: Math.max(...items.map((i) => i.value), 0),
+  };
 }
 
-const TEMPLATE_MAPPINGS: TemplateMapping[] = [
-  {
-    templateId: 'ranking-barras',
-    label: 'Ranking de Barras (animado)',
-    matches: (config) => config.type === 'bar',
-    convert: (config, data, spec) => {
-      const xField = config.xField ?? Object.keys(data[0] ?? {})[0];
-      const yField = config.yField ?? Object.keys(data[0] ?? {})[1];
-      const items = takeN(data, 15).map((d, i) => ({
-        label: String(d[xField] ?? ''),
-        value: Number(d[yField] ?? 0),
-        color: config.colors?.[i % (config.colors?.length ?? 12)] ?? DEFAULT_COLORS[i % 12],
-      }));
-      return {
-        title: config.title ?? spec.table,
-        items,
-        maxValue: Math.max(...items.map((i) => i.value)),
-      };
-    },
-  },
-  {
-    templateId: 'head-to-head',
-    label: 'Head to Head',
-    matches: (config, data) => config.type === 'bar' && data.length === 2,
-    convert: (config, data) => {
-      const xField = config.xField ?? Object.keys(data[0] ?? {})[0];
-      const yField = config.yField ?? Object.keys(data[0] ?? {})[1];
-      return {
-        title: config.title ?? 'Head to Head',
-        player1: {name: String(data[0][xField]), value: Number(data[0][yField])},
-        player2: {name: String(data[1][xField]), value: Number(data[1][yField])},
-      };
-    },
-  },
-  {
-    templateId: 'stats-kpi',
-    label: 'KPI / Estadística',
-    matches: (config, data) => config.type === 'bar' && data.length === 1,
-    convert: (config, data) => {
-      const yField = config.yField ?? Object.keys(data[0] ?? {})[1];
-      const xField = config.xField ?? Object.keys(data[0] ?? {})[0];
-      return {
-        label: config.title ?? String(data[0][xField]),
-        value: Number(data[0][yField] ?? 0),
-        color: config.colors?.[0] ?? '#3b82f6',
-      };
-    },
-  },
-  {
-    templateId: 'win-streak',
-    label: 'Racha de Victorias',
-    matches: (config, data) => config.type === 'line',
-    convert: (config, data) => {
-      const xField = config.xField ?? Object.keys(data[0] ?? {})[0];
-      const yField = config.yField ?? Object.keys(data[0] ?? {})[1];
-      const streak = data.map((d) => ({
-        label: String(d[xField] ?? ''),
-        value: Number(d[yField] ?? 0),
-      }));
-      return {
-        title: config.title ?? 'Racha',
-        streak,
-      };
-    },
-  },
-  {
-    templateId: 'timeline-reinados',
-    label: 'Timeline de Reinados',
-    matches: (config, data) => config.type === 'area' || config.type === 'line',
-    convert: (config, data) => {
-      const xField = config.xField ?? Object.keys(data[0] ?? {})[0];
-      const yField = config.yField ?? Object.keys(data[0] ?? {})[1];
-      return {
-        title: config.title ?? 'Timeline',
-        events: data.map((d) => ({
-          date: String(d[xField] ?? ''),
-          value: Number(d[yField] ?? 0),
-        })),
-      };
-    },
-  },
-];
+function convertHeadToHead(data: Record<string, unknown>[], config: ChartConfig): Record<string, unknown> {
+  const nameCol = config.xField ?? Object.keys(data[0] ?? {})[0];
+  const valueCol = config.yField ?? Object.keys(data[0] ?? {})[1];
+  const drawsCol = Object.keys(data[0] ?? {}).find((k) => k.toLowerCase().includes('draw'));
+
+  return {
+    wrestlerA: String(data[0]?.[nameCol] ?? ''),
+    wrestlerB: String(data[1]?.[nameCol] ?? ''),
+    winsA: Number(data[0]?.[valueCol] ?? 0),
+    winsB: Number(data[1]?.[valueCol] ?? 0),
+    draws: drawsCol ? Number(data[0]?.[drawsCol] ?? 0) : 0,
+  };
+}
+
+function convertStatsKpi(data: Record<string, unknown>[], config: ChartConfig): Record<string, unknown> {
+  const labelCol = config.xField ?? Object.keys(data[0] ?? {})[0];
+  const valueCol = config.yField ?? Object.keys(data[0] ?? {})[1];
+  return {
+    label: config.title ?? String(data[0]?.[labelCol] ?? ''),
+    value: Number(data[0]?.[valueCol] ?? 0),
+    color: config.colors?.[0] ?? '#3b82f6',
+  };
+}
+
+function convertWinStreak(data: Record<string, unknown>[], config: ChartConfig): Record<string, unknown> {
+  const nameCol = config.xField ?? Object.keys(data[0] ?? {})[0];
+  const valueCol = config.yField ?? Object.keys(data[0] ?? {})[1];
+  const name = String(data[0]?.[nameCol] ?? '');
+  const count = data.length;
+
+  return {
+    wrestlerName: name,
+    streakCount: count,
+    matchType: config.title ?? 'Victoria',
+    events: data.map((d) => String(d[nameCol] ?? '')),
+    promotionColor: config.colors?.[0] ?? '#FFD700',
+  };
+}
+
+function convertTimelineReinados(data: Record<string, unknown>[], config: ChartConfig): Record<string, unknown> {
+  const labelCol = config.xField ?? Object.keys(data[0] ?? {})[0];
+  const valueCol = config.yField ?? Object.keys(data[0] ?? {})[1];
+  const endCol = Object.keys(data[0] ?? {}).find((k) => k.toLowerCase().includes('end'));
+  const defensesCol = Object.keys(data[0] ?? {}).find((k) => k.toLowerCase().includes('defense'));
+
+  const champion = String(data[0]?.[labelCol] ?? '');
+  const title = config.title ?? '';
+
+  const reigns = data.map((d) => ({
+    start: String(d[labelCol] ?? ''),
+    end: endCol ? (d[endCol] ? String(d[endCol]) : null) : null,
+    days: Number(d[valueCol] ?? 0),
+    defenses: defensesCol ? Number(d[defensesCol] ?? 0) : 0,
+  }));
+
+  return {
+    championName: champion,
+    titleName: title,
+    reigns,
+    promotionColor: config.colors?.[0] ?? '#FFD700',
+  };
+}
+
+function convertHeatmapLuchas(data: Record<string, unknown>[], config: ChartConfig): Record<string, unknown> {
+  const rowCol = Object.keys(data[0] ?? {}).find((k) => k.toLowerCase().includes('row') || k.toLowerCase().includes('promotion') || k.toLowerCase().includes('category')) ?? Object.keys(data[0] ?? {})[0];
+  const colCol = Object.keys(data[0] ?? {}).find((k) => k.toLowerCase().includes('col') || k.toLowerCase().includes('year') || k.toLowerCase().includes('period')) ?? Object.keys(data[0] ?? {})[1];
+  const valCol = config.yField ?? Object.keys(data[0] ?? {})[2];
+
+  const rowSet = new Set<string>();
+  const colSet = new Set<string>();
+  const cells = data.map((d) => {
+    const row = String(d[rowCol] ?? '');
+    const col = String(d[colCol] ?? '');
+    rowSet.add(row);
+    colSet.add(col);
+    return {row, col, value: Number(d[valCol] ?? 0)};
+  });
+
+  return {
+    title: config.title ?? '',
+    rows: Array.from(rowSet),
+    cols: Array.from(colSet),
+    cells,
+    colorScale: ['#1e293b', '#f59e0b'] as [string, string],
+  };
+}
+
+const CONVERTERS: Record<string, (data: Record<string, unknown>[], config: ChartConfig) => Record<string, unknown>> = {
+  'ranking-barras': convertRankingBarras,
+  'head-to-head': convertHeadToHead,
+  'stats-kpi': convertStatsKpi,
+  'win-streak': convertWinStreak,
+  'timeline-reinados': convertTimelineReinados,
+  'heatmap-luchas': convertHeatmapLuchas,
+};
 
 export function getCompatibleTemplates(
   config: ChartConfig,
   data: Record<string, unknown>[],
-): TemplateMapping[] {
+): {templateId: string; label: string; score: number}[] {
   if (data.length === 0) return [];
-  return TEMPLATE_MAPPINGS.filter((m) => m.matches(config, data));
+
+  const columns = Object.keys(data[0]);
+  const matches = matchTemplates(columns, data);
+
+  return matches.map((m) => {
+    const entry = TEMPLATES[m.templateId];
+    return {
+      templateId: m.templateId,
+      label: entry?.meta.name ?? m.templateId,
+      score: m.score,
+    };
+  });
 }
 
 export function convertToRemotionProps(
   config: ChartConfig,
   data: Record<string, unknown>[],
-  spec: QuerySpec,
+  _spec: QuerySpec,
   templateId: string,
 ): RemotionInputProps | null {
-  const mapping = TEMPLATE_MAPPINGS.find((m) => m.templateId === templateId);
-  if (!mapping) return null;
+  const converter = CONVERTERS[templateId];
+  if (!converter) return null;
 
   return {
     templateId,
-    props: mapping.convert(config, data, spec),
+    props: converter(data, config),
   };
 }
 

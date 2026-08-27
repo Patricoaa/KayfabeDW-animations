@@ -14,5 +14,14 @@
       "type": "text",
       "default": "Luchas por Año y Promoción"
     }
-  ]
+  ],
+  "dataProfile": {
+    "requiredColumns": ["row", "col", "value"],
+    "columnHints": {
+      "label": ["text"],
+      "value": ["number"]
+    },
+    "minRows": 4,
+    "rowMatch": "at_least"
+  }
 }

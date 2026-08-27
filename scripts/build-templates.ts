@@ -15,6 +15,18 @@ interface DataOption {
   options?: {value: string; label: string}[];
 }
 
+interface DataProfile {
+  requiredColumns?: string[];
+  optionalColumns?: string[];
+  columnHints?: {
+    label?: string[];
+    value?: string[];
+  };
+  minRows?: number;
+  maxRows?: number;
+  rowMatch?: 'exact' | 'range' | 'at_least';
+}
+
 interface TemplateMeta {
   id: string;
   name: string;
@@ -25,6 +37,7 @@ interface TemplateMeta {
   fps: number;
   defaultDuration: number;
   dataOptions: DataOption[];
+  dataProfile?: DataProfile;
 }
 
 function discoverTemplates(): TemplateMeta[] {
@@ -102,6 +115,19 @@ export interface TemplateMeta {
   fps: number;
   defaultDuration: number;
   dataOptions: DataOption[];
+  dataProfile?: DataProfile;
+}
+
+export interface DataProfile {
+  requiredColumns?: string[];
+  optionalColumns?: string[];
+  columnHints?: {
+    label?: string[];
+    value?: string[];
+  };
+  minRows?: number;
+  maxRows?: number;
+  rowMatch?: 'exact' | 'range' | 'at_least';
 }
 
 export interface DataOption {

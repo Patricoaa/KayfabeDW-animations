@@ -20,5 +20,16 @@
       "type": "text",
       "required": true
     }
-  ]
+  ],
+  "dataProfile": {
+    "requiredColumns": ["name", "wins"],
+    "optionalColumns": ["draws"],
+    "columnHints": {
+      "label": ["text"],
+      "value": ["number"]
+    },
+    "minRows": 2,
+    "maxRows": 2,
+    "rowMatch": "exact"
+  }
 }
