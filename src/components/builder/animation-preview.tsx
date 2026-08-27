@@ -5,56 +5,84 @@ import {Player} from '@remotion/player';
 import type {QuerySpec} from '@/lib/query-spec';
 import type {ChartConfig} from '@/lib/chart-config';
 import {convertToRemotionProps} from '@/lib/viz-to-remotion';
+import {TEMPLATES} from '@/remotion/generated/registry';
+import type {TemplateId} from '@/remotion/generated/registry';
+
+type RenderState =
+  | {status: 'idle'}
+  | {status: 'rendering'; phase: string; progress: number}
+  | {status: 'done'; url: string; size: number}
+  | {status: 'error'; message: string};
 
 type AnimationPreviewProps = {
   templateId: string;
   data: Record<string, unknown>[];
   config: ChartConfig;
   spec: QuerySpec;
+  templateProps?: Record<string, unknown> | null;
+  duration?: number;
 };
 
-export function AnimationPreview({templateId, data, config, spec}: AnimationPreviewProps) {
-  const [rendering, setRendering] = useState(false);
-  const [renderResult, setRenderResult] = useState<string | null>(null);
-  const [exportFormat, setExportFormat] = useState<'mp4' | 'gif'>('mp4');
+export function AnimationPreview({
+  templateId,
+  data,
+  config,
+  spec,
+  templateProps: externalProps,
+  duration: externalDuration,
+}: AnimationPreviewProps) {
+  const [renderState, setRenderState] = useState<RenderState>({status: 'idle'});
+  const [duration, setDuration] = useState(externalDuration ?? 10);
 
-  const remotionProps = useMemo(
+  const entry = TEMPLATES[templateId as TemplateId];
+  const fps = entry?.meta.fps ?? 30;
+  const compositionId = entry?.meta.componentId ?? templateId;
+
+  // Use external props if provided (template data loaded), otherwise convert from query data
+  const convertedProps = useMemo(
     () => convertToRemotionProps(config, data, spec, templateId),
     [templateId, config, data, spec],
   );
 
+  const remotionProps = externalProps ?? convertedProps?.props ?? null;
+
   const handleExport = async () => {
     if (!remotionProps) return;
-    setRendering(true);
-    setRenderResult(null);
+    setRenderState({status: 'rendering', phase: 'Iniciando...', progress: 0.05});
     try {
       const res = await fetch('/api/render', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-          template: templateId,
-          dataOptions: remotionProps.props,
-          format: exportFormat,
+          compositionId,
+          inputProps: remotionProps,
+          durationInFrames: duration * fps,
         }),
       });
-      if (!res.ok) throw new Error('Error rendering');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      setRenderResult(url);
-    } catch (e) {
-      console.error('Render error:', e);
-    } finally {
-      setRendering(false);
+      const data = await res.json();
+      if (data.type === 'done') {
+        setRenderState({status: 'done', url: data.url, size: data.size});
+      } else if (data.type === 'error') {
+        setRenderState({status: 'error', message: data.message});
+      } else {
+        setRenderState({status: 'error', message: 'Respuesta inesperada del servidor'});
+      }
+    } catch (err) {
+      setRenderState({status: 'error', message: (err as Error).message});
     }
   };
 
   if (!remotionProps) {
     return (
       <div className="flex-1 flex items-center justify-center text-zinc-500 text-sm">
-        No se pudieron generar las props para este template
+        {data.length === 0
+          ? 'Selecciona columnas en el canvas para ver la preview'
+          : 'No se pudieron generar las props para este template'}
       </div>
     );
   }
+
+  const Comp = loadComponent(templateId);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -63,14 +91,15 @@ export function AnimationPreview({templateId, data, config, spec}: AnimationPrev
         <div className="w-full max-w-4xl">
           <div className="border border-zinc-700 rounded-lg overflow-hidden shadow-2xl">
             <Player
-              component={loadComponent(templateId)}
-              inputProps={remotionProps.props}
-              durationInFrames={150}
-              fps={30}
-              compositionWidth={1920}
-              compositionHeight={1080}
+              component={Comp}
+              inputProps={remotionProps}
+              durationInFrames={duration * fps}
+              fps={fps}
+              compositionWidth={entry?.meta.width ?? 1920}
+              compositionHeight={entry?.meta.height ?? 1080}
               style={{width: '100%'}}
               controls
+              acknowledgeRemotionLicense
             />
           </div>
         </div>
@@ -78,51 +107,78 @@ export function AnimationPreview({templateId, data, config, spec}: AnimationPrev
 
       {/* Export bar */}
       <div className="flex items-center gap-3 px-6 py-3 border-t border-zinc-800 bg-zinc-900">
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setExportFormat('mp4')}
-            className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
-              exportFormat === 'mp4'
-                ? 'bg-zinc-700 text-white'
-                : 'text-zinc-500 hover:text-zinc-300'
-            }`}
-          >
-            MP4
-          </button>
-          <button
-            onClick={() => setExportFormat('gif')}
-            className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
-              exportFormat === 'gif'
-                ? 'bg-zinc-700 text-white'
-                : 'text-zinc-500 hover:text-zinc-300'
-            }`}
-          >
-            GIF
-          </button>
+        {/* Duration control */}
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-zinc-500">Duración:</label>
+          <input
+            type="range"
+            min={1}
+            max={20}
+            value={duration}
+            onChange={(e) => setDuration(Number(e.target.value))}
+            className="w-20 accent-blue-500"
+          />
+          <span className="text-xs text-zinc-400 w-12 text-right">{duration}s</span>
         </div>
 
-        <button
-          onClick={handleExport}
-          disabled={rendering}
-          className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-500 disabled:bg-zinc-700 rounded text-sm font-medium transition-colors"
-        >
-          {rendering ? (
-            <span className="flex items-center justify-center gap-2">
-              <span className="animate-spin">⟳</span> Renderizando...
-            </span>
-          ) : (
-            'Exportar'
-          )}
-        </button>
+        <div className="flex-1" />
 
-        {renderResult && (
-          <a
-            href={renderResult}
-            download={`visualizacion.${exportFormat}`}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded text-sm font-medium transition-colors"
+        {/* Render status */}
+        {renderState.status === 'rendering' && (
+          <div className="flex items-center gap-3 flex-1">
+            <div className="flex-1">
+              <div className="text-xs text-zinc-400 mb-1">{renderState.phase}</div>
+              <div className="w-full bg-zinc-800 rounded-full h-1.5">
+                <div
+                  className="bg-blue-500 h-1.5 rounded-full transition-all duration-300"
+                  style={{width: `${renderState.progress * 100}%`}}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {renderState.status === 'done' && (
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-green-400">
+              Listo ({(renderState.size / 1024 / 1024).toFixed(1)} MB)
+            </span>
+            <a
+              href={renderState.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-white font-medium transition-colors"
+            >
+              Descargar MP4
+            </a>
+            <button
+              onClick={() => setRenderState({status: 'idle'})}
+              className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 rounded text-zinc-300 transition-colors"
+            >
+              Cerrar
+            </button>
+          </div>
+        )}
+
+        {renderState.status === 'error' && (
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-red-400">{renderState.message}</span>
+            <button
+              onClick={() => setRenderState({status: 'idle'})}
+              className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 rounded text-zinc-300 transition-colors"
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
+
+        {renderState.status === 'idle' && (
+          <button
+            onClick={handleExport}
+            className="px-4 py-2 bg-green-600 hover:bg-green-500 rounded text-sm font-medium transition-colors"
           >
-            Descargar
-          </a>
+            Exportar MP4
+          </button>
         )}
       </div>
     </div>

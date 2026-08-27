@@ -16,6 +16,9 @@ import {ChartPreview} from '@/components/charts/chart-preview';
 import {TemplatePicker} from '@/components/builder/template-picker';
 import {AnimationPreview} from '@/components/builder/animation-preview';
 import {BuilderNav} from '@/components/builder/builder-nav';
+import {DataOptionsForm} from '@/components/builder/data-options-form';
+import {TEMPLATES} from '@/remotion/generated/registry';
+import type {TemplateId} from '@/remotion/generated/registry';
 
 const QueryCanvas = dynamic(
   () => import('@/components/canvas/query-canvas').then((m) => m.QueryCanvas),
@@ -43,6 +46,7 @@ export default function BuilderPage() {
 function BuilderContent() {
   const searchParams = useSearchParams();
   const editId = searchParams.get('edit');
+  const templateParam = searchParams.get('template');
   const [spec, setSpec] = useState<QuerySpec>(defaultQuerySpec(''));
   const [chartConfig, setChartConfig] = useState<ChartConfig>(DEFAULT_CHART_CONFIG);
   const [vizName, setVizName] = useState('Nueva visualización');
@@ -52,12 +56,29 @@ function BuilderContent() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [sideTab, setSideTab] = useState<'data' | 'preview'>('data');
-  const [outputMode, setOutputMode] = useState<OutputMode>('static');
-  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [outputMode, setOutputMode] = useState<OutputMode>(
+    templateParam ? 'animated' : 'static',
+  );
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(templateParam);
   const [meta, setMeta] = useState<SchemaMetadata | null>(null);
+
+  // Template-specific state
+  const [templateOptions, setTemplateOptions] = useState<Record<string, unknown>>({});
+  const [templateProps, setTemplateProps] = useState<Record<string, unknown> | null>(null);
+  const [templateLoading, setTemplateLoading] = useState(false);
+  const [templateError, setTemplateError] = useState<string | null>(null);
+  const [duration, setDuration] = useState(10);
+
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editIdRef = useRef<string | null>(editId);
   editIdRef.current = editId;
+
+  // Derived template state (must be before effects that reference activeTemplate)
+  const bestTemplate = outputMode === 'animated' && data.length > 0
+    ? suggestBestTemplate(chartConfig, data)
+    : null;
+  const activeTemplate = selectedTemplate ?? bestTemplate;
+  const templateEntry = activeTemplate ? TEMPLATES[activeTemplate as TemplateId] : null;
 
   // Load schema metadata
   useEffect(() => {
@@ -71,14 +92,29 @@ function BuilderContent() {
     if (!editId) return;
     fetch(`/api/viz-specs/${editId}`)
       .then((r) => r.json())
-      .then((data) => {
-        if (data.query_spec) setSpec(data.query_spec);
-        if (data.chart_config) setChartConfig(data.chart_config);
-        if (data.name) setVizName(data.name);
+      .then((d) => {
+        if (d.query_spec) setSpec(d.query_spec);
+        if (d.chart_config) setChartConfig(d.chart_config);
+        if (d.name) setVizName(d.name);
         setSaved(true);
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Error loading viz_spec'));
   }, [editId]);
+
+  // Initialize duration from template default when template changes
+  useEffect(() => {
+    if (activeTemplate) {
+      const entry = TEMPLATES[activeTemplate as TemplateId];
+      if (entry) setDuration(entry.meta.defaultDuration);
+    }
+  }, [activeTemplate]);
+
+  // Clear template props when template changes
+  useEffect(() => {
+    setTemplateProps(null);
+    setTemplateOptions({});
+    setTemplateError(null);
+  }, [selectedTemplate]);
 
   const executeQuery = useCallback(async (q: QuerySpec) => {
     if (!q.table) return;
@@ -116,6 +152,26 @@ function BuilderContent() {
     };
   }, []);
 
+  const loadTemplateData = useCallback(async () => {
+    if (!activeTemplate) return;
+    setTemplateLoading(true);
+    setTemplateError(null);
+    try {
+      const res = await fetch(`/api/templates/${activeTemplate}/data`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({options: templateOptions}),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+      setTemplateProps(json.props);
+    } catch (e) {
+      setTemplateError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setTemplateLoading(false);
+    }
+  }, [activeTemplate, templateOptions]);
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -149,13 +205,6 @@ function BuilderContent() {
   };
 
   const columns = data.length > 0 ? Object.keys(data[0]) : [];
-
-  // Auto-select best template when switching to animation mode
-  const bestTemplate = outputMode === 'animated' && data.length > 0
-    ? suggestBestTemplate(chartConfig, data)
-    : null;
-
-  const activeTemplate = selectedTemplate ?? bestTemplate;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -260,12 +309,71 @@ function BuilderContent() {
                   />
                 )}
                 {outputMode === 'animated' && (
-                  <TemplatePicker
-                    data={data}
-                    config={chartConfig}
-                    selectedTemplate={activeTemplate}
-                    onSelect={setSelectedTemplate}
-                  />
+                  <>
+                    <TemplatePicker
+                      data={data}
+                      config={chartConfig}
+                      selectedTemplate={activeTemplate}
+                      onSelect={setSelectedTemplate}
+                    />
+
+                    {/* Template data options + duration */}
+                    {activeTemplate && templateEntry && (
+                      <div className="space-y-3 border-t border-zinc-700 pt-3">
+                        <label className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider">
+                          Datos de plantilla
+                        </label>
+
+                        {templateEntry.meta.dataOptions.length > 0 && (
+                          <DataOptionsForm
+                            options={templateEntry.meta.dataOptions}
+                            values={templateOptions}
+                            onChange={(key, val) => setTemplateOptions((prev) => ({...prev, [key]: val}))}
+                          />
+                        )}
+
+                        {/* Duration slider */}
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">
+                            Duración (segundos)
+                          </label>
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="range"
+                              min={1}
+                              max={20}
+                              value={duration}
+                              onChange={(e) => setDuration(Number(e.target.value))}
+                              className="flex-1 accent-blue-500"
+                            />
+                            <span className="text-sm text-zinc-300 w-20 text-right">
+                              {duration}s ({duration * (templateEntry.meta.fps ?? 30)} frames)
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={loadTemplateData}
+                          disabled={templateLoading}
+                          className="w-full bg-green-600 hover:bg-green-700 disabled:bg-zinc-700 text-white font-medium py-2 rounded-lg transition-colors text-sm"
+                        >
+                          {templateLoading ? 'Cargando...' : 'Cargar datos de plantilla'}
+                        </button>
+
+                        {templateError && (
+                          <div className="p-2 bg-red-900/20 border border-red-800 rounded text-red-400 text-xs">
+                            {templateError}
+                          </div>
+                        )}
+
+                        {templateProps && (
+                          <div className="p-2 bg-green-900/20 border border-green-800 rounded text-green-400 text-xs">
+                            Datos cargados correctamente
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -299,6 +407,8 @@ function BuilderContent() {
               data={data}
               config={chartConfig}
               spec={spec}
+              templateProps={templateProps}
+              duration={duration}
             />
           ) : (
             <div className="flex-1 flex items-center justify-center text-zinc-600 text-sm">
