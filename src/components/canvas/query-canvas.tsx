@@ -206,7 +206,7 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
         id,
         type: 'tableNode',
         position: {x: 50, y: 50},
-        data: {table: mainTable, selectedColumns: tableColumns[spec.table] ?? [], onToggleColumn: handleToggleColumn} as unknown as TableNodeData,
+        data: {table: mainTable, selectedColumns: tableColumns[spec.table] ?? [], primary: true, onToggleColumn: handleToggleColumn} as unknown as TableNodeData,
       });
     }
 
@@ -304,6 +304,28 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
     onChangeRef.current({...specRef.current, joins});
   }, [edges, initialized, nodes]);
 
+  // Sync primary table (root table node) into QuerySpec.table
+  useEffect(() => {
+    if (!initialized) return;
+    const tableNodes = nodes.filter(
+      (n) => (n.data as TableNodeData)?.table,
+    );
+    if (tableNodes.length === 0) {
+      if (specRef.current.table) {
+        onChangeRef.current({...specRef.current, table: ''});
+      }
+      return;
+    }
+    const current = tableNodes.find(
+      (n) => (n.data as TableNodeData)?.primary,
+    );
+    const primary = current ?? tableNodes[0];
+    const name = (primary.data as TableNodeData).table.name;
+    if (specRef.current.table !== name) {
+      onChangeRef.current({...specRef.current, table: name});
+    }
+  }, [nodes, initialized]);
+
   const handleConnect: OnConnect = useCallback(
     (connection: Connection) => {
       if (!connection.source || !connection.target) return;
@@ -384,6 +406,7 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
           table,
           selectedColumns: table.columns.slice(0, 3).map((c) => c.name),
           onToggleColumn: handleToggleColumn,
+          primary: !specRef.current.table,
         } as unknown as TableNodeData,
       };
 
@@ -414,6 +437,7 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
           table,
           selectedColumns: table.columns.slice(0, 3).map((c) => c.name),
           onToggleColumn: handleToggleColumn,
+          primary: !specRef.current.table,
         } as unknown as TableNodeData,
       };
 

@@ -10,6 +10,7 @@ export type TableNodeData = {
   table: TableInfo;
   selectedColumns: string[];
   onToggleColumn: (tableName: string, columnName: string) => void;
+  primary?: boolean;
 };
 
 function columnTypeColor(type: string): string {
