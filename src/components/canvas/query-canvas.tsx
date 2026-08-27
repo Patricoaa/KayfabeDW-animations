@@ -237,18 +237,31 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
     [],
   );
 
-  // Delete a table node and its join edges
+  // Keep a current table → nodeId map (avoids stale-closure lookups, which
+  // break the memoized TableNode's delete button).
+  const nodeIdByTableRef = useRef<Record<string, string>>({});
+  useEffect(() => {
+    const map: Record<string, string> = {};
+    for (const n of nodes) {
+      const d = n.data as TableNodeData;
+      if (d?.table) map[d.table.name] = n.id;
+    }
+    nodeIdByTableRef.current = map;
+  }, [nodes]);
+
+  // Delete a table node and its join edges (functional updates so it works
+  // even when invoked from a memoized node with a stale closure).
   const handleDeleteTable = useCallback(
     (tableName: string) => {
-      const tableNodeId = nodes.find((n) => (n.data as TableNodeData)?.table?.name === tableName)?.id;
-      if (!tableNodeId) return;
-      if (selectedNodeId === tableNodeId) setSelectedNodeId(null);
-      setNodes((nds) => nds.filter((n) => n.id !== tableNodeId));
+      const id = nodeIdByTableRef.current[tableName];
+      if (!id) return;
+      setNodes((nds) => nds.filter((n) => n.id !== id));
       setEdges((eds) =>
-        eds.filter((e) => e.source !== tableNodeId && e.target !== tableNodeId),
+        eds.filter((e) => e.source !== id && e.target !== id),
       );
+      setSelectedNodeId((cur) => (cur === id ? null : cur));
     },
-    [nodes, selectedNodeId, setNodes, setEdges, setSelectedNodeId],
+    [setNodes, setEdges, setSelectedNodeId],
   );
 
   // Initialize canvas from spec (when loading a saved viz_spec)
