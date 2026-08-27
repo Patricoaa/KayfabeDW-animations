@@ -354,6 +354,7 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
   );
 
   const clearCanvas = useCallback(() => {
+    if (!confirm('¿Limpiar todo el canvas? Esta acción no se puede deshacer.')) return;
     setNodes([]);
     setEdges([]);
     nodeIdCounter = 0;

@@ -1,14 +1,14 @@
 # UI/UX Audit — KayfabeDW Animations
 
 **Date**: 2026-08-27
-**Last updated**: 2026-08-27 (post-P16)
-**Score**: ~5.5/10 usability, 2/10 accessibility, 6.5/10 visual consistency
+**Last updated**: 2026-08-27 (post-Round 1)
+**Score**: ~6/10 usability, 2/10 accessibility, 7/10 visual consistency
 
 ---
 
 ## Executive Summary
 
-The app has been **unified into a single flow** at `/builder`. The old landing page (`/`) now redirects. The Builder supports both template-driven and custom-query workflows. The React Flow canvas is powerful but the overall UX still suffers from missing feedback, no onboarding, and accessibility gaps. There is no design system file — all tokens are hardcoded in Tailwind classes.
+The app has been **unified into a single flow** at `/builder`. The old landing page (`/`) now redirects. The Builder supports both template-driven and custom-query workflows. Dead code and broken dependencies have been cleaned up. The React Flow canvas is powerful but the overall UX still suffers from missing feedback, no onboarding, and accessibility gaps.
 
 ---
 
@@ -16,11 +16,11 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 
 | Category | Total | Fixed | Remaining |
 |----------|-------|-------|-----------|
-| Critical (C) | 13 | 4 | 9 |
+| Critical (C) | 17 | 9 | 8 |
 | Accessibility (A) | 6 | 0 | 6 |
 | UX Flow (U) | 16 | 3 | 13 |
-| Visual Design (V) | 7 | 0 | 7 |
-| **Total** | **42** | **7** | **35** |
+| Visual Design (V) | 7 | 1 | 6 |
+| **Total** | **46** | **13** | **33** |
 
 ---
 
@@ -30,8 +30,8 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 | # | Issue | Location | Status |
 |---|---|---|---|
 | **C1** | **GIF export is fake** — UI shows MP4/GIF toggle but API always renders MP4 | `animation-preview.tsx`, `render/route.ts:129` | ✅ **FIXED** — GIF option removed, export only shows MP4 |
-| **C2** | **Gallery delete silently ignores errors** — card removed locally but may persist on server | `gallery/page.tsx:43-47` | ❌ Open |
-| **C3** | **Clear canvas has no confirmation** — "Limpiar" button wipes all work instantly | `query-canvas.tsx:399-404` | ❌ Open |
+| **C2** | **Gallery delete silently ignores errors** — card removed locally but may persist on server | `gallery/page.tsx:43-47` | ✅ **FIXED** — checks response status, shows error toast on failure, only removes on success |
+| **C3** | **Clear canvas has no confirmation** — "Limpiar" button wipes all work instantly | `query-canvas.tsx:399-404` | ✅ **FIXED** — `confirm()` dialog with "no se puede deshacer" warning |
 | **C4** | **No unsaved changes warning** — navigating away from builder loses all work | `builder/page.tsx` | ❌ Open |
 | **C5** | **BuilderNav "Animations" link navigates away** from builder with no warning | `builder-nav.tsx:24` | ⚠️ Partially mitigated — `/` now redirects to `/builder`, but link still navigates away |
 
@@ -46,18 +46,18 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 ### Technical Debt
 | # | Issue | Location | Status |
 |---|---|---|---|
-| **C10** | **Blob URL memory leak** — `URL.createObjectURL()` never revoked | `animation-preview.tsx:42` | ❌ Open — old animation-preview used blob URLs; new version uses Vercel Blob URLs directly (no leak), but `animation-panel.tsx` still has it (dead code) |
+| **C10** | **Blob URL memory leak** — `URL.createObjectURL()` never revoked | `animation-preview.tsx:42` | ✅ **FIXED** — new AnimationPreview uses Vercel Blob URLs directly, dead `animation-panel.tsx` removed |
 | **C11** | **Hardcoded animation duration** — 150 frames (5s), no user control | `animation-preview.tsx` | ✅ **FIXED** — duration slider (1-20s) added to animation preview export bar |
 | **C12** | **`require()` for template loading** — not code-split, SSR-unsafe | `animation-preview.tsx:132-148` | ❌ Open — still uses `require()` in `loadComponent()` |
 | **C13** | **Global mutable `nodeIdCounter`** — breaks React Strict Mode / SSR | `query-canvas.tsx` | ❌ Open |
 
 ### New Issues (discovered during P16)
-| # | Issue | Location | Severity |
-|---|---|---|---|
-| **C14** | **Dead code: `animation-panel.tsx`** — not imported anywhere, has broken render payload | `components/builder/animation-panel.tsx` | Medium |
-| **C15** | **Dead code: `filter-bar.tsx`** — not imported anywhere | `components/builder/filter-bar.tsx` | Low |
-| **C16** | **Template props not persisted** — `templateProps` state is lost on save/reload; only `query_spec` and `chart_config` are saved to `viz_spec` | `builder/page.tsx` | Medium |
-| **C17** | **`?template=` param not re-applied** — if user switches away from animated mode and back, the template param effect doesn't re-fire | `builder/page.tsx:97-103` | Low |
+| # | Issue | Location | Severity | Status |
+|---|---|---|---|---|
+| **C14** | **Dead code: `animation-panel.tsx`** — not imported anywhere, has broken render payload | `components/builder/animation-panel.tsx` | Medium | ✅ **FIXED** — file deleted |
+| **C15** | **Dead code: `filter-bar.tsx`** — not imported anywhere | `components/builder/filter-bar.tsx` | Low | ✅ **FIXED** — file deleted |
+| **C16** | **Template props not persisted** — `templateProps` state is lost on save/reload; only `query_spec` and `chart_config` are saved to `viz_spec` | `builder/page.tsx` | Medium | ❌ Open |
+| **C17** | **`?template=` param not re-applied** — if user switches away from animated mode and back, the template param effect doesn't re-fire | `builder/page.tsx:97-103` | Low | ❌ Open |
 
 ---
 
@@ -116,7 +116,7 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 |---|---|---|---|
 | **V1** | **No design tokens file** — all constants in Tailwind classes + inline styles | Hard to maintain consistency | ❌ Open |
 | **V2** | **No icon library** — emoji characters as icons (📊⚔️🔥📅🗺️) | Inconsistent rendering, no accessibility | ❌ Open |
-| **V3** | **`clsx` and `tailwind-merge` unused** — dead dependencies | Dead code | ❌ Open |
+| **V3** | **`clsx` and `tailwind-merge` unused** — dead dependencies | Dead code | ✅ **FIXED** — removed from package.json |
 | **V4** | **Dark-only mode** — no light theme, no system preference detection | Accessibility | ❌ Open |
 | **V5** | **Builder not responsive** — fixed w-80/w-64 sidebars, desktop-only | Mobile unusable | ❌ Open |
 | **V6** | **Inconsistent button styles** — some rounded, some rounded-lg, varying padding | Visual noise | ❌ Open |
@@ -127,13 +127,13 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 ## Improvement Proposals
 
 ### Tier 1: Quick Wins (1-2 days each)
-- ~~P1: Confirm clear canvas~~ → **C3** (open)
+- ~~P1: Confirm clear canvas~~ → ✅ Done (C3)
 - ~~P2: Fix/remove fake GIF option~~ → ✅ Done (C1)
 - P3: Toast notification system → **C6** (open)
-- ~~P4: Fix blob URL memory leak~~ → ✅ Done in new AnimationPreview (C10 partially)
+- ~~P4: Fix blob URL memory leak~~ → ✅ Done (C10)
 - P5: Unsaved changes warning → **C4** (open)
 - ~~P6: Render error display~~ → ✅ Done (C7)
-- P7: Remove dead dependencies → **V3** (open)
+- ~~P7: Remove dead dependencies~~ → ✅ Done (V3)
 
 ### Tier 2: UX Improvements (2-5 days each)
 - P8: Create DESIGN.md → **V1** (open)
@@ -158,6 +158,6 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 - P23: Extract shared design tokens → **V1** (open)
 
 ### New Proposals (from P16)
-- **P24**: Remove dead code (`animation-panel.tsx`, `filter-bar.tsx`) → **C14, C15**
-- **P25**: Persist template props in viz_spec (or re-fetch on load) → **C16**
+- ~~**P24**: Remove dead code (`animation-panel.tsx`, `filter-bar.tsx`)~~ → ✅ Done (C14, C15)
+- **P25**: Persist template props in viz_spec (or re-fetch on load) → **C16** (open)
 - **P26**: Add cancel button during render → **U14** (partial)

@@ -25,6 +25,7 @@ export default function GalleryPage() {
   const [specs, setSpecs] = useState<VizSpec[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/viz-specs')
@@ -37,11 +38,13 @@ export default function GalleryPage() {
   const handleDelete = useCallback(async (id: string) => {
     if (!confirm('¿Eliminar esta visualización?')) return;
     setDeleting(id);
+    setDeleteError(null);
     try {
-      await fetch(`/api/viz-specs/${id}`, {method: 'DELETE'});
+      const res = await fetch(`/api/viz-specs/${id}`, {method: 'DELETE'});
+      if (!res.ok) throw new Error('Error al eliminar');
       setSpecs((prev) => prev.filter((s) => s.id !== id));
-    } catch {
-      // ignore
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : 'Error al eliminar');
     } finally {
       setDeleting(null);
     }
@@ -132,6 +135,15 @@ export default function GalleryPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {deleteError && (
+        <div className="fixed bottom-4 right-4 p-3 bg-red-900/20 border border-red-800 rounded-lg text-red-400 text-sm max-w-sm">
+          {deleteError}
+          <button onClick={() => setDeleteError(null)} className="ml-2 text-red-300 hover:text-white">
+            ✕
+          </button>
         </div>
       )}
     </div>
