@@ -2,17 +2,26 @@
 
 import {useCallback, useEffect, useRef, useState} from 'react';
 import Link from 'next/link';
-import {useRouter} from 'next/navigation';
 import type {QuerySpec} from '@/lib/query-spec';
 import {defaultQuerySpec} from '@/lib/query-spec';
 import type {ChartConfig} from '@/lib/chart-config';
 import {DEFAULT_CHART_CONFIG} from '@/lib/chart-config';
-import {DataPanel} from '@/components/builder/data-panel';
-import {FilterBar} from '@/components/builder/filter-bar';
+import type {SchemaMetadata, TableInfo} from '@/lib/schema-metadata';
+import {getSchemaMetadata} from '@/lib/schema-metadata';
+import dynamic from 'next/dynamic';
 import {ChartConfigPanel} from '@/components/builder/chart-config-panel';
 import {ChartPreview} from '@/components/charts/chart-preview';
 import {AnimationPanel} from '@/components/builder/animation-panel';
 import {BuilderNav} from '@/components/builder/builder-nav';
+
+const QueryCanvas = dynamic(
+  () => import('@/components/canvas/query-canvas').then((m) => m.QueryCanvas),
+  {ssr: false, loading: () => (
+    <div className="flex-1 flex items-center justify-center text-zinc-500 text-sm">
+      Cargando canvas...
+    </div>
+  )},
+);
 
 type VizSpec = {
   id?: string;
@@ -21,8 +30,9 @@ type VizSpec = {
   chart_config: ChartConfig;
 };
 
+type OutputMode = 'static' | 'animated';
+
 export default function BuilderPage() {
-  const router = useRouter();
   const [spec, setSpec] = useState<QuerySpec>(defaultQuerySpec(''));
   const [chartConfig, setChartConfig] = useState<ChartConfig>(DEFAULT_CHART_CONFIG);
   const [vizName, setVizName] = useState('Nueva visualización');
@@ -31,8 +41,16 @@ export default function BuilderPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [sideTab, setSideTab] = useState<'data' | 'chart' | 'filters' | 'animation'>('data');
+  const [sideTab, setSideTab] = useState<'data' | 'preview'>('data');
+  const [outputMode, setOutputMode] = useState<OutputMode>('static');
+  const [meta, setMeta] = useState<SchemaMetadata | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    getSchemaMetadata()
+      .then(setMeta)
+      .catch((e) => setError(e.message));
+  }, []);
 
   const executeQuery = useCallback(async (q: QuerySpec) => {
     if (!q.table) return;
@@ -125,10 +143,10 @@ export default function BuilderPage() {
 
       {/* Main layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left sidebar — config */}
+        {/* Left sidebar — 2 tabs */}
         <aside className="w-80 border-r border-zinc-800 flex flex-col overflow-hidden">
           <div className="flex border-b border-zinc-800">
-            {(['data', 'chart', 'filters', 'animation'] as const).map((tab) => (
+            {(['data', 'preview'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setSideTab(tab)}
@@ -138,34 +156,69 @@ export default function BuilderPage() {
                     : 'text-zinc-500 hover:text-zinc-300'
                 }`}
               >
-                {tab === 'data' ? 'Datos' : tab === 'chart' ? 'Gráfico' : tab === 'filters' ? 'Filtros' : 'Animación'}
+                {tab === 'data' ? 'Datos' : 'Preview'}
               </button>
             ))}
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {sideTab === 'data' && (
-              <DataPanel spec={spec} onChange={handleSpecChange} />
-            )}
-            {sideTab === 'chart' && (
-              <ChartConfigPanel
-                config={chartConfig}
-                onChange={setChartConfig}
-                columns={columns}
-              />
-            )}
-            {sideTab === 'filters' && (
-              <FilterBar
-                specTable={spec.table}
-                filters={spec.filters ?? []}
-                onChange={(filters) => handleSpecChange({...spec, filters})}
-              />
-            )}
-            {sideTab === 'animation' && (
-              <AnimationPanel
-                data={data}
-                config={chartConfig}
+            {sideTab === 'data' && meta && (
+              <QueryCanvas
                 spec={spec}
+                onChange={handleSpecChange}
+                meta={meta.tables}
               />
+            )}
+            {sideTab === 'data' && !meta && (
+              <div className="space-y-3 animate-pulse">
+                <div className="h-8 bg-zinc-800 rounded" />
+                <div className="h-8 bg-zinc-800 rounded" />
+                <div className="h-20 bg-zinc-800 rounded" />
+              </div>
+            )}
+            {sideTab === 'preview' && (
+              <div className="space-y-4">
+                {/* Output mode toggle */}
+                <div>
+                  <label className="text-xs font-medium text-zinc-400 mb-2 block">Modo de salida</label>
+                  <div className="grid grid-cols-2 gap-1">
+                    <button
+                      onClick={() => setOutputMode('static')}
+                      className={`px-3 py-2 rounded text-xs font-medium transition-colors ${
+                        outputMode === 'static'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                      }`}
+                    >
+                      📊 Estático
+                    </button>
+                    <button
+                      onClick={() => setOutputMode('animated')}
+                      className={`px-3 py-2 rounded text-xs font-medium transition-colors ${
+                        outputMode === 'animated'
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                      }`}
+                    >
+                      🎬 Animación
+                    </button>
+                  </div>
+                </div>
+
+                {outputMode === 'static' && (
+                  <ChartConfigPanel
+                    config={chartConfig}
+                    onChange={setChartConfig}
+                    columns={columns}
+                  />
+                )}
+                {outputMode === 'animated' && (
+                  <AnimationPanel
+                    data={data}
+                    config={chartConfig}
+                    spec={spec}
+                  />
+                )}
+              </div>
             )}
           </div>
         </aside>
@@ -181,13 +234,21 @@ export default function BuilderPage() {
             {error && <span className="text-red-400">{error}</span>}
           </div>
 
-          {/* Chart preview */}
+          {/* Preview area */}
           <div className="flex-1 flex items-center justify-center p-8 overflow-auto">
             <div className="w-full max-w-3xl">
               {chartConfig.title && (
                 <h2 className="text-center text-lg font-semibold mb-4">{chartConfig.title}</h2>
               )}
-              <ChartPreview data={data} config={chartConfig} />
+              {outputMode === 'static' ? (
+                <ChartPreview data={data} config={chartConfig} />
+              ) : (
+                <AnimationPanel
+                  data={data}
+                  config={chartConfig}
+                  spec={spec}
+                />
+              )}
             </div>
           </div>
         </main>

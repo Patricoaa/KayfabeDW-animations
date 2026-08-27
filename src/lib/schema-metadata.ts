@@ -11,13 +11,19 @@ export type ForeignKeyInfo = {
   refColumn: string;
 };
 
+export type ReverseForeignKeyInfo = {
+  column: string;
+  fromTable: string;
+  fromColumn: string;
+};
+
 export type TableInfo = {
   name: string;
   kind: 'table' | 'view';
   columns: ColumnInfo[];
   primaryKey: string[];
   foreignKeys: ForeignKeyInfo[];
-  referencedBy: ForeignKeyInfo[];
+  referencedBy: ReverseForeignKeyInfo[];
 };
 
 export type SchemaMetadata = {
@@ -84,6 +90,24 @@ export function getRelatedTables(tables: TableInfo[], tableName: string): TableI
   return Array.from(related)
     .map((name) => getTableByName(tables, name))
     .filter((t): t is TableInfo => t !== undefined);
+}
+
+export function getSuggestedJoin(
+  tables: TableInfo[],
+  fromTable: string,
+  toTable: string,
+): {sourceColumn: string; targetColumn: string} | null {
+  const from = getTableByName(tables, fromTable);
+  const to = getTableByName(tables, toTable);
+  if (!from || !to) return null;
+
+  const fk = from.foreignKeys.find((f) => f.refTable === toTable);
+  if (fk) return {sourceColumn: fk.column, targetColumn: fk.refColumn};
+
+  const reverseFk = to.foreignKeys.find((f) => f.refTable === fromTable);
+  if (reverseFk) return {sourceColumn: reverseFk.refColumn, targetColumn: reverseFk.column};
+
+  return null;
 }
 
 export function findJoinPath(
