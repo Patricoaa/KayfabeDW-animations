@@ -1,28 +1,27 @@
 import type {ChartConfig} from './chart-config';
-import type {QuerySpec} from './query-spec';
 import {TEMPLATES} from '@/remotion/generated/registry';
 import type {TemplateId} from '@/remotion/generated/registry';
 import {matchTemplates} from './profile-matcher';
+import {prepareSeries, toSeries, type CanonicalSeries} from './chart-data';
 
 export type RemotionInputProps = {
   templateId: string;
   props: Record<string, unknown>;
 };
 
-const DEFAULT_COLORS = [
-  '#6366f1', '#8b5cf6', '#a855f7', '#d946ef',
-  '#ec4899', '#f43f5e', '#f97316', '#eab308',
-  '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6',
-];
+/**
+ * Single source of truth for series-shaped data. All converters go through
+ * `prepareSeries` (same pipeline as the static charts), so the animated and
+ * static representations of the same query always agree on labels, values,
+ * aggregation, sort, limit and colors.
+ */
+function buildSeries(data: Record<string, unknown>[], config: ChartConfig): CanonicalSeries[] {
+  if (!data || data.length === 0) return [];
+  return toSeries(prepareSeries(data, config));
+}
 
 function convertRankingBarras(data: Record<string, unknown>[], config: ChartConfig): Record<string, unknown> {
-  const labelCol = config.xField ?? Object.keys(data[0] ?? {})[0];
-  const valueCol = config.yField ?? Object.keys(data[0] ?? {})[1];
-  const items = data.slice(0, 15).map((d, i) => ({
-    label: String(d[labelCol] ?? ''),
-    value: Number(d[valueCol] ?? 0),
-    color: config.colors?.[i % (config.colors?.length ?? 12)] ?? DEFAULT_COLORS[i % 12],
-  }));
+  const items = buildSeries(data, config).slice(0, 15);
   return {
     title: config.title ?? '',
     items,
@@ -31,59 +30,57 @@ function convertRankingBarras(data: Record<string, unknown>[], config: ChartConf
 }
 
 function convertHeadToHead(data: Record<string, unknown>[], config: ChartConfig): Record<string, unknown> {
-  const nameCol = config.xField ?? Object.keys(data[0] ?? {})[0];
-  const valueCol = config.yField ?? Object.keys(data[0] ?? {})[1];
+  const items = buildSeries(data, config);
   const drawsCol = Object.keys(data[0] ?? {}).find((k) => k.toLowerCase().includes('draw'));
 
   return {
-    wrestlerA: String(data[0]?.[nameCol] ?? ''),
-    wrestlerB: String(data[1]?.[nameCol] ?? ''),
-    winsA: Number(data[0]?.[valueCol] ?? 0),
-    winsB: Number(data[1]?.[valueCol] ?? 0),
+    wrestlerA: items[0]?.label ?? '',
+    wrestlerB: items[1]?.label ?? '',
+    winsA: items[0]?.value ?? 0,
+    winsB: items[1]?.value ?? 0,
     draws: drawsCol ? Number(data[0]?.[drawsCol] ?? 0) : 0,
   };
 }
 
 function convertStatsKpi(data: Record<string, unknown>[], config: ChartConfig): Record<string, unknown> {
-  const labelCol = config.xField ?? Object.keys(data[0] ?? {})[0];
-  const valueCol = config.yField ?? Object.keys(data[0] ?? {})[1];
+  const prepared = prepareSeries(data, config);
   return {
-    label: config.title ?? String(data[0]?.[labelCol] ?? ''),
-    value: Number(data[0]?.[valueCol] ?? 0),
+    label: config.title ?? prepared.items[0]?.label ?? '',
+    value: prepared.items[0]?.value ?? 0,
     color: config.colors?.[0] ?? '#3b82f6',
   };
 }
 
 function convertWinStreak(data: Record<string, unknown>[], config: ChartConfig): Record<string, unknown> {
-  const nameCol = config.xField ?? Object.keys(data[0] ?? {})[0];
-  const valueCol = config.yField ?? Object.keys(data[0] ?? {})[1];
-  const name = String(data[0]?.[nameCol] ?? '');
-  const count = data.length;
+  const prepared = prepareSeries(data, config);
+  const name = prepared.items[0]?.label ?? '';
 
   return {
     wrestlerName: name,
-    streakCount: count,
+    streakCount: data.length,
     matchType: config.title ?? 'Victoria',
-    events: data.map((d) => String(d[nameCol] ?? '')),
+    events: prepared.items.map((i) => i.label),
     promotionColor: config.colors?.[0] ?? '#FFD700',
   };
 }
 
 function convertTimelineReinados(data: Record<string, unknown>[], config: ChartConfig): Record<string, unknown> {
-  const labelCol = config.xField ?? Object.keys(data[0] ?? {})[0];
-  const valueCol = config.yField ?? Object.keys(data[0] ?? {})[1];
+  const prepared = prepareSeries(data, config);
   const endCol = Object.keys(data[0] ?? {}).find((k) => k.toLowerCase().includes('end'));
   const defensesCol = Object.keys(data[0] ?? {}).find((k) => k.toLowerCase().includes('defense'));
 
-  const champion = String(data[0]?.[labelCol] ?? '');
+  const champion = prepared.items[0]?.label ?? '';
   const title = config.title ?? '';
 
-  const reigns = data.map((d) => ({
-    start: String(d[labelCol] ?? ''),
-    end: endCol ? (d[endCol] ? String(d[endCol]) : null) : null,
-    days: Number(d[valueCol] ?? 0),
-    defenses: defensesCol ? Number(d[defensesCol] ?? 0) : 0,
-  }));
+  const reigns = prepared.items.map((item) => {
+    const raw = (item.raw ?? {}) as Record<string, unknown>;
+    return {
+      start: item.label,
+      end: endCol ? (raw[endCol] ? String(raw[endCol]) : null) : null,
+      days: item.value,
+      defenses: defensesCol ? Number(raw[defensesCol] ?? 0) : 0,
+    };
+  });
 
   return {
     championName: champion,
@@ -117,23 +114,10 @@ function convertHeatmapLuchas(data: Record<string, unknown>[], config: ChartConf
   };
 }
 
-function pickSeries(data: Record<string, unknown>[], config: ChartConfig): {label: string; value: number; color: string}[] {
-  const labelCol = config.xField ?? Object.keys(data[0] ?? {})[0];
-  const valueCol = config.yField ?? Object.keys(data[0] ?? {})[1];
-  const colorCol = config.colorField;
-  return data.map((d, i) => ({
-    label: String(d[labelCol] ?? ''),
-    value: Number(d[valueCol] ?? 0),
-    color: colorCol
-      ? String(d[colorCol] ?? config.colors?.[i % (config.colors?.length ?? 12)] ?? DEFAULT_COLORS[i % 12])
-      : config.colors?.[i % (config.colors?.length ?? 12)] ?? DEFAULT_COLORS[i % 12],
-  }));
-}
-
 function convertGenericBar(data: Record<string, unknown>[], config: ChartConfig): Record<string, unknown> {
   return {
     title: config.title ?? '',
-    series: pickSeries(data, config),
+    series: buildSeries(data, config),
     numberFormat: config.numberFormat ?? 'short',
   };
 }
@@ -141,17 +125,16 @@ function convertGenericBar(data: Record<string, unknown>[], config: ChartConfig)
 function convertGenericLine(data: Record<string, unknown>[], config: ChartConfig): Record<string, unknown> {
   return {
     title: config.title ?? '',
-    series: pickSeries(data, config),
+    series: buildSeries(data, config),
     numberFormat: config.numberFormat ?? 'short',
   };
 }
 
 function convertGenericKpi(data: Record<string, unknown>[], config: ChartConfig): Record<string, unknown> {
-  const labelCol = config.xField ?? Object.keys(data[0] ?? {})[0];
-  const valueCol = config.yField ?? Object.keys(data[0] ?? {})[1];
+  const prepared = prepareSeries(data, config);
   return {
-    title: config.title ?? String(data[0]?.[labelCol] ?? ''),
-    value: Number(data[0]?.[valueCol] ?? 0),
+    title: config.title ?? prepared.items[0]?.label ?? '',
+    value: prepared.items[0]?.value ?? 0,
     color: config.colors?.[0] ?? '#3b82f6',
   };
 }
@@ -213,7 +196,6 @@ export function getCompatibleTemplates(
 export function convertToRemotionProps(
   config: ChartConfig,
   data: Record<string, unknown>[],
-  _spec: QuerySpec,
   templateId: string,
 ): RemotionInputProps | null {
   const converter = CONVERTERS[templateId];

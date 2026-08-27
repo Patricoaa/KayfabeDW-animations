@@ -25,8 +25,19 @@ export function downloadChartSvg(container: HTMLElement, filename: string): bool
 }
 
 export async function downloadChartPng(container: HTMLElement, filename: string): Promise<boolean> {
+  const dataUrl = await chartToDataUrl(container);
+  if (!dataUrl) return false;
+  triggerDownload(dataUrl, `${filename}.png`);
+  return true;
+}
+
+/**
+ * Rasterizes the inline SVG chart to a white-background PNG data URL.
+ * Shared by the PNG download flow and thumbnail generation.
+ */
+export async function chartToDataUrl(container: HTMLElement): Promise<string | null> {
   const svg = findChartSvg(container);
-  if (!svg) return false;
+  if (!svg) return null;
   const bbox = svg.getBBox();
   const width = Math.max(bbox.width || svg.viewBox.baseVal.width, svg.getBoundingClientRect().width || 600);
   const height = Math.max(bbox.height || svg.viewBox.baseVal.height, svg.getBoundingClientRect().height || 380);
@@ -53,9 +64,7 @@ export async function downloadChartPng(container: HTMLElement, filename: string)
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    const png = canvas.toDataURL('image/png');
-    triggerDownload(png, `${filename}.png`);
-    return true;
+    return canvas.toDataURL('image/png');
   } finally {
     URL.revokeObjectURL(url);
   }

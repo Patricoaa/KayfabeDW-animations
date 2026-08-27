@@ -30,6 +30,7 @@ type VizSpec = {
   query_spec: {table?: string; select?: {column: string}[]; joins?: {table: string}[]};
   chart_config: {type?: string; title?: string};
   animation_config?: {templateId?: string; templateOptions?: Record<string, unknown>; duration?: number} | null;
+  thumbnail_url?: string | null;
   is_draft?: boolean;
   version?: number;
   created_at: string;
@@ -171,6 +172,15 @@ export default function GalleryPage() {
       >
         {/* U4: Color-coded header bar */}
         <div className="h-1.5" style={{backgroundColor: accentColor}} />
+
+        {spec.thumbnail_url && (
+          <img
+            src={spec.thumbnail_url}
+            alt={`Vista previa de ${spec.name}`}
+            loading="lazy"
+            className="w-full h-40 object-cover bg-elevated"
+          />
+        )}
 
         <div className="p-4">
           <div className="flex items-start justify-between mb-2">

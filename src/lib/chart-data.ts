@@ -158,6 +158,25 @@ export function prepareSeries(
   };
 }
 
+/**
+ * Canonical minimal series shape shared by the static chart renderers and the
+ * animated (Remotion) templates. Both consumers build it from the same
+ * `prepareSeries` path so shapes/colors/sort/limit always agree.
+ */
+export type CanonicalSeries = {
+  label: string;
+  value: number;
+  color: string;
+};
+
+export function toSeries(prepared: PreparedData): CanonicalSeries[] {
+  return prepared.items.map((item) => ({
+    label: item.label,
+    value: item.value,
+    color: item.color ?? pickColor(undefined, 0),
+  }));
+}
+
 export function detectAggregateField(data: Record<string, unknown>[], yField: string, xField: string): 'sum' | 'avg' | 'count' | null {
   if (data.length < 2) return null;
   const groups = new Set(data.map((r) => String(r[xField] ?? '')));

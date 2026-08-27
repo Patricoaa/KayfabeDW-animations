@@ -25,7 +25,7 @@ import {DEFAULT_CHART_CONFIG, applyChartDefaults} from '@/lib/chart-config';
 import type {SchemaMetadata} from '@/lib/schema-metadata';
 import {getSchemaMetadata} from '@/lib/schema-metadata';
 import {suggestBestTemplate, isGenericTemplate} from '@/lib/viz-to-remotion';
-import {downloadChartSvg, downloadChartPng, sanitizeFilename} from '@/lib/export-static';
+import {downloadChartSvg, downloadChartPng, sanitizeFilename, chartToDataUrl} from '@/lib/export-static';
 import dynamic from 'next/dynamic';
 import {ChartConfigPanel} from '@/components/builder/chart-config-panel';
 import {ChartPreview} from '@/components/charts/chart-preview';
@@ -96,6 +96,10 @@ function BuilderContent() {
   const [templateProps, setTemplateProps] = useState<Record<string, unknown> | null>(null);
   const [templateLoading, setTemplateLoading] = useState(false);
   const [templateError, setTemplateError] = useState<string | null>(null);
+  // When true, the canonical template data (externalProps) wins over the
+  // converted query data in the animated preview. Set when the user clicks
+  // "Usar datos canónicos de la plantilla (reemplaza tu query)".
+  const [preferTemplateProps, setPreferTemplateProps] = useState(false);
   const [duration, setDuration] = useState(10);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -175,6 +179,7 @@ function BuilderContent() {
     setTemplateProps(null);
     setTemplateOptions({});
     setTemplateError(null);
+    setPreferTemplateProps(false);
   }, [selectedTemplate]);
 
   const executeQuery = useCallback(async (q: QuerySpec) => {
@@ -323,6 +328,11 @@ function BuilderContent() {
 
   const loadTemplateData = useCallback(async () => {
     if (!activeTemplate) return;
+    if (data.length > 0 && !confirm(
+      'Usar datos canónicos de la plantilla reemplaza los datos de tu consulta en la preview. ¿Continuar?',
+    )) {
+      return;
+    }
     setTemplateLoading(true);
     setTemplateError(null);
     try {
@@ -334,7 +344,8 @@ function BuilderContent() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
       setTemplateProps(json.props);
-      addToast('Datos de plantilla cargados', 'success');
+      setPreferTemplateProps(true);
+      addToast('Datos canónicos de la plantilla cargados', 'success');
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setTemplateError(msg);
@@ -342,7 +353,7 @@ function BuilderContent() {
     } finally {
       setTemplateLoading(false);
     }
-  }, [activeTemplate, templateOptions, addToast]);
+  }, [activeTemplate, templateOptions, data.length, addToast]);
 
   // E2E: Static export (SVG / PNG)
   const [staticExporting, setStaticExporting] = useState<'none' | 'svg' | 'png'>('none');
@@ -373,6 +384,26 @@ function BuilderContent() {
     }
     setSaving(true);
     try {
+      // Best-effort thumbnail: rasterize the static chart (if visible) so the
+      // gallery can show a preview. Non-fatal on failure.
+      let thumbnailUrl: string | undefined;
+      if (outputMode === 'static' && staticExportRef.current && data.length > 0) {
+        try {
+          const dataUrl = await chartToDataUrl(staticExportRef.current);
+          if (dataUrl) {
+            const thumbRes = await fetch('/api/thumbnail', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({dataUrl}),
+            });
+            const thumb = await thumbRes.json();
+            if (thumbRes.ok && thumb.url) thumbnailUrl = thumb.url;
+          }
+        } catch {
+          // Thumbnail is best-effort
+        }
+      }
+
       const isEdit = !!editIdRef.current;
       const url = isEdit ? `/api/viz-specs/${editIdRef.current}` : '/api/viz-specs';
       const method = isEdit ? 'PUT' : 'POST';
@@ -386,6 +417,7 @@ function BuilderContent() {
           animation_config: outputMode === 'animated' && activeTemplate
             ? {templateId: activeTemplate, templateOptions, duration}
             : null,
+          thumbnail_url: thumbnailUrl,
           is_draft: false,
           version_bump: true,
         }),
@@ -605,8 +637,8 @@ function BuilderContent() {
                 templateId={activeTemplate}
                 data={data}
                 config={chartConfig}
-                spec={spec}
                 templateProps={templateProps}
+                preferTemplateProps={preferTemplateProps}
                 duration={duration}
               />
             ) : (
@@ -702,9 +734,12 @@ function BuilderContent() {
                         <button
                           onClick={loadTemplateData}
                           disabled={templateLoading}
+                          title="Reemplaza los datos de tu consulta por los datos canónicos de la plantilla"
                           className="w-full bg-amber-500 hover:bg-amber-400 disabled:bg-elevated disabled:text-muted text-black font-semibold py-2 rounded-lg transition-colors text-sm"
                         >
-                          {templateLoading ? 'Cargando...' : 'Cargar datos de plantilla'}
+                          {templateLoading
+                            ? 'Cargando...'
+                            : 'Usar datos canónicos de la plantilla (reemplaza tu query)'}
                         </button>
 
                         {templateError && (

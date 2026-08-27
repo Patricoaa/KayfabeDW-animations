@@ -13,10 +13,7 @@ function getClient() {
 export async function GET() {
   try {
     const supabase = getClient();
-    const {data, error} = await supabase
-      .from('viz_spec')
-      .select('*')
-      .order('created_at', {ascending: false});
+    const {data, error} = await supabase.rpc('list_viz_specs');
     if (error) throw error;
     return NextResponse.json(data ?? []);
   } catch (err) {
@@ -29,19 +26,17 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const supabase = getClient();
-    const {data, error} = await supabase
-      .from('viz_spec')
-      .insert({
-        name: body.name ?? 'Sin título',
-        query_spec: body.query_spec ?? {},
-        chart_config: body.chart_config ?? {},
-        animation_config: body.animation_config ?? null,
-        folder_id: body.folder_id ?? null,
-        is_draft: body.is_draft ?? true,
-        version: 1,
-      })
-      .select()
-      .single();
+    const {data, error} = await supabase.rpc('save_viz_spec', {
+      p_id: body.id ?? null,
+      p_name: body.name ?? 'Sin título',
+      p_query_spec: body.query_spec ?? {},
+      p_chart_config: body.chart_config ?? {},
+      p_animation_config: body.animation_config ?? null,
+      p_folder_id: body.folder_id ?? null,
+      p_is_draft: body.is_draft ?? true,
+      p_version_bump: body.version_bump === true,
+      p_thumbnail_url: body.thumbnail_url ?? null,
+    });
     if (error) throw error;
     return NextResponse.json(data);
   } catch (err) {

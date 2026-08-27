@@ -3,7 +3,6 @@
 import {useState, useMemo, useEffect, useRef} from 'react';
 import React from 'react';
 import {Player} from '@remotion/player';
-import type {QuerySpec} from '@/lib/query-spec';
 import type {ChartConfig} from '@/lib/chart-config';
 import {convertToRemotionProps} from '@/lib/viz-to-remotion';
 import {TEMPLATES} from '@/remotion/generated/registry';
@@ -19,8 +18,8 @@ type AnimationPreviewProps = {
   templateId: string;
   data: Record<string, unknown>[];
   config: ChartConfig;
-  spec: QuerySpec;
   templateProps?: Record<string, unknown> | null;
+  preferTemplateProps?: boolean;
   duration?: number;
 };
 
@@ -59,8 +58,8 @@ export function AnimationPreview({
   templateId,
   data,
   config,
-  spec,
   templateProps: externalProps,
+  preferTemplateProps = false,
   duration: externalDuration,
 }: AnimationPreviewProps) {
   const [renderState, setRenderState] = useState<RenderState>({status: 'idle'});
@@ -73,18 +72,26 @@ export function AnimationPreview({
   const fps = entry?.meta.fps ?? 30;
   const compositionId = entry?.meta.componentId ?? templateId;
 
-  // Use external props if provided (template data loaded), otherwise convert from query data
+  // Convert query data into template props. When there's query data we prefer
+  // the converted (canonical) props so the MP4 matches the static chart;
+  // externalProps (template-canonical data) are only used when the user
+  // explicitly opted in via the "Usar datos canónicos de la plantilla" button.
   const convertedProps = useMemo(
-    () => convertToRemotionProps(config, data, spec, templateId),
-    [templateId, config, data, spec],
+    () => (data.length > 0 ? convertToRemotionProps(config, data, templateId) : null),
+    [templateId, config, data],
   );
 
-  const remotionProps = externalProps ?? convertedProps?.props ?? null;
+  const remotionProps = useMemo(() => {
+    if (preferTemplateProps && externalProps) return externalProps;
+    if (convertedProps?.props) return convertedProps.props;
+    return externalProps ?? null;
+  }, [preferTemplateProps, externalProps, convertedProps]);
 
   const handleExport = async () => {
     if (!remotionProps) return;
     const controller = new AbortController();
     abortRef.current = controller;
+    const startedAt = Date.now();
     setRenderState({status: 'rendering', phase: 'Iniciando...', progress: 0.05});
     try {
       const res = await fetch('/api/render', {
@@ -97,11 +104,27 @@ export function AnimationPreview({
         }),
         signal: controller.signal,
       });
-      const data = await res.json();
-      if (data.type === 'done') {
-        setRenderState({status: 'done', url: data.url, size: data.size});
-      } else if (data.type === 'error') {
-        setRenderState({status: 'error', message: data.message});
+      const result = await res.json();
+      if (result.type === 'done') {
+        setRenderState({status: 'done', url: result.url, size: result.size});
+        // Best-effort render history entry (D4: persist animation_render).
+        try {
+          await fetch('/api/renders', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              template_id: templateId,
+              input_props: remotionProps,
+              output_url: result.url,
+              output_size: result.size,
+              render_time_ms: Date.now() - startedAt,
+            }),
+          });
+        } catch {
+          // Non-fatal — download link already shown.
+        }
+      } else if (result.type === 'error') {
+        setRenderState({status: 'error', message: result.message});
       } else {
         setRenderState({status: 'error', message: 'Respuesta inesperada del servidor'});
       }
