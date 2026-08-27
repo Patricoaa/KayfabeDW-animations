@@ -3,6 +3,7 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
 import Link from 'next/link';
 import {useRouter} from 'next/navigation';
+import {useToast} from '@/components/ui/toast';
 
 const CHART_ICONS: Record<string, string> = {
   bar: '📊',
@@ -36,6 +37,7 @@ type SortKey = 'newest' | 'oldest' | 'name-asc' | 'name-desc';
 
 export default function GalleryPage() {
   const router = useRouter();
+  const {addToast} = useToast();
   const [specs, setSpecs] = useState<VizSpec[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -107,6 +109,7 @@ export default function GalleryPage() {
       const res = await fetch(`/api/viz-specs/${id}`, {method: 'DELETE'});
       if (!res.ok) throw new Error('Error al eliminar');
       setSpecs((prev) => prev.filter((s) => s.id !== id));
+      addToast('Visualización eliminada', 'success');
     } catch (e) {
       setDeleteError(e instanceof Error ? e.message : 'Error al eliminar');
     } finally {
@@ -130,6 +133,7 @@ export default function GalleryPage() {
       });
       if (!res.ok) throw new Error('Error al duplicar');
       const created = await res.json();
+      addToast('Visualización duplicada', 'success');
       if (created?.id) {
         router.push(`/builder?edit=${created.id}`);
       }

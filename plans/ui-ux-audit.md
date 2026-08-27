@@ -1,8 +1,8 @@
 # UI/UX Audit — KayfabeDW Animations
 
 **Date**: 2026-08-27
-**Last updated**: 2026-08-27 (post-Round 3)
-**Score**: ~7/10 usability, 2/10 accessibility, 7.5/10 visual consistency
+**Last updated**: 2026-08-27 (post-Round 4)
+**Score**: ~7.5/10 usability, 2/10 accessibility, 7.5/10 visual consistency
 
 ---
 
@@ -16,11 +16,11 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 
 | Category | Total | Fixed | Remaining |
 |----------|-------|-------|-----------|
-| Critical (C) | 17 | 11 | 6 |
+| Critical (C) | 17 | 13 | 4 |
 | Accessibility (A) | 6 | 0 | 6 |
-| UX Flow (U) | 16 | 8 | 8 |
+| UX Flow (U) | 16 | 11 | 5 |
 | Visual Design (V) | 7 | 1 | 6 |
-| **Total** | **46** | **20** | **26** |
+| **Total** | **46** | **25** | **21** |
 
 ---
 
@@ -38,7 +38,7 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 ### Missing Feedback
 | # | Issue | Location | Status |
 |---|---|---|---|
-| **C6** | **No toast/notification system** — success/failure feedback is only inline or console.error | All files | ❌ Open |
+| **C6** | **No toast/notification system** — success/failure feedback is only inline or console.error | All files | ✅ **FIXED** — ToastProvider + useToast hook, toasts on save, template load, gallery delete/duplicate |
 | **C7** | **Render errors are console.error only** — user sees nothing when export fails | `animation-preview.tsx:45` | ✅ **FIXED** — errors now shown inline in export bar with "Reintentar" button |
 | **C8** | **No render progress** — export shows spinning icon with no indication of progress | `animation-preview.tsx:104-116` | ✅ **FIXED** — progress bar with phase labels (Bundling → Chrome → Composition → Rendering → Uploading) |
 | **C9** | **Silent template fetch failure** — empty list shown with no error message | `app/page.tsx:73` | ✅ **FIXED** — old landing page removed, redirect to `/builder` |
@@ -48,7 +48,7 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 |---|---|---|---|
 | **C10** | **Blob URL memory leak** — `URL.createObjectURL()` never revoked | `animation-preview.tsx:42` | ✅ **FIXED** — new AnimationPreview uses Vercel Blob URLs directly, dead `animation-panel.tsx` removed |
 | **C11** | **Hardcoded animation duration** — 150 frames (5s), no user control | `animation-preview.tsx` | ✅ **FIXED** — duration slider (1-20s) added to animation preview export bar |
-| **C12** | **`require()` for template loading** — not code-split, SSR-unsafe | `animation-preview.tsx:132-148` | ❌ Open — still uses `require()` in `loadComponent()` |
+| **C12** | **`require()` for template loading** — not code-split, SSR-unsafe | `animation-preview.tsx:132-148` | ✅ **FIXED** — replaced with `React.lazy` dynamic imports, code-split per template |
 | **C13** | **Global mutable `nodeIdCounter`** — breaks React Strict Mode / SSR | `query-canvas.tsx` | ❌ Open |
 
 ### New Issues (discovered during P16)
@@ -97,14 +97,14 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 | # | Issue | Impact | Status |
 |---|---|---|---|
 | **U10** | **No undo/redo** — accidental canvas changes are permanent | Frustration | ❌ Open |
-| **U11** | **Auto-executes query on every change** — complex queries feel slow | Perceived lag | ❌ Open |
+| **U11** | **Auto-executes query on every change** — complex queries feel slow | Perceived lag | ✅ **FIXED** — debounce increased to 800ms, manual "▶ Ejecutar" button shown when pending |
 | **U12** | **No query result count limit warning** — expensive queries have no guard | Performance risk | ❌ Open |
-| **U13** | **Save validation too lenient** — saves even with empty column selection | Empty viz_specs | ❌ Open |
+| **U13** | **Save validation too lenient** — saves even with empty column selection | Empty viz_specs | ✅ **FIXED** — validates `spec.select` before save, shows toast error if empty |
 
 ### Export & Preview
 | # | Issue | Impact | Status |
 |---|---|---|---|
-| **U14** | **No render timeout/cancellation** — can take 120s with no escape | User stuck | ❌ Open |
+| **U14** | **No render timeout/cancellation** — can take 120s with no escape | User stuck | ✅ **FIXED** — AbortController cancel button during rendering |
 | **U15** | **Animation preview has no loading state** — blank area while Remotion loads | Confusion | ❌ Open |
 | **U16** | **Duration not configurable** in animation preview | Limited control | ✅ **FIXED** — duration slider (1-20s) in animation preview export bar |
 
@@ -160,4 +160,28 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 ### New Proposals (from P16)
 - ~~**P24**: Remove dead code (`animation-panel.tsx`, `filter-bar.tsx`)~~ → ✅ Done (C14, C15)
 - ~~**P25**: Persist template props in viz_spec (or re-fetch on load)~~ → ✅ Done (C16)
-- **P26**: Add cancel button during render → **U14** (partial)
+- **P26**: Add cancel button during render → ✅ Done (U14)
+
+---
+
+## Round 4 Summary (post-Round 4)
+
+**5 issues fixed** (C6, C12, U11, U13, U14):
+
+| Issue | Fix |
+|-------|-----|
+| **C6** | Toast system: `ToastProvider` + `useToast` hook in `src/components/ui/toast.tsx` |
+| **C12** | Template loading: `React.lazy` dynamic imports replace `require()` |
+| **U11** | Query debounce: 800ms + manual "▶ Ejecutar" button |
+| **U13** | Save validation: requires at least 1 column selected |
+| **U14** | Render cancel: AbortController + cancel button during rendering |
+
+**Progress**: 25/46 issues fixed (54%)
+
+### Remaining Issues by Priority
+
+| Priority | Issues | Est. Effort |
+|----------|--------|-------------|
+| **High** | C5 (nav), C13 (global counter), C17 (?template= re-apply) | 2-3h |
+| **Medium** | U10 (undo/redo), U15 (canvas zoom), U16 (keyboard shortcuts) | 1-2 weeks |
+| **Low** | A1-A6 (accessibility), V1-V7 (design tokens, icons, responsive) | 2+ weeks |

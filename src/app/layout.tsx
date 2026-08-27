@@ -1,4 +1,5 @@
 import type {Metadata} from 'next';
+import {Providers} from '@/components/ui/providers';
 import '../../styles/global.css';
 
 export const metadata: Metadata = {
@@ -13,7 +14,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" className="dark">
-      <body className="bg-zinc-950 text-white antialiased">{children}</body>
+      <body className="bg-zinc-950 text-white antialiased">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

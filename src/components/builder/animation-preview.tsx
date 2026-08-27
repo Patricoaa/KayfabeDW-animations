@@ -1,6 +1,7 @@
 'use client';
 
-import {useState, useMemo} from 'react';
+import {useState, useMemo, useEffect, useRef} from 'react';
+import React from 'react';
 import {Player} from '@remotion/player';
 import type {QuerySpec} from '@/lib/query-spec';
 import type {ChartConfig} from '@/lib/chart-config';
@@ -23,6 +24,28 @@ type AnimationPreviewProps = {
   duration?: number;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const LAZY_COMPONENTS: Record<string, React.LazyExoticComponent<React.FC<any>>> = {
+  'ranking-barras': React.lazy(() =>
+    import('@/remotion/templates/ranking-barras').then((m) => ({default: m.RankingBarras})),
+  ),
+  'head-to-head': React.lazy(() =>
+    import('@/remotion/templates/head-to-head').then((m) => ({default: m.HeadToHead})),
+  ),
+  'stats-kpi': React.lazy(() =>
+    import('@/remotion/templates/stats-kpi').then((m) => ({default: m.StatsKpi})),
+  ),
+  'win-streak': React.lazy(() =>
+    import('@/remotion/templates/win-streak').then((m) => ({default: m.WinStreak})),
+  ),
+  'timeline-reinados': React.lazy(() =>
+    import('@/remotion/templates/timeline-reinados').then((m) => ({default: m.TimelineReinados})),
+  ),
+  'heatmap-luchas': React.lazy(() =>
+    import('@/remotion/templates/heatmap-luchas').then((m) => ({default: m.HeatmapLuchas})),
+  ),
+};
+
 export function AnimationPreview({
   templateId,
   data,
@@ -33,6 +56,9 @@ export function AnimationPreview({
 }: AnimationPreviewProps) {
   const [renderState, setRenderState] = useState<RenderState>({status: 'idle'});
   const [duration, setDuration] = useState(externalDuration ?? 10);
+  const [mounted, setMounted] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => setMounted(true), []);
 
   const entry = TEMPLATES[templateId as TemplateId];
   const fps = entry?.meta.fps ?? 30;
@@ -48,6 +74,8 @@ export function AnimationPreview({
 
   const handleExport = async () => {
     if (!remotionProps) return;
+    const controller = new AbortController();
+    abortRef.current = controller;
     setRenderState({status: 'rendering', phase: 'Iniciando...', progress: 0.05});
     try {
       const res = await fetch('/api/render', {
@@ -58,6 +86,7 @@ export function AnimationPreview({
           inputProps: remotionProps,
           durationInFrames: duration * fps,
         }),
+        signal: controller.signal,
       });
       const data = await res.json();
       if (data.type === 'done') {
@@ -68,8 +97,18 @@ export function AnimationPreview({
         setRenderState({status: 'error', message: 'Respuesta inesperada del servidor'});
       }
     } catch (err) {
-      setRenderState({status: 'error', message: (err as Error).message});
+      if ((err as Error).name === 'AbortError') {
+        setRenderState({status: 'idle'});
+      } else {
+        setRenderState({status: 'error', message: (err as Error).message});
+      }
+    } finally {
+      abortRef.current = null;
     }
+  };
+
+  const handleCancel = () => {
+    abortRef.current?.abort();
   };
 
   if (!remotionProps) {
@@ -82,7 +121,7 @@ export function AnimationPreview({
     );
   }
 
-  const Comp = loadComponent(templateId);
+  const Comp = LAZY_COMPONENTS[templateId];
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -90,17 +129,21 @@ export function AnimationPreview({
       <div className="flex-1 flex items-center justify-center p-6 overflow-auto bg-zinc-950">
         <div className="w-full max-w-4xl">
           <div className="border border-zinc-700 rounded-lg overflow-hidden shadow-2xl">
-            <Player
-              component={Comp}
-              inputProps={remotionProps}
-              durationInFrames={duration * fps}
-              fps={fps}
-              compositionWidth={entry?.meta.width ?? 1920}
-              compositionHeight={entry?.meta.height ?? 1080}
-              style={{width: '100%'}}
-              controls
-              acknowledgeRemotionLicense
-            />
+            {mounted && Comp && (
+              <React.Suspense fallback={<div className="p-8 text-zinc-500 text-sm text-center">Cargando template...</div>}>
+                <Player
+                  component={Comp}
+                  inputProps={remotionProps}
+                  durationInFrames={duration * fps}
+                  fps={fps}
+                  compositionWidth={entry?.meta.width ?? 1920}
+                  compositionHeight={entry?.meta.height ?? 1080}
+                  style={{width: '100%'}}
+                  controls
+                  acknowledgeRemotionLicense
+                />
+              </React.Suspense>
+            )}
           </div>
         </div>
       </div>
@@ -135,6 +178,12 @@ export function AnimationPreview({
                 />
               </div>
             </div>
+            <button
+              onClick={handleCancel}
+              className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 rounded text-zinc-300 text-xs transition-colors"
+            >
+              Cancelar
+            </button>
           </div>
         )}
 
@@ -183,23 +232,4 @@ export function AnimationPreview({
       </div>
     </div>
   );
-}
-
-function loadComponent(templateId: string): React.FC<Record<string, unknown>> {
-  switch (templateId) {
-    case 'ranking-barras':
-      return require('@/remotion/templates/ranking-barras').RankingBarras;
-    case 'head-to-head':
-      return require('@/remotion/templates/head-to-head').HeadToHead;
-    case 'stats-kpi':
-      return require('@/remotion/templates/stats-kpi').StatsKpi;
-    case 'win-streak':
-      return require('@/remotion/templates/win-streak').WinStreak;
-    case 'timeline-reinados':
-      return require('@/remotion/templates/timeline-reinados').TimelineReinados;
-    case 'heatmap-luchas':
-      return require('@/remotion/templates/heatmap-luchas').HeatmapLuchas;
-    default:
-      return require('@/remotion/templates/ranking-barras').RankingBarras;
-  }
 }

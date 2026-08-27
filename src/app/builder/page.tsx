@@ -19,6 +19,7 @@ import {BuilderNav} from '@/components/builder/builder-nav';
 import {DataOptionsForm} from '@/components/builder/data-options-form';
 import {TEMPLATES} from '@/remotion/generated/registry';
 import type {TemplateId} from '@/remotion/generated/registry';
+import {useToast} from '@/components/ui/toast';
 
 const QueryCanvas = dynamic(
   () => import('@/components/canvas/query-canvas').then((m) => m.QueryCanvas),
@@ -47,12 +48,14 @@ function BuilderContent() {
   const searchParams = useSearchParams();
   const editId = searchParams.get('edit');
   const templateParam = searchParams.get('template');
+  const {addToast} = useToast();
   const [spec, setSpec] = useState<QuerySpec>(defaultQuerySpec(''));
   const [chartConfig, setChartConfig] = useState<ChartConfig>(DEFAULT_CHART_CONFIG);
   const [vizName, setVizName] = useState('Nueva visualización');
   const [data, setData] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingQuery, setPendingQuery] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [sideTab, setSideTab] = useState<'data' | 'preview'>('data');
@@ -154,11 +157,22 @@ function BuilderContent() {
     (newSpec: QuerySpec) => {
       setSpec(newSpec);
       setSaved(false);
+      setPendingQuery(true);
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => executeQuery(newSpec), 400);
+      debounceRef.current = setTimeout(() => {
+        executeQuery(newSpec);
+        setPendingQuery(false);
+      }, 800);
     },
     [executeQuery],
   );
+
+  // Manual execute
+  const handleRunQuery = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    executeQuery(spec);
+    setPendingQuery(false);
+  }, [executeQuery, spec]);
 
   useEffect(() => {
     return () => {
@@ -189,14 +203,22 @@ function BuilderContent() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
       setTemplateProps(json.props);
+      addToast('Datos de plantilla cargados', 'success');
     } catch (e) {
-      setTemplateError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setTemplateError(msg);
+      addToast(`Error cargando datos: ${msg}`, 'error');
     } finally {
       setTemplateLoading(false);
     }
-  }, [activeTemplate, templateOptions]);
+  }, [activeTemplate, templateOptions, addToast]);
 
   const handleSave = async () => {
+    // Validate: require at least one column selected
+    if (!spec.select || spec.select.length === 0) {
+      addToast('Selecciona al menos una columna en el canvas antes de guardar', 'error');
+      return;
+    }
     setSaving(true);
     try {
       const isEdit = !!editIdRef.current;
@@ -216,6 +238,7 @@ function BuilderContent() {
       });
       if (!res.ok) throw new Error('Error saving');
       setSaved(true);
+      addToast('Guardado correctamente', 'success');
       // If newly created, update the URL to edit mode
       if (!isEdit) {
         const created = await res.json();
@@ -225,7 +248,9 @@ function BuilderContent() {
         }
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      addToast(`Error al guardar: ${msg}`, 'error');
     } finally {
       setSaving(false);
     }
@@ -247,6 +272,14 @@ function BuilderContent() {
             onChange={(e) => setVizName(e.target.value)}
             className="bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5 text-sm w-64"
           />
+          {pendingQuery && (
+            <button
+              onClick={handleRunQuery}
+              className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 rounded text-sm transition-colors"
+            >
+              ▶ Ejecutar
+            </button>
+          )}
           <button
             onClick={handleSave}
             disabled={saving || !spec.table}
