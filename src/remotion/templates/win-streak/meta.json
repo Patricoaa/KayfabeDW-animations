@@ -10,21 +10,21 @@
   "dataOptions": [
     {
       "key": "wrestlerName",
-      "label": "Luchador",
+      "label": "Luchador (vacío = líder actual de rachas)",
       "type": "text",
-      "default": "The Undertaker"
+      "default": ""
     },
     {
       "key": "streakCount",
-      "label": "Racha",
+      "label": "Racha manual (si no hay datos)",
       "type": "number",
-      "default": 21
+      "default": 1
     },
     {
       "key": "matchType",
       "label": "Tipo de match",
       "type": "text",
-      "default": "WrestleMania"
+      "default": ""
     }
   ],
   "dataProfile": {

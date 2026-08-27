@@ -1,14 +1,7 @@
 import {NextRequest, NextResponse} from 'next/server';
-import {createClient} from '@supabase/supabase-js';
+import {createClient} from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
-
-function getClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) throw new Error('Missing env vars');
-  return createClient(url, key);
-}
 
 export async function GET(
   _request: NextRequest,
@@ -16,7 +9,7 @@ export async function GET(
 ) {
   try {
     const {id} = await params;
-    const supabase = getClient();
+    const supabase = await createClient();
     const {data, error} = await supabase.rpc('get_viz_spec', {p_id: id});
     if (error) throw error;
     if (!data) return NextResponse.json({error: 'No encontrado'}, {status: 404});
@@ -34,7 +27,7 @@ export async function PUT(
   try {
     const {id} = await params;
     const body = await request.json();
-    const supabase = getClient();
+    const supabase = await createClient();
     const {data, error} = await supabase.rpc('save_viz_spec', {
       p_id: id,
       p_name: body.name,
@@ -60,7 +53,7 @@ export async function DELETE(
 ) {
   try {
     const {id} = await params;
-    const supabase = getClient();
+    const supabase = await createClient();
     const {error} = await supabase.rpc('delete_viz_spec', {p_id: id});
     if (error) throw error;
     return NextResponse.json({ok: true});

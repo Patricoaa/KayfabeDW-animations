@@ -13,6 +13,22 @@
       "label": "Título",
       "type": "text",
       "default": "Luchas por Año y Promoción"
+    },
+    {
+      "key": "maxPromotions",
+      "label": "Máx. promociones",
+      "type": "number",
+      "min": 1,
+      "max": 20,
+      "default": 8
+    },
+    {
+      "key": "maxYears",
+      "label": "Máx. años",
+      "type": "number",
+      "min": 1,
+      "max": 15,
+      "default": 7
     }
   ],
   "dataProfile": {

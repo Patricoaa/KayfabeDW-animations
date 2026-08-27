@@ -9,20 +9,42 @@
   "defaultDuration": 10,
   "dataOptions": [
     {
+      "key": "kpi",
+      "label": "Métrica",
+      "type": "select",
+      "options": [
+        { "value": "events_count", "label": "Eventos" },
+        { "value": "matches_count", "label": "Luchas" },
+        { "value": "wrestlers_count", "label": "Luchadores" },
+        { "value": "promotions_count", "label": "Promociones" },
+        { "value": "titles_count", "label": "Títulos" },
+        { "value": "stables_count", "label": "Estables" },
+        { "value": "venues_count", "label": "Recintos" },
+        { "value": "active_promotions_count", "label": "Promociones activas" }
+      ],
+      "default": "events_count"
+    },
+    {
       "key": "label",
-      "label": "Label",
+      "label": "Label (opcional)",
       "type": "text",
-      "default": "Total de Eventos"
+      "default": ""
     },
     {
       "key": "value",
-      "label": "Valor",
+      "label": "Valor manual (si no hay datos)",
       "type": "number",
-      "default": 2847
+      "default": 0
     },
     {
       "key": "suffix",
       "label": "Sufijo",
+      "type": "text",
+      "default": ""
+    },
+    {
+      "key": "prefix",
+      "label": "Prefijo",
       "type": "text",
       "default": ""
     },

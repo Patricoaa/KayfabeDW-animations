@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import {notFound} from 'next/navigation';
-import {getSupabase} from '@/lib/supabase';
+import {requireUser} from '@/lib/session';
 import {TEMPLATES} from '@/remotion/generated/registry';
 import {ArrowLeft, Film} from 'lucide-react';
 
@@ -23,7 +23,7 @@ type RenderRecord = {
 export default async function RenderDetailPage({params}: {params: Promise<{id: string}>}) {
   const {id} = await params;
 
-  const supabase = getSupabase();
+  const supabase = await requireUser();
   const {data, error} = await supabase.rpc('get_render', {p_id: id});
   if (error || !data) notFound();
 
