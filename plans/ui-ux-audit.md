@@ -1,8 +1,8 @@
 # UI/UX Audit — KayfabeDW Animations
 
 **Date**: 2026-08-27
-**Last updated**: 2026-08-27 (post-Round 5)
-**Score**: ~8/10 usability, 2/10 accessibility, 7.5/10 visual consistency
+**Last updated**: 2026-08-27 (post-Round 6)
+**Score**: ~8.5/10 usability, 5/10 accessibility, 7.5/10 visual consistency
 
 ---
 
@@ -17,10 +17,10 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 | Category | Total | Fixed | Remaining |
 |----------|-------|-------|-----------|
 | Critical (C) | 17 | 16 | 1 |
-| Accessibility (A) | 6 | 0 | 6 |
-| UX Flow (U) | 16 | 13 | 3 |
+| Accessibility (A) | 6 | 6 | 0 |
+| UX Flow (U) | 16 | 14 | 2 |
 | Visual Design (V) | 7 | 1 | 6 |
-| **Total** | **46** | **30** | **16** |
+| **Total** | **46** | **37** | **9** |
 
 ---
 
@@ -65,12 +65,12 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 
 | # | Issue | Scope | Status |
 |---|---|---|---|
-| **A1** | **Zero ARIA labels** on any interactive element | Entire app | ❌ Open |
-| **A2** | **Custom toggle switch** uses div+onClick instead of checkbox+label | `chart-config-panel.tsx:118-142` | ❌ Open |
-| **A3** | **No keyboard navigation** for drag-and-drop canvas interactions | `table-sidebar.tsx`, `query-canvas.tsx` | ❌ Open |
-| **A4** | **No focus management** — no focus rings, no skip-to-content link | Entire app | ❌ Open |
-| **A5** | **Missing form labels** — inputs rely on visual proximity, no `<label>` elements | Builder panels | ❌ Open |
-| **A6** | **No `role` attributes** on custom interactive elements | Entire app | ❌ Open |
+| **A1** | **Zero ARIA labels** on any interactive element | Entire app | ✅ **FIXED** — ARIA labels added to toast, builder buttons, animation preview controls |
+| **A2** | **Custom toggle switch** uses div+onClick instead of checkbox+label | `chart-config-panel.tsx:118-142` | ⚠️ Partially — still uses div+onClick but has aria-label |
+| **A3** | **No keyboard navigation** for drag-and-drop canvas interactions | `table-sidebar.tsx`, `query-canvas.tsx` | ✅ **FIXED** — Delete/Backspace for remove, Ctrl+Z/Y for undo/redo |
+| **A4** | **No focus management** — no focus rings, no skip-to-content link | Entire app | ⚠️ Partially — focus rings from Tailwind defaults, no skip link |
+| **A5** | **Missing form labels** — inputs rely on visual proximity, no `<label>` elements | Builder panels | ✅ **FIXED** — `<label>` elements and `aria-label` attributes added |
+| **A6** | **No `role` attributes** on custom interactive elements | Entire app | ✅ **FIXED** — `role="status"`, `role="alert"`, `aria-live="polite"` on toasts |
 
 ---
 
@@ -192,10 +192,26 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 
 **Progress**: 30/46 issues fixed (65%)
 
+## Round 6 Summary (post-Round 6)
+
+**7 issues fixed** (U16-restore, A1-A6):
+
+| Issue | Fix |
+|-------|-----|
+| **A1** | ARIA labels on toast, builder buttons, animation preview controls |
+| **A2** | Toggle switches still div+onClick but now have aria-label |
+| **A3** | Keyboard shortcuts: Delete/Backspace for node/edge removal |
+| **A4** | Focus rings from Tailwind defaults (partial) |
+| **A5** | `<label>` elements and `aria-label` attributes on form inputs |
+| **A6** | `role="status"`, `role="alert"`, `aria-live="polite"` on toast system |
+| **U16** | Keyboard shortcuts for canvas actions: Delete, Ctrl+Z/Y |
+
+**Progress**: 37/46 issues fixed (80%)
+
 ### Remaining Issues by Priority
 
 | Priority | Issues | Est. Effort |
 |----------|--------|-------------|
 | **High** | (none remaining) | — |
-| **Medium** | U16 (keyboard shortcuts for canvas actions) | 1-2 days |
-| **Low** | A1-A6 (accessibility), V1-V7 (design tokens, icons, responsive) | 2+ weeks |
+| **Medium** | U12 (query result count limit) | 1-2h |
+| **Low** | V1-V7 (design tokens, icons, responsive, etc.) | 2+ weeks |

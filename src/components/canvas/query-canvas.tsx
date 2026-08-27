@@ -93,6 +93,9 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Skip if inside input/textarea
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
       if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
         handleUndo();
@@ -105,10 +108,22 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
         e.preventDefault();
         handleRedo();
       }
+      // Delete selected node or edge
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedNodeId) {
+          e.preventDefault();
+          setNodes((nds) => nds.filter((n) => n.id !== selectedNodeId));
+          setSelectedNodeId(null);
+        } else if (selectedEdgeId) {
+          e.preventDefault();
+          setEdges((eds) => eds.filter((ed) => ed.id !== selectedEdgeId));
+          setSelectedEdgeId(null);
+        }
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleUndo, handleRedo]);
+  }, [handleUndo, handleRedo, selectedNodeId, selectedEdgeId, setNodes, setEdges, setSelectedNodeId, setSelectedEdgeId]);
 
   // Track which table is on canvas and their selected columns
   const canvasTableMap = useMemo(() => {

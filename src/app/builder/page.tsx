@@ -278,11 +278,13 @@ function BuilderContent() {
             value={vizName}
             onChange={(e) => setVizName(e.target.value)}
             className="bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5 text-sm w-64"
+            aria-label="Nombre de la visualización"
           />
           {pendingQuery && (
             <button
               onClick={handleRunQuery}
               className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 rounded text-sm transition-colors"
+              aria-label="Ejecutar consulta"
             >
               ▶ Ejecutar
             </button>
@@ -291,12 +293,14 @@ function BuilderContent() {
             onClick={handleSave}
             disabled={saving || !spec.table}
             className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 rounded text-sm transition-colors"
+            aria-label={saving ? 'Guardando...' : saved ? 'Guardado' : 'Guardar visualización'}
           >
             {saving ? 'Guardando...' : saved ? '✓ Guardado' : 'Guardar'}
           </button>
           <Link
             href="/builder/gallery"
             className="px-4 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-sm transition-colors"
+            aria-label="Ir a la galería de visualizaciones"
           >
             Galería
           </Link>

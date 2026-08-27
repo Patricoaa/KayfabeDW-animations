@@ -49,8 +49,14 @@ export function ToastProvider({children}: {children: React.ReactNode}) {
   return (
     <ToastContext.Provider value={{addToast}}>
       {children}
+      {/* Screen reader announcements */}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {toasts.map((t) => (
+          <span key={t.id}>{t.message}</span>
+        ))}
+      </div>
       {/* Toast container */}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm">
+      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm" role="status" aria-live="polite">
         {toasts.map((t) => (
           <div
             key={t.id}
@@ -61,11 +67,13 @@ export function ToastProvider({children}: {children: React.ReactNode}) {
                 ? 'bg-red-900/90 border-red-700 text-red-200'
                 : 'bg-zinc-800/90 border-zinc-600 text-zinc-200'
             }`}
+            role="alert"
           >
             <span className="flex-1">{t.message}</span>
             <button
               onClick={() => removeToast(t.id)}
               className="text-zinc-400 hover:text-white ml-1"
+              aria-label="Cerrar notificación"
             >
               ✕
             </button>

@@ -155,14 +155,16 @@ export function AnimationPreview({
       <div className="flex items-center gap-3 px-6 py-3 border-t border-zinc-800 bg-zinc-900">
         {/* Duration control */}
         <div className="flex items-center gap-2">
-          <label className="text-xs text-zinc-500">Duración:</label>
+          <label htmlFor="duration-slider" className="text-xs text-zinc-500">Duración:</label>
           <input
+            id="duration-slider"
             type="range"
             min={1}
             max={20}
             value={duration}
             onChange={(e) => setDuration(Number(e.target.value))}
             className="w-20 accent-blue-500"
+            aria-label="Duración de la animación en segundos"
           />
           <span className="text-xs text-zinc-400 w-12 text-right">{duration}s</span>
         </div>
@@ -200,12 +202,14 @@ export function AnimationPreview({
               target="_blank"
               rel="noopener noreferrer"
               className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-white font-medium transition-colors"
+              aria-label="Descargar video MP4"
             >
               Descargar MP4
             </a>
             <button
               onClick={() => setRenderState({status: 'idle'})}
               className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 rounded text-zinc-300 transition-colors"
+              aria-label="Cerrar resultado del render"
             >
               Cerrar
             </button>
@@ -218,6 +222,7 @@ export function AnimationPreview({
             <button
               onClick={() => setRenderState({status: 'idle'})}
               className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 rounded text-zinc-300 transition-colors"
+              aria-label="Reintentar render"
             >
               Reintentar
             </button>
@@ -228,6 +233,7 @@ export function AnimationPreview({
           <button
             onClick={handleExport}
             className="px-4 py-2 bg-green-600 hover:bg-green-500 rounded text-sm font-medium transition-colors"
+            aria-label="Exportar animación como MP4"
           >
             Exportar MP4
           </button>
