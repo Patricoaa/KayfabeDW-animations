@@ -85,7 +85,7 @@ export function TableSidebar({tables, canvasTables, onAddTable}: TableSidebarPro
           <label className="text-micro font-semibold text-muted uppercase tracking-widest mb-1 block font-display">
             Tablas ({tablesList.length})
           </label>
-          <div className="space-y-0.5 max-h-[200px] overflow-y-auto">
+          <div className="space-y-0.5">
             {tablesList.map((t) => (
               <TableItem
                 key={t.name}
@@ -105,7 +105,7 @@ export function TableSidebar({tables, canvasTables, onAddTable}: TableSidebarPro
           <label className="text-micro font-semibold text-muted uppercase tracking-widest mb-1 block font-display">
             Vistas ({viewsList.length})
           </label>
-          <div className="space-y-0.5 max-h-[200px] overflow-y-auto">
+          <div className="space-y-0.5">
             {viewsList.map((t) => (
               <TableItem
                 key={t.name}

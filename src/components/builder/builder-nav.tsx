@@ -8,7 +8,6 @@ import {LogOut, Sun, Moon} from 'lucide-react';
 
 const NAV_ITEMS = [
   {href: '/builder', label: 'Builder'},
-  {href: '/builder/gallery', label: 'Galería'},
   {href: '/history', label: 'Historial'},
 ];
 

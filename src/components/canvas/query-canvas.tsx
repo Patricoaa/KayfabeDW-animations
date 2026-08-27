@@ -356,70 +356,73 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
     setInitialized(true);
   }, [spec, meta, initialized, handleToggleColumn, handleDeleteTable, setNodes, setEdges]);
 
-  // Sync selected columns to QuerySpec select
+  // Sync canvas state (table + select + joins) into QuerySpec atomically in
+  // ONE effect. Previously three separate effects each did
+  // onChange({...specRef.current, X}), racing each other: since specRef is
+  // only refreshed on the parent's next render, the last effect to run won
+  // with a stale spec, resurrecting the wildcard select:[{column:'*'}].
   useEffect(() => {
     if (!initialized) return;
+
+    // Primary table (root table node) into QuerySpec.table
+    const tableNodes = nodes.filter((n) => (n.data as TableNodeData)?.table);
+    let table = '';
+    if (tableNodes.length > 0) {
+      const primary =
+        tableNodes.find((n) => (n.data as TableNodeData)?.primary) ??
+        tableNodes[0];
+      table = (primary.data as TableNodeData).table.name;
+    }
+
+    // Selected columns into QuerySpec.select
     const select: QuerySpec['select'] = [];
-    for (const node of nodes) {
+    for (const node of tableNodes) {
       const data = node.data as TableNodeData;
-      if (!data?.table) continue;
-      for (const col of data.selectedColumns) {
+      for (const col of data.selectedColumns ?? []) {
         select.push({column: `${data.table.name}.${col}`, alias: col});
       }
     }
-    // Only update if select actually changed
-    const currentSelect = specRef.current.select ?? [];
-    const selectChanged =
-      select.length !== currentSelect.length ||
-      select.some((s, i) => s.column !== currentSelect[i]?.column || s.alias !== currentSelect[i]?.alias);
-    if (selectChanged) {
-      onChangeRef.current({...specRef.current, select: select.length > 0 ? select : [{column: '*'}]});
-    }
-  }, [nodes, initialized]);
 
-  // Sync edges to QuerySpec joins
-  useEffect(() => {
-    if (!initialized) return;
+    // Edges into QuerySpec.joins
     const joins: QuerySpec['joins'] = [];
     for (const edge of edges) {
-      const data = edge.data as JoinEdgeData;
+      const edgeData = edge.data as JoinEdgeData;
       const sourceNode = nodes.find((n) => n.id === edge.source);
       const targetNode = nodes.find((n) => n.id === edge.target);
-      if (!sourceNode || !targetNode) continue;
-      const sourceData = sourceNode.data as TableNodeData;
-      const targetData = targetNode.data as TableNodeData;
+      const sourceData = sourceNode?.data as TableNodeData;
+      const targetData = targetNode?.data as TableNodeData;
       if (!sourceData?.table || !targetData?.table) continue;
-
       joins.push({
         table: targetData.table.name,
-        on: data?.condition ?? `${sourceData.table.name}.id = ${targetData.table.name}.id`,
-        type: data?.joinType ?? 'INNER',
+        on: edgeData?.condition ?? `${sourceData.table.name}.id = ${targetData.table.name}.id`,
+        type: edgeData?.joinType ?? 'INNER',
       });
     }
-    onChangeRef.current({...specRef.current, joins});
-  }, [edges, initialized, nodes]);
 
-  // Sync primary table (root table node) into QuerySpec.table
-  useEffect(() => {
-    if (!initialized) return;
-    const tableNodes = nodes.filter(
-      (n) => (n.data as TableNodeData)?.table,
-    );
-    if (tableNodes.length === 0) {
-      if (specRef.current.table) {
-        onChangeRef.current({...specRef.current, table: ''});
-      }
-      return;
+    const nextSelect: QuerySpec['select'] =
+      select.length > 0 ? select : [{column: '*'}];
+
+    const cur = specRef.current;
+    const curJoins = cur.joins ?? [];
+    const curSelect = cur.select ?? [];
+    const changed =
+      cur.table !== table ||
+      curJoins.length !== joins.length ||
+      curJoins.some(
+        (j, i) =>
+          j.table !== joins[i]?.table ||
+          j.on !== joins[i]?.on ||
+          j.type !== joins[i]?.type,
+      ) ||
+      nextSelect.length !== curSelect.length ||
+      nextSelect.some(
+        (s, i) => s.column !== curSelect[i]?.column || s.alias !== curSelect[i]?.alias,
+      );
+
+    if (changed) {
+      onChangeRef.current({...cur, table, select: nextSelect, joins});
     }
-    const current = tableNodes.find(
-      (n) => (n.data as TableNodeData)?.primary,
-    );
-    const primary = current ?? tableNodes[0];
-    const name = (primary.data as TableNodeData).table.name;
-    if (specRef.current.table !== name) {
-      onChangeRef.current({...specRef.current, table: name});
-    }
-  }, [nodes, initialized]);
+  }, [nodes, edges, initialized]);
 
   const handleConnect: OnConnect = useCallback(
     (connection: Connection) => {
@@ -586,10 +589,10 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
   }, [selectedEdge, nodes]);
 
   return (
-    <div className="flex h-full overflow-hidden -m-4">
+    <div className="flex h-full min-h-0 overflow-hidden">
       {/* Left sidebar — table list */}
-      <div className="w-56 border-r border-border-default overflow-y-auto p-2">
-        <div className="flex items-center justify-between mb-2">
+      <div className="w-56 shrink-0 min-h-0 border-r border-border-default p-2 flex flex-col">
+        <div className="flex items-center justify-between mb-2 shrink-0">
           <label className="text-micro font-semibold text-muted uppercase tracking-widest font-display">
             Tablas
           </label>
@@ -624,7 +627,7 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-1 mb-2">
+        <div className="flex items-center gap-1 mb-2 shrink-0">
           <button
             onClick={() => setShowRelations((v) => !v)}
             className={`flex items-center gap-1.5 px-2 py-1 rounded text-[11px] font-semibold transition-colors ${
@@ -639,11 +642,13 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
             Relaciones
           </button>
         </div>
-        <TableSidebar
-          tables={meta}
-          canvasTables={Object.keys(canvasTableMap)}
-          onAddTable={addTableDirectly}
-        />
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <TableSidebar
+            tables={meta}
+            canvasTables={Object.keys(canvasTableMap)}
+            onAddTable={addTableDirectly}
+          />
+        </div>
       </div>
 
       {/* Center — React Flow canvas */}
@@ -695,7 +700,7 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
       </div>
 
       {/* Right panel — properties */}
-      <div className="w-64 border-l border-border-default overflow-y-auto p-3">
+      <div className="w-64 shrink-0 min-h-0 border-l border-border-default overflow-y-auto p-3">
         <PropertiesPanel
           spec={spec}
           meta={meta}

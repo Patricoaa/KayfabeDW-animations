@@ -33,7 +33,7 @@ export default async function RenderDetailPage({params}: {params: Promise<{id: s
   return (
     <div className="min-h-screen p-8 max-w-4xl mx-auto">
       <Link
-        href="/builder/gallery"
+        href="/history"
         className="inline-flex items-center gap-1 text-muted hover:text-primary transition-colors text-sm mb-6"
       >
         <ArrowLeft size={14} /> Volver

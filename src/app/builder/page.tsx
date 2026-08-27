@@ -500,11 +500,11 @@ function BuilderContent() {
             {saving ? 'Guardando...' : saved ? 'Guardado' : 'Guardar'}
           </button>
           <Link
-            href="/builder/gallery"
+            href="/history"
             className="px-4 h-9 bg-elevated hover:bg-card-hover rounded-lg text-sm font-semibold transition-colors flex items-center"
-            aria-label="Ir a la galería de visualizaciones"
+            aria-label="Ir al historial de visualizaciones y renders"
           >
-            Galería
+            Historial
           </Link>
           <button
             onClick={() => {
