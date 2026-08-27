@@ -25,8 +25,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({error: error.message, code: error.code, details: error.details}, {status: 500});
     }
 
-    // PostgREST wraps SETOF jsonb as [{query_builder: {...}}, ...]
-    // Unwrap to flat array: [{...}, ...]
+    // Supabase client returns SETOF jsonb as flat array via PostgREST
+    // but may also wrap as [{query_builder: {...}}] — unwrap if needed
     let rows: Record<string, unknown>[] = [];
     if (Array.isArray(data)) {
       rows = data.map((row: Record<string, unknown>) => {
@@ -35,6 +35,8 @@ export async function POST(request: NextRequest) {
         }
         return row;
       });
+    } else if (data && typeof data === 'object') {
+      rows = [data as Record<string, unknown>];
     }
 
     return NextResponse.json({data: rows});
