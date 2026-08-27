@@ -72,6 +72,7 @@ function BuilderContent() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editIdRef = useRef<string | null>(editId);
   editIdRef.current = editId;
+  const durationLoadedRef = useRef(false);
 
   // Derived template state (must be before effects that reference activeTemplate)
   const bestTemplate = outputMode === 'animated' && data.length > 0
@@ -96,6 +97,18 @@ function BuilderContent() {
         if (d.query_spec) setSpec(d.query_spec);
         if (d.chart_config) setChartConfig(d.chart_config);
         if (d.name) setVizName(d.name);
+        if (d.animation_config) {
+          const ac = d.animation_config;
+          if (ac.templateId) {
+            setSelectedTemplate(ac.templateId);
+            setOutputMode('animated');
+          }
+          if (ac.templateOptions) setTemplateOptions(ac.templateOptions);
+          if (ac.duration) {
+            setDuration(ac.duration);
+            durationLoadedRef.current = true;
+          }
+        }
         setSaved(true);
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Error loading viz_spec'));
@@ -103,10 +116,11 @@ function BuilderContent() {
 
   // Initialize duration from template default when template changes
   useEffect(() => {
-    if (activeTemplate) {
+    if (activeTemplate && !durationLoadedRef.current) {
       const entry = TEMPLATES[activeTemplate as TemplateId];
       if (entry) setDuration(entry.meta.defaultDuration);
     }
+    durationLoadedRef.current = false;
   }, [activeTemplate]);
 
   // Clear template props when template changes
@@ -152,6 +166,16 @@ function BuilderContent() {
     };
   }, []);
 
+  // Warn before leaving with unsaved changes
+  useEffect(() => {
+    if (saved) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [saved]);
+
   const loadTemplateData = useCallback(async () => {
     if (!activeTemplate) return;
     setTemplateLoading(true);
@@ -185,6 +209,9 @@ function BuilderContent() {
           name: vizName,
           query_spec: spec,
           chart_config: chartConfig,
+          animation_config: outputMode === 'animated' && activeTemplate
+            ? {templateId: activeTemplate, templateOptions, duration}
+            : null,
         }),
       });
       if (!res.ok) throw new Error('Error saving');

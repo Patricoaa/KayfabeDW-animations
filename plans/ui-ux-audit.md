@@ -1,8 +1,8 @@
 # UI/UX Audit — KayfabeDW Animations
 
 **Date**: 2026-08-27
-**Last updated**: 2026-08-27 (post-Round 1)
-**Score**: ~6/10 usability, 2/10 accessibility, 7/10 visual consistency
+**Last updated**: 2026-08-27 (post-Round 2)
+**Score**: ~6.5/10 usability, 2/10 accessibility, 7/10 visual consistency
 
 ---
 
@@ -16,11 +16,11 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 
 | Category | Total | Fixed | Remaining |
 |----------|-------|-------|-----------|
-| Critical (C) | 17 | 9 | 8 |
+| Critical (C) | 17 | 11 | 6 |
 | Accessibility (A) | 6 | 0 | 6 |
-| UX Flow (U) | 16 | 3 | 13 |
+| UX Flow (U) | 16 | 5 | 11 |
 | Visual Design (V) | 7 | 1 | 6 |
-| **Total** | **46** | **13** | **33** |
+| **Total** | **46** | **17** | **29** |
 
 ---
 
@@ -32,7 +32,7 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 | **C1** | **GIF export is fake** — UI shows MP4/GIF toggle but API always renders MP4 | `animation-preview.tsx`, `render/route.ts:129` | ✅ **FIXED** — GIF option removed, export only shows MP4 |
 | **C2** | **Gallery delete silently ignores errors** — card removed locally but may persist on server | `gallery/page.tsx:43-47` | ✅ **FIXED** — checks response status, shows error toast on failure, only removes on success |
 | **C3** | **Clear canvas has no confirmation** — "Limpiar" button wipes all work instantly | `query-canvas.tsx:399-404` | ✅ **FIXED** — `confirm()` dialog with "no se puede deshacer" warning |
-| **C4** | **No unsaved changes warning** — navigating away from builder loses all work | `builder/page.tsx` | ❌ Open |
+| **C4** | **No unsaved changes warning** — navigating away from builder loses all work | `builder/page.tsx` | ✅ **FIXED** — `beforeunload` event warns when navigating with unsaved changes |
 | **C5** | **BuilderNav "Animations" link navigates away** from builder with no warning | `builder-nav.tsx:24` | ⚠️ Partially mitigated — `/` now redirects to `/builder`, but link still navigates away |
 
 ### Missing Feedback
@@ -56,7 +56,7 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 |---|---|---|---|---|
 | **C14** | **Dead code: `animation-panel.tsx`** — not imported anywhere, has broken render payload | `components/builder/animation-panel.tsx` | Medium | ✅ **FIXED** — file deleted |
 | **C15** | **Dead code: `filter-bar.tsx`** — not imported anywhere | `components/builder/filter-bar.tsx` | Low | ✅ **FIXED** — file deleted |
-| **C16** | **Template props not persisted** — `templateProps` state is lost on save/reload; only `query_spec` and `chart_config` are saved to `viz_spec` | `builder/page.tsx` | Medium | ❌ Open |
+| **C16** | **Template props not persisted** — `templateProps` state is lost on save/reload; only `query_spec` and `chart_config` are saved to `viz_spec` | `builder/page.tsx` | ✅ **FIXED** — `animation_config` now stores `templateId`, `templateOptions`, `duration`; restored on load |
 | **C17** | **`?template=` param not re-applied** — if user switches away from animated mode and back, the template param effect doesn't re-fire | `builder/page.tsx:97-103` | Low | ❌ Open |
 
 ---
@@ -89,9 +89,9 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 | # | Issue | Impact | Status |
 |---|---|---|---|
 | **U6** | **No onboarding flow** — first-time users get empty canvas with no context | Steep learning curve | ❌ Open |
-| **U7** | **No tooltips** — JOIN types, chart types, template scores unexplained | Confusion | ❌ Open |
+| **U7** | **No tooltips** — JOIN types, chart types, template scores unexplained | Confusion | ⚠️ Partially — template picker now shows descriptions and explains score; JOIN/chart tooltips still missing |
 | **U8** | **No help text** — what columns to select for each template is unclear | Trial and error | ❌ Open |
-| **U9** | **Template picker score is unexplained** — "75" means nothing to users | Confusion | ❌ Open |
+| **U9** | **Template picker score is unexplained** — "75" means nothing to users | Confusion | ✅ **FIXED** — score explanation text added: "Score = qué tan bien coinciden tus datos con el template" |
 
 ### Canvas Interactions
 | # | Issue | Impact | Status |
@@ -131,7 +131,7 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 - ~~P2: Fix/remove fake GIF option~~ → ✅ Done (C1)
 - P3: Toast notification system → **C6** (open)
 - ~~P4: Fix blob URL memory leak~~ → ✅ Done (C10)
-- P5: Unsaved changes warning → **C4** (open)
+- ~~P5: Unsaved changes warning~~ → ✅ Done (C4)
 - ~~P6: Render error display~~ → ✅ Done (C7)
 - ~~P7: Remove dead dependencies~~ → ✅ Done (V3)
 
@@ -140,7 +140,7 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 - P9: Add ARIA labels and roles → **A1-A6** (open)
 - P10: Add keyboard navigation → **A3** (open)
 - P11: Add undo/redo to canvas → **U10** (open)
-- P12: Add template picker tooltips → **U7, U9** (open)
+- P12: Add template picker tooltips → ✅ Partially done (U7, U9 — descriptions + score explanation added; JOIN/chart tooltips still missing)
 - P13: Add gallery thumbnails → **U4** (open)
 - P14: Add gallery sorting/filtering → **U3** (open)
 - P15: Add duplicate/copy in gallery → **U5** (open)
@@ -159,5 +159,5 @@ The app has been **unified into a single flow** at `/builder`. The old landing p
 
 ### New Proposals (from P16)
 - ~~**P24**: Remove dead code (`animation-panel.tsx`, `filter-bar.tsx`)~~ → ✅ Done (C14, C15)
-- **P25**: Persist template props in viz_spec (or re-fetch on load) → **C16** (open)
+- ~~**P25**: Persist template props in viz_spec (or re-fetch on load)~~ → ✅ Done (C16)
 - **P26**: Add cancel button during render → **U14** (partial)

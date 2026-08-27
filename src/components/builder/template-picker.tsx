@@ -48,17 +48,22 @@ export function TemplatePicker({data, config, selectedTemplate, onSelect}: Templ
       <label className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider">
         Templates ({templates.length})
       </label>
+      <p className="text-[9px] text-zinc-600">
+        Score = qué tan bien coinciden tus datos con el template (más alto = mejor)
+      </p>
       <div className="grid grid-cols-2 gap-1.5">
         {templates.map((t) => {
           const entry = TEMPLATES[t.templateId as TemplateId];
           const icon = TEMPLATE_ICONS[t.templateId] ?? '🎬';
           const isSelected = selectedTemplate === t.templateId;
           const isBest = t === templates[0];
+          const description = entry?.meta.description ?? '';
 
           return (
             <button
               key={t.templateId}
               onClick={() => onSelect(t.templateId)}
+              title={`${entry?.meta.name}: ${description}`}
               className={`relative flex flex-col items-center gap-1 p-2 rounded-lg text-center transition-all ${
                 isSelected
                   ? 'bg-blue-600/20 border border-blue-500/50 text-white'
@@ -72,7 +77,8 @@ export function TemplatePicker({data, config, selectedTemplate, onSelect}: Templ
               )}
               <span className="text-lg">{icon}</span>
               <span className="text-[10px] font-medium leading-tight">{t.label}</span>
-              <span className="text-[8px] opacity-50">score {t.score}</span>
+              <span className="text-[8px] opacity-50 leading-tight line-clamp-2">{description}</span>
+              <span className="text-[8px] opacity-40">score {t.score}</span>
             </button>
           );
         })}
