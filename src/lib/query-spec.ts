@@ -51,7 +51,7 @@ export function defaultQuerySpec(table: string): QuerySpec {
     filters: [],
     groupBy: [],
     orderBy: [],
-    limit: 100,
+    limit: undefined,
   };
 }
 

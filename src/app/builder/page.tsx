@@ -188,21 +188,37 @@ function BuilderContent() {
     setError(null);
     setResultTruncated(false);
     try {
-      const res = await fetch('/api/query', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({spec: q}),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? 'Error executing query');
-      const rows = json.data ?? [];
-      // U12: Warn if result exceeds 1000 rows
-      if (rows.length >= 1000) {
-        setResultTruncated(true);
-        setData(rows.slice(0, 1000));
-      } else {
-        setData(rows);
+      // Capture the full result set by walking OFFSET pages. A user-set
+      // `limit` caps the total captured; otherwise we page through everything
+      // up to a safety ceiling (ABS_MAX) to avoid memory blowups.
+      const PAGE = 1000;
+      const ABS_MAX = 50000;
+      const userLimit = q.limit && q.limit > 0 ? q.limit : Infinity;
+      const cap = Math.min(ABS_MAX, userLimit);
+      const pageSize = Number.isFinite(cap) ? Math.min(PAGE, cap) : PAGE;
+
+      const all: Record<string, unknown>[] = [];
+      let offset = 0;
+      while (all.length < cap) {
+        const res = await fetch('/api/query', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({spec: {...q, limit: pageSize, offset}}),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? 'Error executing query');
+        const rows: Record<string, unknown>[] = json.data ?? [];
+        all.push(...rows);
+        // Natural end of data.
+        if (rows.length < pageSize) break;
+        offset += pageSize;
       }
+
+      // Warn only when we hit the safety ceiling, not when the user chose a limit.
+      if (!Number.isFinite(userLimit) && all.length >= ABS_MAX) {
+        setResultTruncated(true);
+      }
+      setData(all);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -590,7 +606,7 @@ function BuilderContent() {
               )}
             </span>
             <div className="flex items-center gap-3">
-              {resultTruncated && <span className="text-amber-600">Resultados truncados a 1000 filas</span>}
+              {resultTruncated && <span className="text-amber-600">Se capturaron hasta 50.000 filas</span>}
               {loading && <span className="text-amber-500">Consultando...</span>}
               {error && <span className="text-red-500">{error}</span>}
             </div>

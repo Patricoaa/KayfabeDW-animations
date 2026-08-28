@@ -257,7 +257,7 @@ function CrossTablePanel({
     }
   };
 
-  const updateLimit = (limit: number) => {
+  const updateLimit = (limit: number | undefined) => {
     onSpecChange({...spec, limit});
   };
 
@@ -401,11 +401,13 @@ function CrossTablePanel({
         <input
           type="number"
           min={1}
-          max={5000}
-          value={spec.limit ?? 100}
-          onChange={(e) => updateLimit(Number(e.target.value))}
+          max={50000}
+          value={spec.limit ?? ''}
+          onChange={(e) => updateLimit(e.target.value === '' ? undefined : Number(e.target.value))}
+          placeholder="Sin límite (todo)"
           className="w-full bg-elevated border border-border-default rounded px-2 py-1 text-[10px] font-body focus:ring-1 focus:ring-amber-500"
         />
+        <p className="text-[9px] text-muted mt-0.5">Vacío = capturar todas las filas. Número = máximo a capturar.</p>
       </div>
 
       <div>
