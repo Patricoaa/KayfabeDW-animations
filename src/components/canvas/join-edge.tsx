@@ -10,6 +10,7 @@ export type JoinEdgeData = {
   joinType: JoinType;
   condition: string;
   onEdit?: (edgeId: string) => void;
+  cardinality?: string;
 };
 
 const JOIN_COLORS: Record<JoinType, string> = {
@@ -30,7 +31,7 @@ function JoinEdgeComponent({
   data,
   style,
 }: EdgeProps) {
-  const {joinType = 'INNER', condition = '', onEdit} = (data ?? {}) as JoinEdgeData;
+  const {joinType = 'INNER', condition = '', onEdit, cardinality} = (data ?? {}) as JoinEdgeData;
   const color = JOIN_COLORS[joinType] ?? '#f59e0b';
 
   const [edgePath, labelX, labelY] = getBezierPath({
@@ -71,6 +72,9 @@ function JoinEdgeComponent({
             }}
           >
             {joinType}
+            {cardinality && (
+              <span className="ml-1 font-bold" title={`Cardinalidad ${cardinality}`}>{cardinality}</span>
+            )}
             {condition && (
               <span className="ml-1 opacity-60 truncate max-w-[100px] inline-block">
                 {condition}

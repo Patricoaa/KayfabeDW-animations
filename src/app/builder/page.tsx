@@ -23,7 +23,7 @@ import {defaultQuerySpec} from '@/lib/query-spec';
 import type {ChartConfig} from '@/lib/chart-config';
 import {DEFAULT_CHART_CONFIG, applyChartDefaults} from '@/lib/chart-config';
 import type {SchemaMetadata} from '@/lib/schema-metadata';
-import {getSchemaMetadata} from '@/lib/schema-metadata';
+import {getSchemaMetadata, getTableDepth} from '@/lib/schema-metadata';
 import {suggestBestTemplate, isGenericTemplate} from '@/lib/viz-to-remotion';
 import {applyChartFilters} from '@/lib/chart-data';
 import {downloadChartSvg, downloadChartPng, sanitizeFilename, chartToDataUrl} from '@/lib/export-static';
@@ -489,6 +489,40 @@ function BuilderContent() {
     [data, chartConfig.filters],
   );
 
+  // Fan-out metadata for the step-2 chart panel. `aliasToTable` maps each
+  // selected column (by alias or bare name) back to its source table, so the
+  // config panel can warn when an aggregate is applied to a shallower table in
+  // a fan-out JOIN graph. `fanOutTables` are the tables whose rows get
+  // multiplied by deeper joins (i.e. not a max-depth leaf).
+  const {aliasToTable, fanOutTables} = useMemo(() => {
+    const aliasMap: Record<string, string> = {};
+    for (const f of spec.select ?? []) {
+      if (f.column === '*') continue;
+      const dotIdx = f.column.indexOf('.');
+      if (dotIdx <= 0) continue;
+      const tableName = f.column.slice(0, dotIdx);
+      const colName = f.column.slice(dotIdx + 1);
+      aliasMap[f.alias ?? f.column] = tableName;
+      aliasMap[colName] = tableName;
+      aliasMap[f.column] = tableName;
+    }
+
+    let fanOut: string[] = [];
+    const joins = spec.joins ?? [];
+    if (joins.length > 0 && (spec.select?.length ?? 0) > 0 && meta) {
+      const depth = getTableDepth(meta.tables, spec);
+      const depths = Object.values(depth);
+      if (depths.length > 0) {
+        const maxDepth = Math.max(...depths);
+        fanOut = Object.entries(depth)
+          .filter(([, d]) => d < maxDepth)
+          .map(([t]) => t);
+      }
+    }
+    return {aliasToTable: aliasMap, fanOutTables: fanOut};
+  }, [spec, meta]);
+
+
   // Stepper derived state — honest active/done per step
   const stepDone = (n: number) => {
     if (n === 1) return !!spec.table && (spec.select?.length ?? 0) > 0;
@@ -747,6 +781,8 @@ function BuilderContent() {
                 config={chartConfig}
                 onChange={setChartConfig}
                 columns={columns}
+                aliasToTable={aliasToTable}
+                fanOutTables={fanOutTables}
               />
             )}
             {outputMode === 'animated' && (

@@ -44,7 +44,7 @@ export type ChartConfig = {
   lineSmooth?: boolean;
   showDataLabels?: boolean;
   groupMode?: GroupMode;
-  aggregate?: 'sum' | 'avg' | 'count' | 'min' | 'max';
+  aggregate?: 'sum' | 'avg' | 'count' | 'min' | 'max' | 'count_distinct';
   // Post-capture row filters applied on the captured dataset (step 2), not SQL.
   filters?: ChartFilter[];
   configVersion?: number;

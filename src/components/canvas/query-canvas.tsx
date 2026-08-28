@@ -31,7 +31,7 @@ import type {RelationshipEdgeData} from './relationship-edge';
 import {TableSidebar} from './table-sidebar';
 import {PropertiesPanel} from './properties-panel';
 import type {TableInfo} from '@/lib/schema-metadata';
-import {getSuggestedJoin, getViewSourceTables} from '@/lib/schema-metadata';
+import {getSuggestedJoin, getViewSourceTables, getRelationCardinality} from '@/lib/schema-metadata';
 import type {QuerySpec} from '@/lib/query-spec';
 import {defaultQuerySpec} from '@/lib/query-spec';
 
@@ -187,7 +187,7 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
           tt,
           t.name,
           fk.refTable,
-          {kind: 'fk', label: `${fk.column} → ${fk.refColumn}`},
+          {kind: 'fk', label: `${fk.column} → ${fk.refColumn}  (${getRelationCardinality(meta, t.name, fk.refTable)})`},
           fk.column,
           fk.refColumn,
         );
@@ -326,10 +326,12 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
       // Find the source and target node IDs
       let sourceNodeId: string | undefined;
       let targetNodeId: string | undefined;
+      let sourceTableName = '';
       for (const node of initNodes) {
         const data = node.data as TableNodeData;
         if (join.on?.includes(`${data.table.name}.`)) {
           sourceNodeId = node.id;
+          sourceTableName = data.table.name;
         }
         if (data.table.name === join.table) {
           targetNodeId = node.id;
@@ -346,6 +348,7 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
           joinType: (join.type ?? 'INNER') as JoinType,
           condition: join.on ?? '',
           onEdit: handleEdgeEdit,
+          cardinality: sourceTableName ? getRelationCardinality(meta, sourceTableName, join.table) : undefined,
         } as unknown as JoinEdgeData,
       });
     }
@@ -453,6 +456,7 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
           joinType: 'INNER',
           condition,
           onEdit: handleEdgeEdit,
+          cardinality: getRelationCardinality(meta, sourceData.table.name, targetData.table.name),
         } as unknown as JoinEdgeData,
       };
 
@@ -529,6 +533,7 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
             joinType: 'INNER',
             condition: `${table.name}.${suggested.sourceColumn} = ${nd.table.name}.${suggested.targetColumn}`,
             onEdit: handleEdgeEdit,
+            cardinality: getRelationCardinality(meta, nd.table.name, table.name),
           } as unknown as JoinEdgeData,
         };
         break;

@@ -3,7 +3,7 @@
 import {useCallback} from 'react';
 import {X, Eye, LayoutGrid} from 'lucide-react';
 import type {TableInfo} from '@/lib/schema-metadata';
-import {isNumericType, isDateType, isBooleanType} from '@/lib/schema-metadata';
+import {isNumericType, isDateType, isBooleanType, getRelationCardinality} from '@/lib/schema-metadata';
 import type {QuerySpec, FilterRule} from '@/lib/query-spec';
 import type {JoinType} from './join-edge';
 
@@ -168,6 +168,11 @@ function EdgeProperties({
       <div className="text-[10px] text-muted space-y-1">
         <p>Origen: {edge.sourceTable}</p>
         <p>Destino: {edge.targetTable}</p>
+        <p>
+          Cardinalidad: {edge.sourceTable} {getRelationCardinality(meta, edge.sourceTable, edge.targetTable)} {edge.targetTable}
+          {getRelationCardinality(meta, edge.sourceTable, edge.targetTable) === '1:N' &&
+            <span className="text-amber-600"> — fan-out: cada fila de {edge.sourceTable} se multiplica por {edge.targetTable}</span>}
+        </p>
       </div>
     </div>
   );

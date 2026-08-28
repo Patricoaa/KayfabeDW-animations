@@ -8,6 +8,8 @@ type ChartConfigPanelProps = {
   config: ChartConfig;
   onChange: (config: ChartConfig) => void;
   columns: string[];
+  aliasToTable?: Record<string, string>;
+  fanOutTables?: string[];
 };
 
 const CHART_TYPES: {type: ChartType; label: string; Icon: typeof BarChart3}[] = [
@@ -46,7 +48,7 @@ const FILTER_OPS: {value: ChartFilterOp; label: string}[] = [
   {value: 'is_not_empty', label: 'no vacío'},
 ];
 
-export function ChartConfigPanel({config, onChange, columns}: ChartConfigPanelProps) {
+export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, fanOutTables = []}: ChartConfigPanelProps) {
   const update = (patch: Partial<ChartConfig>) => onChange({...config, ...patch});
   const updateFilter = (index: number, patch: Partial<ChartFilter>) => {
     const next = [...(config.filters ?? [])];
@@ -59,6 +61,14 @@ export function ChartConfigPanel({config, onChange, columns}: ChartConfigPanelPr
     update({filters: next});
   };
   const isSingleSeries = config.type === 'bar' || config.type === 'line' || config.type === 'area' || config.type === 'pie';
+
+  // Fan-out detection: when aggregating a field from a shallower (non-leaf)
+  // table with a plain count/sum/avg, the result reflects the deepest table's
+  // granularity. Warn and point to count_distinct as the fix.
+  const yTable = config.yField ? aliasToTable[config.yField] : undefined;
+  const aggDangerous = config.aggregate === 'sum' || config.aggregate === 'avg' || config.aggregate === 'count';
+  const showFanOutWarning =
+    !!config.aggregate && aggDangerous && !!yTable && fanOutTables.includes(yTable);
 
   return (
     <div className="space-y-4">
@@ -117,9 +127,15 @@ export function ChartConfigPanel({config, onChange, columns}: ChartConfigPanelPr
               <option value="sum">Suma</option>
               <option value="avg">Promedio</option>
               <option value="count">Conteo</option>
+              <option value="count_distinct">Conteo distintivo</option>
               <option value="min">Mínimo</option>
               <option value="max">Máximo</option>
             </FieldSelect>
+          )}
+          {showFanOutWarning && (
+            <div className="p-2 bg-amber-500/10 border border-amber-500/30 rounded text-[11px] text-amber-600 leading-snug">
+              Hay un fan-out en el JOIN: el campo «{config.yField}» pertenece a «{yTable}», que se repite por cada fila de la tabla más profunda. Con «{config.aggregate}» cada fila se cuenta una vez por repetición. Usá <span className="font-semibold">Conteo distintivo</span> para contar entidades reales de «{yTable}».
+            </div>
           )}
         </>
       )}

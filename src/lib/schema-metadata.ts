@@ -154,6 +154,78 @@ export function findJoinPath(
   return null;
 }
 
+/**
+ * Multiplicity of the relationship between two tables, from the perspective of
+ * `fromTable → toTable`. Deduced from FK metadata:
+ * - `fromTable` holds a foreign key pointing at `toTable` ⇒ many `from` per one `to` (N:1).
+ * - `toTable` holds a foreign key pointing at `fromTable` ⇒ one `from` per many `to` (1:N).
+ * - Both directions present ⇒ N:N (e.g. a join-table pattern).
+ * - Neither ⇒ unknown.
+ */
+export function getRelationCardinality(
+  tables: TableInfo[],
+  fromTable: string,
+  toTable: string,
+): '1:1' | '1:N' | 'N:1' | 'N:N' | 'unknown' {
+  const from = getTableByName(tables, fromTable);
+  const to = getTableByName(tables, toTable);
+  if (!from || !to) return 'unknown';
+
+  const fromHasFkTo = from.foreignKeys.some((fk) => fk.refTable === toTable);
+  const toHasFkTo = to.foreignKeys.some((fk) => fk.refTable === fromTable);
+
+  if (fromHasFkTo && toHasFkTo) return 'N:N';
+  if (fromHasFkTo) return 'N:1';
+  if (toHasFkTo) return '1:N';
+  return 'unknown';
+}
+
+/**
+ * Depth (distance in the JOIN graph) of each table relative to the FROM table.
+ * The FROM table has depth 0; each JOIN target is one deeper than its source.
+ * The deepest table(s) are the most granular — an entity count of any shallower
+ * table is inflated by the fan-out unless it is aggregated with count_distinct.
+ */
+export function getTableDepth(
+  tables: TableInfo[],
+  spec: {table: string; joins?: {table: string; on?: string}[]},
+): Record<string, number> {
+  const depth: Record<string, number> = {};
+  const root = spec.table;
+  if (!root) return depth;
+  depth[root] = 0;
+
+  const joins = spec.joins ?? [];
+  if (joins.length === 0) return depth;
+
+  // Build an adjacency from each source (the table named in the ON clause) to
+  // the join target, so we can walk the graph even if the FROM root isn't
+  // explicitly listed as a source.
+  const adjacency = new Map<string, string[]>();
+  const ensure = (t: string) => {
+    if (!adjacency.has(t)) adjacency.set(t, []);
+    return adjacency.get(t)!;
+  };
+  for (const j of joins) {
+    const sourceMatch = /([A-Za-z_][A-Za-z0-9_]*)\./.exec(j.on ?? '');
+    const source = sourceMatch ? sourceMatch[1] : root;
+    ensure(source).push(j.table);
+  }
+
+  const queue = [root];
+  while (queue.length) {
+    const cur = queue.shift()!;
+    const curDepth = depth[cur];
+    for (const next of adjacency.get(cur) ?? []) {
+      if (depth[next] === undefined) {
+        depth[next] = curDepth + 1;
+        queue.push(next);
+      }
+    }
+  }
+  return depth;
+}
+
 export function isNumericType(type: string): boolean {
   return /^(int|bigint|smallint|numeric|decimal|real|double|float|serial|bigserial)/.test(type);
 }

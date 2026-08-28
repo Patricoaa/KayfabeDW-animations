@@ -24,15 +24,19 @@ export type PreparedData = {
 export function aggregate(
   data: Record<string, unknown>[],
   yField: string,
-  agg: 'sum' | 'avg' | 'count' | 'min' | 'max',
+  agg: 'sum' | 'avg' | 'count' | 'min' | 'max' | 'count_distinct',
   groupField: string,
 ): Record<string, unknown>[] {
   const groups = new Map<string, number[]>();
+  const distinct = new Map<string, Set<string>>();
   for (const row of data) {
     const key = String(row[groupField] ?? '');
     const val = Number(row[yField] ?? 0);
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(isNaN(val) ? 0 : val);
+    if (!distinct.has(key)) distinct.set(key, new Set());
+    const raw = row[yField];
+    distinct.get(key)!.add(raw === null || raw === undefined ? String(raw) : String(raw));
   }
   return Array.from(groups.entries()).map(([label, vals]) => {
     let value: number;
@@ -48,6 +52,9 @@ export function aggregate(
         break;
       case 'min':
         value = Math.min(...vals);
+        break;
+      case 'count_distinct':
+        value = distinct.get(label)?.size ?? 0;
         break;
       case 'count':
       default:
