@@ -47,10 +47,16 @@ export type ChartConfig = {
   aggregate?: 'sum' | 'avg' | 'count' | 'min' | 'max' | 'count_distinct';
   // Post-capture row filters applied on the captured dataset (step 2), not SQL.
   filters?: ChartFilter[];
+  // Table-chart specific controls. `tableColumns` limits which dataset columns
+  // render (empty = all); `tableLimit` caps the shown rows; `tableSort` orders
+  // the rows by a column.
+  tableColumns?: string[];
+  tableLimit?: number;
+  tableSort?: {column: string; direction: 'asc' | 'desc'};
   configVersion?: number;
 };
 
-export const CHART_CONFIG_VERSION = 2;
+export const CHART_CONFIG_VERSION = 3;
 
 export const DEFAULT_CHART_CONFIG: ChartConfig = {
   type: 'bar',

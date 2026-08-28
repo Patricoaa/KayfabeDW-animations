@@ -130,8 +130,19 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
         </>
       ) : (
         <>
-          <FieldSelect label="Eje X / Categoría" value={config.xField ?? ''} options={fieldMeta} fallback={columns} onChange={(v) => update({xField: v})} />
-          <FieldSelect label="Eje Y / Valor" value={config.yField ?? ''} options={fieldMeta} fallback={columns} role="numeric" onChange={(v) => update({yField: v})} />
+          {config.type !== 'table' && (
+            <>
+              <FieldSelect label="Eje X / Categoría" value={config.xField ?? ''} options={fieldMeta} fallback={columns} onChange={(v) => update({xField: v})} />
+              <FieldSelect label="Eje Y / Valor" value={config.yField ?? ''} options={fieldMeta} fallback={columns} role="numeric" onChange={(v) => update({yField: v})} />
+            </>
+          )}
+          {config.type === 'table' && (
+            <TableControls
+              columns={columns}
+              config={config}
+              onUpdate={update}
+            />
+          )}
           {config.type !== 'table' && (
             <FieldSelect label="Agregación" value={config.aggregate ?? ''} onChange={(v) => update({aggregate: (v || undefined) as ChartConfig['aggregate']})} optional custom>
               <option value="">Ninguna</option>
@@ -215,7 +226,7 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
       {(config.type === 'line' || config.type === 'area') && (
         <Toggle label="Curva suavizada" checked={config.lineSmooth ?? false} onChange={(v) => update({lineSmooth: v})} />
       )}
-      <Toggle label="Mostrar grid" checked={config.showGrid ?? true} onChange={(v) => update({showGrid: v})} />
+      {config.type !== 'table' && <Toggle label="Mostrar grid" checked={config.showGrid ?? true} onChange={(v) => update({showGrid: v})} />}
       {config.type !== 'table' && <Toggle label="Mostrar etiquetas de datos" checked={config.showDataLabels ?? true} onChange={(v) => update({showDataLabels: v})} />}
 
       {/* Number format */}
@@ -363,6 +374,117 @@ function FieldSelect({
           </option>
         )}
       </select>
+    </div>
+  );
+}
+
+function TableControls({
+  columns,
+  config,
+  onUpdate,
+}: {
+  columns: string[];
+  config: ChartConfig;
+  onUpdate: (patch: Partial<ChartConfig>) => void;
+}) {
+  const shown = config.tableColumns ?? [];
+  const toggleCol = (col: string) => {
+    const next = shown.includes(col) ? shown.filter((c) => c !== col) : [...shown, col];
+    onUpdate({tableColumns: next});
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Column selection */}
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-sm font-medium block">Columnas a mostrar</label>
+          <div className="flex gap-2">
+            <button
+              onClick={() => onUpdate({tableColumns: []})}
+              className="text-[10px] text-amber-500 hover:text-amber-400 font-medium"
+            >
+              Todas
+            </button>
+            <button
+              onClick={() => onUpdate({tableColumns: columns})}
+              className="text-[10px] text-muted hover:text-primary font-medium"
+            >
+              Ninguna
+            </button>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {columns.length === 0 ? (
+            <p className="text-[10px] text-muted">Sin columnas</p>
+          ) : columns.map((c) => {
+            const active = shown.length === 0 || shown.includes(c);
+            return (
+              <button
+                key={c}
+                onClick={() => toggleCol(c)}
+                className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors border ${
+                  active
+                    ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
+                    : 'bg-elevated text-muted border-border-subtle'
+                }`}
+              >
+                {c}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[10px] text-muted mt-1">Vacío = mostrar todas las columnas.</p>
+      </div>
+
+      {/* Row limit */}
+      <div>
+        <label className="text-sm font-medium mb-1 block">Máx. filas a mostrar</label>
+        <input
+          type="number"
+          min={1}
+          max={5000}
+          value={config.tableLimit ?? ''}
+          onChange={(e) => onUpdate({tableLimit: e.target.value ? Number(e.target.value) : undefined})}
+          placeholder="500"
+          className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+        />
+      </div>
+
+      {/* Sort by column */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium block">Ordenar por</label>
+        <div className="flex gap-2">
+          <select
+            value={config.tableSort?.column ?? ''}
+            onChange={(e) =>
+              onUpdate({
+                tableSort: e.target.value
+                  ? {column: e.target.value, direction: config.tableSort?.direction ?? 'asc'}
+                  : undefined,
+              })
+            }
+            className="flex-1 bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+          >
+            <option value="">Sin orden</option>
+            {columns.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+          {config.tableSort?.column && (
+            <select
+              value={config.tableSort.direction}
+              onChange={(e) =>
+                onUpdate({tableSort: {column: config.tableSort!.column, direction: e.target.value as 'asc' | 'desc'}})
+              }
+              className="bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+            >
+              <option value="asc">Asc</option>
+              <option value="desc">Desc</option>
+            </select>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
