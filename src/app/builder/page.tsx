@@ -442,7 +442,20 @@ function BuilderContent() {
     }
   };
 
-  const columns = data.length > 0 ? Object.keys(data[0]) : [];
+  // Column selector source of truth: the columns the user selected on the
+  // canvas (persisted in spec.select), not the raw keys of the first query
+  // row. This keeps the config chart/animation selector in sync with the
+  // selected columns across all joined tables. Falls back to the result keys
+  // only when nothing specific was selected (the `*` wildcard path).
+  const selectedColumns = (spec.select ?? [])
+    .filter((f) => f.column !== '*')
+    .map((f) => f.alias ?? f.column);
+  const columns =
+    selectedColumns.length > 0
+      ? selectedColumns
+      : data.length > 0
+        ? Object.keys(data[0])
+        : [];
 
   // Stepper derived state — honest active/done per step
   const stepDone = (n: number) => {

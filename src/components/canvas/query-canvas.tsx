@@ -504,15 +504,26 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
       };
 
       let autoEdge: Edge | null = null;
-      for (const n of nodes) {
+      // Prefer joining to the primary (FROM) node so the join anchors to the
+      // FROM clause; fall back to any existing node with a direct FK. The new
+      // table is always the edge TARGET so the join derivation (which pushes
+      // the target table) emits `JOIN <new>` instead of re-joining an existing
+      // table (which previously produced `FROM event JOIN event` → "table
+      // name 'event' specified more than once").
+      const existingNodes = [...nodes].sort(
+        (a, b) =>
+          Number((b.data as TableNodeData)?.primary ?? false) -
+          Number((a.data as TableNodeData)?.primary ?? false),
+      );
+      for (const n of existingNodes) {
         const nd = n.data as TableNodeData;
         if (!nd?.table) continue;
         const suggested = getSuggestedJoin(meta, table.name, nd.table.name);
         if (!suggested) continue;
         autoEdge = {
           id: `edge-${id}-${n.id}`,
-          source: id,
-          target: n.id,
+          source: n.id,
+          target: id,
           type: 'joinEdge',
           data: {
             joinType: 'INNER',
