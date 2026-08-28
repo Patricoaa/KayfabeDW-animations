@@ -16,6 +16,7 @@ import {
   type OnNodesChange,
   type OnEdgesChange,
   type ReactFlowInstance,
+  type XYPosition,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {RotateCcw, RotateCw, Eraser, Database, MousePointerClick, Plus, Waypoints} from 'lucide-react';
@@ -481,19 +482,12 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
     setSelectedEdgeId(null);
   }, []);
 
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      const data = e.dataTransfer.getData('application/table');
-      if (!data || !reactFlowInstance) return;
-
-      const table: TableInfo = JSON.parse(data);
+  // Add a table node and, when a direct FK exists between it and a table
+  // already on the canvas, auto-create the join edge so the SELECTed columns
+  // stay valid (otherwise query_builder errors: missing FROM-clause entry).
+  const addTableWithAutoJoin = useCallback(
+    (table: TableInfo, position: XYPosition) => {
       if (canvasTableMap[table.name]) return;
-
-      const position = reactFlowInstance.screenToFlowPosition({
-        x: e.clientX,
-        y: e.clientY,
-      });
 
       const id = nextNodeId();
       const newNode: Node = {
@@ -509,9 +503,47 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
         } as unknown as TableNodeData,
       };
 
+      let autoEdge: Edge | null = null;
+      for (const n of nodes) {
+        const nd = n.data as TableNodeData;
+        if (!nd?.table) continue;
+        const suggested = getSuggestedJoin(meta, table.name, nd.table.name);
+        if (!suggested) continue;
+        autoEdge = {
+          id: `edge-${id}-${n.id}`,
+          source: id,
+          target: n.id,
+          type: 'joinEdge',
+          data: {
+            joinType: 'INNER',
+            condition: `${table.name}.${suggested.sourceColumn} = ${nd.table.name}.${suggested.targetColumn}`,
+            onEdit: handleEdgeEdit,
+          } as unknown as JoinEdgeData,
+        };
+        break;
+      }
+
       setNodes((nds) => [...nds, newNode]);
+      if (autoEdge) setEdges((eds) => addEdge(autoEdge as Edge, eds));
     },
-    [reactFlowInstance, canvasTableMap, setNodes, handleToggleColumn, handleDeleteTable],
+    [canvasTableMap, nodes, meta, nextNodeId, handleToggleColumn, handleDeleteTable, handleEdgeEdit, setNodes, setEdges],
+  );
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      const data = e.dataTransfer.getData('application/table');
+      if (!data || !reactFlowInstance) return;
+
+      const table: TableInfo = JSON.parse(data);
+      const position = reactFlowInstance.screenToFlowPosition({
+        x: e.clientX,
+        y: e.clientY,
+      });
+
+      addTableWithAutoJoin(table, position);
+    },
+    [reactFlowInstance, addTableWithAutoJoin],
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -521,29 +553,13 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
 
   const addTableDirectly = useCallback(
     (table: TableInfo) => {
-      if (canvasTableMap[table.name]) return;
-
       const position = reactFlowInstance
         ? reactFlowInstance.screenToFlowPosition({x: 300, y: 200 + nodes.length * 50})
         : {x: 300, y: 200 + nodes.length * 50};
 
-      const id = nextNodeId();
-      const newNode: Node = {
-        id,
-        type: 'tableNode',
-        position,
-        data: {
-          table,
-          selectedColumns: table.columns.slice(0, 3).map((c) => c.name),
-          onToggleColumn: handleToggleColumn,
-          onDeleteTable: handleDeleteTable,
-          primary: !specRef.current.table,
-        } as unknown as TableNodeData,
-      };
-
-      setNodes((nds) => [...nds, newNode]);
+      addTableWithAutoJoin(table, position);
     },
-    [canvasTableMap, reactFlowInstance, nodes.length, setNodes, handleToggleColumn, handleDeleteTable],
+    [reactFlowInstance, nodes.length, addTableWithAutoJoin],
   );
 
   const clearCanvas = useCallback(() => {
