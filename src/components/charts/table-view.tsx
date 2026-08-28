@@ -33,21 +33,36 @@ export function TableView({data, config}: Props) {
     });
   }
 
+  // Text search across all visible columns.
+  const query = (config.tableSearch ?? '').trim().toLowerCase();
+  if (query) {
+    const cols = columns;
+    rows = rows.filter((row) => cols.some((c) => String(row[c] ?? '').toLowerCase().includes(query)));
+  }
+
   const limit = config.tableLimit ?? 50;
   const shown = rows.slice(0, limit);
+  const sticky = config.stickyHeader ?? false;
+
+  const thead = (
+    <thead>
+      <tr className="border-b border-border-default">
+        {columns.map((col) => (
+          <th
+            key={col}
+            className={`text-left px-3 py-2 text-secondary font-medium whitespace-nowrap ${sticky ? 'sticky top-0 bg-elevated z-10' : ''}`}
+          >
+            {col}
+          </th>
+        ))}
+      </tr>
+    </thead>
+  );
 
   return (
-    <div className="overflow-x-auto">
+    <div className={sticky ? 'overflow-auto max-h-96' : 'overflow-x-auto'}>
       <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b border-border-default">
-            {columns.map((col) => (
-              <th key={col} className="text-left px-3 py-2 text-secondary font-medium whitespace-nowrap">
-                {col}
-              </th>
-            ))}
-          </tr>
-        </thead>
+        {thead}
         <tbody>
           {shown.map((row, i) => (
             <tr key={i} className="border-b border-border-subtle hover:bg-card-hover">
@@ -60,6 +75,7 @@ export function TableView({data, config}: Props) {
           ))}
         </tbody>
       </table>
+      {rows.length === 0 && <p className="text-xs text-muted my-4 text-center">Sin coincidencias</p>}
       {rows.length > limit && (
         <div className="text-xs text-muted mt-2 text-center">
           Mostrando {shown.length} de {rows.length} filas

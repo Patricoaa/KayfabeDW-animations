@@ -91,6 +91,14 @@ export type ChartConfig = {
   // F2: visual style overrides. All fields optional; the renderers resolve
   // against sensible defaults via resolveChartStyle in chart-data.
   style?: ChartStyle;
+  // F3: per-chart-type controls.
+  innerRadius?: number;        // pie: 0 (tarta) a >0 (donut)
+  sliceLimit?: number;         // pie: máx. segmentos a mostrar
+  pieLabel?: 'none' | 'value' | 'percent' | 'both'; // pie: modo de etiqueta
+  trendline?: boolean;         // scatter: línea de tendencia lineal
+  lineDash?: boolean;          // line/area: línea discontinua
+  tableSearch?: string;        // table: filtro por texto
+  stickyHeader?: boolean;      // table: encabezado fijo
   // Post-capture row filters applied on the captured dataset (step 2), not SQL.
   filters?: ChartFilter[];
   // Table-chart specific controls. `tableColumns` limits which dataset columns
@@ -102,7 +110,7 @@ export type ChartConfig = {
   configVersion?: number;
 };
 
-export const CHART_CONFIG_VERSION = 5;
+export const CHART_CONFIG_VERSION = 6;
 
 export const DEFAULT_CHART_CONFIG: ChartConfig = {
   type: 'bar',

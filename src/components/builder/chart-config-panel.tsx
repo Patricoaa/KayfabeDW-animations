@@ -278,6 +278,61 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
           </div>
         </div>
       )}
+      {/* Pie controls */}
+      {config.type === 'pie' && (
+        <>
+          <Toggle label="Donut" checked={(config.innerRadius ?? 0) > 0} onChange={(v) => update({innerRadius: v ? 66 : 0})} />
+          {(config.innerRadius ?? 0) > 0 && (
+            <div>
+              <label className="text-sm font-medium mb-1 block">Grosor del anillo</label>
+              <input
+                type="range"
+                min={25}
+                max={85}
+                value={config.innerRadius ?? 66}
+                onChange={(e) => update({innerRadius: Number(e.target.value)})}
+                className="w-full accent-amber-500"
+              />
+            </div>
+          )}
+          <div>
+            <label className="text-sm font-medium mb-1 block">Etiquetas de segmento</label>
+            <select
+              value={config.pieLabel ?? 'percent'}
+              onChange={(e) => update({pieLabel: e.target.value as 'none' | 'value' | 'percent' | 'both'})}
+              className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+            >
+              <option value="percent">Porcentaje</option>
+              <option value="value">Valor</option>
+              <option value="both">Valor y porcentaje</option>
+              <option value="none">Ninguna</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Máx. segmentos</label>
+            <input
+              type="number"
+              min={1}
+              max={50}
+              value={config.sliceLimit ?? ''}
+              onChange={(e) => update({sliceLimit: e.target.value ? Number(e.target.value) : undefined})}
+              placeholder="Sin límite"
+              className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+            />
+          </div>
+        </>
+      )}
+
+      {/* Scatter */}
+      {config.type === 'scatter' && (
+        <Toggle label="Línea de tendencia" checked={config.trendline ?? false} onChange={(v) => update({trendline: v})} />
+      )}
+
+      {/* Line / Area extras */}
+      {(config.type === 'line' || config.type === 'area') && (
+        <Toggle label="Línea discontinua" checked={config.lineDash ?? false} onChange={(v) => update({lineDash: v})} />
+      )}
+
       {config.type === 'bar' || config.type === 'line' || config.type === 'area' ? (
         <>
           <Toggle label="Mostrar leyenda" checked={config.showLegend ?? true} onChange={(v) => update({showLegend: v})} />
@@ -648,6 +703,42 @@ function TableControls({
           className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
         />
       </div>
+
+      {/* Search filter */}
+      <div>
+        <label className="text-sm font-medium mb-1 block">Buscar en filas</label>
+        <input
+          type="text"
+          value={config.tableSearch ?? ''}
+          onChange={(e) => onUpdate({tableSearch: e.target.value})}
+          placeholder="Filtra por cualquier columna"
+          className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+        />
+      </div>
+
+      {/* Sticky header */}
+      <label className="flex items-center justify-between cursor-pointer select-none">
+        <span className="text-sm text-secondary">Encabezado fijo</span>
+        <input
+          type="checkbox"
+          role="switch"
+          checked={config.stickyHeader ?? false}
+          onChange={(e) => onUpdate({stickyHeader: e.target.checked})}
+          className="peer sr-only"
+        />
+        <span
+          aria-hidden="true"
+          className={`relative w-9 h-5 rounded-full transition-colors ${
+            config.stickyHeader ? 'bg-amber-500' : 'bg-border-default'
+          }`}
+        >
+          <span
+            className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+              config.stickyHeader ? 'translate-x-4' : ''
+            }`}
+          />
+        </span>
+      </label>
 
       {/* Sort by column */}
       <div className="space-y-2">

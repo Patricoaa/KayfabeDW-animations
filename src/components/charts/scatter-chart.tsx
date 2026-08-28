@@ -1,7 +1,7 @@
 'use client';
 
 import type {ChartConfig} from '@/lib/chart-config';
-import {formatValue, pickColor, resolveChartStyle} from '@/lib/chart-data';
+import {formatValue, resolveChartStyle, pickColor} from '@/lib/chart-data';
 
 type Props = {
   data: Record<string, unknown>[];
@@ -11,12 +11,13 @@ type Props = {
 export function ScatterChart({data, config}: Props) {
   const xField = config.xField ?? '';
   const yField = config.yField ?? '';
+  const colorField = config.colorField ?? '';
 
   const points = data
     .map((d) => ({
       x: Number(d[xField] ?? 0),
       y: Number(d[yField] ?? 0),
-      label: String(d[config.categoryField ?? ''] ?? ''),
+      label: colorField ? String(d[colorField] ?? '') : String(d[config.categoryField ?? ''] ?? ''),
     }))
     .filter((d) => !isNaN(d.x) && !isNaN(d.y));
 
@@ -44,6 +45,36 @@ export function ScatterChart({data, config}: Props) {
   const yLabel = config.yLabel ?? yField;
   const st = resolveChartStyle(config.style);
 
+  // Per-category colors. Gather the distinct labels in first-appearance order
+  // and map each to a palette color when colorField (or categoryField) is set.
+  const cats: string[] = [];
+  const catColors = new Map<string, string>();
+  for (const p of points) {
+    if (p.label && !catColors.has(p.label)) {
+      cats.push(p.label);
+      catColors.set(p.label, pickColor(config.colors, cats.length - 1));
+    }
+  }
+  const pointColor = (p: (typeof points)[number]) => (p.label && catColors.has(p.label) ? catColors.get(p.label)! : pickColor(config.colors, 0));
+
+  // Optional linear trendline via least squares.
+  let trendPath: string | undefined;
+  if (config.trendline && points.length >= 2) {
+    const n = points.length;
+    const sx = points.reduce((s, p) => s + p.x, 0);
+    const sy = points.reduce((s, p) => s + p.y, 0);
+    const sxy = points.reduce((s, p) => s + p.x * p.y, 0);
+    const sxx = points.reduce((s, p) => s + p.x * p.x, 0);
+    const denom = n * sxx - sx * sx;
+    if (denom !== 0) {
+      const slope = (n * sxy - sx * sy) / denom;
+      const intercept = (sy - slope * sx) / n;
+      const x0 = 0;
+      const x1 = maxX;
+      trendPath = `M ${toX(x0)} ${toY(slope * x0 + intercept)} L ${toX(x1)} ${toY(slope * x1 + intercept)}`;
+    }
+  }
+
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
       {config.showGrid !== false && [0, 0.25, 0.5, 0.75, 1].map((frac, i) => (
@@ -55,13 +86,17 @@ export function ScatterChart({data, config}: Props) {
       <text x={margin.left - 8} y={margin.top + 4} textAnchor="end" fill={st.textColor} fontSize={10}>{formatValue(maxY, numFmt)}</text>
       <text x={margin.left + plotW} y={margin.top + plotH + 4} textAnchor="middle" fill={st.textColor} fontSize={10}>{formatValue(maxX, numFmt)}</text>
 
+      {trendPath && (
+        <path d={trendPath} fill="none" stroke={st.axisColor} strokeWidth={1.5} strokeDasharray="5 4" opacity={st.pointOpacity} />
+      )}
+
       {points.map((p, i) => (
         <circle
           key={i}
           cx={toX(p.x)}
           cy={toY(p.y)}
           r={st.pointSize}
-          fill={pickColor(config.colors, i)}
+          fill={pointColor(p)}
           opacity={st.pointOpacity * st.globalOpacity}
           stroke="#111"
           strokeWidth={1}

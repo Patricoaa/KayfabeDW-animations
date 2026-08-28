@@ -68,7 +68,7 @@ function MultiLine({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
           {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={st.axisColor} fontSize={11}>{config.xLabel}</text>}
           {config.yLabel && <text x={16} y={height / 2} textAnchor="middle" fill={st.axisColor} fontSize={11} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text>}
           {seriesPaths.map((s) => (
-            <path key={s.name} d={s.path} fill="none" stroke={s.color} strokeWidth={st.lineWidth} strokeLinejoin="round" />
+            <path key={s.name} d={s.path} fill="none" stroke={s.color} strokeWidth={st.lineWidth} strokeLinejoin="round" strokeDasharray={config.lineDash ? '6 4' : undefined} />
           ))}
           {showMarkers &&
             seriesPaths.map((s) =>
@@ -139,7 +139,7 @@ function SingleLine({data, config}: Props) {
       })}
       {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={st.axisColor} fontSize={11}>{config.xLabel}</text>}
       {config.yLabel && <text x={16} y={height / 2} textAnchor="middle" fill={st.axisColor} fontSize={11} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text>}
-      <path d={path} fill="none" stroke={color} strokeWidth={st.lineWidth} strokeLinejoin="round" />
+      <path d={path} fill="none" stroke={color} strokeWidth={st.lineWidth} strokeLinejoin="round" strokeDasharray={config.lineDash ? '6 4' : undefined} />
       {showMarkers &&
         pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={st.pointSize} fill={color} stroke="#111" strokeWidth={1.5} opacity={st.pointOpacity} />)}
       {n > 0 && prepared.items.map((p, i) => (
