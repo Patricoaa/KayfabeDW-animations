@@ -1,7 +1,7 @@
 'use client';
 
 import type {ChartConfig} from '@/lib/chart-config';
-import {formatValue, pickColor} from '@/lib/chart-data';
+import {formatValue, pickColor, resolveChartStyle} from '@/lib/chart-data';
 
 type Props = {
   data: Record<string, unknown>[];
@@ -42,33 +42,34 @@ export function ScatterChart({data, config}: Props) {
   const numFmt = config.numberFormat ?? 'short';
   const xLabel = config.xLabel ?? xField;
   const yLabel = config.yLabel ?? yField;
+  const st = resolveChartStyle(config.style);
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto">
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
       {config.showGrid !== false && [0, 0.25, 0.5, 0.75, 1].map((frac, i) => (
         <g key={i}>
-          <line x1={toX(frac * maxX)} y1={margin.top} x2={toX(frac * maxX)} y2={margin.top + plotH} stroke="#333" strokeWidth={1} />
-          <line x1={margin.left} y1={toY(frac * maxY)} x2={margin.left + plotW} y2={toY(frac * maxY)} stroke="#333" strokeWidth={1} />
+          <line x1={toX(frac * maxX)} y1={margin.top} x2={toX(frac * maxX)} y2={margin.top + plotH} stroke={st.gridColor} strokeWidth={1} />
+          <line x1={margin.left} y1={toY(frac * maxY)} x2={margin.left + plotW} y2={toY(frac * maxY)} stroke={st.gridColor} strokeWidth={1} />
         </g>
       ))}
-      <text x={margin.left - 8} y={margin.top + 4} textAnchor="end" fill="#888" fontSize={10}>{formatValue(maxY, numFmt)}</text>
-      <text x={margin.left + plotW} y={margin.top + plotH + 4} textAnchor="middle" fill="#888" fontSize={10}>{formatValue(maxX, numFmt)}</text>
+      <text x={margin.left - 8} y={margin.top + 4} textAnchor="end" fill={st.textColor} fontSize={10}>{formatValue(maxY, numFmt)}</text>
+      <text x={margin.left + plotW} y={margin.top + plotH + 4} textAnchor="middle" fill={st.textColor} fontSize={10}>{formatValue(maxX, numFmt)}</text>
 
       {points.map((p, i) => (
         <circle
           key={i}
           cx={toX(p.x)}
           cy={toY(p.y)}
-          r={6}
+          r={st.pointSize}
           fill={pickColor(config.colors, i)}
-          opacity={0.7}
+          opacity={st.pointOpacity * st.globalOpacity}
           stroke="#111"
           strokeWidth={1}
         />
       ))}
 
-      <text x={width / 2} y={height - 8} textAnchor="middle" fill="#888" fontSize={11}>{xLabel}</text>
-      <text x={14} y={height / 2} textAnchor="middle" fill="#888" fontSize={11} transform={`rotate(-90, 14, ${height / 2})`}>{yLabel}</text>
+      <text x={width / 2} y={height - 8} textAnchor="middle" fill={st.axisColor} fontSize={11}>{xLabel}</text>
+      <text x={14} y={height / 2} textAnchor="middle" fill={st.axisColor} fontSize={11} transform={`rotate(-90, 14, ${height / 2})`}>{yLabel}</text>
     </svg>
   );
 }

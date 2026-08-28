@@ -1,5 +1,5 @@
 import type {ChartConfig} from '@/lib/chart-config';
-import type {NumberFormat, SortBy, ChartFilter} from '@/lib/chart-config';
+import type {NumberFormat, SortBy, ChartFilter, ChartStyle} from '@/lib/chart-config';
 
 export type SeriesItem = {
   label: string;
@@ -167,6 +167,50 @@ export function formatValue(value: number, format: NumberFormat): string {
 export function pickColor(colors: string[] | undefined, index: number): string {
   const palette = colors && colors.length ? colors : ['#6366f1'];
   return palette[index % palette.length];
+}
+
+export type ResolvedChartStyle = {
+  fontFamily: string;
+  titleFontSize: number;
+  titleColor: string;
+  labelFontSize: number;
+  textColor: string;
+  axisColor: string;
+  gridColor: string;
+  lineWidth: number;
+  pointSize: number;
+  pointOpacity: number;
+  globalOpacity: number;
+};
+
+export const DEFAULT_CHART_STYLE: ResolvedChartStyle = {
+  fontFamily: 'inherit',
+  titleFontSize: 14,
+  titleColor: '#aaa',
+  labelFontSize: 9,
+  textColor: '#888',
+  axisColor: '#888',
+  gridColor: '#333',
+  lineWidth: 2.5,
+  pointSize: 4,
+  pointOpacity: 1,
+  globalOpacity: 1,
+};
+
+export function resolveChartStyle(style?: ChartStyle): ResolvedChartStyle {
+  return {
+    fontFamily: style?.fontFamily ?? DEFAULT_CHART_STYLE.fontFamily,
+    titleFontSize: style?.titleFontSize ?? DEFAULT_CHART_STYLE.titleFontSize,
+    titleColor: style?.titleColor ?? DEFAULT_CHART_STYLE.titleColor,
+    labelFontSize: style?.labelFontSize ?? DEFAULT_CHART_STYLE.labelFontSize,
+    textColor: style?.textColor ?? DEFAULT_CHART_STYLE.textColor,
+    axisColor: style?.axisColor ?? DEFAULT_CHART_STYLE.axisColor,
+    gridColor: style?.gridColor ?? DEFAULT_CHART_STYLE.gridColor,
+    lineWidth: style?.lineWidth ?? DEFAULT_CHART_STYLE.lineWidth,
+    pointSize: style?.pointSize ?? DEFAULT_CHART_STYLE.pointSize,
+    pointOpacity: style?.pointOpacity ?? DEFAULT_CHART_STYLE.pointOpacity,
+    globalOpacity: style?.globalOpacity ?? DEFAULT_CHART_STYLE.globalOpacity,
+  };
 }
 
 /**

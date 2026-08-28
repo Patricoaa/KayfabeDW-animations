@@ -1,7 +1,7 @@
 'use client';
 
 import type {ChartConfig} from '@/lib/chart-config';
-import {prepareSeries, prepareMultiSeries, formatValue, pickColor, type PreparedMultiSeries} from '@/lib/chart-data';
+import {prepareSeries, prepareMultiSeries, formatValue, pickColor, resolveChartStyle, type PreparedMultiSeries} from '@/lib/chart-data';
 import {Legend} from './legend';
 
 type Props = {
@@ -23,6 +23,7 @@ export function BarChart({data, config}: Props) {
 }
 
 function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartConfig}) {
+  const st = resolveChartStyle(config.style);
   const numFmt = config.numberFormat ?? 'short';
   const stacked = (config.groupMode ?? 'grouped') === 'stacked' || !!config.stacked;
   const showLegend = config.showLegend ?? true;
@@ -67,13 +68,13 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
         {showLegend && legendPosition === 'right' && (
           <Legend items={multi.series.map((s) => ({label: s.name, color: s.color}))} position="right" />
         )}
-        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto">
+        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
           {config.showGrid !== false && tickValues.map((v, i) => {
             const y = margin.top + plotH - (v / maxVal) * plotH;
             return (
               <g key={i}>
-                <line x1={margin.left} y1={y} x2={width - margin.right} y2={y} stroke="#333" strokeWidth={1} />
-                <text x={margin.left - 8} y={y + 4} textAnchor="end" fill="#888" fontSize={10}>
+                <line x1={margin.left} y1={y} x2={width - margin.right} y2={y} stroke={st.gridColor} strokeWidth={1} />
+                <text x={margin.left - 8} y={y + 4} textAnchor="end" fill={st.textColor} fontSize={10}>
                   {formatValue(v, numFmt)}
                 </text>
               </g>
@@ -81,10 +82,10 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
           })}
 
           {config.xLabel && (
-            <text x={width / 2} y={height - 6} textAnchor="middle" fill="#aaa" fontSize={11}>{config.xLabel}</text>
+            <text x={width / 2} y={height - 6} textAnchor="middle" fill={st.axisColor} fontSize={11}>{config.xLabel}</text>
           )}
           {config.yLabel && (
-            <text x={16} y={height / 2} textAnchor="middle" fill="#aaa" fontSize={11} transform={`rotate(-90, 16, ${height / 2})`}>
+            <text x={16} y={height / 2} textAnchor="middle" fill={st.axisColor} fontSize={11} transform={`rotate(-90, 16, ${height / 2})`}>
               {config.yLabel}
             </text>
           )}
@@ -115,7 +116,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                   height={h}
                   fill={s.color}
                   rx={2}
-                  opacity={0.9}
+                  opacity={st.globalOpacity}
                 />
               );
             });
@@ -130,8 +131,8 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                 x={cx}
                 y={height - margin.bottom + 14}
                 textAnchor="middle"
-                fill="#888"
-                fontSize={9}
+                fill={st.textColor}
+                fontSize={st.labelFontSize}
                 transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${cx}, ${height - margin.bottom + 14})` : undefined}
               >
                 {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
@@ -149,6 +150,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
 
 function SingleBar({data, config}: Props) {
   const prepared = prepareSeries(data, config);
+  const st = resolveChartStyle(config.style);
   const horizontal = config.horizontal ?? false;
   const numFmt = config.numberFormat ?? 'short';
   const width = 600;
@@ -166,21 +168,21 @@ function SingleBar({data, config}: Props) {
     const tickValues = Array.from({length: xTicks + 1}, (_, i) => (maxVal / xTicks) * i);
 
     return (
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
         {config.showGrid !== false && tickValues.map((v, i) => {
           const x = margin.left + (v / maxVal) * plotW;
           return (
             <g key={i}>
-              <line x1={x} y1={margin.top} x2={x} y2={margin.top + plotH} stroke="#333" strokeWidth={1} />
-              <text x={x} y={margin.top + plotH + 14} textAnchor="middle" fill="#888" fontSize={10}>
+              <line x1={x} y1={margin.top} x2={x} y2={margin.top + plotH} stroke={st.gridColor} strokeWidth={1} />
+              <text x={x} y={margin.top + plotH + 14} textAnchor="middle" fill={st.textColor} fontSize={10}>
                 {formatValue(v, numFmt)}
               </text>
             </g>
           );
         })}
 
-        {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill="#aaa" fontSize={11}>{config.xLabel}</text>}
-        {config.yLabel && <text x={14} y={height / 2} textAnchor="middle" fill="#aaa" fontSize={11} transform={`rotate(-90, 14, ${height / 2})`}>{config.yLabel}</text>}
+        {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={st.axisColor} fontSize={11}>{config.xLabel}</text>}
+        {config.yLabel && <text x={14} y={height / 2} textAnchor="middle" fill={st.axisColor} fontSize={11} transform={`rotate(-90, 14, ${height / 2})`}>{config.yLabel}</text>}
 
         {prepared.items.map((d, i) => {
           const y = margin.top + gap + i * (barH + gap);
@@ -188,13 +190,13 @@ function SingleBar({data, config}: Props) {
           const color = d.color ?? pickColor(config.colors, i);
           return (
             <g key={i}>
-              <rect x={margin.left} y={y} width={Math.max(barW, 0)} height={barH} fill={color} rx={4} opacity={0.9} />
+              <rect x={margin.left} y={y} width={Math.max(barW, 0)} height={barH} fill={color} rx={4} opacity={st.globalOpacity} />
               {config.showDataLabels !== false && (
                 <text x={margin.left + barW + 6} y={y + barH / 2 + 3} textAnchor="start" fill="#ccc" fontSize={10}>
                   {formatValue(d.value, numFmt)}
                 </text>
               )}
-              <text x={margin.left - 8} y={y + barH / 2 + 3} textAnchor="end" fill="#888" fontSize={9}>
+              <text x={margin.left - 8} y={y + barH / 2 + 3} textAnchor="end" fill={st.textColor} fontSize={st.labelFontSize}>
                 {d.label.length > 16 ? d.label.slice(0, 16) + '…' : d.label}
               </text>
             </g>
@@ -212,21 +214,21 @@ function SingleBar({data, config}: Props) {
   const labelAngle = config.labelAngle ?? (n > 8 ? -30 : 0);
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto">
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
       {config.showGrid !== false && tickValues.map((v, i) => {
         const y = margin.top + plotH - (v / maxVal) * plotH;
         return (
           <g key={i}>
-            <line x1={margin.left} y1={y} x2={width - margin.right} y2={y} stroke="#333" strokeWidth={1} />
-            <text x={margin.left - 8} y={y + 4} textAnchor="end" fill="#888" fontSize={10}>
+            <line x1={margin.left} y1={y} x2={width - margin.right} y2={y} stroke={st.gridColor} strokeWidth={1} />
+            <text x={margin.left - 8} y={y + 4} textAnchor="end" fill={st.textColor} fontSize={10}>
               {formatValue(v, numFmt)}
             </text>
           </g>
         );
       })}
 
-      {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill="#aaa" fontSize={11}>{config.xLabel}</text>}
-      {config.yLabel && <text x={16} y={height / 2} textAnchor="middle" fill="#aaa" fontSize={11} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text>}
+      {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={st.axisColor} fontSize={11}>{config.xLabel}</text>}
+      {config.yLabel && <text x={16} y={height / 2} textAnchor="middle" fill={st.axisColor} fontSize={11} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text>}
 
       {prepared.items.map((d, i) => {
         const x = margin.left + gap + i * (barWidth + gap);
@@ -234,7 +236,7 @@ function SingleBar({data, config}: Props) {
         const color = d.color ?? pickColor(config.colors, i);
         return (
           <g key={i}>
-            <rect x={x} y={margin.top + plotH - barH} width={barWidth} height={barH} fill={color} rx={4} opacity={0.9} />
+            <rect x={x} y={margin.top + plotH - barH} width={barWidth} height={barH} fill={color} rx={4} opacity={st.globalOpacity} />
             {config.showDataLabels !== false && (
               <text x={x + barWidth / 2} y={margin.top + plotH - barH - 6} textAnchor="middle" fill="#ccc" fontSize={10}>
                 {formatValue(d.value, numFmt)}
@@ -244,8 +246,8 @@ function SingleBar({data, config}: Props) {
               x={x + barWidth / 2}
               y={height - margin.bottom + 14}
               textAnchor="middle"
-              fill="#888"
-              fontSize={9}
+              fill={st.textColor}
+              fontSize={st.labelFontSize}
               transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${x + barWidth / 2}, ${height - margin.bottom + 14})` : undefined}
             >
               {d.label.length > 12 ? d.label.slice(0, 12) + '…' : d.label}

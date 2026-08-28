@@ -1,7 +1,7 @@
 'use client';
 
 import type {ChartConfig} from '@/lib/chart-config';
-import {prepareSeries, prepareMultiSeries, formatValue, type PreparedMultiSeries} from '@/lib/chart-data';
+import {prepareSeries, prepareMultiSeries, formatValue, resolveChartStyle, type PreparedMultiSeries} from '@/lib/chart-data';
 import {Legend} from './legend';
 
 type Props = {
@@ -21,6 +21,7 @@ export function AreaChart({data, config}: Props) {
 }
 
 function MultiArea({multi, config}: {multi: PreparedMultiSeries; config: ChartConfig}) {
+  const st = resolveChartStyle(config.style);
   const width = 600;
   const height = 380;
   const margin = {top: 24, right: 24, bottom: 66, left: 66};
@@ -53,24 +54,24 @@ function MultiArea({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
       {showLegend && legendPosition === 'top' && <Legend items={multi.series.map((s) => ({label: s.name, color: s.color}))} position="top" />}
       <div className="flex gap-2">
         {showLegend && legendPosition === 'right' && <Legend items={multi.series.map((s) => ({label: s.name, color: s.color}))} position="right" />}
-        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto">
+        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
           {config.showGrid !== false && tickValues.map((v, i) => {
             const y = toY(v);
             return (
               <g key={i}>
-                <line x1={margin.left} y1={y} x2={width - margin.right} y2={y} stroke="#333" strokeWidth={1} />
-                <text x={margin.left - 8} y={y + 4} textAnchor="end" fill="#888" fontSize={10}>{formatValue(v, numFmt)}</text>
+                <line x1={margin.left} y1={y} x2={width - margin.right} y2={y} stroke={st.gridColor} strokeWidth={1} />
+                <text x={margin.left - 8} y={y + 4} textAnchor="end" fill={st.textColor} fontSize={10}>{formatValue(v, numFmt)}</text>
               </g>
             );
           })}
-          {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill="#aaa" fontSize={11}>{config.xLabel}</text>}
-          {config.yLabel && <text x={16} y={height / 2} textAnchor="middle" fill="#aaa" fontSize={11} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text>}
-          {seriesPaths.map((s) => <path key={s.name} d={s.area} fill={s.color} opacity={0.25} />)}
-          {seriesPaths.map((s) => <path key={s.name} d={s.line} fill="none" stroke={s.color} strokeWidth={2.5} strokeLinejoin="round" />)}
+          {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={st.axisColor} fontSize={11}>{config.xLabel}</text>}
+          {config.yLabel && <text x={16} y={height / 2} textAnchor="middle" fill={st.axisColor} fontSize={11} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text>}
+          {seriesPaths.map((s) => <path key={s.name} d={s.area} fill={s.color} opacity={st.globalOpacity * 0.25} />)}
+          {seriesPaths.map((s) => <path key={s.name} d={s.line} fill="none" stroke={s.color} strokeWidth={st.lineWidth} strokeLinejoin="round" />)}
           {showMarkers &&
             seriesPaths.map((s) =>
               s.points.map((p, i) => (
-                <circle key={`${s.name}-${i}`} cx={p.x} cy={p.y} r={4} fill={s.color} stroke="#111" strokeWidth={1.5} />
+                <circle key={`${s.name}-${i}`} cx={p.x} cy={p.y} r={st.pointSize} fill={s.color} stroke="#111" strokeWidth={1.5} opacity={st.pointOpacity} />
               )),
             )}
           {n > 0 && multi.categories.map((cat, i) => {
@@ -81,8 +82,8 @@ function MultiArea({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
                 x={cx}
                 y={height - margin.bottom + 14}
                 textAnchor="middle"
-                fill="#888"
-                fontSize={9}
+                fill={st.textColor}
+                fontSize={st.labelFontSize}
                 transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${cx}, ${height - margin.bottom + 14})` : undefined}
               >
                 {cat.length > 10 ? cat.slice(0, 10) + '…' : cat}
@@ -98,6 +99,7 @@ function MultiArea({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
 
 function SingleArea({data, config}: Props) {
   const prepared = prepareSeries(data, config);
+  const st = resolveChartStyle(config.style);
   const width = 600;
   const height = 380;
   const margin = {top: 24, right: 24, bottom: 66, left: 66};
@@ -124,29 +126,29 @@ function SingleArea({data, config}: Props) {
   const area = n > 0 ? `${line} L ${toX(n - 1)} ${baseY} L ${toX(0)} ${baseY} Z` : line;
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto">
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
       {config.showGrid !== false && tickValues.map((v, i) => {
         const y = toY(v);
         return (
           <g key={i}>
-            <line x1={margin.left} y1={y} x2={width - margin.right} y2={y} stroke="#333" strokeWidth={1} />
-            <text x={margin.left - 8} y={y + 4} textAnchor="end" fill="#888" fontSize={10}>{formatValue(v, numFmt)}</text>
+            <line x1={margin.left} y1={y} x2={width - margin.right} y2={y} stroke={st.gridColor} strokeWidth={1} />
+            <text x={margin.left - 8} y={y + 4} textAnchor="end" fill={st.textColor} fontSize={10}>{formatValue(v, numFmt)}</text>
           </g>
         );
       })}
-      {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill="#aaa" fontSize={11}>{config.xLabel}</text>}
-      {config.yLabel && <text x={16} y={height / 2} textAnchor="middle" fill="#aaa" fontSize={11} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text>}
-      <path d={area} fill={color} opacity={0.25} />
-      <path d={line} fill="none" stroke={color} strokeWidth={2.5} strokeLinejoin="round" />
-      {showMarkers && pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={4} fill={color} stroke="#111" strokeWidth={1.5} />)}
+      {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={st.axisColor} fontSize={11}>{config.xLabel}</text>}
+      {config.yLabel && <text x={16} y={height / 2} textAnchor="middle" fill={st.axisColor} fontSize={11} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text>}
+      <path d={area} fill={color} opacity={st.globalOpacity * 0.25} />
+      <path d={line} fill="none" stroke={color} strokeWidth={st.lineWidth} strokeLinejoin="round" />
+      {showMarkers && pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={st.pointSize} fill={color} stroke="#111" strokeWidth={1.5} opacity={st.pointOpacity} />)}
       {n > 0 && prepared.items.map((p, i) => (
         <text
           key={i}
           x={toX(i)}
           y={height - margin.bottom + 14}
           textAnchor="middle"
-          fill="#888"
-          fontSize={9}
+          fill={st.textColor}
+          fontSize={st.labelFontSize}
           transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${toX(i)}, ${height - margin.bottom + 14})` : undefined}
         >
           {p.label.length > 10 ? p.label.slice(0, 10) + '…' : p.label}

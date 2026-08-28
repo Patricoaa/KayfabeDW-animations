@@ -1,7 +1,7 @@
 'use client';
 
 import type {ChartConfig} from '@/lib/chart-config';
-import {prepareSeries, formatValue, pickColor} from '@/lib/chart-data';
+import {prepareSeries, formatValue, pickColor, resolveChartStyle} from '@/lib/chart-data';
 
 type Props = {
   data: Record<string, unknown>[];
@@ -10,6 +10,7 @@ type Props = {
 
 export function PieChart({data, config}: Props) {
   const prepared = prepareSeries(data, config);
+  const st = resolveChartStyle(config.style);
   const slices = prepared.items.filter((d) => d.value > 0);
 
   if (slices.length === 0) {
@@ -43,7 +44,7 @@ export function PieChart({data, config}: Props) {
           const path = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`;
           const color = s.color ?? pickColor(config.colors, i);
           cumAngle = endAngle;
-          return <path key={i} d={path} fill={color} opacity={0.9} />;
+          return <path key={i} d={path} fill={color} opacity={st.globalOpacity} />;
         })}
       </svg>
       <div className="flex flex-col gap-1">

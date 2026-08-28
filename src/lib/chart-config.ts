@@ -16,6 +16,43 @@ export type ChartFilter = {
   value?: string;
 };
 
+export type ChartStyle = {
+  fontFamily?: string;
+  titleFontSize?: number;
+  titleColor?: string;
+  labelFontSize?: number;
+  textColor?: string;
+  axisColor?: string;
+  gridColor?: string;
+  lineWidth?: number;
+  pointSize?: number;
+  pointOpacity?: number;
+  globalOpacity?: number;
+};
+
+export const PALETTES: {name: string; colors: string[]}[] = [
+  {
+    name: 'Colorblind (Wong)',
+    colors: [
+      '#0072B2', '#E69F00', '#009E73', '#F0E442',
+      '#56B4E9', '#D55E00', '#CC79A7', '#999999',
+      '#332288', '#88CCEE', '#44AA99', '#117733',
+    ],
+  },
+  {
+    name: 'Vivid',
+    colors: ['#e63946', '#f4a261', '#2a9d8f', '#457b9d', '#8338ec', '#d00000', '#fb8500', '#606c38'],
+  },
+  {
+    name: 'Pastel',
+    colors: ['#a8dadc', '#457b9d', '#f1faee', '#e9c46a', '#f4a261', '#e76f51', '#bde0fe', '#cdb4db'],
+  },
+  {
+    name: 'Mono (grises)',
+    colors: ['#1f2937', '#4b5563', '#6b7280', '#9ca3af', '#d1d5db', '#111827', '#374151', '#8b5cf6'],
+  },
+];
+
 export type ChartConfig = {
   type: ChartType;
   title?: string;
@@ -51,6 +88,9 @@ export type ChartConfig = {
   seriesField?: string;
   legendItems?: {label: string; color: string}[];
   showMarkers?: boolean;
+  // F2: visual style overrides. All fields optional; the renderers resolve
+  // against sensible defaults via resolveChartStyle in chart-data.
+  style?: ChartStyle;
   // Post-capture row filters applied on the captured dataset (step 2), not SQL.
   filters?: ChartFilter[];
   // Table-chart specific controls. `tableColumns` limits which dataset columns
@@ -62,7 +102,7 @@ export type ChartConfig = {
   configVersion?: number;
 };
 
-export const CHART_CONFIG_VERSION = 4;
+export const CHART_CONFIG_VERSION = 5;
 
 export const DEFAULT_CHART_CONFIG: ChartConfig = {
   type: 'bar',

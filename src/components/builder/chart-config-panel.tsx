@@ -2,7 +2,8 @@
 
 import React from 'react';
 import {BarChart3, PieChart, LineChart, AreaChart, ScatterChart, Table2} from 'lucide-react';
-import type {ChartConfig, ChartType, NumberFormat, SortBy, ChartFilter, ChartFilterOp, LegendPosition} from '@/lib/chart-config';
+import type {ChartConfig, ChartType, NumberFormat, SortBy, ChartFilter, ChartFilterOp, LegendPosition, ChartStyle} from '@/lib/chart-config';
+import {PALETTES} from '@/lib/chart-config';
 
 // Metadata for a selected column available to the axis selectors: its alias
 // (the value used as a row key), its origin table, the bare column name, and
@@ -71,7 +72,27 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
     next.splice(index, 1);
     update({filters: next});
   };
+  const updateStyle = (patch: Partial<ChartStyle>) => update({style: {...(config.style ?? {}), ...patch}});
+  const applyPalette = (colors: string[]) => {
+    // Assign the palette to each configured series (multi-series) or to the
+    // chart-level colors (single-series). When no series are configured yet,
+    // fall back to the chart-level colors.
+    if (config.seriesField) {
+      const items = (config.legendItems ?? []).map((li, i) => ({...li, color: colors[i % colors.length]}));
+      update({legendItems: items});
+    } else {
+      update({colors});
+    }
+  };
+  const setSeriesColor = (index: number, color: string) => {
+    const items = [...(config.legendItems ?? [])];
+    if (!items[index]) items[index] = {label: `Serie ${index + 1}`, color};
+    else items[index] = {...items[index], color};
+    update({legendItems: items});
+  };
   const isSingleSeries = config.type === 'bar' || config.type === 'line' || config.type === 'area' || config.type === 'pie';
+  const hasSeries = !!config.seriesField && (config.type === 'bar' || config.type === 'line' || config.type === 'area');
+  const legendItems = config.legendItems ?? [];
 
   // Fan-out detection: when aggregating a field from a shallower (non-leaf)
   // table with a plain count/sum/avg, the result reflects the deepest table's
@@ -352,6 +373,132 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
           </div>
         </>
       ) : null}
+
+      {/* Estilos visuales */}
+      <div className="pt-1 border-t border-border-subtle">
+        <label className="text-sm font-medium mb-2 block font-display">Estilos</label>
+
+        {/* Palettes */}
+        <label className="text-sm font-medium mb-1 block">Paleta de colores</label>
+        <div className="space-y-2">
+          {PALETTES.map((p) => (
+            <button
+              key={p.name}
+              onClick={() => applyPalette(p.colors)}
+              className="w-full text-left rounded-lg border border-border-subtle p-1.5 hover:border-amber-500/40 transition-colors"
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] text-secondary">{p.name}</span>
+                <span className="text-[10px] text-muted">Aplicar</span>
+              </div>
+              <div className="flex gap-0.5">
+                {p.colors.slice(0, 8).map((c, i) => (
+                  <div key={i} className="flex-1 h-3 rounded-sm" style={{backgroundColor: c}} />
+                ))}
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {/* Per-series color pickers (multi-series charts) */}
+        {hasSeries && (
+          <div className="mt-3">
+            <label className="text-sm font-medium mb-1 block">Colores de serie</label>
+            <div className="space-y-1.5">
+              {legendItems.length === 0 && (
+                <p className="text-[10px] text-muted">Los colores se aplican al elegir una serie.</p>
+              )}
+              {legendItems.map((li, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={li.color}
+                    onChange={(e) => setSeriesColor(i, e.target.value)}
+                    className="w-8 h-8 rounded cursor-pointer border border-border-default bg-transparent"
+                    aria-label={`Color de ${li.label}`}
+                  />
+                  <span className="text-xs text-secondary truncate">{li.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Fonts + colors */}
+        <div className="mt-3 space-y-2">
+          <div>
+            <label className="text-sm font-medium mb-1 block">Fuente</label>
+            <input
+              type="text"
+              value={config.style?.fontFamily ?? ''}
+              onChange={(e) => updateStyle({fontFamily: e.target.value || undefined})}
+              placeholder="inherit"
+              className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Tamaño de título</label>
+            <input
+              type="number"
+              min={8}
+              max={40}
+              value={config.style?.titleFontSize ?? ''}
+              onChange={(e) => updateStyle({titleFontSize: e.target.value ? Number(e.target.value) : undefined})}
+              className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <ColorInput label="Texto" value={config.style?.textColor} onChange={(v) => updateStyle({textColor: v})} />
+            <ColorInput label="Ejes" value={config.style?.axisColor} onChange={(v) => updateStyle({axisColor: v})} />
+            <ColorInput label="Cuadrícula" value={config.style?.gridColor} onChange={(v) => updateStyle({gridColor: v})} />
+            <ColorInput label="Título" value={config.style?.titleColor} onChange={(v) => updateStyle({titleColor: v})} />
+          </div>
+          {(config.type === 'line' || config.type === 'area') && (
+            <>
+              <NumberInput label="Grosor de línea" value={config.style?.lineWidth} min={1} max={8} step={0.5} onChange={(v) => updateStyle({lineWidth: v})} />
+              {(config.showMarkers ?? true) && (
+                <>
+                  <NumberInput label="Tamaño de punto" value={config.style?.pointSize} min={1} max={12} onChange={(v) => updateStyle({pointSize: v})} />
+                  <NumberInput label="Opacidad de punto" value={config.style?.pointOpacity} min={0.1} max={1} step={0.05} onChange={(v) => updateStyle({pointOpacity: v})} />
+                </>
+              )}
+            </>
+          )}
+          <NumberInput label="Opacidad global" value={config.style?.globalOpacity} min={0.1} max={1} step={0.05} onChange={(v) => updateStyle({globalOpacity: v})} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ColorInput({label, value, onChange}: {label: string; value?: string; onChange: (v: string) => void}) {
+  return (
+    <label className="flex items-center gap-2">
+      <input
+        type="color"
+        value={value ?? '#888888'}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-8 h-8 rounded cursor-pointer border border-border-default bg-transparent"
+        aria-label={label}
+      />
+      <span className="text-xs text-secondary">{label}</span>
+    </label>
+  );
+}
+
+function NumberInput({label, value, min, max, step = 1, onChange}: {label: string; value?: number; min: number; max: number; step?: number; onChange: (v: number | undefined) => void}) {
+  return (
+    <div>
+      <label className="text-sm font-medium mb-1 block">{label}</label>
+      <input
+        type="number"
+        min={min}
+        max={max}
+        step={step}
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value ? Number(e.target.value) : undefined)}
+        className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+      />
     </div>
   );
 }
