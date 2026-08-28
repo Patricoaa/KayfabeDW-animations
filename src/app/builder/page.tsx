@@ -23,12 +23,13 @@ import {defaultQuerySpec} from '@/lib/query-spec';
 import type {ChartConfig} from '@/lib/chart-config';
 import {DEFAULT_CHART_CONFIG, applyChartDefaults} from '@/lib/chart-config';
 import type {SchemaMetadata} from '@/lib/schema-metadata';
-import {getSchemaMetadata, getTableDepth} from '@/lib/schema-metadata';
+import {getSchemaMetadata, getTableDepth, isNumericType} from '@/lib/schema-metadata';
 import {suggestBestTemplate, isGenericTemplate} from '@/lib/viz-to-remotion';
 import {applyChartFilters} from '@/lib/chart-data';
 import {downloadChartSvg, downloadChartPng, sanitizeFilename, chartToDataUrl} from '@/lib/export-static';
 import dynamic from 'next/dynamic';
 import {ChartConfigPanel} from '@/components/builder/chart-config-panel';
+import type {ColumnMeta} from '@/components/builder/chart-config-panel';
 import {ChartPreview} from '@/components/charts/chart-preview';
 import {TemplatePicker} from '@/components/builder/template-picker';
 import {AnimationPreview} from '@/components/builder/animation-preview';
@@ -493,18 +494,29 @@ function BuilderContent() {
   // selected column (by alias or bare name) back to its source table, so the
   // config panel can warn when an aggregate is applied to a shallower table in
   // a fan-out JOIN graph. `fanOutTables` are the tables whose rows get
-  // multiplied by deeper joins (i.e. not a max-depth leaf).
-  const {aliasToTable, fanOutTables} = useMemo(() => {
+  // multiplied by deeper joins (i.e. not a max-depth leaf). `fieldMeta`
+  // carries per-column type + origin so the axis selectors can filter by type
+  // and label each option with its table.
+  const {aliasToTable, fanOutTables, fieldMeta} = useMemo(() => {
     const aliasMap: Record<string, string> = {};
+    const fieldList: ColumnMeta[] = [];
     for (const f of spec.select ?? []) {
       if (f.column === '*') continue;
       const dotIdx = f.column.indexOf('.');
       if (dotIdx <= 0) continue;
       const tableName = f.column.slice(0, dotIdx);
       const colName = f.column.slice(dotIdx + 1);
-      aliasMap[f.alias ?? f.column] = tableName;
+      const alias = f.alias ?? f.column;
+      aliasMap[alias] = tableName;
       aliasMap[colName] = tableName;
       aliasMap[f.column] = tableName;
+
+      let isNumeric = false;
+      const col = meta?.tables
+        .find((t) => t.name === tableName)
+        ?.columns.find((c) => c.name === colName);
+      if (col) isNumeric = isNumericType(col.type);
+      fieldList.push({alias, table: tableName, name: colName, isNumeric});
     }
 
     let fanOut: string[] = [];
@@ -519,7 +531,7 @@ function BuilderContent() {
           .map(([t]) => t);
       }
     }
-    return {aliasToTable: aliasMap, fanOutTables: fanOut};
+    return {aliasToTable: aliasMap, fanOutTables: fanOut, fieldMeta: fieldList};
   }, [spec, meta]);
 
 
@@ -783,6 +795,7 @@ function BuilderContent() {
                 columns={columns}
                 aliasToTable={aliasToTable}
                 fanOutTables={fanOutTables}
+                fieldMeta={fieldMeta}
               />
             )}
             {outputMode === 'animated' && (

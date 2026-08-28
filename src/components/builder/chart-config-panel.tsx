@@ -4,12 +4,23 @@ import React from 'react';
 import {BarChart3, PieChart, LineChart, AreaChart, ScatterChart, Table2} from 'lucide-react';
 import type {ChartConfig, ChartType, NumberFormat, SortBy, ChartFilter, ChartFilterOp} from '@/lib/chart-config';
 
+// Metadata for a selected column available to the axis selectors: its alias
+// (the value used as a row key), its origin table, the bare column name, and
+// whether it is numeric (used to filter "value" roles to numerics only).
+export type ColumnMeta = {
+  alias: string;
+  table: string;
+  name: string;
+  isNumeric: boolean;
+};
+
 type ChartConfigPanelProps = {
   config: ChartConfig;
   onChange: (config: ChartConfig) => void;
   columns: string[];
   aliasToTable?: Record<string, string>;
   fanOutTables?: string[];
+  fieldMeta?: ColumnMeta[];
 };
 
 const CHART_TYPES: {type: ChartType; label: string; Icon: typeof BarChart3}[] = [
@@ -48,7 +59,7 @@ const FILTER_OPS: {value: ChartFilterOp; label: string}[] = [
   {value: 'is_not_empty', label: 'no vacío'},
 ];
 
-export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, fanOutTables = []}: ChartConfigPanelProps) {
+export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, fanOutTables = [], fieldMeta = []}: ChartConfigPanelProps) {
   const update = (patch: Partial<ChartConfig>) => onChange({...config, ...patch});
   const updateFilter = (index: number, patch: Partial<ChartFilter>) => {
     const next = [...(config.filters ?? [])];
@@ -108,21 +119,21 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
       {/* Field mappings — vary by chart type */}
       {config.type === 'pie' ? (
         <>
-          <FieldSelect label="Etiqueta" value={config.xField ?? ''} columns={columns} onChange={(v) => update({xField: v})} />
-          <FieldSelect label="Valor" value={config.yField ?? ''} columns={columns} onChange={(v) => update({yField: v})} />
+          <FieldSelect label="Etiqueta" value={config.xField ?? ''} options={fieldMeta} fallback={columns} onChange={(v) => update({xField: v})} />
+          <FieldSelect label="Valor" value={config.yField ?? ''} options={fieldMeta} fallback={columns} role="numeric" onChange={(v) => update({yField: v})} />
         </>
       ) : config.type === 'scatter' ? (
         <>
-          <FieldSelect label="Eje X" value={config.xField ?? ''} columns={columns} onChange={(v) => update({xField: v})} />
-          <FieldSelect label="Eje Y" value={config.yField ?? ''} columns={columns} onChange={(v) => update({yField: v})} />
-          <FieldSelect label="Color (categoría)" value={config.colorField ?? ''} columns={columns} onChange={(v) => update({colorField: v})} optional />
+          <FieldSelect label="Eje X" value={config.xField ?? ''} options={fieldMeta} fallback={columns} role="numeric" onChange={(v) => update({xField: v})} />
+          <FieldSelect label="Eje Y" value={config.yField ?? ''} options={fieldMeta} fallback={columns} role="numeric" onChange={(v) => update({yField: v})} />
+          <FieldSelect label="Color (categoría)" value={config.colorField ?? ''} options={fieldMeta} fallback={columns} onChange={(v) => update({colorField: v})} optional />
         </>
       ) : (
         <>
-          <FieldSelect label="Eje X / Categoría" value={config.xField ?? ''} columns={columns} onChange={(v) => update({xField: v})} />
-          <FieldSelect label="Eje Y / Valor" value={config.yField ?? ''} columns={columns} onChange={(v) => update({yField: v})} />
+          <FieldSelect label="Eje X / Categoría" value={config.xField ?? ''} options={fieldMeta} fallback={columns} onChange={(v) => update({xField: v})} />
+          <FieldSelect label="Eje Y / Valor" value={config.yField ?? ''} options={fieldMeta} fallback={columns} role="numeric" onChange={(v) => update({yField: v})} />
           {config.type !== 'table' && (
-            <FieldSelect label="Agregación" value={config.aggregate ?? ''} columns={[]} onChange={(v) => update({aggregate: (v || undefined) as ChartConfig['aggregate']})} optional custom>
+            <FieldSelect label="Agregación" value={config.aggregate ?? ''} onChange={(v) => update({aggregate: (v || undefined) as ChartConfig['aggregate']})} optional custom>
               <option value="">Ninguna</option>
               <option value="sum">Suma</option>
               <option value="avg">Promedio</option>
@@ -286,7 +297,9 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
 function FieldSelect({
   label,
   value,
-  columns,
+  options = [],
+  fallback = [],
+  role = 'any',
   onChange,
   optional = false,
   custom = false,
@@ -294,7 +307,9 @@ function FieldSelect({
 }: {
   label: string;
   value: string;
-  columns: string[];
+  options?: ColumnMeta[];
+  fallback?: string[];
+  role?: 'any' | 'numeric';
   onChange: (v: string) => void;
   optional?: boolean;
   custom?: boolean;
@@ -314,6 +329,15 @@ function FieldSelect({
       </div>
     );
   }
+
+  // When we have rich metadata, filter numeric-only roles and label options
+  // with their table when multiple tables are present. Always keep the
+  // currently selected value visible even if it no longer matches the type
+  // filter, so a previous selection isn't silently hidden.
+  const useMeta = options.length > 0;
+  const showTable = useMeta && new Set(options.map((o) => o.table)).size > 1;
+  const numericList = options.filter((o) => o.isNumeric);
+
   return (
     <div>
       <label className="text-sm font-medium mb-1 block">{label}</label>
@@ -323,9 +347,21 @@ function FieldSelect({
         className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
       >
         {optional && <option value="">Ninguno</option>}
-        {columns.map((c) => (
-          <option key={c} value={c}>{c}</option>
-        ))}
+        {!useMeta &&
+          fallback.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        {useMeta &&
+          (role === 'numeric' ? numericList : options).map((o) => (
+            <option key={o.alias} value={o.alias}>
+              {showTable ? `${o.table}.${o.name}` : o.alias}
+            </option>
+          ))}
+        {useMeta && value && role === 'numeric' && !numericList.some((o) => o.alias === value) && (
+          <option value={value} disabled>
+            {showTable ? value : value} (no disponible para este eje)
+          </option>
+        )}
       </select>
     </div>
   );
