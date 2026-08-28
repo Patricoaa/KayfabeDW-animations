@@ -1,6 +1,6 @@
 'use client';
 
-import {Suspense, useCallback, useEffect, useRef, useState} from 'react';
+import {Suspense, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import Link from 'next/link';
 import {useSearchParams} from 'next/navigation';
 import {
@@ -25,6 +25,7 @@ import {DEFAULT_CHART_CONFIG, applyChartDefaults} from '@/lib/chart-config';
 import type {SchemaMetadata} from '@/lib/schema-metadata';
 import {getSchemaMetadata} from '@/lib/schema-metadata';
 import {suggestBestTemplate, isGenericTemplate} from '@/lib/viz-to-remotion';
+import {applyChartFilters} from '@/lib/chart-data';
 import {downloadChartSvg, downloadChartPng, sanitizeFilename, chartToDataUrl} from '@/lib/export-static';
 import dynamic from 'next/dynamic';
 import {ChartConfigPanel} from '@/components/builder/chart-config-panel';
@@ -125,63 +126,6 @@ function BuilderContent() {
       .catch((e) => setError(e.message));
   }, []);
 
-  // Load saved viz_spec when editing
-  useEffect(() => {
-    if (!editId) return;
-    fetch(`/api/viz-specs/${editId}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.query_spec) setSpec(d.query_spec);
-        if (d.chart_config) setChartConfig(d.chart_config);
-        if (d.name) setVizName(d.name);
-        if (d.animation_config) {
-          const ac = d.animation_config;
-          if (ac.templateId) {
-            setSelectedTemplate(ac.templateId);
-            setOutputMode('animated');
-          }
-          if (ac.templateOptions) setTemplateOptions(ac.templateOptions);
-          if (ac.duration) {
-            setDuration(ac.duration);
-            durationLoadedRef.current = true;
-          }
-        }
-        setSaved(true);
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Error loading viz_spec'));
-  }, [editId]);
-
-  // U2: Restore state from share URL param
-  useEffect(() => {
-    if (!shareParam) return;
-    try {
-      const decoded = JSON.parse(decodeURIComponent(atob(shareParam)));
-      if (decoded.spec) setSpec(decoded.spec);
-      if (decoded.chartConfig) setChartConfig(decoded.chartConfig);
-      // Clear the share param from URL
-      window.history.replaceState(null, '', '/builder');
-    } catch {
-      // Invalid share param, ignore
-    }
-  }, [shareParam]);
-
-  // Initialize duration from template default when template changes
-  useEffect(() => {
-    if (activeTemplate && !durationLoadedRef.current) {
-      const entry = TEMPLATES[activeTemplate as TemplateId];
-      if (entry) setDuration(entry.meta.defaultDuration);
-    }
-    durationLoadedRef.current = false;
-  }, [activeTemplate]);
-
-  // Clear template props when template changes
-  useEffect(() => {
-    setTemplateProps(null);
-    setTemplateOptions({});
-    setTemplateError(null);
-    setPreferTemplateProps(false);
-  }, [selectedTemplate]);
-
   const executeQuery = useCallback(async (q: QuerySpec) => {
     if (!q.table) return;
     setLoading(true);
@@ -225,6 +169,71 @@ function BuilderContent() {
       setLoading(false);
     }
   }, []);
+
+  // Load saved viz_spec when editing
+  useEffect(() => {
+    if (!editId) return;
+    fetch(`/api/viz-specs/${editId}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.query_spec) {
+          setSpec(d.query_spec);
+          // Re-run the query so the dataset isn't empty after a reload.
+          executeQuery(d.query_spec);
+        }
+        if (d.chart_config) setChartConfig(d.chart_config);
+        if (d.name) setVizName(d.name);
+        if (d.animation_config) {
+          const ac = d.animation_config;
+          if (ac.templateId) {
+            setSelectedTemplate(ac.templateId);
+            setOutputMode('animated');
+          }
+          if (ac.templateOptions) setTemplateOptions(ac.templateOptions);
+          if (ac.duration) {
+            setDuration(ac.duration);
+            durationLoadedRef.current = true;
+          }
+        }
+        setSaved(true);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : 'Error loading viz_spec'));
+  }, [editId, executeQuery]);
+
+  // U2: Restore state from share URL param
+  useEffect(() => {
+    if (!shareParam) return;
+    try {
+      const decoded = JSON.parse(decodeURIComponent(atob(shareParam)));
+      if (decoded.spec) {
+        setSpec(decoded.spec);
+        // Re-run the query so the shared dataset populates immediately.
+        executeQuery(decoded.spec);
+      }
+      if (decoded.chartConfig) setChartConfig(decoded.chartConfig);
+      // Clear the share param from URL
+      window.history.replaceState(null, '', '/builder');
+    } catch {
+      // Invalid share param, ignore
+    }
+  }, [shareParam, executeQuery]);
+
+  // Initialize duration from template default when template changes
+  useEffect(() => {
+    if (activeTemplate && !durationLoadedRef.current) {
+      const entry = TEMPLATES[activeTemplate as TemplateId];
+      if (entry) setDuration(entry.meta.defaultDuration);
+    }
+    durationLoadedRef.current = false;
+  }, [activeTemplate]);
+
+  // Clear template props when template changes
+  useEffect(() => {
+    setTemplateProps(null);
+    setTemplateOptions({});
+    setTemplateError(null);
+    setPreferTemplateProps(false);
+  }, [selectedTemplate]);
 
   const handleSpecChange = useCallback(
     (newSpec: QuerySpec) => {
@@ -403,7 +412,7 @@ function BuilderContent() {
       // Best-effort thumbnail: rasterize the static chart (if visible) so the
       // gallery can show a preview. Non-fatal on failure.
       let thumbnailUrl: string | undefined;
-      if (outputMode === 'static' && staticExportRef.current && data.length > 0) {
+      if (outputMode === 'static' && staticExportRef.current && filteredData.length > 0) {
         try {
           const dataUrl = await chartToDataUrl(staticExportRef.current);
           if (dataUrl) {
@@ -472,6 +481,13 @@ function BuilderContent() {
       : data.length > 0
         ? Object.keys(data[0])
         : [];
+
+  // Step-2 post-capture filters applied to the raw dataset before any preview
+  // renders, so static charts and animated templates stay consistent.
+  const filteredData = useMemo(
+    () => applyChartFilters(data, chartConfig.filters ?? []),
+    [data, chartConfig.filters],
+  );
 
   // Stepper derived state — honest active/done per step
   const stepDone = (n: number) => {
@@ -630,19 +646,21 @@ function BuilderContent() {
               <div className="h-full flex flex-col">
                 <div className="flex-1 overflow-auto flex items-center justify-center p-8">
                   <div ref={staticExportRef} className="w-full max-w-4xl">
-                    {data.length === 0 ? (
+                    {filteredData.length === 0 ? (
                       <div className="text-center text-muted text-sm font-body">
-                        Cargá datos en el canvas para ver tu gráfico
+                        {data.length > 0
+                          ? 'Ninguna fila coincide con el filtro del gráfico'
+                          : 'Cargá datos en el canvas para ver tu gráfico'}
                       </div>
                     ) : (
-                      <ChartPreview data={data} config={chartConfig} />
+                      <ChartPreview data={filteredData} config={chartConfig} />
                     )}
                   </div>
                 </div>
                 <div className="flex items-center justify-center gap-2 px-6 py-3 border-t border-border-default bg-card shrink-0">
                   <button
                     onClick={() => handleStaticExport('svg')}
-                    disabled={staticExporting !== 'none' || data.length === 0}
+                    disabled={staticExporting !== 'none' || filteredData.length === 0}
                     className="px-3 h-9 bg-elevated hover:bg-card-hover disabled:opacity-40 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
                     aria-label="Exportar gráfico como SVG"
                   >
@@ -650,21 +668,21 @@ function BuilderContent() {
                   </button>
                   <button
                     onClick={() => handleStaticExport('png')}
-                    disabled={staticExporting !== 'none' || data.length === 0}
+                    disabled={staticExporting !== 'none' || filteredData.length === 0}
                     className="px-3 h-9 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
                     aria-label="Exportar gráfico como PNG"
                   >
                     <Image size={14} /> PNG
                   </button>
                   <span className="ml-2 text-[10px] text-muted font-body">
-                    {data.length === 0 ? 'Cargá datos para exportar' : `${data.length} filas`}
+                    {filteredData.length === 0 ? 'Cargá datos para exportar' : `${filteredData.length} filas`}
                   </span>
                 </div>
               </div>
             ) : activeTemplate ? (
               <AnimationPreview
                 templateId={activeTemplate}
-                data={data}
+                data={filteredData}
                 config={chartConfig}
                 templateProps={templateProps}
                 preferTemplateProps={preferTemplateProps}
@@ -734,7 +752,7 @@ function BuilderContent() {
             {outputMode === 'animated' && (
               <>
                 <TemplatePicker
-                  data={data}
+                  data={filteredData}
                   config={chartConfig}
                   selectedTemplate={activeTemplate}
                   onSelect={(id) => {

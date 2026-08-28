@@ -1,5 +1,5 @@
 import type {ChartConfig} from '@/lib/chart-config';
-import type {NumberFormat, SortBy} from '@/lib/chart-config';
+import type {NumberFormat, SortBy, ChartFilter} from '@/lib/chart-config';
 
 export type SeriesItem = {
   label: string;
@@ -81,6 +81,61 @@ export function sortRows(
 export function limitRows(data: Record<string, unknown>[], limit?: number): Record<string, unknown>[] {
   if (!limit || limit <= 0) return data;
   return data.slice(0, limit);
+}
+
+/**
+ * Applies post-capture row filters (chart-level, step 2) to the raw dataset.
+ * These filter the already-fetched rows in the client and are NOT part of the
+ * SQL query. Comparison is numeric when both sides parse as numbers, otherwise
+ * string.
+ */
+export function applyChartFilters(
+  data: Record<string, unknown>[],
+  filters?: ChartFilter[],
+): Record<string, unknown>[] {
+  if (!filters || filters.length === 0) return data;
+  return data.filter((row) => {
+    for (const f of filters) {
+      const raw = row[f.column];
+      if (!passesFilter(raw, f)) return false;
+    }
+    return true;
+  });
+}
+
+function passesFilter(raw: unknown, f: ChartFilter): boolean {
+  const val = String(raw ?? '');
+  switch (f.op) {
+    case 'is_empty':
+      return raw === null || raw === undefined || String(raw).trim() === '';
+    case 'is_not_empty':
+      return raw !== null && raw !== undefined && String(raw).trim() !== '';
+    case 'contains':
+      return val.toLowerCase().includes((f.value ?? '').toLowerCase());
+    default: {
+      const a = Number(raw);
+      const b = Number(f.value);
+      if (raw !== null && raw !== undefined && raw !== '' && f.value !== '' && !isNaN(a) && !isNaN(b)) {
+        switch (f.op) {
+          case 'eq': return a === b;
+          case 'neq': return a !== b;
+          case 'gt': return a > b;
+          case 'gte': return a >= b;
+          case 'lt': return a < b;
+          case 'lte': return a <= b;
+        }
+      }
+      switch (f.op) {
+        case 'eq': return val === String(f.value ?? '');
+        case 'neq': return val !== String(f.value ?? '');
+        case 'gt': return val > String(f.value ?? '');
+        case 'gte': return val >= String(f.value ?? '');
+        case 'lt': return val < String(f.value ?? '');
+        case 'lte': return val <= String(f.value ?? '');
+      }
+      return true;
+    }
+  }
 }
 
 export function formatValue(value: number, format: NumberFormat): string {

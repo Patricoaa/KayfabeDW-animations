@@ -8,6 +8,14 @@ export type LegendPosition = 'top' | 'right' | 'bottom';
 
 export type GroupMode = 'grouped' | 'stacked';
 
+export type ChartFilterOp = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'is_empty' | 'is_not_empty';
+
+export type ChartFilter = {
+  column: string;
+  op: ChartFilterOp;
+  value?: string;
+};
+
 export type ChartConfig = {
   type: ChartType;
   title?: string;
@@ -37,6 +45,8 @@ export type ChartConfig = {
   showDataLabels?: boolean;
   groupMode?: GroupMode;
   aggregate?: 'sum' | 'avg' | 'count' | 'min' | 'max';
+  // Post-capture row filters applied on the captured dataset (step 2), not SQL.
+  filters?: ChartFilter[];
   configVersion?: number;
 };
 

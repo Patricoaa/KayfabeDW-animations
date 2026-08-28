@@ -9,9 +9,8 @@ type Props = {
 };
 
 export function BarChart({data, config}: Props) {
-  const xField = config.xField ?? '';
-  const yField = config.yField ?? '';
   const prepared = prepareSeries(data, config);
+  const horizontal = config.horizontal ?? false;
 
   if (prepared.items.length === 0) {
     return (
@@ -25,6 +24,72 @@ export function BarChart({data, config}: Props) {
   const width = 600;
   const height = 380;
   const margin = {top: 24, right: 24, bottom: 66, left: 66};
+  const numFmt = config.numberFormat ?? 'short';
+
+  if (horizontal) {
+    const plotW = width - margin.left - margin.right;
+    const plotH = height - margin.top - margin.bottom;
+    const n = prepared.items.length;
+    const barH = Math.min(40, (plotH / n) * 0.7);
+    const gap = (plotH - barH * n) / (n + 1);
+    const xTicks = 5;
+    const tickValues = Array.from({length: xTicks + 1}, (_, i) => (maxVal / xTicks) * i);
+
+    return (
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto">
+        {config.showGrid !== false && tickValues.map((v, i) => {
+          const x = margin.left + (v / maxVal) * plotW;
+          return (
+            <g key={i}>
+              <line x1={x} y1={margin.top} x2={x} y2={margin.top + plotH} stroke="#333" strokeWidth={1} />
+              <text x={x} y={margin.top + plotH + 14} textAnchor="middle" fill="#888" fontSize={10}>
+                {formatValue(v, numFmt)}
+              </text>
+            </g>
+          );
+        })}
+
+        {config.xLabel && (
+          <text x={width / 2} y={height - 6} textAnchor="middle" fill="#aaa" fontSize={11}>
+            {config.xLabel}
+          </text>
+        )}
+        {config.yLabel && (
+          <text x={14} y={height / 2} textAnchor="middle" fill="#aaa" fontSize={11} transform={`rotate(-90, 14, ${height / 2})`}>
+            {config.yLabel}
+          </text>
+        )}
+
+        {prepared.items.map((d, i) => {
+          const y = margin.top + gap + i * (barH + gap);
+          const barW = (d.value / maxVal) * plotW;
+          const color = d.color ?? pickColor(config.colors, i);
+          return (
+            <g key={i}>
+              <rect
+                x={margin.left}
+                y={y}
+                width={barW}
+                height={barH}
+                fill={color}
+                rx={4}
+                opacity={0.9}
+              />
+              {config.showDataLabels !== false && (
+                <text x={margin.left + barW + 6} y={y + barH / 2 + 3} textAnchor="start" fill="#ccc" fontSize={10}>
+                  {formatValue(d.value, numFmt)}
+                </text>
+              )}
+              <text x={margin.left - 8} y={y + barH / 2 + 3} textAnchor="end" fill="#888" fontSize={9}>
+                {d.label.length > 16 ? d.label.slice(0, 16) + '…' : d.label}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    );
+  }
+
   const plotW = width - margin.left - margin.right;
   const plotH = height - margin.top - margin.bottom;
   const n = prepared.items.length;
@@ -33,7 +98,6 @@ export function BarChart({data, config}: Props) {
 
   const yTicks = 5;
   const tickValues = Array.from({length: yTicks + 1}, (_, i) => (maxVal / yTicks) * i);
-  const numFmt = config.numberFormat ?? 'short';
   const labelAngle = config.labelAngle ?? (n > 8 ? -30 : 0);
 
   return (

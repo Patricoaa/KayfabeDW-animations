@@ -10,6 +10,7 @@ type Props = {
 
 export function AreaChart({data, config}: Props) {
   const prepared = prepareSeries(data, config);
+  const horizontal = config.horizontal ?? false;
 
   if (prepared.items.length === 0) {
     return (
@@ -27,6 +28,56 @@ export function AreaChart({data, config}: Props) {
   const plotH = height - margin.top - margin.bottom;
   const n = prepared.items.length;
 
+  const numFmt = config.numberFormat ?? 'short';
+  const color = config.colors?.[0] ?? '#6366f1';
+  const labelAngle = config.labelAngle ?? (n > 8 ? -30 : 0);
+
+  if (horizontal) {
+    // Values on the X axis, categories (index) on the vertical axis.
+    const toX = (v: number) => margin.left + (v / maxVal) * plotW;
+    const toY = (i: number) => margin.top + (i / Math.max(n - 1, 1)) * plotH;
+
+    const linePath = prepared.items.map((p, i) => `${i === 0 ? 'M' : 'L'} ${toX(p.value)} ${toY(i)}`).join(' ');
+    const areaPath = `${linePath} L ${toX(prepared.items[n - 1].value)} ${margin.top + plotH} L ${toX(prepared.items[0].value)} ${margin.top + plotH} Z`;
+
+    const xTicks = 5;
+    const tickValues = Array.from({length: xTicks + 1}, (_, i) => (maxVal / xTicks) * i);
+
+    return (
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto">
+        {config.showGrid !== false && tickValues.map((v, i) => {
+          const x = toX(v);
+          return (
+            <g key={i}>
+              <line x1={x} y1={margin.top} x2={x} y2={margin.top + plotH} stroke="#333" strokeWidth={1} />
+              <text x={x} y={margin.top + plotH + 14} textAnchor="middle" fill="#888" fontSize={10}>
+                {formatValue(v, numFmt)}
+              </text>
+            </g>
+          );
+        })}
+
+        {config.xLabel && (
+          <text x={width / 2} y={height - 6} textAnchor="middle" fill="#aaa" fontSize={11}>{config.xLabel}</text>
+        )}
+        {config.yLabel && (
+          <text x={14} y={height / 2} textAnchor="middle" fill="#aaa" fontSize={11} transform={`rotate(-90, 14, ${height / 2})`}>
+            {config.yLabel}
+          </text>
+        )}
+
+        <path d={areaPath} fill={color} opacity={0.25} />
+        <path d={linePath} fill="none" stroke={color} strokeWidth={2.5} strokeLinejoin="round" />
+
+        {prepared.items.map((p, i) => (
+          <text key={i} x={margin.left - 8} y={toY(i) + 3} textAnchor="end" fill="#888" fontSize={9}>
+            {p.label.length > 16 ? p.label.slice(0, 16) + '…' : p.label}
+          </text>
+        ))}
+      </svg>
+    );
+  }
+
   const toX = (i: number) => margin.left + (i / Math.max(n - 1, 1)) * plotW;
   const toY = (v: number) => margin.top + plotH - (v / maxVal) * plotH;
 
@@ -35,9 +86,6 @@ export function AreaChart({data, config}: Props) {
 
   const yTicks = 5;
   const tickValues = Array.from({length: yTicks + 1}, (_, i) => (maxVal / yTicks) * i);
-  const color = config.colors?.[0] ?? '#6366f1';
-  const numFmt = config.numberFormat ?? 'short';
-  const labelAngle = config.labelAngle ?? (n > 8 ? -30 : 0);
 
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto">

@@ -397,17 +397,17 @@ function CrossTablePanel({
       </div>
 
       <div>
-        <label className="text-micro font-semibold text-secondary mb-1 block font-display">LÍMITE</label>
+        <label className="text-micro font-semibold text-secondary mb-1 block font-display">CAPTURAR (MÁX. FILAS)</label>
         <input
           type="number"
           min={1}
           max={50000}
           value={spec.limit ?? ''}
           onChange={(e) => updateLimit(e.target.value === '' ? undefined : Number(e.target.value))}
-          placeholder="Sin límite (todo)"
+          placeholder="Todo"
           className="w-full bg-elevated border border-border-default rounded px-2 py-1 text-[10px] font-body focus:ring-1 focus:ring-amber-500"
         />
-        <p className="text-[9px] text-muted mt-0.5">Vacío = capturar todas las filas. Número = máximo a capturar.</p>
+        <p className="text-[9px] text-muted mt-0.5">Vacío = capturar todas las filas de la DB. Número = máximo a capturar.</p>
       </div>
 
       <div>

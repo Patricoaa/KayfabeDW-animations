@@ -2,7 +2,7 @@
 
 import React from 'react';
 import {BarChart3, PieChart, LineChart, AreaChart, ScatterChart, Table2} from 'lucide-react';
-import type {ChartConfig, ChartType, NumberFormat, SortBy, GroupMode} from '@/lib/chart-config';
+import type {ChartConfig, ChartType, NumberFormat, SortBy, ChartFilter, ChartFilterOp} from '@/lib/chart-config';
 
 type ChartConfigPanelProps = {
   config: ChartConfig;
@@ -34,8 +34,30 @@ const SORTS: {value: SortBy; label: string}[] = [
   {value: 'label', label: 'Etiqueta A→Z'},
 ];
 
+const FILTER_OPS: {value: ChartFilterOp; label: string}[] = [
+  {value: 'eq', label: '='},
+  {value: 'neq', label: '≠'},
+  {value: 'gt', label: '>'},
+  {value: 'gte', label: '≥'},
+  {value: 'lt', label: '<'},
+  {value: 'lte', label: '≤'},
+  {value: 'contains', label: 'contiene'},
+  {value: 'is_empty', label: 'vacío'},
+  {value: 'is_not_empty', label: 'no vacío'},
+];
+
 export function ChartConfigPanel({config, onChange, columns}: ChartConfigPanelProps) {
   const update = (patch: Partial<ChartConfig>) => onChange({...config, ...patch});
+  const updateFilter = (index: number, patch: Partial<ChartFilter>) => {
+    const next = [...(config.filters ?? [])];
+    next[index] = {...next[index], ...patch};
+    update({filters: next});
+  };
+  const updateFilterRemove = (index: number) => {
+    const next = [...(config.filters ?? [])];
+    next.splice(index, 1);
+    update({filters: next});
+  };
   const isSingleSeries = config.type === 'bar' || config.type === 'line' || config.type === 'area' || config.type === 'pie';
 
   return (
@@ -102,27 +124,67 @@ export function ChartConfigPanel({config, onChange, columns}: ChartConfigPanelPr
         </>
       )}
 
+      {/* Post-capture row filters (applied on the fetched dataset, not SQL) */}
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-sm font-medium block">Filtrar filas</label>
+          <button
+            onClick={() => {
+              const next = [...(config.filters ?? []), {column: columns[0] ?? '', op: 'eq' as ChartFilterOp, value: ''}];
+              update({filters: next});
+            }}
+            className="text-xs text-amber-500 hover:text-amber-400 font-medium"
+          >
+            + Agregar filtro
+          </button>
+        </div>
+        {(!config.filters || config.filters.length === 0) && (
+          <p className="text-[10px] text-muted">Filtra las filas ya capturadas en el paso 1 (no cambia tu query).</p>
+        )}
+        {(config.filters ?? []).map((f, i) => (
+          <div key={i} className="flex items-center gap-1 mb-1.5">
+            <select
+              value={f.column}
+              onChange={(e) => updateFilter(i, {column: e.target.value})}
+              className="flex-1 bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+            >
+              {columns.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+            <select
+              value={f.op}
+              onChange={(e) => updateFilter(i, {op: e.target.value as ChartFilterOp})}
+              className="bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+            >
+              {FILTER_OPS.map((op) => (
+                <option key={op.value} value={op.value}>{op.label}</option>
+              ))}
+            </select>
+            {f.op !== 'is_empty' && f.op !== 'is_not_empty' && (
+              <input
+                type="text"
+                value={f.value ?? ''}
+                onChange={(e) => updateFilter(i, {value: e.target.value})}
+                placeholder="valor"
+                className="w-24 bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+              />
+            )}
+            <button
+              onClick={() => updateFilterRemove(i)}
+              className="text-muted hover:text-red-500 px-1 text-xs"
+              aria-label="Eliminar filtro"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
+
       {/* Toggles */}
       {config.type === 'bar' || config.type === 'line' || config.type === 'area' ? (
         <Toggle label="Horizontal" checked={config.horizontal ?? false} onChange={(v) => update({horizontal: v})} />
       ) : null}
-      {config.type === 'bar' && (
-        <div className="grid grid-cols-2 gap-1">
-          {(['grouped', 'stacked'] as GroupMode[]).map((m) => (
-            <button
-              key={m}
-              onClick={() => update({groupMode: m})}
-              className={`px-2 py-1.5 rounded text-xs transition-colors ${
-                (config.groupMode ?? 'grouped') === m
-                  ? 'bg-amber-500 text-black'
-                  : 'bg-elevated text-secondary hover:bg-card-hover'
-              }`}
-            >
-              {m === 'grouped' ? 'Agrupado' : 'Apuñado'}
-            </button>
-          ))}
-        </div>
-      )}
       {(config.type === 'line' || config.type === 'area') && (
         <Toggle label="Curva suavizada" checked={config.lineSmooth ?? false} onChange={(v) => update({lineSmooth: v})} />
       )}
@@ -161,7 +223,7 @@ export function ChartConfigPanel({config, onChange, columns}: ChartConfigPanelPr
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium mb-1 block">Limitar filas</label>
+            <label className="text-sm font-medium mb-1 block">Filas del gráfico</label>
             <input
               type="number"
               min={1}
@@ -171,6 +233,7 @@ export function ChartConfigPanel({config, onChange, columns}: ChartConfigPanelPr
               placeholder="Sin límite"
               className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
             />
+            <p className="text-[10px] text-muted mt-0.5">Límite de presentación en el gráfico; no altera los datos capturados.</p>
           </div>
         </>
       )}
