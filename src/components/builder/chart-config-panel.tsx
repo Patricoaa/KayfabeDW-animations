@@ -94,6 +94,19 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
   const hasSeries = !!config.seriesField && (config.type === 'bar' || config.type === 'line' || config.type === 'area');
   const legendItems = config.legendItems ?? [];
 
+  const CANVAS_PRESETS: Record<string, {width: number; height: number}> = {
+    '600x380': {width: 600, height: 380},
+    '800x480': {width: 800, height: 480},
+    '600x600': {width: 600, height: 600},
+    '900x320': {width: 900, height: 320},
+  };
+  const canvasKey = `${config.width ?? 600}x${config.height ?? 380}`;
+  const presetKey = () => (CANVAS_PRESETS[canvasKey] ? canvasKey : 'custom');
+  const applyPreset = (key: string) => {
+    const p = CANVAS_PRESETS[key];
+    if (p) update({width: p.width, height: p.height});
+  };
+
   // Fan-out detection: when aggregating a field from a shallower (non-leaf)
   // table with a plain count/sum/avg, the result reflects the deepest table's
   // granularity. Warn and point to count_distinct as the fix.
@@ -522,6 +535,65 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
           <NumberInput label="Opacidad global" value={config.style?.globalOpacity} min={0.1} max={1} step={0.05} onChange={(v) => updateStyle({globalOpacity: v})} />
         </div>
       </div>
+
+      {/* Lienzo y ejes (cartesianos) */}
+      {config.type === 'bar' || config.type === 'line' || config.type === 'area' || config.type === 'scatter' ? (
+        <div className="pt-1 border-t border-border-subtle">
+          <label className="text-sm font-medium mb-2 block font-display">Lienzo y ejes</label>
+
+          {/* Canvas presets */}
+          <div className="mb-2">
+            <label className="text-sm font-medium mb-1 block">Tamaño del lienzo</label>
+            <select
+              value={presetKey()}
+              onChange={(e) => applyPreset(e.target.value)}
+              className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+            >
+              <option value="600x380">Estándar (600×380)</option>
+              <option value="800x480">Grande (800×480)</option>
+              <option value="600x600">Cuadrado (600×600)</option>
+              <option value="900x320">Panorámica (900×320)</option>
+              <option value="custom">Personalizado</option>
+            </select>
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <NumberInput label="Ancho" value={config.width} min={300} max={1600} step={20} onChange={(v) => update({width: v})} />
+              <NumberInput label="Alto" value={config.height} min={200} max={1000} step={20} onChange={(v) => update({height: v})} />
+            </div>
+          </div>
+
+          {/* Y axis */}
+          <Toggle label="Empezar en cero" checked={config.startAtZero ?? true} onChange={(v) => update({startAtZero: v})} />
+          <NumberInput label="Cantidad de divisiones (Y)" value={config.tickCount} min={2} max={12} onChange={(v) => update({tickCount: v})} />
+          <div className="grid grid-cols-2 gap-2">
+            <NumberInput label="Y mín." value={config.yMin} min={-1e9} max={1e9} onChange={(v) => update({yMin: v})} />
+            <NumberInput label="Y máx." value={config.yMax} min={-1e9} max={1e9} onChange={(v) => update({yMax: v})} />
+          </div>
+
+          {/* X axis (scatter) */}
+          {config.type === 'scatter' && (
+            <div className="grid grid-cols-2 gap-2">
+              <NumberInput label="X mín." value={config.xMin} min={-1e9} max={1e9} onChange={(v) => update({xMin: v})} />
+              <NumberInput label="X máx." value={config.xMax} min={-1e9} max={1e9} onChange={(v) => update({xMax: v})} />
+            </div>
+          )}
+
+          {/* Label angle */}
+          {(config.type === 'bar' || config.type === 'line' || config.type === 'area') && (
+            <div>
+              <label className="text-sm font-medium mb-1 block">Ángulo de etiquetas</label>
+              <input
+                type="range"
+                min={-90}
+                max={90}
+                value={config.labelAngle ?? 0}
+                onChange={(e) => update({labelAngle: Number(e.target.value)})}
+                className="w-full accent-amber-500"
+              />
+              <p className="text-[10px] text-muted text-right">{config.labelAngle ?? 0}°</p>
+            </div>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

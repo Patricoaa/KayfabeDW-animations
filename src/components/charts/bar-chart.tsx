@@ -1,7 +1,7 @@
 'use client';
 
 import type {ChartConfig} from '@/lib/chart-config';
-import {prepareSeries, prepareMultiSeries, formatValue, pickColor, resolveChartStyle, type PreparedMultiSeries} from '@/lib/chart-data';
+import {prepareSeries, prepareMultiSeries, formatValue, pickColor, resolveChartStyle, resolveYDomain, type PreparedMultiSeries} from '@/lib/chart-data';
 import {Legend} from './legend';
 
 type Props = {
@@ -30,22 +30,23 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const legendPosition = config.legendPosition ?? 'bottom';
   const labelAngle = config.labelAngle ?? (multi.categories.length > 8 ? -30 : 0);
 
-  const width = 600;
-  const height = 380;
+  const width = config.width ?? 600;
+  const height = config.height ?? 380;
   const margin = {top: 24, right: 24, bottom: 66, left: 66};
   const plotW = width - margin.left - margin.right;
   const plotH = height - margin.top - margin.bottom;
   const nCat = multi.categories.length;
   const nS = multi.series.length;
-  const maxVal = multi.max || 1;
+  const maxVal = Math.max(multi.max, 0) || 1;
+  const domain = resolveYDomain(0, maxVal, config);
+  const yRange = Math.max(domain.yMax - domain.yMin, 0.001);
   const catBand = plotW / Math.max(nCat, 1);
   const innerGap = 2;
   const barW = stacked
     ? Math.max(catBand * 0.7 - innerGap * 2, 2)
     : Math.max(Math.min(catBand * 0.7 / nS - innerGap, 46), 2);
 
-  const yTicks = 5;
-  const tickValues = Array.from({length: yTicks + 1}, (_, i) => (maxVal / yTicks) * i);
+  const tickValues = domain.ticks;
 
   const stackBase = stacked
     ? multi.categories.map((_, ci) => {
@@ -70,7 +71,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
         )}
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
           {config.showGrid !== false && tickValues.map((v, i) => {
-            const y = margin.top + plotH - (v / maxVal) * plotH;
+            const y = margin.top + plotH - ((v - domain.yMin) / yRange) * plotH;
             return (
               <g key={i}>
                 <line x1={margin.left} y1={y} x2={width - margin.right} y2={y} stroke={st.gridColor} strokeWidth={1} />
@@ -94,12 +95,12 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
             const bandX = margin.left + ci * catBand;
             return multi.series.map((s, si) => {
               const val = s.values[ci] ?? 0;
-              const h = Math.max((Math.abs(val) / maxVal) * plotH, 0);
+              const h = Math.max((Math.abs(val) / yRange) * plotH, 0);
               let x: number;
               let y: number;
               if (stacked) {
                 const base = stackBase![ci][si];
-                const baseH = (base / maxVal) * plotH;
+                const baseH = (base / yRange) * plotH;
                 x = bandX + catBand * 0.15;
                 y = margin.top + plotH - baseH - h;
               } else {
@@ -153,24 +154,25 @@ function SingleBar({data, config}: Props) {
   const st = resolveChartStyle(config.style);
   const horizontal = config.horizontal ?? false;
   const numFmt = config.numberFormat ?? 'short';
-  const width = 600;
-  const height = 380;
+  const width = config.width ?? 600;
+  const height = config.height ?? 380;
   const margin = {top: 24, right: 24, bottom: 66, left: 66};
   const plotW = width - margin.left - margin.right;
   const plotH = height - margin.top - margin.bottom;
-  const maxVal = prepared.max || 1;
+  const maxVal = Math.max(prepared.max, 0) || 1;
+  const domain = resolveYDomain(0, maxVal, config);
+  const yRange = Math.max(domain.yMax - domain.yMin, 0.001);
   const n = prepared.items.length;
 
   if (horizontal) {
     const barH = Math.min(40, (plotH / n) * 0.7);
     const gap = (plotH - barH * n) / (n + 1);
-    const xTicks = 5;
-    const tickValues = Array.from({length: xTicks + 1}, (_, i) => (maxVal / xTicks) * i);
+    const tickValues = domain.ticks;
 
     return (
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
         {config.showGrid !== false && tickValues.map((v, i) => {
-          const x = margin.left + (v / maxVal) * plotW;
+          const x = margin.left + ((v - domain.yMin) / yRange) * plotW;
           return (
             <g key={i}>
               <line x1={x} y1={margin.top} x2={x} y2={margin.top + plotH} stroke={st.gridColor} strokeWidth={1} />
@@ -186,7 +188,7 @@ function SingleBar({data, config}: Props) {
 
         {prepared.items.map((d, i) => {
           const y = margin.top + gap + i * (barH + gap);
-          const barW = (d.value / maxVal) * plotW;
+          const barW = ((d.value - domain.yMin) / yRange) * plotW;
           const color = d.color ?? pickColor(config.colors, i);
           return (
             <g key={i}>
@@ -209,14 +211,13 @@ function SingleBar({data, config}: Props) {
   const barWidth = Math.min(60, (plotW / n) * 0.7);
   const gap = (plotW - barWidth * n) / (n + 1);
 
-  const yTicks = 5;
-  const tickValues = Array.from({length: yTicks + 1}, (_, i) => (maxVal / yTicks) * i);
+  const tickValues = domain.ticks;
   const labelAngle = config.labelAngle ?? (n > 8 ? -30 : 0);
 
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
       {config.showGrid !== false && tickValues.map((v, i) => {
-        const y = margin.top + plotH - (v / maxVal) * plotH;
+        const y = margin.top + plotH - ((v - domain.yMin) / yRange) * plotH;
         return (
           <g key={i}>
             <line x1={margin.left} y1={y} x2={width - margin.right} y2={y} stroke={st.gridColor} strokeWidth={1} />
@@ -232,7 +233,7 @@ function SingleBar({data, config}: Props) {
 
       {prepared.items.map((d, i) => {
         const x = margin.left + gap + i * (barWidth + gap);
-        const barH = (d.value / maxVal) * plotH;
+        const barH = ((d.value - domain.yMin) / yRange) * plotH;
         const color = d.color ?? pickColor(config.colors, i);
         return (
           <g key={i}>

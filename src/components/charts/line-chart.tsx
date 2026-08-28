@@ -1,7 +1,7 @@
 'use client';
 
 import type {ChartConfig} from '@/lib/chart-config';
-import {prepareSeries, prepareMultiSeries, formatValue, resolveChartStyle, type PreparedMultiSeries} from '@/lib/chart-data';
+import {prepareSeries, prepareMultiSeries, formatValue, resolveChartStyle, resolveYDomain, type PreparedMultiSeries} from '@/lib/chart-data';
 import {Legend} from './legend';
 
 type Props = {
@@ -22,13 +22,15 @@ export function LineChart({data, config}: Props) {
 
 function MultiLine({multi, config}: {multi: PreparedMultiSeries; config: ChartConfig}) {
   const st = resolveChartStyle(config.style);
-  const width = 600;
-  const height = 380;
+  const width = config.width ?? 600;
+  const height = config.height ?? 380;
   const margin = {top: 24, right: 24, bottom: 66, left: 66};
   const plotW = width - margin.left - margin.right;
   const plotH = height - margin.top - margin.bottom;
   const n = multi.categories.length;
   const maxVal = multi.max || 1;
+  const domain = resolveYDomain(0, maxVal, config);
+  const yRange = Math.max(domain.yMax - domain.yMin, 0.001);
   const numFmt = config.numberFormat ?? 'short';
   const labelAngle = config.labelAngle ?? (n > 8 ? -30 : 0);
   const showMarkers = config.showMarkers ?? true;
@@ -37,10 +39,9 @@ function MultiLine({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
   const smooth = config.lineSmooth ?? false;
 
   const toX = (i: number) => margin.left + (i / Math.max(n - 1, 1)) * plotW;
-  const toY = (v: number) => margin.top + plotH - (v / maxVal) * plotH;
+  const toY = (v: number) => margin.top + plotH - ((v - domain.yMin) / yRange) * plotH;
 
-  const yTicks = 5;
-  const tickValues = Array.from({length: yTicks + 1}, (_, i) => (maxVal / yTicks) * i);
+  const tickValues = domain.ticks;
   const seriesPaths = multi.series.map((s) => {
     const pts = s.values.map((v, i) => ({x: toX(i), y: toY(v)}));
     return {
@@ -102,13 +103,15 @@ function MultiLine({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
 function SingleLine({data, config}: Props) {
   const prepared = prepareSeries(data, config);
   const st = resolveChartStyle(config.style);
-  const width = 600;
-  const height = 380;
+  const width = config.width ?? 600;
+  const height = config.height ?? 380;
   const margin = {top: 24, right: 24, bottom: 66, left: 66};
   const plotW = width - margin.left - margin.right;
   const plotH = height - margin.top - margin.bottom;
   const n = prepared.items.length;
   const maxVal = prepared.max || 1;
+  const domain = resolveYDomain(0, maxVal, config);
+  const yRange = Math.max(domain.yMax - domain.yMin, 0.001);
   const numFmt = config.numberFormat ?? 'short';
   const color = config.colors?.[0] ?? '#6366f1';
   const labelAngle = config.labelAngle ?? (n > 8 ? -30 : 0);
@@ -120,9 +123,8 @@ function SingleLine({data, config}: Props) {
   }
 
   const toX = (i: number) => margin.left + (i / Math.max(n - 1, 1)) * plotW;
-  const toY = (v: number) => margin.top + plotH - (v / maxVal) * plotH;
-  const yTicks = 5;
-  const tickValues = Array.from({length: yTicks + 1}, (_, i) => (maxVal / yTicks) * i);
+  const toY = (v: number) => margin.top + plotH - ((v - domain.yMin) / yRange) * plotH;
+  const tickValues = domain.ticks;
   const pts = prepared.items.map((p, i) => ({x: toX(i), y: toY(p.value)}));
   const path = (smooth ? buildSmoothPath : buildLinearPath)(pts);
 

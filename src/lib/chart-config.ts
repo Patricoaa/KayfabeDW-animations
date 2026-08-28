@@ -99,6 +99,13 @@ export type ChartConfig = {
   lineDash?: boolean;          // line/area: línea discontinua
   tableSearch?: string;        // table: filtro por texto
   stickyHeader?: boolean;      // table: encabezado fijo
+  // F4: lienzo y ejes (bart/line/area/scatter).
+  tickCount?: number;          // cantidad de líneas de división en Y
+  startAtZero?: boolean;       // forzar Y a partir de 0
+  yMin?: number;
+  yMax?: number;
+  xMin?: number;
+  xMax?: number;
   // Post-capture row filters applied on the captured dataset (step 2), not SQL.
   filters?: ChartFilter[];
   // Table-chart specific controls. `tableColumns` limits which dataset columns
@@ -110,7 +117,7 @@ export type ChartConfig = {
   configVersion?: number;
 };
 
-export const CHART_CONFIG_VERSION = 6;
+export const CHART_CONFIG_VERSION = 7;
 
 export const DEFAULT_CHART_CONFIG: ChartConfig = {
   type: 'bar',

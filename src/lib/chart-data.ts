@@ -213,6 +213,52 @@ export function resolveChartStyle(style?: ChartStyle): ResolvedChartStyle {
   };
 }
 
+export type ResolvedYDomain = {
+  yMin: number;
+  yMax: number;
+  ticks: number[];
+};
+
+function niceStep(raw: number): number {
+  if (!isFinite(raw) || raw <= 0) return 1;
+  const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+  const frac = raw / pow;
+  let step: number;
+  if (frac < 1.5) step = 1;
+  else if (frac < 3) step = 2;
+  else if (frac < 7) step = 5;
+  else step = 10;
+  return step * pow;
+}
+
+// Resolves the Y domain and its tick values from the raw data min/max plus the
+// optional axis overrides (yMin/yMax, startAtZero, tickCount).
+export function resolveYDomain(dataMin: number, dataMax: number, config: ChartConfig): ResolvedYDomain {
+  return resolveAxis(dataMin, dataMax, config, config.yMin, config.yMax);
+}
+
+// X-axis variant honoring xMin/xMax instead of yMin/yMax (scatter).
+export function resolveXDomain(dataMin: number, dataMax: number, config: ChartConfig): ResolvedYDomain {
+  return resolveAxis(dataMin, dataMax, config, config.xMin, config.xMax);
+}
+
+function resolveAxis(dataMin: number, dataMax: number, config: ChartConfig, minOv?: number, maxOv?: number): ResolvedYDomain {
+  const startAtZero = config.startAtZero ?? true;
+  let rawMin = startAtZero ? Math.min(0, dataMin) : dataMin;
+  let rawMax = dataMax > rawMin ? dataMax : rawMin + 1;
+  if (maxOv !== undefined) rawMax = maxOv;
+  if (minOv !== undefined) rawMin = minOv;
+  const rawStep = (rawMax - rawMin) / Math.max(2, config.tickCount ?? 5);
+  const step = niceStep(rawStep);
+  const yMin = Math.floor(rawMin / step) * step;
+  const yMax = Math.ceil(rawMax / step) * step;
+  const ticks: number[] = [];
+  for (let v = yMin; v <= yMax + step / 2; v += step) {
+    ticks.push(Math.round(v * 1e6) / 1e6);
+  }
+  return {yMin, yMax, ticks};
+}
+
 /**
  * Prepares a series from raw rows for a single-series chart.
  * - Picks x/y fields (falling back to auto-detection)

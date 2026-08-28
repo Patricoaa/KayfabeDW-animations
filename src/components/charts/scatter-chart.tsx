@@ -1,7 +1,7 @@
 'use client';
 
 import type {ChartConfig} from '@/lib/chart-config';
-import {formatValue, resolveChartStyle, pickColor} from '@/lib/chart-data';
+import {formatValue, resolveChartStyle, resolveYDomain, resolveXDomain, pickColor} from '@/lib/chart-data';
 
 type Props = {
   data: Record<string, unknown>[];
@@ -29,16 +29,21 @@ export function ScatterChart({data, config}: Props) {
     );
   }
 
-  const maxX = Math.max(...points.map((d) => d.x), 1);
-  const maxY = Math.max(...points.map((d) => d.y), 1);
-  const width = 600;
-  const height = 380;
+  const width = config.width ?? 600;
+  const height = config.height ?? 380;
   const margin = {top: 24, right: 24, bottom: 66, left: 66};
   const plotW = width - margin.left - margin.right;
   const plotH = height - margin.top - margin.bottom;
 
-  const toX = (v: number) => margin.left + (v / maxX) * plotW;
-  const toY = (v: number) => margin.top + plotH - (v / maxY) * plotH;
+  const dataMaxX = Math.max(...points.map((d) => d.x), 1);
+  const dataMaxY = Math.max(...points.map((d) => d.y), 1);
+  const xDom = resolveXDomain(0, dataMaxX, config);
+  const yDom = resolveYDomain(0, dataMaxY, config);
+  const xRange = Math.max(xDom.yMax - xDom.yMin, 0.001);
+  const yRange = Math.max(yDom.yMax - yDom.yMin, 0.001);
+
+  const toX = (v: number) => margin.left + ((v - xDom.yMin) / xRange) * plotW;
+  const toY = (v: number) => margin.top + plotH - ((v - yDom.yMin) / yRange) * plotH;
 
   const numFmt = config.numberFormat ?? 'short';
   const xLabel = config.xLabel ?? xField;
@@ -69,22 +74,30 @@ export function ScatterChart({data, config}: Props) {
     if (denom !== 0) {
       const slope = (n * sxy - sx * sy) / denom;
       const intercept = (sy - slope * sx) / n;
-      const x0 = 0;
-      const x1 = maxX;
-      trendPath = `M ${toX(x0)} ${toY(slope * x0 + intercept)} L ${toX(x1)} ${toY(slope * x1 + intercept)}`;
+      trendPath = `M ${toX(xDom.yMin)} ${toY(slope * xDom.yMin + intercept)} L ${toX(xDom.yMax)} ${toY(slope * xDom.yMax + intercept)}`;
     }
   }
 
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
-      {config.showGrid !== false && [0, 0.25, 0.5, 0.75, 1].map((frac, i) => (
-        <g key={i}>
-          <line x1={toX(frac * maxX)} y1={margin.top} x2={toX(frac * maxX)} y2={margin.top + plotH} stroke={st.gridColor} strokeWidth={1} />
-          <line x1={margin.left} y1={toY(frac * maxY)} x2={margin.left + plotW} y2={toY(frac * maxY)} stroke={st.gridColor} strokeWidth={1} />
-        </g>
-      ))}
-      <text x={margin.left - 8} y={margin.top + 4} textAnchor="end" fill={st.textColor} fontSize={10}>{formatValue(maxY, numFmt)}</text>
-      <text x={margin.left + plotW} y={margin.top + plotH + 4} textAnchor="middle" fill={st.textColor} fontSize={10}>{formatValue(maxX, numFmt)}</text>
+      {config.showGrid !== false && yDom.ticks.map((v, i) => {
+        const y = toY(v);
+        return (
+          <g key={`y-${i}`}>
+            <line x1={margin.left} y1={y} x2={margin.left + plotW} y2={y} stroke={st.gridColor} strokeWidth={1} />
+            <text x={margin.left - 8} y={y + 4} textAnchor="end" fill={st.textColor} fontSize={10}>{formatValue(v, numFmt)}</text>
+          </g>
+        );
+      })}
+      {config.showGrid !== false && xDom.ticks.map((v, i) => {
+        const x = toX(v);
+        return (
+          <g key={`x-${i}`}>
+            <line x1={x} y1={margin.top} x2={x} y2={margin.top + plotH} stroke={st.gridColor} strokeWidth={1} />
+            <text x={x} y={margin.top + plotH + 14} textAnchor="middle" fill={st.textColor} fontSize={10}>{formatValue(v, numFmt)}</text>
+          </g>
+        );
+      })}
 
       {trendPath && (
         <path d={trendPath} fill="none" stroke={st.axisColor} strokeWidth={1.5} strokeDasharray="5 4" opacity={st.pointOpacity} />
