@@ -231,6 +231,123 @@ export type CanonicalSeries = {
   color: string;
 };
 
+export type MultiSeriesDatum = {
+  name: string;
+  values: number[];
+  color: string;
+};
+
+export type PreparedMultiSeries = {
+  categories: string[];
+  series: MultiSeriesDatum[];
+  max: number;
+  categoryTotals: number[];
+};
+
+const AGGREGATES = ['sum', 'avg', 'count', 'min', 'max', 'count_distinct'] as const;
+type AggregateFn = typeof AGGREGATES[number];
+
+function reduceVals(vals: number[], agg?: AggregateFn): number {
+  if (vals.length === 0) return 0;
+  switch (agg) {
+    case 'avg':
+      return vals.reduce((a, b) => a + b, 0) / vals.length;
+    case 'max':
+      return Math.max(...vals);
+    case 'min':
+      return Math.min(...vals);
+    case 'count':
+      return vals.length;
+    case 'count_distinct':
+      return new Set(vals).size;
+    case 'sum':
+    default:
+      return vals.reduce((a, b) => a + b, 0);
+  }
+}
+
+/**
+ * Prepares a multi-series dataset from raw rows (static builder charts only).
+ * Groups rows by `config.seriesField` into named series; categories come from
+ * `config.xField`. Leaves `prepareSeries`/`toSeries` untouched so the animated
+ * (Remotion) templates keep their single-series behavior.
+ *
+ * When no seriesField is set, produces a single series (a flat category->value
+ * mapping), matching the legacy single-series rendering. LegendItem overrides
+ * map by series label to re-color individual series.
+ */
+export function prepareMultiSeries(
+  data: Record<string, unknown>[],
+  config: ChartConfig,
+): PreparedMultiSeries {
+  const rows = data ?? [];
+  const empty: PreparedMultiSeries = {categories: [], series: [], max: 0, categoryTotals: []};
+  if (rows.length === 0) return empty;
+
+  let xField = config.xField;
+  let yField = config.yField;
+  const seriesField = config.seriesField;
+  if (!xField || !rows[0] || !(xField in rows[0])) xField = pickAutoField(rows[0], 'category');
+  if (!yField || !rows[0] || !(yField in rows[0])) yField = pickAutoField(rows[0], 'value');
+  if (!xField) xField = Object.keys(rows[0])[0] ?? '';
+  if (!yField) yField = Object.keys(rows[0])[1] ?? xField;
+
+  const categories: string[] = [];
+  const catIndex = new Map<string, number>();
+  const cellVals = new Map<string, number[]>();
+  const seriesOrder: string[] = [];
+
+  const cellKey = (seriesName: string, cat: string) => `${seriesName}\u0000${cat}`;
+
+  for (const row of rows) {
+    const cat = String(row[xField] ?? '');
+    const val = Number(row[yField] ?? 0);
+    if (isNaN(val)) continue;
+    if (!catIndex.has(cat)) {
+      catIndex.set(cat, categories.length);
+      categories.push(cat);
+    }
+    let seriesName: string;
+    if (seriesField) {
+      const raw = row[seriesField];
+      seriesName = raw === null || raw === undefined || String(raw) === '' ? '(vacío)' : String(raw);
+    } else {
+      seriesName = config.title || 'Serie';
+    }
+    if (!seriesOrder.includes(seriesName)) seriesOrder.push(seriesName);
+    const key = cellKey(seriesName, cat);
+    if (!cellVals.has(key)) cellVals.set(key, []);
+    cellVals.get(key)!.push(val);
+  }
+
+  const agg = config.aggregate as AggregateFn | undefined;
+  const legendColors = new Map<string, string>();
+  for (const li of config.legendItems ?? []) {
+    if (li && typeof li.label === 'string' && li.color) legendColors.set(li.label, li.color);
+  }
+
+  const series: MultiSeriesDatum[] = seriesOrder.map((name, i) => ({
+    name,
+    values: categories.map((cat) => reduceVals(cellVals.get(cellKey(name, cat)) ?? [], agg)),
+    color: legendColors.get(name) ?? pickColor(config.colors, i),
+  }));
+
+  const categoryTotals = categories.map((_, ci) =>
+    series.reduce((s, se) => s + (se.values[ci] ?? 0), 0),
+  );
+
+  return {
+    categories,
+    series,
+    max: Math.max(
+      ...series.flatMap((s) => s.values),
+      ...categoryTotals,
+      0,
+    ),
+    categoryTotals,
+  };
+}
+
 export function toSeries(prepared: PreparedData): CanonicalSeries[] {
   return prepared.items.map((item) => ({
     label: item.label,

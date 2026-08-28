@@ -45,6 +45,12 @@ export type ChartConfig = {
   showDataLabels?: boolean;
   groupMode?: GroupMode;
   aggregate?: 'sum' | 'avg' | 'count' | 'min' | 'max' | 'count_distinct';
+  // F1: multi-series. `seriesField` groups rows into named series (grouped by
+  // xField category); when unset the chart renders a single series using
+  // yField. `legendItems` overrides the per-series colors shown in the legend.
+  seriesField?: string;
+  legendItems?: {label: string; color: string}[];
+  showMarkers?: boolean;
   // Post-capture row filters applied on the captured dataset (step 2), not SQL.
   filters?: ChartFilter[];
   // Table-chart specific controls. `tableColumns` limits which dataset columns
@@ -56,7 +62,7 @@ export type ChartConfig = {
   configVersion?: number;
 };
 
-export const CHART_CONFIG_VERSION = 3;
+export const CHART_CONFIG_VERSION = 4;
 
 export const DEFAULT_CHART_CONFIG: ChartConfig = {
   type: 'bar',
@@ -79,6 +85,7 @@ export const DEFAULT_CHART_CONFIG: ChartConfig = {
   labelAngle: 0,
   lineSmooth: false,
   showDataLabels: true,
+  showMarkers: true,
   groupMode: 'grouped',
   configVersion: CHART_CONFIG_VERSION,
 };

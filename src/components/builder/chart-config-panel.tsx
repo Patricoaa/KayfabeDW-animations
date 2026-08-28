@@ -2,7 +2,7 @@
 
 import React from 'react';
 import {BarChart3, PieChart, LineChart, AreaChart, ScatterChart, Table2} from 'lucide-react';
-import type {ChartConfig, ChartType, NumberFormat, SortBy, ChartFilter, ChartFilterOp} from '@/lib/chart-config';
+import type {ChartConfig, ChartType, NumberFormat, SortBy, ChartFilter, ChartFilterOp, LegendPosition} from '@/lib/chart-config';
 
 // Metadata for a selected column available to the axis selectors: its alias
 // (the value used as a row key), its origin table, the bare column name, and
@@ -134,6 +134,14 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
             <>
               <FieldSelect label="Eje X / Categoría" value={config.xField ?? ''} options={fieldMeta} fallback={columns} onChange={(v) => update({xField: v})} />
               <FieldSelect label="Eje Y / Valor" value={config.yField ?? ''} options={fieldMeta} fallback={columns} role="numeric" onChange={(v) => update({yField: v})} />
+              <FieldSelect
+                label="Serie (opcional)"
+                value={config.seriesField ?? ''}
+                options={fieldMeta}
+                fallback={columns}
+                onChange={(v) => update({seriesField: v || undefined})}
+                optional
+              />
             </>
           )}
           {config.type === 'table' && (
@@ -226,6 +234,49 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
       {(config.type === 'line' || config.type === 'area') && (
         <Toggle label="Curva suavizada" checked={config.lineSmooth ?? false} onChange={(v) => update({lineSmooth: v})} />
       )}
+      {config.type === 'bar' && (
+        <div>
+          <label className="text-sm font-medium mb-1 block">Modo de barras</label>
+          <div className="flex gap-1">
+            {[
+              {value: 'grouped' as const, label: 'Agrupadas'},
+              {value: 'stacked' as const, label: 'Apiladas'},
+            ].map((m) => (
+              <button
+                key={m.value}
+                onClick={() => update({groupMode: m.value})}
+                className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                  (config.groupMode ?? 'grouped') === m.value
+                    ? 'bg-amber-500 text-black'
+                    : 'bg-elevated text-secondary hover:bg-card-hover'
+                }`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {config.type === 'bar' || config.type === 'line' || config.type === 'area' ? (
+        <>
+          <Toggle label="Mostrar leyenda" checked={config.showLegend ?? true} onChange={(v) => update({showLegend: v})} />
+          <div>
+            <label className="text-sm font-medium mb-1 block">Posición de leyenda</label>
+            <select
+              value={config.legendPosition ?? 'bottom'}
+              onChange={(e) => update({legendPosition: e.target.value as LegendPosition})}
+              className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+            >
+              <option value="top">Arriba</option>
+              <option value="bottom">Abajo</option>
+              <option value="right">Derecha</option>
+            </select>
+          </div>
+        </>
+      ) : null}
+      {config.type === 'line' || config.type === 'area' ? (
+        <Toggle label="Mostrar puntos" checked={config.showMarkers ?? true} onChange={(v) => update({showMarkers: v})} />
+      ) : null}
       {config.type !== 'table' && <Toggle label="Mostrar grid" checked={config.showGrid ?? true} onChange={(v) => update({showGrid: v})} />}
       {config.type !== 'table' && <Toggle label="Mostrar etiquetas de datos" checked={config.showDataLabels ?? true} onChange={(v) => update({showDataLabels: v})} />}
 
