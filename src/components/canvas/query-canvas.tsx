@@ -593,7 +593,13 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
         position,
         data: {
           table,
-          selectedColumns: table.columns.slice(0, 3).map((c) => c.name),
+          // Start with no columns selected: users explicitly choose the fields
+          // they want. Previously we auto-selected the first 3 columns, which
+          // dragged join keys and PKs (e.g. wrestler.id, match_participant.match_id)
+          // into the SELECT and forced "must appear in GROUP BY" errors (and, as
+          // non-aggregated columns, silently-wrong grouping). Explicit selection
+          // keeps the generated query minimal and correct.
+          selectedColumns: [],
           onToggleColumn: handleToggleColumn,
           onDeleteTable: handleDeleteTable,
           primary: !specRef.current.table,
