@@ -8,6 +8,9 @@ export type LegendPosition = 'top' | 'right' | 'bottom';
 
 export type GroupMode = 'grouped' | 'stacked';
 
+export type AvatarShape = 'circle' | 'rounded';
+export type AvatarPosition = 'above' | 'beside-label' | 'replace-label' | 'bar-end';
+
 export type ChartFilterOp = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'is_empty' | 'is_not_empty';
 
 export type ChartFilter = {
@@ -114,10 +117,18 @@ export type ChartConfig = {
   tableColumns?: string[];
   tableLimit?: number;
   tableSort?: {column: string; direction: 'asc' | 'desc'};
+  // F5: bar-chart avatars. When `avatarField` is set (an optional dataset column
+  // holding absolute image URLs), each single-series bar renders that image.
+  // Shape/radius/size/position are highly customizable.
+  avatarField?: string;
+  avatarShape?: AvatarShape;
+  avatarRadius?: number;
+  avatarSize?: number;
+  avatarPosition?: AvatarPosition;
   configVersion?: number;
 };
 
-export const CHART_CONFIG_VERSION = 7;
+export const CHART_CONFIG_VERSION = 8;
 
 export const DEFAULT_CHART_CONFIG: ChartConfig = {
   type: 'bar',
@@ -142,6 +153,10 @@ export const DEFAULT_CHART_CONFIG: ChartConfig = {
   showDataLabels: true,
   showMarkers: true,
   groupMode: 'grouped',
+  avatarShape: 'circle',
+  avatarRadius: 6,
+  avatarSize: 24,
+  avatarPosition: 'above',
   configVersion: CHART_CONFIG_VERSION,
 };
 

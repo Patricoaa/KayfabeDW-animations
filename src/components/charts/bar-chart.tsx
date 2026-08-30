@@ -164,19 +164,71 @@ function SingleBar({data, config}: Props) {
   const yRange = Math.max(domain.yMax - domain.yMin, 0.001);
   const n = prepared.items.length;
 
+  // Avatars: enabled when a source image column is selected (single series).
+  const avatarField = config.avatarField;
+  const avatarActive = !!avatarField;
+  const avatarSize = config.avatarSize ?? 24;
+  const avatarShape = config.avatarShape ?? 'circle';
+  const avatarRadius = config.avatarRadius ?? 6;
+  const avatarPos = config.avatarPosition ?? 'above';
+
+  const marginAdj = {...margin};
+  if (avatarActive) {
+    if (!horizontal && avatarPos === 'above') marginAdj.top += avatarSize + 10;
+    if (horizontal && avatarPos === 'bar-end') marginAdj.right += avatarSize + 14;
+  }
+  const plotW2 = width - marginAdj.left - marginAdj.right;
+  const plotH2 = height - marginAdj.top - marginAdj.bottom;
+
+  // Returns a valid image URL from the row, or null when missing/invalid.
+  const avatarUrl = (raw?: Record<string, unknown>): string | null => {
+    if (!avatarField) return null;
+    const v = raw?.[avatarField];
+    if (typeof v !== 'string') return null;
+    const t = v.trim();
+    if (t === '') return null;
+    if (t.startsWith('http://') || t.startsWith('https://') || t.startsWith('data:image/') || t.startsWith('/')) return t;
+    return null;
+  };
+
+  const Avatar = ({href, cx, cy, clipId}: {href: string; cx: number; cy: number; clipId: string}) => {
+    return (
+      <g>
+        <defs>
+          <clipPath id={clipId}>
+            {avatarShape === 'circle' ? (
+              <circle cx={cx} cy={cy} r={avatarSize / 2} />
+            ) : (
+              <rect x={cx - avatarSize / 2} y={cy - avatarSize / 2} width={avatarSize} height={avatarSize} rx={avatarRadius} />
+            )}
+          </clipPath>
+        </defs>
+        <image
+          href={href}
+          x={cx - avatarSize / 2}
+          y={cy - avatarSize / 2}
+          width={avatarSize}
+          height={avatarSize}
+          preserveAspectRatio="xMidYMid slice"
+          clipPath={`url(#${clipId})`}
+        />
+      </g>
+    );
+  };
+
   if (horizontal) {
-    const barH = Math.min(40, (plotH / n) * 0.7);
-    const gap = (plotH - barH * n) / (n + 1);
+    const barH = Math.min(40, (plotH2 / n) * 0.7);
+    const gap = (plotH2 - barH * n) / (n + 1);
     const tickValues = domain.ticks;
 
     return (
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
         {config.showGrid !== false && tickValues.map((v, i) => {
-          const x = margin.left + ((v - domain.yMin) / yRange) * plotW;
+          const x = marginAdj.left + ((v - domain.yMin) / yRange) * plotW2;
           return (
             <g key={i}>
-              <line x1={x} y1={margin.top} x2={x} y2={margin.top + plotH} stroke={st.gridColor} strokeWidth={1} />
-              <text x={x} y={margin.top + plotH + 14} textAnchor="middle" fill={st.textColor} fontSize={10}>
+              <line x1={x} y1={marginAdj.top} x2={x} y2={marginAdj.top + plotH2} stroke={st.gridColor} strokeWidth={1} />
+              <text x={x} y={marginAdj.top + plotH2 + 14} textAnchor="middle" fill={st.textColor} fontSize={10}>
                 {formatValue(v, numFmt)}
               </text>
             </g>
@@ -187,20 +239,35 @@ function SingleBar({data, config}: Props) {
         {config.yLabel && <text x={14} y={height / 2} textAnchor="middle" fill={st.axisColor} fontSize={11} transform={`rotate(-90, 14, ${height / 2})`}>{config.yLabel}</text>}
 
         {prepared.items.map((d, i) => {
-          const y = margin.top + gap + i * (barH + gap);
-          const barW = ((d.value - domain.yMin) / yRange) * plotW;
+          const y = marginAdj.top + gap + i * (barH + gap);
+          const barW = ((d.value - domain.yMin) / yRange) * plotW2;
           const color = d.color ?? pickColor(config.colors, i);
+          const img = avatarUrl(d.raw);
+          const labelX = avatarActive && avatarPos === 'beside-label' && img
+            ? marginAdj.left - 8 - avatarSize - 6
+            : marginAdj.left - 8;
           return (
             <g key={i}>
-              <rect x={margin.left} y={y} width={Math.max(barW, 0)} height={barH} fill={color} rx={4} opacity={st.globalOpacity} />
+              <rect x={marginAdj.left} y={y} width={Math.max(barW, 0)} height={barH} fill={color} rx={4} opacity={st.globalOpacity} />
               {config.showDataLabels !== false && (
-                <text x={margin.left + barW + 6} y={y + barH / 2 + 3} textAnchor="start" fill="#ccc" fontSize={10}>
+                <text x={marginAdj.left + barW + 6} y={y + barH / 2 + 3} textAnchor="start" fill="#ccc" fontSize={10}>
                   {formatValue(d.value, numFmt)}
                 </text>
               )}
-              <text x={margin.left - 8} y={y + barH / 2 + 3} textAnchor="end" fill={st.textColor} fontSize={st.labelFontSize}>
-                {d.label.length > 16 ? d.label.slice(0, 16) + '…' : d.label}
-              </text>
+              {img && avatarPos === 'bar-end' && (
+                <Avatar href={img} cx={marginAdj.left + Math.max(barW, 0) + (config.showDataLabels !== false ? 52 : 10) + avatarSize / 2} cy={y + barH / 2} clipId={`bh-av-${i}`} />
+              )}
+              {img && avatarPos === 'beside-label' && (
+                <Avatar href={img} cx={marginAdj.left - 8 - avatarSize / 2} cy={y + barH / 2} clipId={`bh-av-${i}`} />
+              )}
+              {img && avatarPos === 'replace-label' && (
+                <Avatar href={img} cx={marginAdj.left - 8 - avatarSize / 2} cy={y + barH / 2} clipId={`bh-av-${i}`} />
+              )}
+              {!(avatarActive && avatarPos === 'replace-label' && img) && (
+                <text x={labelX} y={y + barH / 2 + 3} textAnchor="end" fill={st.textColor} fontSize={st.labelFontSize}>
+                  {d.label.length > 16 ? d.label.slice(0, 16) + '…' : d.label}
+                </text>
+              )}
             </g>
           );
         })}
@@ -208,8 +275,8 @@ function SingleBar({data, config}: Props) {
     );
   }
 
-  const barWidth = Math.min(60, (plotW / n) * 0.7);
-  const gap = (plotW - barWidth * n) / (n + 1);
+  const barWidth = Math.min(60, (plotW2 / n) * 0.7);
+  const gap = (plotW2 - barWidth * n) / (n + 1);
 
   const tickValues = domain.ticks;
   const labelAngle = config.labelAngle ?? (n > 8 ? -30 : 0);
@@ -217,11 +284,11 @@ function SingleBar({data, config}: Props) {
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
       {config.showGrid !== false && tickValues.map((v, i) => {
-        const y = margin.top + plotH - ((v - domain.yMin) / yRange) * plotH;
+        const y = marginAdj.top + plotH2 - ((v - domain.yMin) / yRange) * plotH2;
         return (
           <g key={i}>
-            <line x1={margin.left} y1={y} x2={width - margin.right} y2={y} stroke={st.gridColor} strokeWidth={1} />
-            <text x={margin.left - 8} y={y + 4} textAnchor="end" fill={st.textColor} fontSize={10}>
+            <line x1={marginAdj.left} y1={y} x2={width - marginAdj.right} y2={y} stroke={st.gridColor} strokeWidth={1} />
+            <text x={marginAdj.left - 8} y={y + 4} textAnchor="end" fill={st.textColor} fontSize={10}>
               {formatValue(v, numFmt)}
             </text>
           </g>
@@ -232,27 +299,47 @@ function SingleBar({data, config}: Props) {
       {config.yLabel && <text x={16} y={height / 2} textAnchor="middle" fill={st.axisColor} fontSize={11} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text>}
 
       {prepared.items.map((d, i) => {
-        const x = margin.left + gap + i * (barWidth + gap);
-        const barH = ((d.value - domain.yMin) / yRange) * plotH;
+        const x = marginAdj.left + gap + i * (barWidth + gap);
+        const barH = ((d.value - domain.yMin) / yRange) * plotH2;
         const color = d.color ?? pickColor(config.colors, i);
+        const img = avatarUrl(d.raw);
+        const labelX = avatarActive && avatarPos === 'beside-label' && img
+          ? x + barWidth / 2 + avatarSize + 6
+          : x + barWidth / 2;
+        const labelY = height - marginAdj.bottom + 14;
+        const topY = marginAdj.top + plotH2 - barH;
         return (
           <g key={i}>
-            <rect x={x} y={margin.top + plotH - barH} width={barWidth} height={barH} fill={color} rx={4} opacity={st.globalOpacity} />
+            <rect x={x} y={topY} width={barWidth} height={barH} fill={color} rx={4} opacity={st.globalOpacity} />
             {config.showDataLabels !== false && (
-              <text x={x + barWidth / 2} y={margin.top + plotH - barH - 6} textAnchor="middle" fill="#ccc" fontSize={10}>
+              <text x={x + barWidth / 2} y={topY - 6} textAnchor="middle" fill="#ccc" fontSize={10}>
                 {formatValue(d.value, numFmt)}
               </text>
             )}
-            <text
-              x={x + barWidth / 2}
-              y={height - margin.bottom + 14}
-              textAnchor="middle"
-              fill={st.textColor}
-              fontSize={st.labelFontSize}
-              transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${x + barWidth / 2}, ${height - margin.bottom + 14})` : undefined}
-            >
-              {d.label.length > 12 ? d.label.slice(0, 12) + '…' : d.label}
-            </text>
+            {/* Avatar above the bar (stacked over the value label) */}
+            {img && avatarPos === 'above' && (
+              <Avatar href={img} cx={x + barWidth / 2} cy={topY - (config.showDataLabels !== false ? 6 + avatarSize / 2 : avatarSize / 2)} clipId={`bv-av-${i}`} />
+            )}
+            {/* Avatar to the left of the category label */}
+            {img && avatarPos === 'beside-label' && (
+              <Avatar href={img} cx={x + barWidth / 2 - avatarSize / 2 - 6} cy={labelY} clipId={`bv-av-${i}`} />
+            )}
+            {/* Avatar replacing the category label */}
+            {img && avatarPos === 'replace-label' && (
+              <Avatar href={img} cx={x + barWidth / 2} cy={labelY} clipId={`bv-av-${i}`} />
+            )}
+            {!(avatarActive && avatarPos === 'replace-label' && img) && (
+              <text
+                x={labelX}
+                y={labelY}
+                textAnchor="middle"
+                fill={st.textColor}
+                fontSize={st.labelFontSize}
+                transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${labelX}, ${labelY})` : undefined}
+              >
+                {d.label.length > 12 ? d.label.slice(0, 12) + '…' : d.label}
+              </text>
+            )}
           </g>
         );
       })}

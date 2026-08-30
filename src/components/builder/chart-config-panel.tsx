@@ -2,7 +2,7 @@
 
 import React, {useState} from 'react';
 import {BarChart3, PieChart, LineChart, AreaChart, ScatterChart, Table2} from 'lucide-react';
-import type {ChartConfig, ChartType, NumberFormat, SortBy, ChartFilter, ChartFilterOp, LegendPosition, ChartStyle} from '@/lib/chart-config';
+import type {ChartConfig, ChartType, NumberFormat, SortBy, ChartFilter, ChartFilterOp, LegendPosition, ChartStyle, AvatarShape, AvatarPosition} from '@/lib/chart-config';
 import {PALETTES} from '@/lib/chart-config';
 
 // Metadata for a selected column available to the axis selectors: its alias
@@ -559,6 +559,79 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+          {/* Bar-chart avatars (single series) */}
+          {config.type === 'bar' && !config.seriesField && (
+            <div className="pt-2 border-t border-border-subtle space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium block font-display">Avatares (imágenes)</label>
+                {config.avatarField && (
+                  <button onClick={() => update({avatarField: undefined})} className="text-xs text-amber-500 hover:text-amber-400 font-medium">
+                    Quitar
+                  </button>
+                )}
+              </div>
+              <FieldSelect
+                label="Columna de imagen"
+                value={config.avatarField ?? ''}
+                options={fieldMeta}
+                fallback={columns}
+                onChange={(v) => update({avatarField: v || undefined})}
+                optional
+              />
+              {config.avatarField && (
+                <>
+                  <NumberInput label="Tamaño" value={config.avatarSize} min={8} max={128} step={2} onChange={(v) => update({avatarSize: v})} />
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Forma</label>
+                    <div className="flex gap-1">
+                      {([
+                        {value: 'circle', label: 'Círculo'},
+                        {value: 'rounded', label: 'Esquinas redondeadas'},
+                      ] as {value: AvatarShape; label: string}[]).map((s) => (
+                        <button
+                          key={s.value}
+                          onClick={() => update({avatarShape: s.value})}
+                          className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                            (config.avatarShape ?? 'circle') === s.value
+                              ? 'bg-amber-500 text-black'
+                              : 'bg-elevated text-secondary hover:bg-card-hover'
+                          }`}
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {(config.avatarShape ?? 'circle') === 'rounded' && (
+                    <NumberInput label="Radio de esquina" value={config.avatarRadius} min={0} max={40} step={1} onChange={(v) => update({avatarRadius: v})} />
+                  )}
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Posición</label>
+                    <select
+                      value={config.avatarPosition ?? 'above'}
+                      onChange={(e) => update({avatarPosition: e.target.value as AvatarPosition})}
+                      className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    >
+                      {config.horizontal ? (
+                        <>
+                          <option value="bar-end">Al final de la barra</option>
+                          <option value="beside-label">Junto a la etiqueta</option>
+                          <option value="replace-label">Reemplazar etiqueta</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="above">Arriba de la barra</option>
+                          <option value="beside-label">Junto a la etiqueta</option>
+                          <option value="replace-label">Reemplazar etiqueta</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+                  <p className="text-[10px] text-muted">Las imágenes se muestran en el preview y en el SVG descargado; puede que no aparezcan al exportar a PNG.</p>
+                </>
+              )}
             </div>
           )}
           {config.type === 'pie' && (
