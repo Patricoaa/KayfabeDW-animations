@@ -434,6 +434,20 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
       select.length > 0 ? select : [{column: '*'}];
 
     const cur = specRef.current;
+
+    // Auto-grouping: when any selected column has an aggregate (sum, count, …),
+    // every OTHER selected column without an aggregate must be in GROUP BY or
+    // Postgres rejects the query ("column X must appear in the GROUP BY
+    // clause"). Merge those non-aggregated columns into groupBy automatically so
+    // users don't have to press the "G" toggle on each one (e.g. imagen_url).
+    let nextGroupBy = [...(cur.groupBy ?? [])];
+    if (nextSelect.some((s) => s.column !== '*' && s.aggregate)) {
+      for (const s of nextSelect) {
+        if (s.column === '*' || s.aggregate) continue;
+        if (!nextGroupBy.includes(s.column)) nextGroupBy.push(s.column);
+      }
+    }
+
     const curJoins = cur.joins ?? [];
     const curSelect = cur.select ?? [];
     const changed =
@@ -448,10 +462,12 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
       nextSelect.length !== curSelect.length ||
       nextSelect.some(
         (s, i) => s.column !== curSelect[i]?.column || s.alias !== curSelect[i]?.alias,
-      );
+      ) ||
+      cur.groupBy?.length !== nextGroupBy.length ||
+      (cur.groupBy ?? []).some((g, i) => g !== nextGroupBy[i]);
 
     if (changed) {
-      onChangeRef.current({...cur, table, select: nextSelect, joins});
+      onChangeRef.current({...cur, table, select: nextSelect, joins, groupBy: nextGroupBy});
     }
   }, [nodes, edges, initialized]);
 
@@ -541,11 +557,13 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
       // the target table) emits `JOIN <new>` instead of re-joining an existing
       // table (which previously produced `FROM event JOIN event` → "table
       // name 'event' specified more than once").
-      const existingNodes = [...nodes].sort(
-        (a, b) =>
-          Number((b.data as TableNodeData)?.primary ?? false) -
-          Number((a.data as TableNodeData)?.primary ?? false),
-      );
+      // Prefer joining to the most recently added node that has a direct FK
+      // relationship, so dependency-ordered additions (wrestler →
+      // match_participant → match) produce the *semantically meaningful*
+      // path. Previously this anchored to the primary (FROM) node and picked
+      // the first FK it found (e.g. match.special_referee_id → wrestler),
+      // silently joining referees instead of participants.
+      const existingNodes = [...nodes].reverse();
       for (const n of existingNodes) {
         const nd = n.data as TableNodeData;
         if (!nd?.table) continue;
