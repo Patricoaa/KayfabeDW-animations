@@ -426,15 +426,37 @@ export function prepareMultiSeries(
     series.reduce((s, se) => s + (se.values[ci] ?? 0), 0),
   );
 
+  // Respect sortBy + limit the same way prepareSeries does, so the "Ordenar
+  // por" and "Filas del gráfico" controls work for multi-series charts too.
+  const indexOrder = categories.map((_, i) => i);
+  const sortBy = config.sortBy ?? 'none';
+  if (sortBy === 'value-desc' || sortBy === 'value-asc') {
+    const dir = sortBy === 'value-desc' ? -1 : 1;
+    indexOrder.sort((a, b) => (categoryTotals[a] - categoryTotals[b]) * dir);
+  } else if (sortBy === 'label') {
+    indexOrder.sort((a, b) => categories[a].localeCompare(categories[b]));
+  }
+  const orderedCategories = indexOrder.map((i) => categories[i]);
+  const orderedTotals = indexOrder.map((i) => categoryTotals[i]);
+  const orderedSeries = series.map((s) => ({
+    ...s,
+    values: indexOrder.map((i) => s.values[i] ?? 0),
+  }));
+  const limit = config.limit && config.limit > 0 ? config.limit : orderedCategories.length;
+  const kept = orderedCategories.slice(0, limit);
+
   return {
-    categories,
-    series,
+    categories: kept,
+    series: orderedSeries.map((s) => ({
+      ...s,
+      values: s.values.slice(0, limit),
+    })),
     max: Math.max(
-      ...series.flatMap((s) => s.values),
-      ...categoryTotals,
+      ...orderedSeries.flatMap((s) => s.values),
+      ...orderedTotals,
       0,
     ),
-    categoryTotals,
+    categoryTotals: orderedTotals.slice(0, limit),
   };
 }
 
