@@ -389,6 +389,15 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
     const usedAliases = new Set<string>();
     const raw: {column: string; alias: string}[] = [];
     const aliasCount = new Map<string, number>();
+    // Preserve any aggregate (sum/count/etc.) the user set in the properties
+    // panel for a column. This effect rebuilds `select` from the canvas nodes,
+    // so without carrying aggregates over, setting "sum" on a field was silently
+    // dropped on the next canvas change — leaving the query un-aggregated (raw
+    // values / wrong GROUP BY / "must appear in GROUP BY" errors).
+    const curSelectForAgg = (specRef.current.select ?? []).filter(
+      (f) => f.column !== '*' && f.aggregate,
+    );
+    const aggByColumn = new Map(curSelectForAgg.map((f) => [f.column, f.aggregate]));
     for (const node of tableNodes) {
       const data = node.data as TableNodeData;
       for (const col of data.selectedColumns ?? []) {
@@ -411,7 +420,8 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
         alias = qualified;
       }
       usedAliases.add(alias);
-      select.push({column: item.column, alias});
+      const aggregate = aggByColumn.get(item.column);
+      select.push(aggregate ? {column: item.column, alias, aggregate} : {column: item.column, alias});
     }
 
     // Edges into QuerySpec.joins
@@ -511,7 +521,10 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
       ) ||
       nextSelect.length !== curSelect.length ||
       nextSelect.some(
-        (s, i) => s.column !== curSelect[i]?.column || s.alias !== curSelect[i]?.alias,
+        (s, i) =>
+          s.column !== curSelect[i]?.column ||
+          s.alias !== curSelect[i]?.alias ||
+          s.aggregate !== curSelect[i]?.aggregate,
       ) ||
       cur.groupBy?.length !== nextGroupBy.length ||
       (cur.groupBy ?? []).some((g, i) => g !== nextGroupBy[i]);
