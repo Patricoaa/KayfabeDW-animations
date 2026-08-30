@@ -29,6 +29,9 @@ export function aggregate(
 ): Record<string, unknown>[] {
   const groups = new Map<string, number[]>();
   const distinct = new Map<string, Set<string>>();
+  // Keep a representative source row per group so companion columns (e.g. an
+  // image URL used for avatars, colors, etc.) survive the aggregation step.
+  const sampleRow = new Map<string, Record<string, unknown>>();
   for (const row of data) {
     const key = String(row[groupField] ?? '');
     const val = Number(row[yField] ?? 0);
@@ -37,6 +40,7 @@ export function aggregate(
     if (!distinct.has(key)) distinct.set(key, new Set());
     const raw = row[yField];
     distinct.get(key)!.add(raw === null || raw === undefined ? String(raw) : String(raw));
+    if (!sampleRow.has(key)) sampleRow.set(key, row);
   }
   return Array.from(groups.entries()).map(([label, vals]) => {
     let value: number;
@@ -61,7 +65,11 @@ export function aggregate(
         value = vals.length;
         break;
     }
-    return {[groupField]: label, [yField]: value};
+    return {
+      ...(sampleRow.get(label) ?? {}),
+      [groupField]: label,
+      [yField]: value,
+    };
   });
 }
 
