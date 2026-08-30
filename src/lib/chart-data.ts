@@ -166,6 +166,13 @@ export function formatValue(value: number, format: NumberFormat): string {
       if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
       if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
       return Math.round(value).toString();
+    case 'duration': {
+      const s = Math.round(Math.abs(value));
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const sign = value < 0 ? '-' : '';
+      return h > 0 ? `${sign}${h}:${String(m).padStart(2, '0')}` : `${sign}${m}m`;
+    }
     case 'none':
     default:
       return String(value);

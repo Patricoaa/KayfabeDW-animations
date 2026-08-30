@@ -39,6 +39,7 @@ const NUMBER_FORMATS: {value: NumberFormat; label: string}[] = [
   {value: 'decimal', label: 'Decimal (12,55)'},
   {value: 'percent', label: 'Porcentaje'},
   {value: 'currency', label: 'Moneda'},
+  {value: 'duration', label: 'Duración (hh:mm)'},
 ];
 
 const SORTS: {value: SortBy; label: string}[] = [

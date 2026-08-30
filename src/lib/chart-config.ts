@@ -1,6 +1,6 @@
 export type ChartType = 'bar' | 'pie' | 'line' | 'area' | 'scatter' | 'table';
 
-export type NumberFormat = 'none' | 'short' | 'percent' | 'currency' | 'decimal';
+export type NumberFormat = 'none' | 'short' | 'percent' | 'currency' | 'decimal' | 'duration';
 
 export type SortBy = 'none' | 'value-desc' | 'value-asc' | 'label';
 
@@ -128,7 +128,7 @@ export type ChartConfig = {
   configVersion?: number;
 };
 
-export const CHART_CONFIG_VERSION = 8;
+export const CHART_CONFIG_VERSION = 9;
 
 export const DEFAULT_CHART_CONFIG: ChartConfig = {
   type: 'bar',
