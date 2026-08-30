@@ -378,13 +378,40 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
       table = (primary.data as TableNodeData).table.name;
     }
 
-    // Selected columns into QuerySpec.select
+    // Selected columns into QuerySpec.select. Aliases default to the bare
+    // column name, but joined tables often share column names (name, id, ...).
+    // Duplicate aliases collapse in the query_builder to_jsonb output (JSON can't
+    // hold duplicate keys), silently dropping data. So when an alias would be
+    // repeated, qualify the colliding entries as "<table>_<column>" so every
+    // selected column maps to a distinct output key. Distinct-column queries stay
+    // byte-identical to keep existing saved specs stable.
     const select: QuerySpec['select'] = [];
+    const usedAliases = new Set<string>();
+    const raw: {column: string; alias: string}[] = [];
+    const aliasCount = new Map<string, number>();
     for (const node of tableNodes) {
       const data = node.data as TableNodeData;
       for (const col of data.selectedColumns ?? []) {
-        select.push({column: `${data.table.name}.${col}`, alias: col});
+        const alias = col;
+        raw.push({column: `${data.table.name}.${col}`, alias});
+        aliasCount.set(alias, (aliasCount.get(alias) ?? 0) + 1);
       }
+    }
+    for (const item of raw) {
+      let alias = item.alias;
+      if ((aliasCount.get(alias) ?? 0) > 1) {
+        // Colliding alias — qualify with the source table so the output key is unique.
+        const tableName = item.column.slice(0, item.column.indexOf('.'));
+        let qualified = `${tableName}_${alias}`;
+        let n = 2;
+        while (usedAliases.has(qualified)) {
+          qualified = `${tableName}_${alias}_${n}`;
+          n += 1;
+        }
+        alias = qualified;
+      }
+      usedAliases.add(alias);
+      select.push({column: item.column, alias});
     }
 
     // Edges into QuerySpec.joins
