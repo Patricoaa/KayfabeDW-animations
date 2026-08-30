@@ -32,7 +32,7 @@ import {TableSidebar} from './table-sidebar';
 import {PropertiesPanel} from './properties-panel';
 import type {TableInfo} from '@/lib/schema-metadata';
 import {getSuggestedJoin, getViewSourceTables, getRelationCardinality} from '@/lib/schema-metadata';
-import type {QuerySpec} from '@/lib/query-spec';
+import type {JoinClause, QuerySpec} from '@/lib/query-spec';
 import {defaultQuerySpec} from '@/lib/query-spec';
 
 const nodeTypes = {tableNode: TableNode};
@@ -415,7 +415,7 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
     }
 
     // Edges into QuerySpec.joins
-    const joins: QuerySpec['joins'] = [];
+    const joins: JoinClause[] = [];
     for (const edge of edges) {
       const edgeData = edge.data as JoinEdgeData;
       const sourceNode = nodes.find((n) => n.id === edge.source);
@@ -429,6 +429,56 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
         type: edgeData?.joinType ?? 'INNER',
       });
     }
+
+    // Deduplicate joins by destination table. A stray or edited edge can leave
+    // two edges pointing at the same table (e.g. both wrestler->match and
+    // match_participant->match), which would produce `JOIN match` twice and
+    // raise "table 'match' specified more than once". Keep a single join per
+    // table, preferring the entry whose condition does not reference a table
+    // that itself is joined later (i.e. the more "resolved" condition).
+    const joinByTable = new Map<string, JoinClause>();
+    for (const j of joins) {
+      const next = joinByTable.get(j.table);
+      if (!next) {
+        joinByTable.set(j.table, j);
+        continue;
+      }
+      const refsOf = (on: string) =>
+        new Set(
+          Array.from(on.matchAll(/([a-z_][a-z0-9_]*)\./gi), (m) => m[1]),
+        );
+      const joinedTables = new Set(joins.map((x) => x.table));
+      const nextRefsOutside = [...refsOf(next.on)].filter((t) => joinedTables.has(t) && t !== j.table);
+      const jRefsOutside = [...refsOf(j.on)].filter((t) => joinedTables.has(t) && t !== next.table);
+      // Prefer the one referencing other joined tables (more specific) so the
+      // surviving join is the meaningful participant->match path.
+      if (jRefsOutside.length > nextRefsOutside.length) joinByTable.set(j.table, j);
+    }
+    const deduped = [...joinByTable.values()];
+
+    // Order joins topologically so a join whose ON references another joined
+    // table comes after that table is introduced to the FROM clause. Otherwise
+    // Postgres fails with "missing FROM-clause entry for table ..." when, for
+    // example, `JOIN match ON match.id = match_participant.match_id` is listed
+    // before the `match_participant` join.
+    const joinedTables = new Set<string>();
+    const refTables = (on: string) =>
+      [...new Set(Array.from(on.matchAll(/([a-z_][a-z0-9_]*)\./gi), (m) => m[1]))];
+    const ordered: JoinClause[] = [];
+    let remaining = [...deduped];
+    let guard = deduped.length + 1;
+    while (remaining.length > 0 && guard-- > 0) {
+      const index = remaining.findIndex((j) =>
+        refTables(j.on).every((t) => t === j.table || t === table || joinedTables.has(t)),
+      );
+      if (index === -1) break; // circular/unknown dependency — keep original order
+      const [j] = remaining.splice(index, 1);
+      joinedTables.add(j.table);
+      ordered.push(j);
+    }
+    ordered.push(...remaining);
+    joins.length = 0;
+    joins.push(...ordered);
 
     const nextSelect: QuerySpec['select'] =
       select.length > 0 ? select : [{column: '*'}];
