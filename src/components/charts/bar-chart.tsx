@@ -22,13 +22,61 @@ export function BarChart({data, config}: Props) {
   return <SingleBar data={data} config={config} />;
 }
 
+function avatarUrlOf(avatarField: string | undefined, raw?: Record<string, unknown>): string | null {
+  if (!avatarField) return null;
+  const v = raw?.[avatarField];
+  if (typeof v !== 'string') return null;
+  const t = v.trim();
+  if (t === '') return null;
+  if (t.startsWith('http://') || t.startsWith('https://') || t.startsWith('data:image/') || t.startsWith('/')) return t;
+  return null;
+}
+
+function Avatar({
+  href, cx, cy, clipId, shape, size, radius,
+}: {
+  href: string; cx: number; cy: number; clipId: string;
+  shape: string | undefined; size: number; radius: number;
+}) {
+  return (
+    <g>
+      <defs>
+        <clipPath id={clipId}>
+          {shape === 'circle' ? (
+            <circle cx={cx} cy={cy} r={size / 2} />
+          ) : (
+            <rect x={cx - size / 2} y={cy - size / 2} width={size} height={size} rx={radius} />
+          )}
+        </clipPath>
+      </defs>
+      <image
+        href={href}
+        x={cx - size / 2}
+        y={cy - size / 2}
+        width={size}
+        height={size}
+        preserveAspectRatio="xMidYMid slice"
+        clipPath={`url(#${clipId})`}
+      />
+    </g>
+  );
+}
+
 function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartConfig}) {
   const st = resolveChartStyle(config.style);
   const numFmt = config.numberFormat ?? 'short';
   const stacked = (config.groupMode ?? 'grouped') === 'stacked' || !!config.stacked;
+  const stackedPercent = config.groupMode === 'stacked-percent';
   const showLegend = config.showLegend ?? true;
   const legendPosition = config.legendPosition ?? 'bottom';
   const labelAngle = config.labelAngle ?? (multi.categories.length > 8 ? -30 : 0);
+
+  const avatarField = config.avatarField;
+  const avatarSize = config.avatarSize ?? 24;
+  const avatarShape = config.avatarShape ?? 'circle';
+  const avatarRadius = config.avatarRadius ?? 6;
+  const avatarPos = config.avatarPosition ?? 'above';
+  const avatarActive = !!avatarField;
 
   const width = config.width ?? 600;
   const height = config.height ?? 380;
@@ -42,13 +90,13 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const yRange = Math.max(domain.yMax - domain.yMin, 0.001);
   const catBand = plotW / Math.max(nCat, 1);
   const innerGap = 2;
-  const barW = stacked
+  const barW = stacked || stackedPercent
     ? Math.max(catBand * 0.7 - innerGap * 2, 2)
     : Math.max(Math.min(catBand * 0.7 / nS - innerGap, 46), 2);
 
   const tickValues = domain.ticks;
 
-  const stackBase = stacked
+  const stackBase = stacked || stackedPercent
     ? multi.categories.map((_, ci) => {
         const base: number[] = [];
         let acc = 0;
@@ -59,6 +107,15 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
         return base;
       })
     : null;
+
+  const stackTotal = stackBase && multi.categories.map((_, ci) =>
+    multi.series.reduce((a, s) => a + Math.max(s.values[ci] ?? 0, 0), 0),
+  );
+  const stackH = (ci: number, si: number) => {
+    const total = stackTotal![ci] || 1;
+    return (Math.max(multi.series[si].values[ci] ?? 0, 0) / total) * plotH;
+  };
+
 
   return (
     <div className="flex flex-col gap-2">
@@ -95,26 +152,41 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
             const bandX = margin.left + ci * catBand;
             return multi.series.map((s, si) => {
               const val = s.values[ci] ?? 0;
-              const h = Math.max((Math.abs(val) / yRange) * plotH, 0);
               let x: number;
               let y: number;
-              if (stacked) {
+              let w: number;
+              let hh: number;
+              if (stacked || stackedPercent) {
                 const base = stackBase![ci][si];
-                const baseH = (base / yRange) * plotH;
-                x = bandX + catBand * 0.15;
-                y = margin.top + plotH - baseH - h;
+                if (stackedPercent) {
+                  const segH = stackH(ci, si);
+                  const baseH = (base / (stackTotal![ci] || 1)) * plotH;
+                  x = bandX + catBand * 0.15;
+                  y = margin.top + plotH - baseH - segH;
+                  hh = segH;
+                } else {
+                  const baseH = (base / yRange) * plotH;
+                  const h = Math.max((Math.abs(val) / yRange) * plotH, 0);
+                  x = bandX + catBand * 0.15;
+                  y = margin.top + plotH - baseH - h;
+                  hh = h;
+                }
+                w = catBand * 0.7;
               } else {
+                const h = Math.max((Math.abs(val) / yRange) * plotH, 0);
                 const offset = (catBand - barW * nS) / 2;
                 x = bandX + offset + si * (barW + innerGap);
                 y = margin.top + plotH - h;
+                w = barW;
+                hh = h;
               }
               return (
                 <rect
                   key={`${ci}-${si}`}
                   x={x}
                   y={y}
-                  width={stacked ? catBand * 0.7 : barW}
-                  height={h}
+                  width={w}
+                  height={hh}
                   fill={s.color}
                   rx={2}
                   opacity={st.globalOpacity}
@@ -126,18 +198,24 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
           {multi.categories.map((cat, ci) => {
             const bandX = margin.left + ci * catBand;
             const cx = bandX + catBand / 2;
+            const img = stackedPercent ? null : (multi.categoryImages?.[ci] ?? null);
+            const hasImg = avatarActive && !!img && labelAngle === 0;
+            const labelX = hasImg ? cx + avatarSize / 2 + 4 : cx;
             return (
-              <text
-                key={ci}
-                x={cx}
-                y={height - margin.bottom + 14}
-                textAnchor="middle"
-                fill={st.textColor}
-                fontSize={st.labelFontSize}
-                transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${cx}, ${height - margin.bottom + 14})` : undefined}
-              >
-                {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
-              </text>
+              <g key={ci}>
+                {hasImg && (
+                  <Avatar href={img!} cx={cx - avatarSize / 2 - 4} cy={height - margin.bottom + 14} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
+                )}
+                <text
+                  x={labelX}
+                  y={height - margin.bottom + 14}
+                  textAnchor="middle"
+                  fill={st.textColor}
+                  fontSize={st.labelFontSize}
+                >
+                  {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
+                </text>
+              </g>
             );
           })}
         </svg>
@@ -180,41 +258,7 @@ function SingleBar({data, config}: Props) {
   const plotW2 = width - marginAdj.left - marginAdj.right;
   const plotH2 = height - marginAdj.top - marginAdj.bottom;
 
-  // Returns a valid image URL from the row, or null when missing/invalid.
-  const avatarUrl = (raw?: Record<string, unknown>): string | null => {
-    if (!avatarField) return null;
-    const v = raw?.[avatarField];
-    if (typeof v !== 'string') return null;
-    const t = v.trim();
-    if (t === '') return null;
-    if (t.startsWith('http://') || t.startsWith('https://') || t.startsWith('data:image/') || t.startsWith('/')) return t;
-    return null;
-  };
-
-  const Avatar = ({href, cx, cy, clipId}: {href: string; cx: number; cy: number; clipId: string}) => {
-    return (
-      <g>
-        <defs>
-          <clipPath id={clipId}>
-            {avatarShape === 'circle' ? (
-              <circle cx={cx} cy={cy} r={avatarSize / 2} />
-            ) : (
-              <rect x={cx - avatarSize / 2} y={cy - avatarSize / 2} width={avatarSize} height={avatarSize} rx={avatarRadius} />
-            )}
-          </clipPath>
-        </defs>
-        <image
-          href={href}
-          x={cx - avatarSize / 2}
-          y={cy - avatarSize / 2}
-          width={avatarSize}
-          height={avatarSize}
-          preserveAspectRatio="xMidYMid slice"
-          clipPath={`url(#${clipId})`}
-        />
-      </g>
-    );
-  };
+  const avatarUrl = (raw?: Record<string, unknown>): string | null => avatarUrlOf(avatarField, raw);
 
   if (horizontal) {
     const barH = Math.min(40, (plotH2 / n) * 0.7);
@@ -255,13 +299,13 @@ function SingleBar({data, config}: Props) {
                 </text>
               )}
               {img && avatarPos === 'bar-end' && (
-                <Avatar href={img} cx={marginAdj.left + Math.max(barW, 0) + (config.showDataLabels !== false ? 52 : 10) + avatarSize / 2} cy={y + barH / 2} clipId={`bh-av-${i}`} />
+                <Avatar href={img} cx={marginAdj.left + Math.max(barW, 0) + (config.showDataLabels !== false ? 52 : 10) + avatarSize / 2} cy={y + barH / 2} clipId={`bh-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
               )}
               {img && avatarPos === 'beside-label' && (
-                <Avatar href={img} cx={marginAdj.left - 8 - avatarSize / 2} cy={y + barH / 2} clipId={`bh-av-${i}`} />
+                <Avatar href={img} cx={marginAdj.left - 8 - avatarSize / 2} cy={y + barH / 2} clipId={`bh-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
               )}
               {img && avatarPos === 'replace-label' && (
-                <Avatar href={img} cx={marginAdj.left - 8 - avatarSize / 2} cy={y + barH / 2} clipId={`bh-av-${i}`} />
+                <Avatar href={img} cx={marginAdj.left - 8 - avatarSize / 2} cy={y + barH / 2} clipId={`bh-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
               )}
               {!(avatarActive && avatarPos === 'replace-label' && img) && (
                 <text x={labelX} y={y + barH / 2 + 3} textAnchor="end" fill={st.textColor} fontSize={st.labelFontSize}>
@@ -318,15 +362,15 @@ function SingleBar({data, config}: Props) {
             )}
             {/* Avatar above the bar (stacked over the value label) */}
             {img && avatarPos === 'above' && (
-              <Avatar href={img} cx={x + barWidth / 2} cy={topY - (config.showDataLabels !== false ? 6 + avatarSize / 2 : avatarSize / 2)} clipId={`bv-av-${i}`} />
+              <Avatar href={img} cx={x + barWidth / 2} cy={topY - (config.showDataLabels !== false ? 6 + avatarSize / 2 : avatarSize / 2)} clipId={`bv-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
             )}
             {/* Avatar to the left of the category label */}
             {img && avatarPos === 'beside-label' && (
-              <Avatar href={img} cx={x + barWidth / 2 - avatarSize / 2 - 6} cy={labelY} clipId={`bv-av-${i}`} />
+              <Avatar href={img} cx={x + barWidth / 2 - avatarSize / 2 - 6} cy={labelY} clipId={`bv-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
             )}
             {/* Avatar replacing the category label */}
             {img && avatarPos === 'replace-label' && (
-              <Avatar href={img} cx={x + barWidth / 2} cy={labelY} clipId={`bv-av-${i}`} />
+              <Avatar href={img} cx={x + barWidth / 2} cy={labelY} clipId={`bv-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
             )}
             {!(avatarActive && avatarPos === 'replace-label' && img) && (
               <text

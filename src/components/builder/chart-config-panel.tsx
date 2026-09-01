@@ -546,6 +546,7 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
                 {[
                   {value: 'grouped' as const, label: 'Agrupadas'},
                   {value: 'stacked' as const, label: 'Apiladas'},
+                  {value: 'stacked-percent' as const, label: 'Apiladas %'},
                 ].map((m) => (
                   <button
                     key={m.value}
@@ -562,8 +563,8 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
               </div>
             </div>
           )}
-          {/* Bar-chart avatars (single series) */}
-          {config.type === 'bar' && !config.seriesField && (
+          {/* Bar-chart avatars (single & multi series; not stacked-percent) */}
+          {config.type === 'bar' && config.groupMode !== 'stacked-percent' && (
             <div className="pt-2 border-t border-border-subtle space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium block font-display">Avatares (imágenes)</label>

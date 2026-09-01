@@ -6,7 +6,7 @@ export type SortBy = 'none' | 'value-desc' | 'value-asc' | 'label';
 
 export type LegendPosition = 'top' | 'right' | 'bottom';
 
-export type GroupMode = 'grouped' | 'stacked';
+export type GroupMode = 'grouped' | 'stacked' | 'stacked-percent';
 
 export type AvatarShape = 'circle' | 'rounded';
 export type AvatarPosition = 'above' | 'beside-label' | 'replace-label' | 'bar-end';

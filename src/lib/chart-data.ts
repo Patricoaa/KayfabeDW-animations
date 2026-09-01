@@ -347,6 +347,7 @@ export type PreparedMultiSeries = {
   series: MultiSeriesDatum[];
   max: number;
   categoryTotals: number[];
+  categoryImages?: (string | null)[];
 };
 
 const AGGREGATES = ['sum', 'avg', 'count', 'min', 'max', 'count_distinct'] as const;
@@ -404,9 +405,26 @@ export function prepareMultiSeries(
 
   const cellKey = (seriesName: string, cat: string) => `${seriesName}\u0000${cat}`;
 
+  const avatarField = config.avatarField;
+  const categoryImages = new Map<string, string | null>();
+
   for (const row of rows) {
     const cat = String(row[xField] ?? '');
     const val = Number(row[yField] ?? 0);
+    // Capture the first valid avatar for each category (constant per category
+    // row, e.g. an event image shared by every gender series of that event).
+    if (avatarField && !categoryImages.has(cat)) {
+      const rawImg = row[avatarField];
+      const img =
+        typeof rawImg === 'string' &&
+        (rawImg.trim().startsWith('http://') ||
+          rawImg.trim().startsWith('https://') ||
+          rawImg.trim().startsWith('data:image/') ||
+          rawImg.trim().startsWith('/'))
+          ? rawImg.trim()
+          : null;
+      categoryImages.set(cat, img);
+    }
     if (isNaN(val)) continue;
     if (!catIndex.has(cat)) {
       catIndex.set(cat, categories.length);
@@ -472,6 +490,7 @@ export function prepareMultiSeries(
       0,
     ),
     categoryTotals: orderedTotals.slice(0, limit),
+    categoryImages: kept.map((cat) => categoryImages.get(cat) ?? null),
   };
 }
 
