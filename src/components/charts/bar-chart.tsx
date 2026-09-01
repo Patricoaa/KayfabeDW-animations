@@ -80,8 +80,6 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const width = config.width ?? 600;
   const height = config.height ?? 380;
   const margin = {top: 24, right: 24, bottom: 66, left: 66};
-  const plotW = width - margin.left - margin.right;
-  const plotH = height - margin.top - margin.bottom;
   const nCat = multi.categories.length;
   const nS = multi.series.length;
   const maxVal = Math.max(multi.max, 0) || 1;
@@ -90,7 +88,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
     : resolveYDomain(0, maxVal, config);
   const yRange = stackedPercent ? 1 : Math.max(domain.yMax - domain.yMin, 0.001);
   const numFmt: NumberFormat = stackedPercent ? 'percent' : (config.numberFormat ?? 'short');
-  const catBand = plotW / Math.max(nCat, 1);
+  const catBand = (width - margin.left - margin.right) / Math.max(nCat, 1);
   const innerGap = 2;
   const barW = stacked || stackedPercent
     ? Math.max(catBand * 0.7 - innerGap * 2, 2)
@@ -113,6 +111,14 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const stackTotal = stackBase && multi.categories.map((_, ci) =>
     multi.series.reduce((a, s) => a + Math.max(s.values[ci] ?? 0, 0), 0),
   );
+
+  // Adjust top margin when avatars sit above the bars.
+  const marginAdj = {...margin};
+  if (avatarActive && avatarPos === 'above' && labelAngle === 0) {
+    marginAdj.top += avatarSize + 10;
+  }
+  const plotH = height - marginAdj.top - marginAdj.bottom;
+
   const stackH = (ci: number, si: number) => {
     const total = stackTotal![ci] || 1;
     return (Math.max(multi.series[si].values[ci] ?? 0, 0) / total) * plotH;
@@ -130,11 +136,11 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
         )}
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
           {config.showGrid !== false && tickValues.map((v, i) => {
-            const y = margin.top + plotH - ((v - domain.yMin) / yRange) * plotH;
+            const y = marginAdj.top + plotH - ((v - domain.yMin) / yRange) * plotH;
             return (
               <g key={i}>
-                <line x1={margin.left} y1={y} x2={width - margin.right} y2={y} stroke={st.gridColor} strokeWidth={1} />
-                <text x={margin.left - 8} y={y + 4} textAnchor="end" fill={st.textColor} fontSize={10}>
+                <line x1={marginAdj.left} y1={y} x2={width - marginAdj.right} y2={y} stroke={st.gridColor} strokeWidth={1} />
+                <text x={marginAdj.left - 8} y={y + 4} textAnchor="end" fill={st.textColor} fontSize={10}>
                   {formatValue(v, numFmt)}
                 </text>
               </g>
@@ -151,7 +157,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
           )}
 
           {multi.categories.map((cat, ci) => {
-            const bandX = margin.left + ci * catBand;
+            const bandX = marginAdj.left + ci * catBand;
             return multi.series.map((s, si) => {
               const val = s.values[ci] ?? 0;
               let x: number;
@@ -164,13 +170,13 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                   const segH = stackH(ci, si);
                   const baseH = (base / (stackTotal![ci] || 1)) * plotH;
                   x = bandX + catBand * 0.15;
-                  y = margin.top + plotH - baseH - segH;
+                  y = marginAdj.top + plotH - baseH - segH;
                   hh = segH;
                 } else {
                   const baseH = (base / yRange) * plotH;
                   const h = Math.max((Math.abs(val) / yRange) * plotH, 0);
                   x = bandX + catBand * 0.15;
-                  y = margin.top + plotH - baseH - h;
+                  y = marginAdj.top + plotH - baseH - h;
                   hh = h;
                 }
                 w = catBand * 0.7;
@@ -178,7 +184,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                 const h = Math.max((Math.abs(val) / yRange) * plotH, 0);
                 const offset = (catBand - barW * nS) / 2;
                 x = bandX + offset + si * (barW + innerGap);
-                y = margin.top + plotH - h;
+                y = marginAdj.top + plotH - h;
                 w = barW;
                 hh = h;
               }
@@ -198,19 +204,65 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
           })}
 
           {multi.categories.map((cat, ci) => {
-            const bandX = margin.left + ci * catBand;
+            const bandX = marginAdj.left + ci * catBand;
             const cx = bandX + catBand / 2;
             const img = multi.categoryImages?.[ci] ?? null;
             const hasImg = avatarActive && !!img && labelAngle === 0;
-            const labelX = hasImg ? cx + avatarSize / 2 + 4 : cx;
+
+            // Compute the top of the highest bar in this category for 'above' positioning.
+            let barTop = marginAdj.top + plotH;
+            if (hasImg && avatarPos === 'above') {
+              if (stacked || stackedPercent) {
+                const total = stackTotal![ci] || 1;
+                barTop = stackedPercent
+                  ? marginAdj.top
+                  : marginAdj.top + plotH - ((multi.series.reduce((a, s) => a + Math.max(s.values[ci] ?? 0, 0), 0)) / yRange) * plotH;
+              } else {
+                const maxInCat = Math.max(...multi.series.map((s) => s.values[ci] ?? 0), 0);
+                barTop = marginAdj.top + plotH - (maxInCat / yRange) * plotH;
+              }
+            }
+
+            if (!hasImg) {
+              return (
+                <text
+                  key={ci}
+                  x={cx}
+                  y={height - marginAdj.bottom + 14}
+                  textAnchor="middle"
+                  fill={st.textColor}
+                  fontSize={st.labelFontSize}
+                >
+                  {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
+                </text>
+              );
+            }
+
+            if (avatarPos === 'above') {
+              return (
+                <g key={ci}>
+                  <Avatar href={img!} cx={cx} cy={barTop - avatarSize / 2 - 4} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
+                  <text x={cx} y={height - marginAdj.bottom + 14} textAnchor="middle" fill={st.textColor} fontSize={st.labelFontSize}>
+                    {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
+                  </text>
+                </g>
+              );
+            }
+
+            if (avatarPos === 'replace-label') {
+              return (
+                <Avatar key={ci} href={img!} cx={cx} cy={height - marginAdj.bottom + 14} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
+              );
+            }
+
+            // Default: 'beside-label' — avatar to the left of the label text.
+            const labelX = cx + avatarSize / 2 + 4;
             return (
               <g key={ci}>
-                {hasImg && (
-                  <Avatar href={img!} cx={cx - avatarSize / 2 - 4} cy={height - margin.bottom + 14} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
-                )}
+                <Avatar href={img!} cx={cx - avatarSize / 2 - 4} cy={height - marginAdj.bottom + 14} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
                 <text
                   x={labelX}
-                  y={height - margin.bottom + 14}
+                  y={height - marginAdj.bottom + 14}
                   textAnchor="middle"
                   fill={st.textColor}
                   fontSize={st.labelFontSize}

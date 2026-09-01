@@ -97,6 +97,7 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
   const [tab, setTab] = useState<'datos' | 'ejes' | 'estilos' | 'componentes'>('datos');
 
   const isCartesian = config.type === 'bar' || config.type === 'line' || config.type === 'area' || config.type === 'scatter';
+  const isStackedPercent = config.type === 'bar' && config.groupMode === 'stacked-percent';
   const TABS: {key: 'datos' | 'ejes' | 'estilos' | 'componentes'; label: string; enabled: boolean}[] = [
     {key: 'datos', label: 'Datos', enabled: true},
     {key: 'ejes', label: 'Ejes', enabled: isCartesian},
@@ -300,15 +301,19 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
           {isSingleSeries && (
             <div>
               <label className="text-sm font-medium mb-1 block">Formato de números</label>
-              <select
-                value={config.numberFormat ?? 'short'}
-                onChange={(e) => update({numberFormat: e.target.value as NumberFormat})}
-                className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-              >
-                {NUMBER_FORMATS.map((nf) => (
-                  <option key={nf.value} value={nf.value}>{nf.label}</option>
-                ))}
-              </select>
+              {isStackedPercent ? (
+                <p className="text-[10px] text-muted py-1">Forzado a porcentaje en apiladas %.</p>
+              ) : (
+                <select
+                  value={config.numberFormat ?? 'short'}
+                  onChange={(e) => update({numberFormat: e.target.value as NumberFormat})}
+                  className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+                >
+                  {NUMBER_FORMATS.map((nf) => (
+                    <option key={nf.value} value={nf.value}>{nf.label}</option>
+                  ))}
+                </select>
+              )}
             </div>
           )}
 
@@ -399,12 +404,18 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
             </div>
 
             {/* Y axis */}
-            <Toggle label="Empezar en cero" checked={config.startAtZero ?? true} onChange={(v) => update({startAtZero: v})} />
-            <NumberInput label="Cantidad de divisiones (Y)" value={config.tickCount} min={2} max={12} onChange={(v) => update({tickCount: v})} />
-            <div className="grid grid-cols-2 gap-2">
-              <NumberInput label="Y mín." value={config.yMin} min={-1e9} max={1e9} onChange={(v) => update({yMin: v})} />
-              <NumberInput label="Y máx." value={config.yMax} min={-1e9} max={1e9} onChange={(v) => update({yMax: v})} />
-            </div>
+            {isStackedPercent ? (
+              <p className="text-[10px] text-muted py-1">Eje Y fijo en 0%–100% (apiladas %).</p>
+            ) : (
+              <>
+                <Toggle label="Empezar en cero" checked={config.startAtZero ?? true} onChange={(v) => update({startAtZero: v})} />
+                <NumberInput label="Cantidad de divisiones (Y)" value={config.tickCount} min={2} max={12} onChange={(v) => update({tickCount: v})} />
+                <div className="grid grid-cols-2 gap-2">
+                  <NumberInput label="Y mín." value={config.yMin} min={-1e9} max={1e9} onChange={(v) => update({yMin: v})} />
+                  <NumberInput label="Y máx." value={config.yMax} min={-1e9} max={1e9} onChange={(v) => update({yMax: v})} />
+                </div>
+              </>
+            )}
 
             {/* X axis (scatter) */}
             {config.type === 'scatter' && (
