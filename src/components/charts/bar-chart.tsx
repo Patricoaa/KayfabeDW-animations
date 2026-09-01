@@ -1,6 +1,6 @@
 'use client';
 
-import type {ChartConfig} from '@/lib/chart-config';
+import type {ChartConfig, NumberFormat} from '@/lib/chart-config';
 import {prepareSeries, prepareMultiSeries, formatValue, pickColor, resolveChartStyle, resolveYDomain, type PreparedMultiSeries} from '@/lib/chart-data';
 import {Legend} from './legend';
 
@@ -64,7 +64,6 @@ function Avatar({
 
 function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartConfig}) {
   const st = resolveChartStyle(config.style);
-  const numFmt = config.numberFormat ?? 'short';
   const stacked = (config.groupMode ?? 'grouped') === 'stacked' || !!config.stacked;
   const stackedPercent = config.groupMode === 'stacked-percent';
   const showLegend = config.showLegend ?? true;
@@ -86,8 +85,11 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const nCat = multi.categories.length;
   const nS = multi.series.length;
   const maxVal = Math.max(multi.max, 0) || 1;
-  const domain = resolveYDomain(0, maxVal, config);
-  const yRange = Math.max(domain.yMax - domain.yMin, 0.001);
+  const domain = stackedPercent
+    ? {yMin: 0, yMax: 1, ticks: [0, 0.25, 0.5, 0.75, 1]}
+    : resolveYDomain(0, maxVal, config);
+  const yRange = stackedPercent ? 1 : Math.max(domain.yMax - domain.yMin, 0.001);
+  const numFmt: NumberFormat = stackedPercent ? 'percent' : (config.numberFormat ?? 'short');
   const catBand = plotW / Math.max(nCat, 1);
   const innerGap = 2;
   const barW = stacked || stackedPercent
@@ -198,7 +200,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
           {multi.categories.map((cat, ci) => {
             const bandX = margin.left + ci * catBand;
             const cx = bandX + catBand / 2;
-            const img = stackedPercent ? null : (multi.categoryImages?.[ci] ?? null);
+            const img = multi.categoryImages?.[ci] ?? null;
             const hasImg = avatarActive && !!img && labelAngle === 0;
             const labelX = hasImg ? cx + avatarSize / 2 + 4 : cx;
             return (

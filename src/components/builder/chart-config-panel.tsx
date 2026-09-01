@@ -563,8 +563,8 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
               </div>
             </div>
           )}
-          {/* Bar-chart avatars (single & multi series; not stacked-percent) */}
-          {config.type === 'bar' && config.groupMode !== 'stacked-percent' && (
+          {/* Bar-chart avatars (single & multi series) */}
+          {config.type === 'bar' && (
             <div className="pt-2 border-t border-border-subtle space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium block font-display">Avatares (imágenes)</label>
