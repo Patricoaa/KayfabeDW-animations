@@ -47,7 +47,7 @@ export function roundedRectPath(
   r: number,
   corners: {tl?: boolean; tr?: boolean; bl?: boolean; br?: boolean} = {tl: true, tr: true, bl: true, br: true},
 ): string {
-  const rad = Math.max(0, Math.min(r, Math.min(w, h) / 2, Math.max(w, h) / 2));
+  const rad = Math.max(0, Math.min(r, Math.min(w, h) / 2));
   const tl = corners.tl ? rad : 0;
   const tr = corners.tr ? rad : 0;
   const br = corners.br ? rad : 0;
@@ -60,9 +60,11 @@ export function roundedRectPath(
     br > 0 ? `A ${br} ${br} 0 0 1 ${x + w - br} ${y + h}` : '',
     `H ${x + bl}`,
     bl > 0 ? `A ${bl} ${bl} 0 0 1 ${x} ${y + h - bl}` : '',
+    `V ${y + tl}`,
+    tl > 0 ? `A ${tl} ${tl} 0 0 1 ${x + tl} ${y}` : '',
     'Z',
   ];
-  return parts.filter(Boolean).join(' ');
+  return parts.join(' ');
 }
 
 // Vertical space (in SVG units) the header needs when placed at the top of the
