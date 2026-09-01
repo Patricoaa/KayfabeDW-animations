@@ -152,10 +152,9 @@ export type ChartConfig = {
   barGap?: number;                 // px gap between bars in the same category
   barCategoryGap?: number;         // 0-0.5 fraction of the band used as side padding
   negativeColor?: string;          // color for negative-value bars (single/grouped)
-  barGradient?: {from: string; to: string}; // vertical linear gradient fill (overrides solid color)
-  // Pill-bar look: corner radius applies only to the outer end of each bar
-  // (top in vertical, right in horizontal); in stacked bars only the last
-  // segment is rounded — the Flourish "rounded time-series" treat.
+  // Pill-bar look: corner radius applies only to the outer end of each bar.
+  // Only available/functional for stacked bar modes (the Flourish "rounded
+  // stacked" treat); grouped/single bars always use the plain radius.
   barRadiusEndsOnly?: boolean;
 
   // Data labels (independent of the series/axis text colors).
@@ -166,13 +165,16 @@ export type ChartConfig = {
 
   // Category (x) label placement + its own font. `categoryLabelPosition`
   // only applies to bar charts: 'axis' keeps labels on the axis line,
-  // 'start'/'inside'/'end' move them next to / inside each bar.
-  categoryLabelPosition?: 'axis' | 'start' | 'inside' | 'end';
+  // 'start'/'inside'/'end' move them next to / inside each bar, and 'beside'
+  // places them just outside the outer end of each bar.
+  categoryLabelPosition?: 'axis' | 'start' | 'inside' | 'end' | 'beside';
 
   // Per-section font overrides (inherit general typography when unset).
   headerFont?: SectionFont;
+  subtitleFont?: SectionFont;
   xLabelFont?: SectionFont;
   yLabelFont?: SectionFont;
+  legendFont?: SectionFont;
 
   // Per-category/per-datum color overrides (label -> color), applied before
   // the palette for single-series bars, pie slices, scatter categories and
@@ -196,7 +198,7 @@ export type ChartConfig = {
   configVersion?: number;
 };
 
-export const CHART_CONFIG_VERSION = 11;
+export const CHART_CONFIG_VERSION = 12;
 
 export const DEFAULT_CHART_CONFIG: ChartConfig = {
   type: 'bar',
@@ -242,5 +244,11 @@ export const DEFAULT_CHART_CONFIG: ChartConfig = {
 };
 
 export function applyChartDefaults(config: Partial<ChartConfig>): ChartConfig {
+  // V12: gradient bar fill was removed from the product. Strip any legacy
+  // value so old saved configs render with a solid bar again.
+  if (config && 'barGradient' in config) {
+    const {barGradient: _drop, ...rest} = config;
+    return {...DEFAULT_CHART_CONFIG, ...rest};
+  }
   return {...DEFAULT_CHART_CONFIG, ...config};
 }

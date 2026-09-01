@@ -82,8 +82,9 @@ export function headerHeight(config: ChartConfig, st: ResolvedChartStyle): numbe
   const hasSub = !!config.subtitle;
   if (!hasTitle && !hasSub) return 0;
   const titleSize = config.headerFont?.size ?? st.titleFontSize;
+  const subSize = config.subtitleFont?.size ?? Math.max(8, titleSize - 3);
   let h = titleSize + 8;
-  if (hasSub) h += Math.max(8, titleSize - 3) + 6;
+  if (hasSub) h += subSize + 6;
   return h;
 }
 
@@ -93,10 +94,11 @@ export function SvgHeader({config, st, width}: {config: ChartConfig; st: Resolve
   const sub = config.subtitle;
   if (!title && !sub) return null;
   const family = config.headerFont?.fontFamily ?? st.fontFamily;
+  const subFamily = config.subtitleFont?.fontFamily ?? family;
   const titleSize = config.headerFont?.size ?? st.titleFontSize;
-  const titleColor = config.headerFont?.color ?? st.titleColor;
-  const subSize = Math.max(8, titleSize - 3);
-  const subColor = config.headerFont?.color ? config.headerFont.color : '#666';
+  const titleColor = config.headerFont?.color ?? st.textColor;
+  const subSize = config.subtitleFont?.size ?? Math.max(8, titleSize - 3);
+  const subColor = config.subtitleFont?.color ?? st.textColor;
   let y = 4 + titleSize;
   return (
     <g fontFamily={family} textAnchor="middle">
@@ -106,7 +108,7 @@ export function SvgHeader({config, st, width}: {config: ChartConfig; st: Resolve
         </text>
       )}
       {sub && (
-        <text x={width / 2} y={y + subSize + 2} fill={subColor} fontSize={subSize}>
+        <text x={width / 2} y={y + subSize + 2} fill={subColor} fontSize={subSize} fontFamily={subFamily}>
           {sub}
         </text>
       )}
@@ -130,6 +132,7 @@ export function SvgLegend({
   width,
   height,
   st,
+  config,
   headerOffset = 0,
 }: {
   items: LegendItem[];
@@ -137,13 +140,15 @@ export function SvgLegend({
   width: number;
   height: number;
   st: ResolvedChartStyle;
+  config: ChartConfig;
   headerOffset?: number;
 }) {
   if (items.length === 0) return null;
-  const fs = 10;
+  const fs = config.legendFont?.size ?? 10;
   const sw = 8;
   const gap = 14;
-  const family = st.fontFamily;
+  const family = config.legendFont?.fontFamily ?? st.fontFamily;
+  const color = config.legendFont?.color ?? st.textColor;
 
   if (position === 'right') {
     const x = width - 112;
@@ -154,7 +159,7 @@ export function SvgLegend({
           const el = (
             <g key={it.label} transform={`translate(${x}, ${y})`}>
               <rect x={0} y={-6} width={sw} height={sw} rx={2} fill={it.color} />
-              <text x={sw + 6} y={0} fontSize={fs} fill="#888">{truncate(it.label, 15)}</text>
+              <text x={sw + 6} y={0} fontSize={fs} fill={color}>{truncate(it.label, 15)}</text>
             </g>
           );
           y += 16;
@@ -182,7 +187,7 @@ export function SvgLegend({
         const el = (
           <g key={it.label} transform={`translate(${x}, ${y})`}>
             <rect x={0} y={-6} width={sw} height={sw} rx={2} fill={it.color} />
-            <text x={sw + 6} y={0} fontSize={fs} fill="#888">{truncate(it.label, 24)}</text>
+            <text x={sw + 6} y={0} fontSize={fs} fill={color}>{truncate(it.label, 24)}</text>
           </g>
         );
         x += sw + 6 + textWidth(it.label, fs) + gap;

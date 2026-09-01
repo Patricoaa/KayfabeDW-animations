@@ -72,6 +72,12 @@ export function ScatterChart({data, config}: Props) {
   const yAxisColor = config.yLabelFont?.color ?? st.axisColor;
   const xAxisFamily = config.xLabelFont?.fontFamily;
   const yAxisFamily = config.yLabelFont?.fontFamily;
+  const yTickFamily = config.yLabelFont?.fontFamily;
+  const yTickSize = config.yLabelFont?.size ?? 10;
+  const yTickColor = config.yLabelFont?.color ?? st.textColor;
+  const xTickFamily = config.xLabelFont?.fontFamily;
+  const xTickSize = config.xLabelFont?.size ?? 10;
+  const xTickColor = config.xLabelFont?.color ?? st.textColor;
   const pointColor = (p: (typeof points)[number]) => (p.label && catColors.has(p.label) ? catColors.get(p.label)! : colorFor(config, p.label, 0));
 
   // Optional linear trendline via least squares.
@@ -96,13 +102,13 @@ export function ScatterChart({data, config}: Props) {
         <defs>{frameFilter(shadowId, config.canvasShadow ?? false)}</defs>
         {frameRect(config, shadowId)}
         {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
-        {showLegend !== false && legendItems.length > 0 && <SvgLegend items={legendItems} position={config.legendPosition ?? 'bottom'} width={width} height={height} st={st} headerOffset={headerH} />}
+        {showLegend !== false && legendItems.length > 0 && <SvgLegend items={legendItems} position={config.legendPosition ?? 'bottom'} width={width} height={height} st={st} config={config} headerOffset={headerH} />}
       {config.showGrid !== false && yDom.ticks.map((v, i) => {
         const y = toY(v);
         return (
           <g key={`y-${i}`}>
             <line x1={margin.left} y1={y} x2={margin.left + plotW} y2={y} stroke={st.gridColor} strokeWidth={1} />
-            <text x={margin.left - 8} y={y + 4} textAnchor="end" fill={st.textColor} fontSize={10}>{formatValue(v, numFmt)}</text>
+            <text x={margin.left - 8} y={y + 4} textAnchor="end" fill={yTickColor} fontSize={yTickSize} fontFamily={yTickFamily}>{formatValue(v, numFmt)}</text>
           </g>
         );
       })}
@@ -111,7 +117,7 @@ export function ScatterChart({data, config}: Props) {
         return (
           <g key={`x-${i}`}>
             <line x1={x} y1={margin.top} x2={x} y2={margin.top + plotH} stroke={st.gridColor} strokeWidth={1} />
-            <text x={x} y={margin.top + plotH + 14} textAnchor="middle" fill={st.textColor} fontSize={10}>{formatValue(v, numFmt)}</text>
+            <text x={x} y={margin.top + plotH + 14} textAnchor="middle" fill={xTickColor} fontSize={xTickSize} fontFamily={xTickFamily}>{formatValue(v, numFmt)}</text>
           </g>
         );
       })}

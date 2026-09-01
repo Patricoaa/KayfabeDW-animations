@@ -48,6 +48,9 @@ function MultiArea({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
   const yAxisColor = config.yLabelFont?.color ?? st.axisColor;
   const xAxisFamily = config.xLabelFont?.fontFamily;
   const yAxisFamily = config.yLabelFont?.fontFamily;
+  const yTickFamily = config.yLabelFont?.fontFamily;
+  const yTickSize = config.yLabelFont?.size ?? 10;
+  const yTickColor = config.yLabelFont?.color ?? st.textColor;
 
   const toX = (i: number) => margin.left + (i / Math.max(n - 1, 1)) * plotW;
   const toY = (v: number) => margin.top + plotH - ((v - domain.yMin) / yRange) * plotH;
@@ -67,13 +70,13 @@ function MultiArea({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
         <defs>{frameFilter(shadowId, config.canvasShadow ?? false)}</defs>
         {frameRect(config, shadowId)}
         {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
-        {showLegend && legendItems.length > 0 && <SvgLegend items={legendItems} position={legendPosition} width={width} height={height} st={st} headerOffset={headerH} />}
+        {showLegend && legendItems.length > 0 && <SvgLegend items={legendItems} position={legendPosition} width={width} height={height} st={st} config={config} headerOffset={headerH} />}
           {config.showGrid !== false && tickValues.map((v, i) => {
             const y = toY(v);
             return (
               <g key={i}>
                 <line x1={margin.left} y1={y} x2={width - margin.right} y2={y} stroke={st.gridColor} strokeWidth={1} />
-                <text x={margin.left - 8} y={y + 4} textAnchor="end" fill={st.textColor} fontSize={10}>{formatValue(v, numFmt)}</text>
+                <text x={margin.left - 8} y={y + 4} textAnchor="end" fill={yTickColor} fontSize={yTickSize} fontFamily={yTickFamily}>{formatValue(v, numFmt)}</text>
               </g>
             );
           })}
@@ -133,6 +136,9 @@ function SingleArea({data, config}: Props) {
   const yAxisColor = config.yLabelFont?.color ?? st.axisColor;
   const xAxisFamily = config.xLabelFont?.fontFamily;
   const yAxisFamily = config.yLabelFont?.fontFamily;
+  const yTickFamily = config.yLabelFont?.fontFamily;
+  const yTickSize = config.yLabelFont?.size ?? 10;
+  const yTickColor = config.yLabelFont?.color ?? st.textColor;
 
   if (n === 0) {
     return <div className="flex items-center justify-center h-48 text-muted text-sm">Sin datos para este gráfico</div>;
@@ -157,7 +163,7 @@ function SingleArea({data, config}: Props) {
         return (
           <g key={i}>
             <line x1={margin.left} y1={y} x2={width - margin.right} y2={y} stroke={st.gridColor} strokeWidth={1} />
-            <text x={margin.left - 8} y={y + 4} textAnchor="end" fill={st.textColor} fontSize={10}>{formatValue(v, numFmt)}</text>
+            <text x={margin.left - 8} y={y + 4} textAnchor="end" fill={yTickColor} fontSize={yTickSize} fontFamily={yTickFamily}>{formatValue(v, numFmt)}</text>
           </g>
         );
       })}

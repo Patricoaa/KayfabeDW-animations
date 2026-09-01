@@ -68,12 +68,11 @@ function hoverPos(e: React.MouseEvent<SVGElement>): {x: number; y: number} {
   return {x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height};
 }
 
-// Module-level counter keeps SVG gradient/filter ids unique across charts on a page.
+// Module-level counter keeps SVG filter ids unique across charts on a page.
 let svgNs = 0;
 
-function barFill(color: string, config: ChartConfig, gradId: string | null, isNegative?: boolean): string {
+function barFill(color: string, config: ChartConfig, isNegative?: boolean): string {
   if (isNegative && config.negativeColor) return config.negativeColor;
-  if (config.barGradient && gradId) return `url(#${gradId})`;
   return color;
 }
 
@@ -203,6 +202,9 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const yAxisColor = config.yLabelFont?.color ?? st.axisColor;
   const xAxisFamily = config.xLabelFont?.fontFamily;
   const yAxisFamily = config.yLabelFont?.fontFamily;
+  const yTickFamily = config.yLabelFont?.fontFamily;
+  const yTickSize = config.yLabelFont?.size ?? 10;
+  const yTickColor = config.yLabelFont?.color ?? st.textColor;
   const radius = config.barRadius ?? 2;
   const borderW = config.barBorderWidth ?? 0;
   const borderColor = config.barBorderColor ?? '#ffffff';
@@ -211,8 +213,6 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const dlColor = config.dataLabelColor ?? '#ccc';
   const tooltipEnabled = config.tooltipEnabled ?? true;
   const shadowId = `f-${svgNs++}`;
-  const gradId = config.barGradient ? `bg-${svgNs++}` : null;
-  const gradProps = horizontal ? {x1: '0%', y1: '0%', x2: '100%', y2: '0%'} : {x1: '0%', y1: '0%', x2: '0%', y2: '100%'};
 
   const [tip, setTip] = useState<TooltipState | null>(null);
   const catTip = (ci: number, cat: string, frac: {x: number; y: number}): TooltipState => ({
@@ -273,23 +273,17 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
       <div className="relative w-full">
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
           <defs>
-            {config.barGradient && gradId && (
-              <linearGradient id={gradId} {...gradProps}>
-                <stop offset="0%" stopColor={config.barGradient.from} />
-                <stop offset="100%" stopColor={config.barGradient.to} />
-              </linearGradient>
-            )}
             {frameFilter(shadowId, config.canvasShadow ?? false)}
           </defs>
           {frameRect(config, shadowId)}
           {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
-          {showLegend && legendItems.length > 0 && <SvgLegend items={legendItems} position={legendPosition} width={width} height={height} st={st} headerOffset={headerH} />}
+          {showLegend && legendItems.length > 0 && <SvgLegend items={legendItems} position={legendPosition} width={width} height={height} st={st} config={config} headerOffset={headerH} />}
               {config.showGrid !== false && tickValues.map((v, i) => {
                 const x = marginAdj.left + ((v - domain.yMin) / yRange) * plotW;
                 return (
                   <g key={i}>
                     {i > 0 && <line x1={x} y1={marginAdj.top} x2={x} y2={marginAdj.top + plotH} stroke={st.gridColor} strokeWidth={1} />}
-                    <text x={x} y={marginAdj.top + plotH + 14} textAnchor="middle" fill={st.textColor} fontSize={10}>
+                    <text x={x} y={marginAdj.top + plotH + 14} textAnchor="middle" fill={yTickColor} fontSize={yTickSize} fontFamily={yTickFamily}>
                       {formatValue(v, numFmt)}
                     </text>
                   </g>
@@ -350,10 +344,10 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                         w = bw;
                         hh = barH;
                       }
-                      const fill = barFill(s.color, config, gradId, val < 0);
+                      const fill = barFill(s.color, config, val < 0);
                       const rectW = Math.max(w, 0);
-                      const pillLast = stacked || stackedPercent ? si === nS - 1 : true;
-                      const rEnds = !!config.barRadiusEndsOnly;
+                      const rEnds = (stacked || stackedPercent) && !!config.barRadiusEndsOnly;
+                      const pillLast = si === nS - 1;
                       return rEnds ? (
                         <path
                           key={`${ci}-${si}`}
@@ -428,7 +422,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                   ? {x: marginAdj.left + 3, anchor: 'start' as const}
                   : catPos === 'inside'
                     ? {x: marginAdj.left + plotW / 2, anchor: 'middle' as const}
-                    : catPos === 'end'
+                    : (catPos === 'end' || catPos === 'beside')
                       ? {x: maxEndX + 4, anchor: 'start' as const}
                       : {x: marginAdj.left - 8, anchor: 'end' as const};
 
@@ -442,6 +436,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                     fill={catColor}
                     fontSize={catSize}
                     fontFamily={catFamily}
+                    transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${labelAt.x}, ${cy + 3})` : undefined}
                   >
                     {cat.length > 16 ? cat.slice(0, 16) + '…' : cat}
                   </text>
@@ -508,23 +503,17 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
     <div className="relative w-full">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
         <defs>
-          {config.barGradient && gradId && (
-            <linearGradient id={gradId} {...gradProps}>
-              <stop offset="0%" stopColor={config.barGradient.from} />
-              <stop offset="100%" stopColor={config.barGradient.to} />
-            </linearGradient>
-          )}
           {frameFilter(shadowId, config.canvasShadow ?? false)}
         </defs>
         {frameRect(config, shadowId)}
         {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
-        {showLegend && legendItems.length > 0 && <SvgLegend items={legendItems} position={legendPosition} width={width} height={height} st={st} headerOffset={headerH} />}
+        {showLegend && legendItems.length > 0 && <SvgLegend items={legendItems} position={legendPosition} width={width} height={height} st={st} config={config} headerOffset={headerH} />}
             {config.showGrid !== false && tickValues.map((v, i) => {
               const y = marginAdj.top + plotH - ((v - domain.yMin) / yRange) * plotH;
               return (
                 <g key={i}>
                   {i > 0 && <line x1={marginAdj.left} y1={y} x2={width - marginAdj.right} y2={y} stroke={st.gridColor} strokeWidth={1} />}
-                  <text x={marginAdj.left - 8} y={y + 4} textAnchor="end" fill={st.textColor} fontSize={10}>
+                  <text x={marginAdj.left - 8} y={y + 4} textAnchor="end" fill={yTickColor} fontSize={yTickSize} fontFamily={yTickFamily}>
                     {formatValue(v, numFmt)}
                   </text>
                 </g>
@@ -583,10 +572,10 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                 w = barW;
                 hh = h;
               }
-const fill = barFill(s.color, config, gradId, val < 0);
+const fill = barFill(s.color, config, val < 0);
                 const rectH = Math.max(hh, 0);
-                const pillLast = stacked || stackedPercent ? si === nS - 1 : true;
-                const rEnds = !!config.barRadiusEndsOnly;
+                const rEnds = (stacked || stackedPercent) && !!config.barRadiusEndsOnly;
+                const pillLast = si === nS - 1;
                 return rEnds ? (
                   <path
                     key={`${ci}-${si}`}
@@ -667,7 +656,7 @@ const fill = barFill(s.color, config, gradId, val < 0);
             }
 
             if (!hasImg) {
-              if (catPos === 'end') {
+              if (catPos === 'end' || catPos === 'beside') {
                 let topY = marginAdj.top + plotH;
                 if (stackedPercent) {
                   topY = marginAdj.top;
@@ -678,21 +667,21 @@ const fill = barFill(s.color, config, gradId, val < 0);
                   topY = marginAdj.top + plotH - (maxInCat / yRange) * plotH;
                 }
                 return (
-                  <text key={ci} x={cx} y={topY - 4} textAnchor="middle" fill={catColor} fontSize={catSize} fontFamily={catFamily}>
+                  <text key={ci} x={cx} y={topY - 4} textAnchor="middle" fill={catColor} fontSize={catSize} fontFamily={catFamily} transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${cx}, ${topY - 4})` : undefined}>
                     {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
                   </text>
                 );
               }
               if (catPos === 'inside') {
                 return (
-                  <text key={ci} x={cx} y={marginAdj.top + plotH / 2} textAnchor="middle" fill={catColor} fontSize={catSize} fontFamily={catFamily}>
+                  <text key={ci} x={cx} y={marginAdj.top + plotH / 2} textAnchor="middle" fill={catColor} fontSize={catSize} fontFamily={catFamily} transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${cx}, ${marginAdj.top + plotH / 2})` : undefined}>
                     {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
                   </text>
                 );
               }
               if (catPos === 'start') {
                 return (
-                  <text key={ci} x={cx} y={marginAdj.top + plotH - 4} textAnchor="middle" fill={catColor} fontSize={catSize} fontFamily={catFamily}>
+                  <text key={ci} x={cx} y={marginAdj.top + plotH - 4} textAnchor="middle" fill={catColor} fontSize={catSize} fontFamily={catFamily} transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${cx}, ${marginAdj.top + plotH - 4})` : undefined}>
                     {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
                   </text>
                 );
@@ -706,6 +695,7 @@ const fill = barFill(s.color, config, gradId, val < 0);
                   fill={catColor}
                   fontSize={catSize}
                   fontFamily={catFamily}
+                  transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${cx}, ${height - marginAdj.bottom + 14})` : undefined}
                 >
                   {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
                 </text>
@@ -793,8 +783,10 @@ function SingleBar({data, config}: Props) {
   const dlColor = config.dataLabelColor ?? '#ccc';
   const tooltipEnabled = config.tooltipEnabled ?? true;
   const shadowId = `f-${svgNs++}`;
-  const gradId = config.barGradient ? `bg-${svgNs++}` : null;
-  const gradProps = horizontal ? {x1: '0%', y1: '0%', x2: '100%', y2: '0%'} : {x1: '0%', y1: '0%', x2: '0%', y2: '100%'};
+  const labelAngle = config.labelAngle ?? (n > 8 ? -30 : 0);
+  const yTickFamily = config.yLabelFont?.fontFamily;
+  const yTickSize = config.yLabelFont?.size ?? 10;
+  const yTickColor = config.yLabelFont?.color ?? st.textColor;
   const [tip, setTip] = useState<TooltipState | null>(null);
 
   const marginAdj = {...margin};
@@ -823,12 +815,6 @@ function SingleBar({data, config}: Props) {
       <div className="relative">
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
           <defs>
-            {config.barGradient && gradId && (
-              <linearGradient id={gradId} {...gradProps}>
-                <stop offset="0%" stopColor={config.barGradient.from} />
-                <stop offset="100%" stopColor={config.barGradient.to} />
-              </linearGradient>
-            )}
             {frameFilter(shadowId, config.canvasShadow ?? false)}
           </defs>
           {frameRect(config, shadowId)}
@@ -838,7 +824,7 @@ function SingleBar({data, config}: Props) {
             return (
               <g key={i}>
                 {i > 0 && <line x1={x} y1={marginAdj.top} x2={x} y2={marginAdj.top + plotH2} stroke={st.gridColor} strokeWidth={1} />}
-                <text x={x} y={marginAdj.top + plotH2 + 14} textAnchor="middle" fill={st.textColor} fontSize={10}>
+                <text x={x} y={marginAdj.top + plotH2 + 14} textAnchor="middle" fill={yTickColor} fontSize={yTickSize} fontFamily={yTickFamily}>
                   {formatValue(v, numFmt)}
                 </text>
               </g>
@@ -862,7 +848,7 @@ function SingleBar({data, config}: Props) {
                 ? {x: marginAdj.left + 3, anchor: 'start' as const}
                 : catPos === 'inside'
                   ? {x: marginAdj.left + bw / 2, anchor: 'middle' as const}
-                  : catPos === 'end'
+                  : (catPos === 'end' || catPos === 'beside')
                     ? {x: endX + 4, anchor: 'start' as const}
                     : {x: marginAdj.left - 8, anchor: 'end' as const};
             const barEndAvatar = avatarActive && avatarPos === 'bar-end' && !!img;
@@ -875,17 +861,7 @@ function SingleBar({data, config}: Props) {
                 onMouseLeave={tooltipEnabled ? () => setTip(null) : undefined}
                 fontFamily={config.dataLabelFontFamily ?? undefined}
               >
-                {config.barRadiusEndsOnly ? (
-                  <path
-                    d={roundedRectPath(marginAdj.left, y, bw, barH, radius, {tr: true, br: true})}
-                    fill={barFill(color, config, gradId, d.value < 0)}
-                    stroke={borderW > 0 ? borderColor : 'none'}
-                    strokeWidth={borderW}
-                    opacity={st.globalOpacity}
-                  />
-                ) : (
-                  <rect x={marginAdj.left} y={y} width={bw} height={barH} fill={barFill(color, config, gradId, d.value < 0)} rx={radius} stroke={borderW > 0 ? borderColor : 'none'} strokeWidth={borderW} opacity={st.globalOpacity} />
-                )}
+                <rect x={marginAdj.left} y={y} width={bw} height={barH} fill={barFill(color, config, d.value < 0)} rx={radius} stroke={borderW > 0 ? borderColor : 'none'} strokeWidth={borderW} opacity={st.globalOpacity} />
                 {config.showDataLabels !== false && dlPos === 'center' && (
                   <text x={marginAdj.left + bw / 2} y={y + barH / 2 + 3} textAnchor="middle" fill={dlColor} fontSize={dlSize} pointerEvents="none">
                     {formatValue(d.value, numFmt)}
@@ -911,7 +887,7 @@ function SingleBar({data, config}: Props) {
                   <Avatar href={img} cx={marginAdj.left - 8 - avatarSize / 2} cy={y + barH / 2} clipId={`bh-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
                 )}
                 {!(avatarActive && avatarPos === 'replace-label' && img) && (
-                  <text x={labelAt.x} y={y + barH / 2 + 3} textAnchor={labelAt.anchor} fill={catColor} fontSize={catSize} fontFamily={catFamily}>
+                  <text x={labelAt.x} y={y + barH / 2 + 3} textAnchor={labelAt.anchor} fill={catColor} fontSize={catSize} fontFamily={catFamily} transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${labelAt.x}, ${y + barH / 2 + 3})` : undefined}>
                     {d.label.length > 16 ? d.label.slice(0, 16) + '…' : d.label}
                   </text>
                 )}
@@ -928,18 +904,11 @@ function SingleBar({data, config}: Props) {
   const gap = (plotW2 - barWidth * n) / (n + 1);
 
   const tickValues = domain.ticks;
-  const labelAngle = config.labelAngle ?? (n > 8 ? -30 : 0);
 
   return (
     <div className="relative">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
         <defs>
-          {config.barGradient && gradId && (
-            <linearGradient id={gradId} {...gradProps}>
-              <stop offset="0%" stopColor={config.barGradient.from} />
-              <stop offset="100%" stopColor={config.barGradient.to} />
-            </linearGradient>
-          )}
           {frameFilter(shadowId, config.canvasShadow ?? false)}
         </defs>
         {frameRect(config, shadowId)}
@@ -949,7 +918,7 @@ function SingleBar({data, config}: Props) {
           return (
             <g key={i}>
               {i > 0 && <line x1={marginAdj.left} y1={y} x2={width - marginAdj.right} y2={y} stroke={st.gridColor} strokeWidth={1} />}
-              <text x={marginAdj.left - 8} y={y + 4} textAnchor="end" fill={st.textColor} fontSize={10}>
+              <text x={marginAdj.left - 8} y={y + 4} textAnchor="end" fill={yTickColor} fontSize={yTickSize} fontFamily={yTickFamily}>
                 {formatValue(v, numFmt)}
               </text>
             </g>
@@ -970,7 +939,7 @@ function SingleBar({data, config}: Props) {
           const barCenterY = topY + barH / 2;
           const labelAt = avatarActive && avatarPos === 'beside-label' && img
             ? {x: x + barWidth / 2 + avatarSize + 6, y: labelY, anchor: 'middle' as const}
-            : catPos === 'end'
+            : (catPos === 'end' || catPos === 'beside')
               ? {x: x + barWidth / 2, y: topY - 6, anchor: 'middle' as const}
               : catPos === 'inside'
                 ? {x: x + barWidth / 2, y: barCenterY, anchor: 'middle' as const}
@@ -985,17 +954,7 @@ function SingleBar({data, config}: Props) {
             onMouseLeave={tooltipEnabled ? () => setTip(null) : undefined}
             fontFamily={config.dataLabelFontFamily ?? undefined}
           >
-              {config.barRadiusEndsOnly ? (
-                <path
-                  d={roundedRectPath(x, topY, barWidth, Math.max(barH, 0), radius, {tl: true, tr: true})}
-                  fill={barFill(color, config, gradId, d.value < 0)}
-                  stroke={borderW > 0 ? borderColor : 'none'}
-                  strokeWidth={borderW}
-                  opacity={st.globalOpacity}
-                />
-              ) : (
-                <rect x={x} y={topY} width={barWidth} height={Math.max(barH, 0)} fill={barFill(color, config, gradId, d.value < 0)} rx={radius} stroke={borderW > 0 ? borderColor : 'none'} strokeWidth={borderW} opacity={st.globalOpacity} />
-              )}
+              <rect x={x} y={topY} width={barWidth} height={Math.max(barH, 0)} fill={barFill(color, config, d.value < 0)} rx={radius} stroke={borderW > 0 ? borderColor : 'none'} strokeWidth={borderW} opacity={st.globalOpacity} />
               {config.showDataLabels !== false && dlPos === 'center' && (
                 <text x={x + barWidth / 2} y={barCenterY + 3} textAnchor="middle" fill={dlColor} fontSize={dlSize} pointerEvents="none">
                   {formatValue(d.value, numFmt)}
