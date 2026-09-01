@@ -698,6 +698,7 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
                 onChange={(e) => update({categoryLabelPosition: e.target.value as CategoryLabelPosition})}
                 className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
               >
+                <option value="hide">Ocultar</option>
                 <option value="axis">En el eje</option>
                 <option value="start-out">Fuera · inicio</option>
                 <option value="center-out">Fuera · centro</option>
@@ -961,20 +962,12 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
                   onChange={(e) => update({avatarPosition: e.target.value as AvatarPosition})}
                   className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
                 >
-                  {config.horizontal ? (
-                    <>
-                      <option value="bar-end">Al final de la barra</option>
-                      <option value="beside-label">Junto a la etiqueta</option>
-                      <option value="replace-label">Reemplazar etiqueta</option>
-                    </>
-                  ) : (
-                    <>
-                      <option value="above">Arriba de la barra</option>
-                      <option value="beside-label">Junto a la etiqueta</option>
-                      <option value="replace-label">Reemplazar etiqueta</option>
-                    </>
-                  )}
+                  <option value="above">Sobre la barra</option>
+                  <option value="bar-end">Al final de la barra</option>
+                  <option value="beside-label">Junto a la etiqueta</option>
+                  <option value="after-label">Después de la etiqueta</option>
                 </select>
+                <p className="text-[10px] text-muted pt-1">En vertical, sobre la barra y al final de la barra quedan sobre el extremo de la columna.</p>
               </div>
               <p className="text-[10px] text-muted">Las imágenes se muestran en el preview y en el SVG descargado; puede que no aparezcan al exportar a PNG.</p>
             </>

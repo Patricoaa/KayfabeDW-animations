@@ -9,14 +9,14 @@ export type LegendPosition = 'top' | 'right' | 'bottom';
 export type GroupMode = 'grouped' | 'stacked' | 'stacked-percent';
 
 export type AvatarShape = 'circle' | 'rounded';
-export type AvatarPosition = 'above' | 'below' | 'inside' | 'beside-label' | 'replace-label' | 'bar-end' | 'bar-start';
+export type AvatarPosition = 'above' | 'bar-end' | 'beside-label' | 'after-label';
 
 export type FontWeight = 400 | 500 | 600 | 700;
 
-// Category label placement. `*out` places labels outside the bar/column
-// (below start, beside center, above/after end); `*in` places them over the
-// bar body. 'axis' (default) keeps labels on the axis line.
-export type CategoryLabelPosition = 'axis' | 'start-out' | 'center-out' | 'end-out' | 'start-in' | 'center-in' | 'end-in';
+// Category label placement. 'hide' draws no category label; `*out` places
+// labels beside the bar/column (start, center, end); `*in` places them over
+// the bar body. 'axis' (default) keeps labels on the axis line.
+export type CategoryLabelPosition = 'hide' | 'axis' | 'start-out' | 'center-out' | 'end-out' | 'start-in' | 'center-in' | 'end-in';
 
 // Per-section text style. Every field is optional: empty sections "inherit"
 // from the general chart typography (style.fontFamily / textColor / labelFontSize).
@@ -209,7 +209,7 @@ export type ChartConfig = {
   configVersion?: number;
 };
 
-export const CHART_CONFIG_VERSION = 13;
+export const CHART_CONFIG_VERSION = 14;
 
 export const DEFAULT_CHART_CONFIG: ChartConfig = {
   type: 'bar',
@@ -255,8 +255,8 @@ export const DEFAULT_CHART_CONFIG: ChartConfig = {
 };
 
 export function applyChartDefaults(config: Partial<ChartConfig>): ChartConfig {
-  // V12: gradient bar fill was removed from the product. V13: the canvas
-  // shadow was removed. Strip any legacy value so old saved configs render clean.
+  // V12: gradient bar fill was removed. V13: the canvas shadow was removed.
+  // V14: avatar positions were reformulated (no more replace-label/below/inside).
   if (!config) return DEFAULT_CHART_CONFIG;
   let clean = config;
   if ('barGradient' in clean || 'canvasShadow' in clean) {
@@ -266,5 +266,10 @@ export function applyChartDefaults(config: Partial<ChartConfig>): ChartConfig {
     void canvasShadow;
     clean = rest as Partial<ChartConfig>;
   }
-  return {...DEFAULT_CHART_CONFIG, ...clean};
+  const validAvatarPositions = ['above', 'bar-end', 'beside-label', 'after-label'];
+  const remapped = {...DEFAULT_CHART_CONFIG, ...clean};
+  if (remapped.avatarPosition !== undefined && !validAvatarPositions.includes(remapped.avatarPosition)) {
+    remapped.avatarPosition = 'beside-label';
+  }
+  return remapped;
 }
