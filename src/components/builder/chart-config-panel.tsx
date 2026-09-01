@@ -934,14 +934,14 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
                 <label className="text-sm font-medium mb-1 block">Forma</label>
                 <div className="flex gap-1">
                   {([
-                    {value: 'circle', label: 'Círculo'},
                     {value: 'rounded', label: 'Esquinas redondeadas'},
+                    {value: 'circle', label: 'Círculo'},
                   ] as {value: AvatarShape; label: string}[]).map((s) => (
                     <button
                       key={s.value}
                       onClick={() => update({avatarShape: s.value})}
                       className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
-                        (config.avatarShape ?? 'circle') === s.value
+                        (config.avatarShape ?? 'rounded') === s.value
                           ? 'bg-amber-500 text-black'
                           : 'bg-elevated text-secondary hover:bg-card-hover'
                       }`}
@@ -952,8 +952,8 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
                 </div>
               </div>
               <NumberInput label="Tamaño" value={config.avatarSize} min={8} max={128} step={2} onChange={(v) => update({avatarSize: v})} />
-              {(config.avatarShape ?? 'circle') === 'rounded' && (
-                <NumberInput label="Radio de esquina" value={config.avatarRadius} min={0} max={40} step={1} onChange={(v) => update({avatarRadius: v})} />
+              {(config.avatarShape ?? 'rounded') === 'rounded' && (
+                <NumberInput label="Radio de esquina (vacío = auto)" value={config.avatarRadius} min={0} max={40} step={1} onChange={(v) => update({avatarRadius: v})} />
               )}
               <div>
                 <label className="text-sm font-medium mb-1 block">Posición</label>

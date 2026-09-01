@@ -153,7 +153,8 @@ export type ChartConfig = {
   tableSort?: {column: string; direction: 'asc' | 'desc'};
   // F5: bar-chart avatars. When `avatarField` is set (an optional dataset column
   // holding absolute image URLs), each single-series bar renders that image.
-  // Shape/radius/size/position are highly customizable.
+  // Rounded-rect is the default shape (fits promo/logo photos); `avatarRadius`
+  // overrides the proportional default of 25% of `avatarSize`.
   avatarField?: string;
   avatarShape?: AvatarShape;
   avatarRadius?: number;
@@ -235,8 +236,7 @@ export const DEFAULT_CHART_CONFIG: ChartConfig = {
   showDataLabels: true,
   showMarkers: true,
   groupMode: 'grouped',
-  avatarShape: 'circle',
-  avatarRadius: 6,
+  avatarShape: 'rounded',
   avatarSize: 24,
   avatarPosition: 'above',
   barRadius: 2,

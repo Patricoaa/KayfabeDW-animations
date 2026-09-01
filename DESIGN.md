@@ -66,6 +66,7 @@ Base type scale: body 14px, button 13px (600), badge 10px (600), `text-micro` se
 - **Cards**: `bg-card border-border-default rounded-lg`, amber-tinted hover border.
 - **Empty states**: designed onboarding cards with amber icon, dashed border, guidance text.
 - **Badges**: amber bg at low opacity + amber text; semantic badges use their functional hue.
+- **Avatares (imágenes en barras)**: por defecto rectángulo con esquinas redondeadas (radio = 25% del tamaño), para que retratos/logos no se recorten. El círculo queda como opción del usuario.
 - **Focus**: amber ring (`focus:ring-amber-500`).
 - **Icons**: Lucide throughout — no emoji.
 

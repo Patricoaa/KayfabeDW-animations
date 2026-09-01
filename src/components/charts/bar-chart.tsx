@@ -137,6 +137,14 @@ function estTextWidth(text: string, size: number): number {
   return Math.min(text.length, 16) * size * 0.58 + 2;
 }
 
+// Rounded-rect avatar radius defaults to a quarter of the size unless the user
+// pinned an explicit radius; circles ignore the radius entirely.
+function resolveAvatarRadius(config: ChartConfig, size: number): number {
+  if (config.avatarRadius !== undefined) return config.avatarRadius;
+  if ((config.avatarShape ?? 'rounded') === 'circle') return size / 2;
+  return Math.min(Math.max(Math.round(size * 0.25), 4), 24);
+}
+
 function Avatar({
   href, cx, cy, clipId, shape, size, radius,
 }: {
@@ -178,8 +186,8 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
 
   const avatarField = config.avatarField;
   const avatarSize = config.avatarSize ?? 24;
-  const avatarShape = config.avatarShape ?? 'circle';
-  const avatarRadius = config.avatarRadius ?? 6;
+  const avatarShape = config.avatarShape ?? 'rounded';
+  const avatarRadius = resolveAvatarRadius(config, avatarSize);
   const avatarPos = config.avatarPosition ?? 'above';
   const avatarActive = !!avatarField;
 
@@ -812,8 +820,8 @@ function SingleBar({data, config}: Props) {
   const avatarField = config.avatarField;
   const avatarActive = !!avatarField;
   const avatarSize = config.avatarSize ?? 24;
-  const avatarShape = config.avatarShape ?? 'circle';
-  const avatarRadius = config.avatarRadius ?? 6;
+  const avatarShape = config.avatarShape ?? 'rounded';
+  const avatarRadius = resolveAvatarRadius(config, avatarSize);
   const avatarPos = config.avatarPosition ?? 'above';
 
   const radius = config.barRadius ?? 2;
