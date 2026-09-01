@@ -2,7 +2,7 @@
 
 import type {ChartConfig} from '@/lib/chart-config';
 import {prepareSeries, prepareMultiSeries, formatValue, resolveChartStyle, resolveYDomain, type PreparedMultiSeries} from '@/lib/chart-data';
-import {Legend} from './legend';
+import {SvgHeader, SvgLegend, headerHeight, legendReserve, frameRect, frameFilter, nextSvgId, type LegendItem} from './chart-frame';
 
 type Props = {
   data: Record<string, unknown>[];
@@ -24,7 +24,10 @@ function MultiLine({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
   const st = resolveChartStyle(config.style);
   const width = config.width ?? 600;
   const height = config.height ?? 380;
-  const margin = {top: 24, right: 24, bottom: 66, left: 66};
+  const legendItems: LegendItem[] = multi.series.map((s) => ({label: s.name, color: s.color}));
+  const headerH = headerHeight(config, st);
+  const legendR = legendReserve(config, legendItems);
+  const margin = {top: 24 + headerH + legendR.top, right: 24 + legendR.right, bottom: 66 + legendR.bottom, left: 66};
   const plotW = width - margin.left - margin.right;
   const plotH = height - margin.top - margin.bottom;
   const n = multi.categories.length;
@@ -37,6 +40,14 @@ function MultiLine({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
   const showLegend = config.showLegend ?? true;
   const legendPosition = config.legendPosition ?? 'bottom';
   const smooth = config.lineSmooth ?? false;
+  const shadowId = nextSvgId('f');
+  const catColor = config.xLabelFont?.color ?? st.textColor;
+  const catSize = config.xLabelFont?.size ?? st.labelFontSize;
+  const catFamily = config.xLabelFont?.fontFamily ?? undefined;
+  const xAxisColor = config.xLabelFont?.color ?? st.axisColor;
+  const yAxisColor = config.yLabelFont?.color ?? st.axisColor;
+  const xAxisFamily = config.xLabelFont?.fontFamily;
+  const yAxisFamily = config.yLabelFont?.fontFamily;
 
   const toX = (i: number) => margin.left + (i / Math.max(n - 1, 1)) * plotW;
   const toY = (v: number) => margin.top + plotH - ((v - domain.yMin) / yRange) * plotH;
@@ -52,11 +63,12 @@ function MultiLine({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
   });
 
   return (
-    <div className="flex flex-col gap-2">
-      {showLegend && legendPosition === 'top' && <Legend items={multi.series.map((s) => ({label: s.name, color: s.color}))} position="top" />}
-      <div className="flex gap-2">
-        {showLegend && legendPosition === 'right' && <Legend items={multi.series.map((s) => ({label: s.name, color: s.color}))} position="right" />}
-        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
+    <div className="relative w-full">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
+        <defs>{frameFilter(shadowId, config.canvasShadow ?? false)}</defs>
+        {frameRect(config, shadowId)}
+        {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
+        {showLegend && legendItems.length > 0 && <SvgLegend items={legendItems} position={legendPosition} width={width} height={height} st={st} headerOffset={headerH} />}
           {config.showGrid !== false && tickValues.map((v, i) => {
             const y = toY(v);
             return (
@@ -66,8 +78,8 @@ function MultiLine({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
               </g>
             );
           })}
-          {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={st.axisColor} fontSize={11}>{config.xLabel}</text>}
-          {config.yLabel && <text x={16} y={height / 2} textAnchor="middle" fill={st.axisColor} fontSize={11} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text>}
+          {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily}>{config.xLabel}</text>}
+          {config.yLabel && <text x={16} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text>}
           {seriesPaths.map((s) => (
             <path key={s.name} d={s.path} fill="none" stroke={s.color} strokeWidth={st.lineWidth} strokeLinejoin="round" strokeDasharray={config.lineDash ? '6 4' : undefined} />
           ))}
@@ -85,8 +97,9 @@ function MultiLine({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
                 x={cx}
                 y={height - margin.bottom + 14}
                 textAnchor="middle"
-                fill={st.textColor}
-                fontSize={st.labelFontSize}
+                fill={catColor}
+                fontSize={catSize}
+                fontFamily={catFamily}
                 transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${cx}, ${height - margin.bottom + 14})` : undefined}
               >
                 {cat.length > 10 ? cat.slice(0, 10) + '…' : cat}
@@ -94,8 +107,6 @@ function MultiLine({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
             );
           })}
         </svg>
-      </div>
-      {showLegend && legendPosition === 'bottom' && <Legend items={multi.series.map((s) => ({label: s.name, color: s.color}))} position="bottom" />}
     </div>
   );
 }
@@ -105,7 +116,7 @@ function SingleLine({data, config}: Props) {
   const st = resolveChartStyle(config.style);
   const width = config.width ?? 600;
   const height = config.height ?? 380;
-  const margin = {top: 24, right: 24, bottom: 66, left: 66};
+  const margin = {top: 24 + headerHeight(config, st), right: 24, bottom: 66, left: 66};
   const plotW = width - margin.left - margin.right;
   const plotH = height - margin.top - margin.bottom;
   const n = prepared.items.length;
@@ -117,6 +128,14 @@ function SingleLine({data, config}: Props) {
   const labelAngle = config.labelAngle ?? (n > 8 ? -30 : 0);
   const showMarkers = config.showMarkers ?? true;
   const smooth = config.lineSmooth ?? false;
+  const shadowId = nextSvgId('f');
+  const catColor = config.xLabelFont?.color ?? st.textColor;
+  const catSize = config.xLabelFont?.size ?? st.labelFontSize;
+  const catFamily = config.xLabelFont?.fontFamily ?? undefined;
+  const xAxisColor = config.xLabelFont?.color ?? st.axisColor;
+  const yAxisColor = config.yLabelFont?.color ?? st.axisColor;
+  const xAxisFamily = config.xLabelFont?.fontFamily;
+  const yAxisFamily = config.yLabelFont?.fontFamily;
 
   if (n === 0) {
     return <div className="flex items-center justify-center h-48 text-muted text-sm">Sin datos para este gráfico</div>;
@@ -129,7 +148,11 @@ function SingleLine({data, config}: Props) {
   const path = (smooth ? buildSmoothPath : buildLinearPath)(pts);
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
+    <div className="relative w-full">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
+        <defs>{frameFilter(shadowId, config.canvasShadow ?? false)}</defs>
+        {frameRect(config, shadowId)}
+        {headerHeight(config, st) > 0 && <SvgHeader config={config} st={st} width={width} />}
       {config.showGrid !== false && tickValues.map((v, i) => {
         const y = toY(v);
         return (
@@ -139,8 +162,8 @@ function SingleLine({data, config}: Props) {
           </g>
         );
       })}
-      {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={st.axisColor} fontSize={11}>{config.xLabel}</text>}
-      {config.yLabel && <text x={16} y={height / 2} textAnchor="middle" fill={st.axisColor} fontSize={11} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text>}
+      {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily}>{config.xLabel}</text>}
+      {config.yLabel && <text x={16} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text>}
       <path d={path} fill="none" stroke={color} strokeWidth={st.lineWidth} strokeLinejoin="round" strokeDasharray={config.lineDash ? '6 4' : undefined} />
       {showMarkers &&
         pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={st.pointSize} fill={color} stroke="#111" strokeWidth={1.5} opacity={st.pointOpacity} />)}
@@ -150,14 +173,16 @@ function SingleLine({data, config}: Props) {
           x={toX(i)}
           y={height - margin.bottom + 14}
           textAnchor="middle"
-          fill={st.textColor}
-          fontSize={st.labelFontSize}
+          fill={catColor}
+          fontSize={catSize}
+          fontFamily={catFamily}
           transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${toX(i)}, ${height - margin.bottom + 14})` : undefined}
         >
           {p.label.length > 10 ? p.label.slice(0, 10) + '…' : p.label}
         </text>
       ))}
     </svg>
+    </div>
   );
 }
 

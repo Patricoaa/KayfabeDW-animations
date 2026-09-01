@@ -9,7 +9,15 @@ export type LegendPosition = 'top' | 'right' | 'bottom';
 export type GroupMode = 'grouped' | 'stacked' | 'stacked-percent';
 
 export type AvatarShape = 'circle' | 'rounded';
-export type AvatarPosition = 'above' | 'beside-label' | 'replace-label' | 'bar-end';
+export type AvatarPosition = 'above' | 'below' | 'inside' | 'beside-label' | 'replace-label' | 'bar-end' | 'bar-start';
+
+// Per-section text style. Every field is optional: empty sections "inherit"
+// from the general chart typography (style.fontFamily / textColor / labelFontSize).
+export type SectionFont = {
+  fontFamily?: string;
+  color?: string;
+  size?: number;
+};
 
 export type ChartFilterOp = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'is_empty' | 'is_not_empty';
 
@@ -69,6 +77,7 @@ export const PALETTES: {name: string; colors: string[]}[] = [
 export type ChartConfig = {
   type: ChartType;
   title?: string;
+  subtitle?: string;
   xField?: string;
   yField?: string;
   categoryField?: string;
@@ -144,11 +153,31 @@ export type ChartConfig = {
   barCategoryGap?: number;         // 0-0.5 fraction of the band used as side padding
   negativeColor?: string;          // color for negative-value bars (single/grouped)
   barGradient?: {from: string; to: string}; // vertical linear gradient fill (overrides solid color)
+  // Pill-bar look: corner radius applies only to the outer end of each bar
+  // (top in vertical, right in horizontal); in stacked bars only the last
+  // segment is rounded — the Flourish "rounded time-series" treat.
+  barRadiusEndsOnly?: boolean;
 
   // Data labels (independent of the series/axis text colors).
   dataLabelPosition?: 'auto' | 'inside' | 'outside' | 'center';
   dataLabelFontSize?: number;
   dataLabelColor?: string;
+  dataLabelFontFamily?: string;
+
+  // Category (x) label placement + its own font. `categoryLabelPosition`
+  // only applies to bar charts: 'axis' keeps labels on the axis line,
+  // 'start'/'inside'/'end' move them next to / inside each bar.
+  categoryLabelPosition?: 'axis' | 'start' | 'inside' | 'end';
+
+  // Per-section font overrides (inherit general typography when unset).
+  headerFont?: SectionFont;
+  xLabelFont?: SectionFont;
+  yLabelFont?: SectionFont;
+
+  // Per-category/per-datum color overrides (label -> color), applied before
+  // the palette for single-series bars, pie slices, scatter categories and
+  // single-series lines/areas.
+  colorOverrides?: Record<string, string>;
 
   // Canvas frame (drawn inside the SVG so it survives export).
   canvasBackground?: string;
@@ -156,6 +185,7 @@ export type ChartConfig = {
   canvasBorderWidth?: number;
   canvasBorderRadius?: number;
   canvasShadow?: boolean;
+  canvasPreset?: string;
 
   // Horizontal reference / target lines drawn over the plot.
   referenceLines?: {value: number; label?: string; color?: string; dash?: boolean}[];
@@ -166,11 +196,12 @@ export type ChartConfig = {
   configVersion?: number;
 };
 
-export const CHART_CONFIG_VERSION = 10;
+export const CHART_CONFIG_VERSION = 11;
 
 export const DEFAULT_CHART_CONFIG: ChartConfig = {
   type: 'bar',
   title: '',
+  subtitle: '',
   // V7: Colorblind-friendly palette (Wong 2011 + adapted)
   colors: [
     '#0072B2', '#E69F00', '#009E73', '#F0E442',
@@ -202,6 +233,8 @@ export const DEFAULT_CHART_CONFIG: ChartConfig = {
   dataLabelPosition: 'auto',
   dataLabelFontSize: 10,
   dataLabelColor: '#cccccc',
+  categoryLabelPosition: 'axis',
+  barRadiusEndsOnly: false,
   canvasBorderRadius: 0,
   canvasBorderWidth: 0,
   tooltipEnabled: true,

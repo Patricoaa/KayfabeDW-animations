@@ -2,8 +2,8 @@
 
 import {useState} from 'react';
 import type {ChartConfig, NumberFormat} from '@/lib/chart-config';
-import {prepareSeries, prepareMultiSeries, formatValue, pickColor, resolveChartStyle, resolveYDomain, type PreparedMultiSeries} from '@/lib/chart-data';
-import {Legend} from './legend';
+import {prepareSeries, prepareMultiSeries, formatValue, colorFor, resolveChartStyle, resolveYDomain, type PreparedMultiSeries} from '@/lib/chart-data';
+import {SvgHeader, SvgLegend, roundedRectPath, headerHeight, legendReserve, frameRect, frameFilter, type LegendItem} from './chart-frame';
 
 type Props = {
   data: Record<string, unknown>[];
@@ -75,33 +75,6 @@ function barFill(color: string, config: ChartConfig, gradId: string | null, isNe
   if (isNegative && config.negativeColor) return config.negativeColor;
   if (config.barGradient && gradId) return `url(#${gradId})`;
   return color;
-}
-
-function frameRect(config: ChartConfig, shadowId?: string) {
-  const w = config.width ?? 600;
-  const h = config.height ?? 380;
-  return (
-    <rect
-      x={0}
-      y={0}
-      width={w}
-      height={h}
-      rx={config.canvasBorderRadius ?? 0}
-      fill={config.canvasBackground ?? 'none'}
-      stroke={(config.canvasBorderWidth ?? 0) > 0 ? (config.canvasBorderColor ?? '#333') : 'none'}
-      strokeWidth={config.canvasBorderWidth ?? 0}
-      filter={config.canvasShadow ? `url(#${shadowId})` : undefined}
-    />
-  );
-}
-
-function frameFilter(shadowId: string, enabled: boolean) {
-  if (!enabled) return null;
-  return (
-    <filter id={shadowId} x="-5%" y="-5%" width="115%" height="115%">
-      <feDropShadow dx="0" dy="5" stdDeviation="7" floodColor="#000000" floodOpacity="0.35" />
-    </filter>
-  );
 }
 
 function referenceLinesSvg(
@@ -208,7 +181,10 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
 
   const width = config.width ?? 600;
   const height = config.height ?? 380;
-  const margin = {top: 24, right: 24, bottom: 66, left: 66};
+  const legendItems: LegendItem[] = multi.series.map((s) => ({label: s.name, color: s.color}));
+  const headerH = headerHeight(config, st);
+  const legendR = legendReserve(config, legendItems);
+  const margin = {top: 24 + headerH + legendR.top, right: 24 + legendR.right, bottom: 66 + legendR.bottom, left: 66};
   const nCat = multi.categories.length;
   const nS = multi.series.length;
   const maxVal = Math.max(multi.max, 0) || 1;
@@ -219,6 +195,14 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const numFmt: NumberFormat = stackedPercent ? 'percent' : (config.numberFormat ?? 'short');
   const barGap = Math.max(config.barGap ?? 2, 0);
   const catGap = config.barCategoryGap ?? 0.15;
+  const catColor = config.xLabelFont?.color ?? st.textColor;
+  const catSize = config.xLabelFont?.size ?? st.labelFontSize;
+  const catFamily = config.xLabelFont?.fontFamily ?? undefined;
+  const catPos = config.categoryLabelPosition ?? 'axis';
+  const xAxisColor = config.xLabelFont?.color ?? st.axisColor;
+  const yAxisColor = config.yLabelFont?.color ?? st.axisColor;
+  const xAxisFamily = config.xLabelFont?.fontFamily;
+  const yAxisFamily = config.yLabelFont?.fontFamily;
   const radius = config.barRadius ?? 2;
   const borderW = config.barBorderWidth ?? 0;
   const borderColor = config.barBorderColor ?? '#ffffff';
@@ -286,26 +270,20 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
       : null;
 
     return (
-      <div className="flex flex-col gap-2">
-        {showLegend && legendPosition === 'top' && (
-          <Legend items={multi.series.map((s) => ({label: s.name, color: s.color}))} position="top" />
-        )}
-        <div className="flex gap-2">
-          {showLegend && legendPosition === 'right' && (
-            <Legend items={multi.series.map((s) => ({label: s.name, color: s.color}))} position="right" />
-          )}
-          <div className="relative flex-1 min-w-0">
-            <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
-              <defs>
-                {config.barGradient && gradId && (
-                  <linearGradient id={gradId} {...gradProps}>
-                    <stop offset="0%" stopColor={config.barGradient.from} />
-                    <stop offset="100%" stopColor={config.barGradient.to} />
-                  </linearGradient>
-                )}
-                {frameFilter(shadowId, config.canvasShadow ?? false)}
-              </defs>
-              {frameRect(config, shadowId)}
+      <div className="relative w-full">
+        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
+          <defs>
+            {config.barGradient && gradId && (
+              <linearGradient id={gradId} {...gradProps}>
+                <stop offset="0%" stopColor={config.barGradient.from} />
+                <stop offset="100%" stopColor={config.barGradient.to} />
+              </linearGradient>
+            )}
+            {frameFilter(shadowId, config.canvasShadow ?? false)}
+          </defs>
+          {frameRect(config, shadowId)}
+          {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
+          {showLegend && legendItems.length > 0 && <SvgLegend items={legendItems} position={legendPosition} width={width} height={height} st={st} headerOffset={headerH} />}
               {config.showGrid !== false && tickValues.map((v, i) => {
                 const x = marginAdj.left + ((v - domain.yMin) / yRange) * plotW;
                 return (
@@ -320,10 +298,10 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
               {referenceLinesSvg(true, true, domain, yRange, marginAdj, plotW, plotH, config)}
 
               {config.xLabel && (
-                <text x={width / 2} y={height - 6} textAnchor="middle" fill={st.axisColor} fontSize={11}>{config.xLabel}</text>
+                <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily}>{config.xLabel}</text>
               )}
               {config.yLabel && (
-                <text x={14} y={height / 2} textAnchor="middle" fill={st.axisColor} fontSize={11} transform={`rotate(-90, 14, ${height / 2})`}>
+                <text x={14} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} transform={`rotate(-90, 14, ${height / 2})`}>
                   {config.yLabel}
                 </text>
               )}
@@ -339,6 +317,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                     className={tooltipEnabled ? 'cursor-pointer' : undefined}
                     onMouseMove={tooltipEnabled ? (e) => { const p = hoverPos(e); setTip(catTip(ci, cat, p)); } : undefined}
                     onMouseLeave={tooltipEnabled ? leave : undefined}
+                    fontFamily={config.dataLabelFontFamily ?? undefined}
                   >
                     {multi.series.map((s, si) => {
                       const val = s.values[ci] ?? 0;
@@ -372,12 +351,24 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                         hh = barH;
                       }
                       const fill = barFill(s.color, config, gradId, val < 0);
-                      return (
+                      const rectW = Math.max(w, 0);
+                      const pillLast = stacked || stackedPercent ? si === nS - 1 : true;
+                      const rEnds = !!config.barRadiusEndsOnly;
+                      return rEnds ? (
+                        <path
+                          key={`${ci}-${si}`}
+                          d={roundedRectPath(x, y, rectW, hh, pillLast ? radius : 0, {tr: pillLast, br: pillLast})}
+                          fill={fill}
+                          stroke={borderW > 0 ? borderColor : 'none'}
+                          strokeWidth={borderW}
+                          opacity={st.globalOpacity}
+                        />
+                      ) : (
                         <rect
                           key={`${ci}-${si}`}
                           x={x}
                           y={y}
-                          width={Math.max(w, 0)}
+                          width={rectW}
                           height={hh}
                           fill={fill}
                           rx={radius}
@@ -430,16 +421,27 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                 const cy = bandY + catBandH / 2;
                 const img = multi.categoryImages?.[ci] ?? null;
                 const hasImg = avatarActive && !!img;
+                const maxEndX = stacked || stackedPercent
+                  ? marginAdj.left + ((stackedPercent ? 1 : (stackTotal![ci] || 1)) / (stackedPercent ? 1 : yRange)) * plotW
+                  : marginAdj.left + (Math.max(...multi.series.map((s) => s.values[ci] ?? 0), 0) / yRange) * plotW;
+                const labelAt = catPos === 'start'
+                  ? {x: marginAdj.left + 3, anchor: 'start' as const}
+                  : catPos === 'inside'
+                    ? {x: marginAdj.left + plotW / 2, anchor: 'middle' as const}
+                    : catPos === 'end'
+                      ? {x: maxEndX + 4, anchor: 'start' as const}
+                      : {x: marginAdj.left - 8, anchor: 'end' as const};
 
               if (!hasImg) {
                 return (
                   <text
                     key={ci}
-                    x={marginAdj.left - 8}
+                    x={labelAt.x}
                     y={cy + 3}
-                    textAnchor="end"
-                    fill={st.textColor}
-                    fontSize={st.labelFontSize}
+                    textAnchor={labelAt.anchor}
+                    fill={catColor}
+                    fontSize={catSize}
+                    fontFamily={catFamily}
                   >
                     {cat.length > 16 ? cat.slice(0, 16) + '…' : cat}
                   </text>
@@ -450,10 +452,10 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                 const total = stackXBase ? (stackTotal![ci] || 1) : yRange;
                 const barEndX = stacked || stackedPercent
                   ? marginAdj.left + ((stackXBase![ci][nS - 1] + Math.max(multi.series[nS - 1].values[ci] ?? 0, 0)) / total) * plotW
-                  : marginAdj.left + (Math.max(...multi.series.map((s) => s.values[ci] ?? 0), 0) / yRange) * plotW;
+                  : maxEndX;
                 return (
                   <g key={ci}>
-                    <text x={marginAdj.left - 8} y={cy + 3} textAnchor="end" fill={st.textColor} fontSize={st.labelFontSize}>
+                    <text x={marginAdj.left - 8} y={cy + 3} textAnchor="end" fill={catColor} fontSize={catSize} fontFamily={catFamily}>
                       {cat.length > 16 ? cat.slice(0, 16) + '…' : cat}
                     </text>
                     <Avatar href={img!} cx={barEndX + (config.showDataLabels !== false ? 52 : 10) + avatarSize / 2} cy={cy} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
@@ -471,7 +473,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
               return (
                 <g key={ci}>
                   <Avatar href={img!} cx={marginAdj.left - 8 - avatarSize / 2} cy={cy} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
-                  <text x={marginAdj.left - 8 - avatarSize - 6} y={cy + 3} textAnchor="end" fill={st.textColor} fontSize={st.labelFontSize}>
+                  <text x={marginAdj.left - 8 - avatarSize - 6} y={cy + 3} textAnchor="end" fill={catColor} fontSize={catSize} fontFamily={catFamily}>
                     {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
                   </text>
                 </g>
@@ -480,11 +482,6 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
           </svg>
           {tooltipEnabled && <HoverTooltip tip={tip} />}
         </div>
-        </div>
-        {showLegend && legendPosition === 'bottom' && (
-          <Legend items={multi.series.map((s) => ({label: s.name, color: s.color}))} position="bottom" />
-        )}
-      </div>
     );
   }
 
@@ -508,26 +505,20 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   };
 
   return (
-    <div className="flex flex-col gap-2">
-      {showLegend && legendPosition === 'top' && (
-        <Legend items={multi.series.map((s) => ({label: s.name, color: s.color}))} position="top" />
-      )}
-      <div className="flex gap-2">
-        {showLegend && legendPosition === 'right' && (
-          <Legend items={multi.series.map((s) => ({label: s.name, color: s.color}))} position="right" />
-        )}
-        <div className="relative flex-1 min-w-0">
-          <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
-            <defs>
-              {config.barGradient && gradId && (
-                <linearGradient id={gradId} {...gradProps}>
-                  <stop offset="0%" stopColor={config.barGradient.from} />
-                  <stop offset="100%" stopColor={config.barGradient.to} />
-                </linearGradient>
-              )}
-              {frameFilter(shadowId, config.canvasShadow ?? false)}
-            </defs>
-            {frameRect(config, shadowId)}
+    <div className="relative w-full">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
+        <defs>
+          {config.barGradient && gradId && (
+            <linearGradient id={gradId} {...gradProps}>
+              <stop offset="0%" stopColor={config.barGradient.from} />
+              <stop offset="100%" stopColor={config.barGradient.to} />
+            </linearGradient>
+          )}
+          {frameFilter(shadowId, config.canvasShadow ?? false)}
+        </defs>
+        {frameRect(config, shadowId)}
+        {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
+        {showLegend && legendItems.length > 0 && <SvgLegend items={legendItems} position={legendPosition} width={width} height={height} st={st} headerOffset={headerH} />}
             {config.showGrid !== false && tickValues.map((v, i) => {
               const y = marginAdj.top + plotH - ((v - domain.yMin) / yRange) * plotH;
               return (
@@ -542,10 +533,10 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
             {referenceLinesSvg(true, false, domain, yRange, marginAdj, plotW, plotH, config)}
 
             {config.xLabel && (
-              <text x={width / 2} y={height - 6} textAnchor="middle" fill={st.axisColor} fontSize={11}>{config.xLabel}</text>
+              <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily}>{config.xLabel}</text>
             )}
             {config.yLabel && (
-              <text x={16} y={height / 2} textAnchor="middle" fill={st.axisColor} fontSize={11} transform={`rotate(-90, 16, ${height / 2})`}>
+              <text x={16} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} transform={`rotate(-90, 16, ${height / 2})`}>
                 {config.yLabel}
               </text>
             )}
@@ -555,12 +546,13 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
               const total = stacked || stackedPercent ? totalLabel(ci) : 0;
               const leave = () => setTip(null);
               return (
-                <g
-                  key={ci}
-                  className={tooltipEnabled ? 'cursor-pointer' : undefined}
-                  onMouseMove={tooltipEnabled ? (e) => { const p = hoverPos(e); setTip(catTip(ci, cat, p)); } : undefined}
-                  onMouseLeave={tooltipEnabled ? leave : undefined}
-                >
+<g
+                key={ci}
+                className={tooltipEnabled ? 'cursor-pointer' : undefined}
+                onMouseMove={tooltipEnabled ? (e) => { const p = hoverPos(e); setTip(catTip(ci, cat, p)); } : undefined}
+                onMouseLeave={tooltipEnabled ? leave : undefined}
+                fontFamily={config.dataLabelFontFamily ?? undefined}
+              >
                 {multi.series.map((s, si) => {
               const val = s.values[ci] ?? 0;
               let x: number;
@@ -591,21 +583,33 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                 w = barW;
                 hh = h;
               }
-              const fill = barFill(s.color, config, gradId, val < 0);
-              return (
-                <rect
-                  key={`${ci}-${si}`}
-                  x={x}
-                  y={y}
-                  width={Math.max(w, 0)}
-                  height={Math.max(hh, 0)}
-                  fill={fill}
-                  rx={radius}
-                  stroke={borderW > 0 ? borderColor : 'none'}
-                  strokeWidth={borderW}
-                  opacity={st.globalOpacity}
-                />
-              );
+const fill = barFill(s.color, config, gradId, val < 0);
+                const rectH = Math.max(hh, 0);
+                const pillLast = stacked || stackedPercent ? si === nS - 1 : true;
+                const rEnds = !!config.barRadiusEndsOnly;
+                return rEnds ? (
+                  <path
+                    key={`${ci}-${si}`}
+                    d={roundedRectPath(x, y, w, rectH, pillLast ? radius : 0, {tl: pillLast, tr: pillLast})}
+                    fill={fill}
+                    stroke={borderW > 0 ? borderColor : 'none'}
+                    strokeWidth={borderW}
+                    opacity={st.globalOpacity}
+                  />
+                ) : (
+                  <rect
+                    key={`${ci}-${si}`}
+                    x={x}
+                    y={y}
+                    width={Math.max(w, 0)}
+                    height={rectH}
+                    fill={fill}
+                    rx={radius}
+                    stroke={borderW > 0 ? borderColor : 'none'}
+                    strokeWidth={borderW}
+                    opacity={st.globalOpacity}
+                  />
+                );
             })}
                 {config.showDataLabels !== false && stackedPercent && stackTotal && stackBase && (
                   multi.series.map((s, si) => {
@@ -663,30 +667,61 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
             }
 
             if (!hasImg) {
+              if (catPos === 'end') {
+                let topY = marginAdj.top + plotH;
+                if (stackedPercent) {
+                  topY = marginAdj.top;
+                } else if (stacked) {
+                  topY = marginAdj.top + plotH - ((multi.series.reduce((a, s) => a + Math.max(s.values[ci] ?? 0, 0), 0)) / yRange) * plotH;
+                } else {
+                  const maxInCat = Math.max(...multi.series.map((s) => s.values[ci] ?? 0), 0);
+                  topY = marginAdj.top + plotH - (maxInCat / yRange) * plotH;
+                }
+                return (
+                  <text key={ci} x={cx} y={topY - 4} textAnchor="middle" fill={catColor} fontSize={catSize} fontFamily={catFamily}>
+                    {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
+                  </text>
+                );
+              }
+              if (catPos === 'inside') {
+                return (
+                  <text key={ci} x={cx} y={marginAdj.top + plotH / 2} textAnchor="middle" fill={catColor} fontSize={catSize} fontFamily={catFamily}>
+                    {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
+                  </text>
+                );
+              }
+              if (catPos === 'start') {
+                return (
+                  <text key={ci} x={cx} y={marginAdj.top + plotH - 4} textAnchor="middle" fill={catColor} fontSize={catSize} fontFamily={catFamily}>
+                    {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
+                  </text>
+                );
+              }
               return (
                 <text
                   key={ci}
                   x={cx}
                   y={height - marginAdj.bottom + 14}
                   textAnchor="middle"
-                  fill={st.textColor}
-                  fontSize={st.labelFontSize}
+                  fill={catColor}
+                  fontSize={catSize}
+                  fontFamily={catFamily}
                 >
                   {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
                 </text>
               );
             }
 
-            if (avatarPos === 'above') {
-              return (
-                <g key={ci}>
-                  <Avatar href={img!} cx={cx} cy={barTop - avatarSize / 2 - 4} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
-                  <text x={cx} y={height - marginAdj.bottom + 14} textAnchor="middle" fill={st.textColor} fontSize={st.labelFontSize}>
-                    {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
-                  </text>
-                </g>
-              );
-            }
+if (avatarPos === 'above') {
+                return (
+                  <g key={ci}>
+                    <Avatar href={img!} cx={cx} cy={barTop - avatarSize / 2 - 4} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
+                    <text x={cx} y={height - marginAdj.bottom + 14} textAnchor="middle" fill={catColor} fontSize={catSize} fontFamily={catFamily}>
+                      {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
+                    </text>
+                  </g>
+                );
+              }
 
             if (avatarPos === 'replace-label') {
               return (
@@ -702,8 +737,9 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                   x={labelX}
                   y={height - marginAdj.bottom + 14}
                   textAnchor="middle"
-                  fill={st.textColor}
-                  fontSize={st.labelFontSize}
+                  fill={catColor}
+                  fontSize={catSize}
+                  fontFamily={catFamily}
                 >
                   {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
                 </text>
@@ -712,11 +748,6 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
           })}
         </svg>
         {tooltipEnabled && <HoverTooltip tip={tip} />}
-        </div>
-      </div>
-      {showLegend && legendPosition === 'bottom' && (
-        <Legend items={multi.series.map((s) => ({label: s.name, color: s.color}))} position="bottom" />
-      )}
     </div>
   );
 }
@@ -728,10 +759,19 @@ function SingleBar({data, config}: Props) {
   const numFmt = config.numberFormat ?? 'short';
   const width = config.width ?? 600;
   const height = config.height ?? 380;
-  const margin = {top: 24, right: 24, bottom: 66, left: 66};
+  const headerH = headerHeight(config, st);
+  const margin = {top: 24 + headerH, right: 24, bottom: 66, left: 66};
   const plotW = width - margin.left - margin.right;
   const plotH = height - margin.top - margin.bottom;
   const maxVal = Math.max(prepared.max, 0) || 1;
+  const catColor = config.xLabelFont?.color ?? st.textColor;
+  const catSize = config.xLabelFont?.size ?? st.labelFontSize;
+  const catFamily = config.xLabelFont?.fontFamily ?? undefined;
+  const catPos = config.categoryLabelPosition ?? 'axis';
+  const xAxisColor = config.xLabelFont?.color ?? st.axisColor;
+  const yAxisColor = config.yLabelFont?.color ?? st.axisColor;
+  const xAxisFamily = config.xLabelFont?.fontFamily;
+  const yAxisFamily = config.yLabelFont?.fontFamily;
   const domain = resolveYDomain(0, maxVal, config);
   const yRange = Math.max(domain.yMax - domain.yMin, 0.001);
   const n = prepared.items.length;
@@ -771,7 +811,7 @@ function SingleBar({data, config}: Props) {
     ...frac,
     title: d.label,
     img: avatarActive ? avatarUrl(d.raw) : null,
-    rows: [{label: 'Valor', color: d.color ?? pickColor(config.colors, prepared.items.indexOf(d)), value: formatValue(d.value, numFmt)}],
+    rows: [{label: 'Valor', color: colorFor(config, d.label, prepared.items.indexOf(d)), value: formatValue(d.value, numFmt)}],
   });
 
   if (horizontal) {
@@ -792,6 +832,7 @@ function SingleBar({data, config}: Props) {
             {frameFilter(shadowId, config.canvasShadow ?? false)}
           </defs>
           {frameRect(config, shadowId)}
+          {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
           {config.showGrid !== false && tickValues.map((v, i) => {
             const x = marginAdj.left + ((v - domain.yMin) / yRange) * plotW2;
             return (
@@ -805,19 +846,25 @@ function SingleBar({data, config}: Props) {
           })}
           {referenceLinesSvg(false, true, domain, yRange, marginAdj, plotW2, plotH2, config)}
 
-          {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={st.axisColor} fontSize={11}>{config.xLabel}</text>}
-          {config.yLabel && <text x={14} y={height / 2} textAnchor="middle" fill={st.axisColor} fontSize={11} transform={`rotate(-90, 14, ${height / 2})`}>{config.yLabel}</text>}
+          {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily}>{config.xLabel}</text>}
+          {config.yLabel && <text x={14} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} transform={`rotate(-90, 14, ${height / 2})`}>{config.yLabel}</text>}
 
           {prepared.items.map((d, i) => {
             const y = marginAdj.top + gap + i * (barH + gap);
             const barW = ((d.value - domain.yMin) / yRange) * plotW2;
             const bw = Math.max(barW, 0);
-            const color = d.color ?? pickColor(config.colors, i);
+            const color = colorFor(config, d.label, i);
             const img = avatarUrl(d.raw);
-            const labelX = avatarActive && avatarPos === 'beside-label' && img
-              ? marginAdj.left - 8 - avatarSize - 6
-              : marginAdj.left - 8;
             const endX = marginAdj.left + bw;
+            const labelAt = avatarActive && avatarPos === 'beside-label' && img
+              ? {x: marginAdj.left - 8 - avatarSize - 6, anchor: 'end' as const}
+              : catPos === 'start'
+                ? {x: marginAdj.left + 3, anchor: 'start' as const}
+                : catPos === 'inside'
+                  ? {x: marginAdj.left + bw / 2, anchor: 'middle' as const}
+                  : catPos === 'end'
+                    ? {x: endX + 4, anchor: 'start' as const}
+                    : {x: marginAdj.left - 8, anchor: 'end' as const};
             const barEndAvatar = avatarActive && avatarPos === 'bar-end' && !!img;
             const labelExtra = barEndAvatar ? avatarSize + 10 : 6;
             return (
@@ -826,8 +873,19 @@ function SingleBar({data, config}: Props) {
                 className={tooltipEnabled ? 'cursor-pointer' : undefined}
                 onMouseMove={tooltipEnabled ? (e) => setTip(itemTip(d, hoverPos(e))) : undefined}
                 onMouseLeave={tooltipEnabled ? () => setTip(null) : undefined}
+                fontFamily={config.dataLabelFontFamily ?? undefined}
               >
-                <rect x={marginAdj.left} y={y} width={bw} height={barH} fill={barFill(color, config, gradId, d.value < 0)} rx={radius} stroke={borderW > 0 ? borderColor : 'none'} strokeWidth={borderW} opacity={st.globalOpacity} />
+                {config.barRadiusEndsOnly ? (
+                  <path
+                    d={roundedRectPath(marginAdj.left, y, bw, barH, radius, {tr: true, br: true})}
+                    fill={barFill(color, config, gradId, d.value < 0)}
+                    stroke={borderW > 0 ? borderColor : 'none'}
+                    strokeWidth={borderW}
+                    opacity={st.globalOpacity}
+                  />
+                ) : (
+                  <rect x={marginAdj.left} y={y} width={bw} height={barH} fill={barFill(color, config, gradId, d.value < 0)} rx={radius} stroke={borderW > 0 ? borderColor : 'none'} strokeWidth={borderW} opacity={st.globalOpacity} />
+                )}
                 {config.showDataLabels !== false && dlPos === 'center' && (
                   <text x={marginAdj.left + bw / 2} y={y + barH / 2 + 3} textAnchor="middle" fill={dlColor} fontSize={dlSize} pointerEvents="none">
                     {formatValue(d.value, numFmt)}
@@ -853,7 +911,7 @@ function SingleBar({data, config}: Props) {
                   <Avatar href={img} cx={marginAdj.left - 8 - avatarSize / 2} cy={y + barH / 2} clipId={`bh-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
                 )}
                 {!(avatarActive && avatarPos === 'replace-label' && img) && (
-                  <text x={labelX} y={y + barH / 2 + 3} textAnchor="end" fill={st.textColor} fontSize={st.labelFontSize}>
+                  <text x={labelAt.x} y={y + barH / 2 + 3} textAnchor={labelAt.anchor} fill={catColor} fontSize={catSize} fontFamily={catFamily}>
                     {d.label.length > 16 ? d.label.slice(0, 16) + '…' : d.label}
                   </text>
                 )}
@@ -885,6 +943,7 @@ function SingleBar({data, config}: Props) {
           {frameFilter(shadowId, config.canvasShadow ?? false)}
         </defs>
         {frameRect(config, shadowId)}
+        {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
         {config.showGrid !== false && tickValues.map((v, i) => {
           const y = marginAdj.top + plotH2 - ((v - domain.yMin) / yRange) * plotH2;
           return (
@@ -898,28 +957,45 @@ function SingleBar({data, config}: Props) {
         })}
         {referenceLinesSvg(false, false, domain, yRange, marginAdj, plotW2, plotH2, config)}
 
-        {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={st.axisColor} fontSize={11}>{config.xLabel}</text>}
-        {config.yLabel && <text x={16} y={height / 2} textAnchor="middle" fill={st.axisColor} fontSize={11} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text>}
+        {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily}>{config.xLabel}</text>}
+        {config.yLabel && <text x={16} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text>}
 
         {prepared.items.map((d, i) => {
           const x = marginAdj.left + gap + i * (barWidth + gap);
           const barH = ((d.value - domain.yMin) / yRange) * plotH2;
-          const color = d.color ?? pickColor(config.colors, i);
+          const color = colorFor(config, d.label, i);
           const img = avatarUrl(d.raw);
-          const labelX = avatarActive && avatarPos === 'beside-label' && img
-            ? x + barWidth / 2 + avatarSize + 6
-            : x + barWidth / 2;
           const labelY = height - marginAdj.bottom + 14;
           const topY = marginAdj.top + plotH2 - barH;
           const barCenterY = topY + barH / 2;
+          const labelAt = avatarActive && avatarPos === 'beside-label' && img
+            ? {x: x + barWidth / 2 + avatarSize + 6, y: labelY, anchor: 'middle' as const}
+            : catPos === 'end'
+              ? {x: x + barWidth / 2, y: topY - 6, anchor: 'middle' as const}
+              : catPos === 'inside'
+                ? {x: x + barWidth / 2, y: barCenterY, anchor: 'middle' as const}
+                : catPos === 'start'
+                  ? {x: x + barWidth / 2, y: marginAdj.top + plotH2 - 4, anchor: 'middle' as const}
+                  : {x: x + barWidth / 2, y: labelY, anchor: 'middle' as const};
           return (
-            <g
-              key={i}
-              className={tooltipEnabled ? 'cursor-pointer' : undefined}
-              onMouseMove={tooltipEnabled ? (e) => setTip(itemTip(d, hoverPos(e))) : undefined}
-              onMouseLeave={tooltipEnabled ? () => setTip(null) : undefined}
-            >
-              <rect x={x} y={topY} width={barWidth} height={Math.max(barH, 0)} fill={barFill(color, config, gradId, d.value < 0)} rx={radius} stroke={borderW > 0 ? borderColor : 'none'} strokeWidth={borderW} opacity={st.globalOpacity} />
+<g
+            key={i}
+            className={tooltipEnabled ? 'cursor-pointer' : undefined}
+            onMouseMove={tooltipEnabled ? (e) => setTip(itemTip(d, hoverPos(e))) : undefined}
+            onMouseLeave={tooltipEnabled ? () => setTip(null) : undefined}
+            fontFamily={config.dataLabelFontFamily ?? undefined}
+          >
+              {config.barRadiusEndsOnly ? (
+                <path
+                  d={roundedRectPath(x, topY, barWidth, Math.max(barH, 0), radius, {tl: true, tr: true})}
+                  fill={barFill(color, config, gradId, d.value < 0)}
+                  stroke={borderW > 0 ? borderColor : 'none'}
+                  strokeWidth={borderW}
+                  opacity={st.globalOpacity}
+                />
+              ) : (
+                <rect x={x} y={topY} width={barWidth} height={Math.max(barH, 0)} fill={barFill(color, config, gradId, d.value < 0)} rx={radius} stroke={borderW > 0 ? borderColor : 'none'} strokeWidth={borderW} opacity={st.globalOpacity} />
+              )}
               {config.showDataLabels !== false && dlPos === 'center' && (
                 <text x={x + barWidth / 2} y={barCenterY + 3} textAnchor="middle" fill={dlColor} fontSize={dlSize} pointerEvents="none">
                   {formatValue(d.value, numFmt)}
@@ -949,12 +1025,13 @@ function SingleBar({data, config}: Props) {
               )}
               {!(avatarActive && avatarPos === 'replace-label' && img) && (
                 <text
-                  x={labelX}
-                  y={labelY}
-                  textAnchor="middle"
-                  fill={st.textColor}
-                  fontSize={st.labelFontSize}
-                  transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${labelX}, ${labelY})` : undefined}
+                  x={labelAt.x}
+                  y={labelAt.y}
+                  textAnchor={labelAt.anchor}
+                  fill={catColor}
+                  fontSize={catSize}
+                  fontFamily={catFamily}
+                  transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${labelAt.x}, ${labelAt.y})` : undefined}
                 >
                   {d.label.length > 12 ? d.label.slice(0, 12) + '…' : d.label}
                 </text>

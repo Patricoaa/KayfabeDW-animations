@@ -1,7 +1,8 @@
 'use client';
 
 import type {ChartConfig} from '@/lib/chart-config';
-import {formatValue, resolveChartStyle, resolveYDomain, resolveXDomain, pickColor} from '@/lib/chart-data';
+import {formatValue, resolveChartStyle, resolveYDomain, resolveXDomain, colorFor} from '@/lib/chart-data';
+import {SvgHeader, SvgLegend, headerHeight, legendReserve, frameRect, frameFilter, nextSvgId, type LegendItem} from './chart-frame';
 
 type Props = {
   data: Record<string, unknown>[];
@@ -31,7 +32,23 @@ export function ScatterChart({data, config}: Props) {
 
   const width = config.width ?? 600;
   const height = config.height ?? 380;
-  const margin = {top: 24, right: 24, bottom: 66, left: 66};
+  const st = resolveChartStyle(config.style);
+
+  // Per-category colors. Gather the distinct labels in first-appearance order
+  // and map each to a palette color (with per-category overrides) when
+  // colorField (or categoryField) is set.
+  const cats: string[] = [];
+  const catColors = new Map<string, string>();
+  for (const p of points) {
+    if (p.label && !catColors.has(p.label)) {
+      cats.push(p.label);
+      catColors.set(p.label, colorFor(config, p.label, cats.length - 1));
+    }
+  }
+  const legendItems: LegendItem[] = cats.map((c) => ({label: c, color: catColors.get(c)!}));
+  const headerH = headerHeight(config, st);
+  const legendR = legendReserve(config, legendItems);
+  const margin = {top: 24 + headerH + legendR.top, right: 24 + legendR.right, bottom: 66 + legendR.bottom, left: 66};
   const plotW = width - margin.left - margin.right;
   const plotH = height - margin.top - margin.bottom;
 
@@ -48,19 +65,14 @@ export function ScatterChart({data, config}: Props) {
   const numFmt = config.numberFormat ?? 'short';
   const xLabel = config.xLabel ?? xField;
   const yLabel = config.yLabel ?? yField;
-  const st = resolveChartStyle(config.style);
 
-  // Per-category colors. Gather the distinct labels in first-appearance order
-  // and map each to a palette color when colorField (or categoryField) is set.
-  const cats: string[] = [];
-  const catColors = new Map<string, string>();
-  for (const p of points) {
-    if (p.label && !catColors.has(p.label)) {
-      cats.push(p.label);
-      catColors.set(p.label, pickColor(config.colors, cats.length - 1));
-    }
-  }
-  const pointColor = (p: (typeof points)[number]) => (p.label && catColors.has(p.label) ? catColors.get(p.label)! : pickColor(config.colors, 0));
+  const shadowId = nextSvgId('f');
+  const showLegend = config.showLegend ?? true;
+  const xAxisColor = config.xLabelFont?.color ?? st.axisColor;
+  const yAxisColor = config.yLabelFont?.color ?? st.axisColor;
+  const xAxisFamily = config.xLabelFont?.fontFamily;
+  const yAxisFamily = config.yLabelFont?.fontFamily;
+  const pointColor = (p: (typeof points)[number]) => (p.label && catColors.has(p.label) ? catColors.get(p.label)! : colorFor(config, p.label, 0));
 
   // Optional linear trendline via least squares.
   let trendPath: string | undefined;
@@ -79,7 +91,12 @@ export function ScatterChart({data, config}: Props) {
   }
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
+    <div className="relative w-full">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
+        <defs>{frameFilter(shadowId, config.canvasShadow ?? false)}</defs>
+        {frameRect(config, shadowId)}
+        {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
+        {showLegend !== false && legendItems.length > 0 && <SvgLegend items={legendItems} position={config.legendPosition ?? 'bottom'} width={width} height={height} st={st} headerOffset={headerH} />}
       {config.showGrid !== false && yDom.ticks.map((v, i) => {
         const y = toY(v);
         return (
@@ -116,8 +133,9 @@ export function ScatterChart({data, config}: Props) {
         />
       ))}
 
-      <text x={width / 2} y={height - 8} textAnchor="middle" fill={st.axisColor} fontSize={11}>{xLabel}</text>
-      <text x={14} y={height / 2} textAnchor="middle" fill={st.axisColor} fontSize={11} transform={`rotate(-90, 14, ${height / 2})`}>{yLabel}</text>
+      <text x={width / 2} y={height - 8} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily}>{xLabel}</text>
+      <text x={14} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} transform={`rotate(-90, 14, ${height / 2})`}>{yLabel}</text>
     </svg>
+    </div>
   );
 }

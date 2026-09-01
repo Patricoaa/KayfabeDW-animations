@@ -184,6 +184,15 @@ export function pickColor(colors: string[] | undefined, index: number): string {
   return palette[index % palette.length];
 }
 
+// Resolves the color for a single datum: per-category override wins (F7
+// "Colores por categoría/dato"), otherwise the palette by index.
+export function colorFor(config: ChartConfig, label: string | number | null | undefined, index: number): string {
+  const key = label === null || label === undefined ? '(vacío)' : String(label);
+  const override = config.colorOverrides?.[key];
+  if (override) return override;
+  return pickColor(config.colors, index);
+}
+
 export type ResolvedChartStyle = {
   fontFamily: string;
   titleFontSize: number;

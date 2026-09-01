@@ -46,7 +46,7 @@ export function ChartPreview({data, config}: ChartPreviewProps) {
     }
   })();
 
-  if (cfg.title) {
+  if (cfg.type === 'table' && cfg.title) {
     return (
       <div style={{fontFamily: st.fontFamily}}>
         <div
