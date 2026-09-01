@@ -64,6 +64,7 @@ function Avatar({
 
 function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartConfig}) {
   const st = resolveChartStyle(config.style);
+  const horizontal = config.horizontal ?? false;
   const stacked = (config.groupMode ?? 'grouped') === 'stacked' || !!config.stacked;
   const stackedPercent = config.groupMode === 'stacked-percent';
   const showLegend = config.showLegend ?? true;
@@ -88,11 +89,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
     : resolveYDomain(0, maxVal, config);
   const yRange = stackedPercent ? 1 : Math.max(domain.yMax - domain.yMin, 0.001);
   const numFmt: NumberFormat = stackedPercent ? 'percent' : (config.numberFormat ?? 'short');
-  const catBand = (width - margin.left - margin.right) / Math.max(nCat, 1);
   const innerGap = 2;
-  const barW = stacked || stackedPercent
-    ? Math.max(catBand * 0.7 - innerGap * 2, 2)
-    : Math.max(Math.min(catBand * 0.7 / nS - innerGap, 46), 2);
 
   const tickValues = domain.ticks;
 
@@ -112,18 +109,186 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
     multi.series.reduce((a, s) => a + Math.max(s.values[ci] ?? 0, 0), 0),
   );
 
-  // Adjust top margin when avatars sit above the bars.
+  // --- HORIZONTAL LAYOUT ---
+  if (horizontal) {
+    const marginAdj = {...margin};
+    if (avatarActive && avatarPos === 'bar-end') {
+      marginAdj.right += avatarSize + 14;
+    }
+    const plotW = width - marginAdj.left - marginAdj.right;
+    const plotH = height - marginAdj.top - marginAdj.bottom;
+    const catBandH = plotH / Math.max(nCat, 1);
+    const barH = stacked || stackedPercent
+      ? Math.max(catBandH * 0.7 - innerGap * 2, 2)
+      : Math.max(Math.min(catBandH * 0.7 / nS - innerGap, 30), 2);
+
+    const stackXBase = stacked || stackedPercent
+      ? multi.categories.map((_, ci) => {
+          const base: number[] = [];
+          let acc = 0;
+          for (const s of multi.series) {
+            base.push(acc);
+            acc += Math.max(s.values[ci] ?? 0, 0);
+          }
+          return base;
+        })
+      : null;
+
+    return (
+      <div className="flex flex-col gap-2">
+        {showLegend && legendPosition === 'top' && (
+          <Legend items={multi.series.map((s) => ({label: s.name, color: s.color}))} position="top" />
+        )}
+        <div className="flex gap-2">
+          {showLegend && legendPosition === 'right' && (
+            <Legend items={multi.series.map((s) => ({label: s.name, color: s.color}))} position="right" />
+          )}
+          <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
+            {config.showGrid !== false && tickValues.map((v, i) => {
+              const x = marginAdj.left + ((v - domain.yMin) / yRange) * plotW;
+              return (
+                <g key={i}>
+                  <line x1={x} y1={marginAdj.top} x2={x} y2={marginAdj.top + plotH} stroke={st.gridColor} strokeWidth={1} />
+                  <text x={x} y={marginAdj.top + plotH + 14} textAnchor="middle" fill={st.textColor} fontSize={10}>
+                    {formatValue(v, numFmt)}
+                  </text>
+                </g>
+              );
+            })}
+
+            {config.xLabel && (
+              <text x={width / 2} y={height - 6} textAnchor="middle" fill={st.axisColor} fontSize={11}>{config.xLabel}</text>
+            )}
+            {config.yLabel && (
+              <text x={14} y={height / 2} textAnchor="middle" fill={st.axisColor} fontSize={11} transform={`rotate(-90, 14, ${height / 2})`}>
+                {config.yLabel}
+              </text>
+            )}
+
+            {multi.categories.map((cat, ci) => {
+              const bandY = marginAdj.top + ci * catBandH;
+              return multi.series.map((s, si) => {
+                const val = s.values[ci] ?? 0;
+                let x: number;
+                let y: number;
+                let w: number;
+                let hh: number;
+                if (stacked || stackedPercent) {
+                  const base = stackXBase![ci][si];
+                  if (stackedPercent) {
+                    const total = stackTotal![ci] || 1;
+                    const segW = (Math.max(val, 0) / total) * plotW;
+                    const baseW = (base / total) * plotW;
+                    x = marginAdj.left + baseW;
+                    y = bandY + catBandH * 0.15;
+                    w = segW;
+                  } else {
+                    const baseW = (base / yRange) * plotW;
+                    const bw = Math.max((Math.abs(val) / yRange) * plotW, 0);
+                    x = marginAdj.left + baseW;
+                    y = bandY + catBandH * 0.15;
+                    w = bw;
+                  }
+                  hh = catBandH * 0.7;
+                } else {
+                  const bw = Math.max((Math.abs(val) / yRange) * plotW, 0);
+                  const offset = (catBandH - barH * nS) / 2;
+                  x = marginAdj.left;
+                  y = bandY + offset + si * (barH + innerGap);
+                  w = bw;
+                  hh = barH;
+                }
+                return (
+                  <rect
+                    key={`${ci}-${si}`}
+                    x={x}
+                    y={y}
+                    width={w}
+                    height={hh}
+                    fill={s.color}
+                    rx={2}
+                    opacity={st.globalOpacity}
+                  />
+                );
+              });
+            })}
+
+            {multi.categories.map((cat, ci) => {
+              const bandY = marginAdj.top + ci * catBandH;
+              const cy = bandY + catBandH / 2;
+              const img = multi.categoryImages?.[ci] ?? null;
+              const hasImg = avatarActive && !!img;
+
+              if (!hasImg) {
+                return (
+                  <text
+                    key={ci}
+                    x={marginAdj.left - 8}
+                    y={cy + 3}
+                    textAnchor="end"
+                    fill={st.textColor}
+                    fontSize={st.labelFontSize}
+                  >
+                    {cat.length > 16 ? cat.slice(0, 16) + '…' : cat}
+                  </text>
+                );
+              }
+
+              if (avatarPos === 'bar-end') {
+                const total = stackXBase ? (stackTotal![ci] || 1) : yRange;
+                const barEndX = stacked || stackedPercent
+                  ? marginAdj.left + ((stackXBase![ci][nS - 1] + Math.max(multi.series[nS - 1].values[ci] ?? 0, 0)) / total) * plotW
+                  : marginAdj.left + (Math.max(...multi.series.map((s) => s.values[ci] ?? 0), 0) / yRange) * plotW;
+                return (
+                  <g key={ci}>
+                    <text x={marginAdj.left - 8} y={cy + 3} textAnchor="end" fill={st.textColor} fontSize={st.labelFontSize}>
+                      {cat.length > 16 ? cat.slice(0, 16) + '…' : cat}
+                    </text>
+                    <Avatar href={img!} cx={barEndX + (config.showDataLabels !== false ? 52 : 10) + avatarSize / 2} cy={cy} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
+                  </g>
+                );
+              }
+
+              if (avatarPos === 'replace-label') {
+                return (
+                  <Avatar key={ci} href={img!} cx={marginAdj.left - 8 - avatarSize / 2} cy={cy} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
+                );
+              }
+
+              // Default: 'beside-label' / 'above'
+              return (
+                <g key={ci}>
+                  <Avatar href={img!} cx={marginAdj.left - 8 - avatarSize / 2} cy={cy} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
+                  <text x={marginAdj.left - 8 - avatarSize - 6} y={cy + 3} textAnchor="end" fill={st.textColor} fontSize={st.labelFontSize}>
+                    {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+        {showLegend && legendPosition === 'bottom' && (
+          <Legend items={multi.series.map((s) => ({label: s.name, color: s.color}))} position="bottom" />
+        )}
+      </div>
+    );
+  }
+
+  // --- VERTICAL LAYOUT (default) ---
   const marginAdj = {...margin};
   if (avatarActive && avatarPos === 'above' && labelAngle === 0) {
     marginAdj.top += avatarSize + 10;
   }
   const plotH = height - marginAdj.top - marginAdj.bottom;
+  const catBand = (width - marginAdj.left - marginAdj.right) / Math.max(nCat, 1);
+  const barW = stacked || stackedPercent
+    ? Math.max(catBand * 0.7 - innerGap * 2, 2)
+    : Math.max(Math.min(catBand * 0.7 / nS - innerGap, 46), 2);
 
   const stackH = (ci: number, si: number) => {
     const total = stackTotal![ci] || 1;
     return (Math.max(multi.series[si].values[ci] ?? 0, 0) / total) * plotH;
   };
-
 
   return (
     <div className="flex flex-col gap-2">
@@ -209,11 +374,9 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
             const img = multi.categoryImages?.[ci] ?? null;
             const hasImg = avatarActive && !!img && labelAngle === 0;
 
-            // Compute the top of the highest bar in this category for 'above' positioning.
             let barTop = marginAdj.top + plotH;
             if (hasImg && avatarPos === 'above') {
               if (stacked || stackedPercent) {
-                const total = stackTotal![ci] || 1;
                 barTop = stackedPercent
                   ? marginAdj.top
                   : marginAdj.top + plotH - ((multi.series.reduce((a, s) => a + Math.max(s.values[ci] ?? 0, 0), 0)) / yRange) * plotH;
@@ -255,7 +418,6 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
               );
             }
 
-            // Default: 'beside-label' — avatar to the left of the label text.
             const labelX = cx + avatarSize / 2 + 4;
             return (
               <g key={ci}>
