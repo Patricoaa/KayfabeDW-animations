@@ -33,6 +33,16 @@ export type ChartStyle = {
   globalOpacity?: number;
 };
 
+// Curated font presets (loaded via next/font/google in src/app/layout.tsx).
+// The `family` value is the CSS variable that resolves to the @font-face
+// family name, so charts referencing it get the real loaded font face.
+export const FONT_PRESETS: {name: string; family: string}[] = [
+  {name: 'Inter', family: 'var(--font-inter)'},
+  {name: 'JetBrains Mono', family: 'var(--font-jetbrains-mono)'},
+  {name: 'Playfair Display', family: 'var(--font-playfair-display)'},
+  {name: 'Space Grotesk', family: 'var(--font-space-grotesk)'},
+];
+
 export const PALETTES: {name: string; colors: string[]}[] = [
   {
     name: 'Colorblind (Wong)',
@@ -125,10 +135,38 @@ export type ChartConfig = {
   avatarRadius?: number;
   avatarSize?: number;
   avatarPosition?: AvatarPosition;
+
+  // F6: granular bar styling (Flourish-like editor).
+  barRadius?: number;              // corner radius of bars (px)
+  barBorderColor?: string;         // stroke around each bar
+  barBorderWidth?: number;         // stroke width (0 = off)
+  barGap?: number;                 // px gap between bars in the same category
+  barCategoryGap?: number;         // 0-0.5 fraction of the band used as side padding
+  negativeColor?: string;          // color for negative-value bars (single/grouped)
+  barGradient?: {from: string; to: string}; // vertical linear gradient fill (overrides solid color)
+
+  // Data labels (independent of the series/axis text colors).
+  dataLabelPosition?: 'auto' | 'inside' | 'outside' | 'center';
+  dataLabelFontSize?: number;
+  dataLabelColor?: string;
+
+  // Canvas frame (drawn inside the SVG so it survives export).
+  canvasBackground?: string;
+  canvasBorderColor?: string;
+  canvasBorderWidth?: number;
+  canvasBorderRadius?: number;
+  canvasShadow?: boolean;
+
+  // Horizontal reference / target lines drawn over the plot.
+  referenceLines?: {value: number; label?: string; color?: string; dash?: boolean}[];
+
+  // Hover tooltips.
+  tooltipEnabled?: boolean;
+
   configVersion?: number;
 };
 
-export const CHART_CONFIG_VERSION = 9;
+export const CHART_CONFIG_VERSION = 10;
 
 export const DEFAULT_CHART_CONFIG: ChartConfig = {
   type: 'bar',
@@ -157,6 +195,16 @@ export const DEFAULT_CHART_CONFIG: ChartConfig = {
   avatarRadius: 6,
   avatarSize: 24,
   avatarPosition: 'above',
+  barRadius: 2,
+  barBorderWidth: 0,
+  barGap: 2,
+  barCategoryGap: 0.15,
+  dataLabelPosition: 'auto',
+  dataLabelFontSize: 10,
+  dataLabelColor: '#cccccc',
+  canvasBorderRadius: 0,
+  canvasBorderWidth: 0,
+  tooltipEnabled: true,
   configVersion: CHART_CONFIG_VERSION,
 };
 

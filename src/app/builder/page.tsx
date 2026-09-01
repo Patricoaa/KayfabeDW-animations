@@ -796,6 +796,7 @@ function BuilderContent() {
                 aliasToTable={aliasToTable}
                 fanOutTables={fanOutTables}
                 fieldMeta={fieldMeta}
+                data={filteredData}
               />
             )}
             {outputMode === 'animated' && (

@@ -1,9 +1,10 @@
 'use client';
 
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {BarChart3, PieChart, LineChart, AreaChart, ScatterChart, Table2} from 'lucide-react';
 import type {ChartConfig, ChartType, NumberFormat, SortBy, ChartFilter, ChartFilterOp, LegendPosition, ChartStyle, AvatarShape, AvatarPosition} from '@/lib/chart-config';
-import {PALETTES} from '@/lib/chart-config';
+import {FONT_PRESETS, PALETTES} from '@/lib/chart-config';
+import {pickColor} from '@/lib/chart-data';
 
 // Metadata for a selected column available to the axis selectors: its alias
 // (the value used as a row key), its origin table, the bare column name, and
@@ -22,6 +23,7 @@ type ChartConfigPanelProps = {
   aliasToTable?: Record<string, string>;
   fanOutTables?: string[];
   fieldMeta?: ColumnMeta[];
+  data?: Record<string, unknown>[];
 };
 
 const CHART_TYPES: {type: ChartType; label: string; Icon: typeof BarChart3}[] = [
@@ -61,7 +63,7 @@ const FILTER_OPS: {value: ChartFilterOp; label: string}[] = [
   {value: 'is_not_empty', label: 'no vacío'},
 ];
 
-export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, fanOutTables = [], fieldMeta = []}: ChartConfigPanelProps) {
+export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, fanOutTables = [], fieldMeta = [], data}: ChartConfigPanelProps) {
   const update = (patch: Partial<ChartConfig>) => onChange({...config, ...patch});
   const updateFilter = (index: number, patch: Partial<ChartFilter>) => {
     const next = [...(config.filters ?? [])];
@@ -75,12 +77,11 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
   };
   const updateStyle = (patch: Partial<ChartStyle>) => update({style: {...(config.style ?? {}), ...patch}});
   const applyPalette = (colors: string[]) => {
-    // Assign the palette to each configured series (multi-series) or to the
-    // chart-level colors (single-series). When no series are configured yet,
-    // fall back to the chart-level colors.
+    // Multi-series: re-color every configured series AND refresh the global
+    // palette, so both paths (empty legendItems vs populated) are covered.
     if (config.seriesField) {
       const items = (config.legendItems ?? []).map((li, i) => ({...li, color: colors[i % colors.length]}));
-      update({legendItems: items});
+      update({colors, legendItems: items});
     } else {
       update({colors});
     }
@@ -91,6 +92,27 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
     else items[index] = {...items[index], color};
     update({legendItems: items});
   };
+
+  // Keep `legendItems` in sync with the real series names in the dataset.
+  // Without this the per-series color pickers never render — the core reason
+  // "Colores de serie" appeared dead. Colors come from the current palette.
+  useEffect(() => {
+    if (!config.seriesField || !data || data.length === 0) return;
+    const names: string[] = [];
+    for (const row of data) {
+      const raw = row[config.seriesField];
+      const name = raw === null || raw === undefined || String(raw) === '' ? '(vacío)' : String(raw);
+      if (!names.includes(name)) names.push(name);
+    }
+    const existing = new Set((config.legendItems ?? []).map((li) => li.label));
+    const missing = names.filter((n) => !existing.has(n));
+    if (missing.length === 0) return;
+    const base = config.legendItems?.length ?? 0;
+    const added = missing.map((n, i) => ({label: n, color: pickColor(config.colors, base + i)}));
+    update({legendItems: [...(config.legendItems ?? []), ...added]});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.seriesField, config.colors, config.legendItems, data]);
+
   const isSingleSeries = config.type === 'bar' || config.type === 'line' || config.type === 'area' || config.type === 'pie';
   const hasSeries = !!config.seriesField && (config.type === 'bar' || config.type === 'line' || config.type === 'area');
   const legendItems = config.legendItems ?? [];
@@ -447,78 +469,126 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
       {/* ============ TAB: ESTILOS ============ */}
       {activeTab === 'estilos' && (
         <div className="space-y-4">
-          {/* Palettes */}
-          <div>
-            <label className="text-sm font-medium mb-1 block font-display">Paleta de colores</label>
-            <div className="space-y-2">
-              {PALETTES.map((p) => (
-                <button
-                  key={p.name}
-                  onClick={() => applyPalette(p.colors)}
-                  className="w-full text-left rounded-lg border border-border-subtle p-1.5 hover:border-amber-500/40 transition-colors"
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] text-secondary">{p.name}</span>
-                    <span className="text-[10px] text-muted">Aplicar</span>
-                  </div>
-                  <div className="flex gap-0.5">
-                    {p.colors.slice(0, 8).map((c, i) => (
-                      <div key={i} className="flex-1 h-3 rounded-sm" style={{backgroundColor: c}} />
-                    ))}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Per-series color pickers (multi-series charts) */}
-          {hasSeries && (
+          {/* ---- COLORS ---- */}
+          <div className="pt-1">
+            <label className="text-xs font-semibold text-muted uppercase tracking-widest block mb-2 font-display">Colores</label>
             <div>
-              <label className="text-sm font-medium mb-1 block">Colores de serie</label>
-              <div className="space-y-1.5">
-                {legendItems.length === 0 && (
-                  <p className="text-[10px] text-muted">Los colores se aplican al elegir una serie.</p>
-                )}
-                {legendItems.map((li, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={li.color}
-                      onChange={(e) => setSeriesColor(i, e.target.value)}
-                      className="w-8 h-8 rounded cursor-pointer border border-border-default bg-transparent"
-                      aria-label={`Color de ${li.label}`}
-                    />
-                    <span className="text-xs text-secondary truncate">{li.label}</span>
-                  </div>
+              <label className="text-sm font-medium mb-1 block">Paleta de colores</label>
+              <div className="space-y-2">
+                {PALETTES.map((p) => (
+                  <button
+                    key={p.name}
+                    onClick={() => applyPalette(p.colors)}
+                    className="w-full text-left rounded-lg border border-border-subtle p-1.5 hover:border-amber-500/40 transition-colors"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] text-secondary">{p.name}</span>
+                      <span className="text-[10px] text-muted">Aplicar</span>
+                    </div>
+                    <div className="flex gap-0.5">
+                      {p.colors.slice(0, 8).map((c, i) => (
+                        <div key={i} className="flex-1 h-3 rounded-sm" style={{backgroundColor: c}} />
+                      ))}
+                    </div>
+                  </button>
                 ))}
               </div>
             </div>
+
+            {/* Per-series color pickers (multi-series charts) */}
+            {hasSeries && (
+              <div className="mt-3">
+                <label className="text-sm font-medium mb-1 block">Colores de serie</label>
+                <div className="space-y-1.5">
+                  {legendItems.length === 0 && (
+                    <p className="text-[10px] text-muted">Se detectan las series al elegir el campo «Serie».</p>
+                  )}
+                  {legendItems.map((li, i) => (
+                    <div key={`${li.label}-${i}`} className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={li.color}
+                        onChange={(e) => setSeriesColor(i, e.target.value)}
+                        className="w-8 h-8 rounded cursor-pointer border border-border-default bg-transparent"
+                        aria-label={`Color de ${li.label}`}
+                      />
+                      <span className="text-xs text-secondary truncate">{li.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {config.type === 'bar' && (
+              <ColorInput label="Color de valores negativos" value={config.negativeColor} onChange={(v) => update({negativeColor: v || undefined})} />
+            )}
+          </div>
+
+          {/* ---- BARS ---- */}
+          {config.type === 'bar' && (
+            <div className="pt-3 border-t border-border-subtle">
+              <label className="text-xs font-semibold text-muted uppercase tracking-widest block mb-2 font-display">Barras</label>
+              <NumberInput label="Radio de esquinas" value={config.barRadius} min={0} max={24} onChange={(v) => update({barRadius: v})} />
+              <div className="grid grid-cols-2 gap-2">
+                <NumberInput label="Grosor de borde" value={config.barBorderWidth} min={0} max={6} onChange={(v) => update({barBorderWidth: v})} />
+                {(config.barBorderWidth ?? 0) > 0 && (
+                  <ColorInput label="Color de borde" value={config.barBorderColor} onChange={(v) => update({barBorderColor: v || undefined})} />
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <NumberInput label="Gap entre barras" value={config.barGap} min={0} max={20} onChange={(v) => update({barGap: v})} />
+                <NumberInput label="Gap de categoría" value={config.barCategoryGap} min={0} max={0.4} step={0.01} onChange={(v) => update({barCategoryGap: v})} />
+              </div>
+              <div className="pt-1">
+                <label className="text-sm font-medium mb-1 block">Relleno degradado</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    checked={!!config.barGradient}
+                    onChange={(e) => update({barGradient: e.target.checked ? {from: '#6b7280', to: '#111827'} : undefined})}
+                    className="peer sr-only"
+                  />
+                  <span
+                    aria-hidden="true"
+                    className={`relative w-9 h-5 rounded-full transition-colors ${config.barGradient ? 'bg-amber-500' : 'bg-border-default'}`}
+                  >
+                    <span
+                      className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${config.barGradient ? 'translate-x-4' : ''}`}
+                    />
+                  </span>
+                  <span className="text-xs text-secondary">{config.barGradient ? 'Activo' : 'Desactivado'}</span>
+                </div>
+              </div>
+              {config.barGradient && (
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  <ColorInput label="Desde" value={config.barGradient.from} onChange={(v) => update({barGradient: {...config.barGradient!, from: v}})} />
+                  <ColorInput label="Hasta" value={config.barGradient.to} onChange={(v) => update({barGradient: {...config.barGradient!, to: v}})} />
+                </div>
+              )}
+            </div>
           )}
 
-          {/* Fonts + colors */}
-          <div className="space-y-2">
+          {/* ---- FONTS & TEXT ---- */}
+          <div className="pt-3 border-t border-border-subtle">
+            <label className="text-xs font-semibold text-muted uppercase tracking-widest block mb-2 font-display">Fuente y texto</label>
             <div>
               <label className="text-sm font-medium mb-1 block">Fuente</label>
-              <input
-                type="text"
+              <select
                 value={config.style?.fontFamily ?? ''}
                 onChange={(e) => updateStyle({fontFamily: e.target.value || undefined})}
-                placeholder="inherit"
                 className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-              />
+              >
+                <option value="">Heredar (por defecto)</option>
+                {FONT_PRESETS.map((f) => (
+                  <option key={f.name} value={f.family}>{f.name}</option>
+                ))}
+              </select>
             </div>
-            <div>
-              <label className="text-sm font-medium mb-1 block">Tamaño de título</label>
-              <input
-                type="number"
-                min={8}
-                max={40}
-                value={config.style?.titleFontSize ?? ''}
-                onChange={(e) => updateStyle({titleFontSize: e.target.value ? Number(e.target.value) : undefined})}
-                className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-              />
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <NumberInput label="Tamaño de título" value={config.style?.titleFontSize} min={8} max={40} onChange={(v) => updateStyle({titleFontSize: v})} />
+              <NumberInput label="Tamaño de etiquetas" value={config.style?.labelFontSize} min={6} max={24} onChange={(v) => updateStyle({labelFontSize: v})} />
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 mt-2">
               <ColorInput label="Texto" value={config.style?.textColor} onChange={(v) => updateStyle({textColor: v})} />
               <ColorInput label="Ejes" value={config.style?.axisColor} onChange={(v) => updateStyle({axisColor: v})} />
               <ColorInput label="Cuadrícula" value={config.style?.gridColor} onChange={(v) => updateStyle({gridColor: v})} />
@@ -528,14 +598,28 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
               <>
                 <NumberInput label="Grosor de línea" value={config.style?.lineWidth} min={1} max={8} step={0.5} onChange={(v) => updateStyle({lineWidth: v})} />
                 {(config.showMarkers ?? true) && (
-                  <>
+                  <div className="grid grid-cols-2 gap-2">
                     <NumberInput label="Tamaño de punto" value={config.style?.pointSize} min={1} max={12} onChange={(v) => updateStyle({pointSize: v})} />
                     <NumberInput label="Opacidad de punto" value={config.style?.pointOpacity} min={0.1} max={1} step={0.05} onChange={(v) => updateStyle({pointOpacity: v})} />
-                  </>
+                  </div>
                 )}
               </>
             )}
             <NumberInput label="Opacidad global" value={config.style?.globalOpacity} min={0.1} max={1} step={0.05} onChange={(v) => updateStyle({globalOpacity: v})} />
+          </div>
+
+          {/* ---- CANVAS ---- */}
+          <div className="pt-3 border-t border-border-subtle">
+            <label className="text-xs font-semibold text-muted uppercase tracking-widest block mb-2 font-display">Canvas y fondo</label>
+            <ColorInput label="Color de fondo" value={config.canvasBackground} onChange={(v) => update({canvasBackground: v || undefined})} />
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <NumberInput label="Borde (grosor)" value={config.canvasBorderWidth} min={0} max={8} onChange={(v) => update({canvasBorderWidth: v})} />
+              {(config.canvasBorderWidth ?? 0) > 0 && (
+                <ColorInput label="Borde (color)" value={config.canvasBorderColor} onChange={(v) => update({canvasBorderColor: v || undefined})} />
+              )}
+            </div>
+            <NumberInput label="Radio de esquinas del lienzo" value={config.canvasBorderRadius} min={0} max={40} onChange={(v) => update({canvasBorderRadius: v})} />
+            <Toggle label="Sombra" checked={config.canvasShadow ?? false} onChange={(v) => update({canvasShadow: v})} />
           </div>
         </div>
       )}
@@ -543,40 +627,83 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
       {/* ============ TAB: COMPONENTES ============ */}
       {activeTab === 'componentes' && (
         <div className="space-y-4">
-          {/* General toggles */}
-          {config.type === 'bar' || config.type === 'line' || config.type === 'area' ? (
-            <Toggle label="Horizontal" checked={config.horizontal ?? false} onChange={(v) => update({horizontal: v})} />
-          ) : null}
-          {(config.type === 'line' || config.type === 'area') && (
-            <Toggle label="Curva suavizada" checked={config.lineSmooth ?? false} onChange={(v) => update({lineSmooth: v})} />
-          )}
-          {config.type === 'bar' && (
-            <div>
-              <label className="text-sm font-medium mb-1 block">Modo de barras</label>
-              <div className="flex gap-1">
-                {[
-                  {value: 'grouped' as const, label: 'Agrupadas'},
-                  {value: 'stacked' as const, label: 'Apiladas'},
-                  {value: 'stacked-percent' as const, label: 'Apiladas %'},
-                ].map((m) => (
-                  <button
-                    key={m.value}
-                    onClick={() => update({groupMode: m.value})}
-                    className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
-                      (config.groupMode ?? 'grouped') === m.value
-                        ? 'bg-amber-500 text-black'
-                        : 'bg-elevated text-secondary hover:bg-card-hover'
-                    }`}
-                  >
-                    {m.label}
-                  </button>
-                ))}
+          {/* ---- ORIENTATION & MODE ---- */}
+          <div>
+            <label className="text-xs font-semibold text-muted uppercase tracking-widest block mb-2 font-display">Orientación y modo</label>
+            {config.type === 'bar' || config.type === 'line' || config.type === 'area' ? (
+              <>
+                <Toggle label="Horizontal" checked={config.horizontal ?? false} onChange={(v) => update({horizontal: v})} />
+                {(config.type === 'line' || config.type === 'area') && (
+                  <Toggle label="Curva suavizada" checked={config.lineSmooth ?? false} onChange={(v) => update({lineSmooth: v})} />
+                )}
+              </>
+            ) : null}
+            {config.type === 'bar' && (
+              <div className="mt-2">
+                <label className="text-sm font-medium mb-1 block">Modo de barras</label>
+                <div className="flex gap-1">
+                  {[
+                    {value: 'grouped' as const, label: 'Agrupadas'},
+                    {value: 'stacked' as const, label: 'Apiladas'},
+                    {value: 'stacked-percent' as const, label: 'Apiladas %'},
+                  ].map((m) => (
+                    <button
+                      key={m.value}
+                      onClick={() => update({groupMode: m.value})}
+                      className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                        (config.groupMode ?? 'grouped') === m.value
+                          ? 'bg-amber-500 text-black'
+                          : 'bg-elevated text-secondary hover:bg-card-hover'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
               </div>
+            )}
+            {(config.type === 'line' || config.type === 'area') && (
+              <Toggle label="Línea discontinua" checked={config.lineDash ?? false} onChange={(v) => update({lineDash: v})} />
+            )}
+            {config.type === 'scatter' && (
+              <Toggle label="Línea de tendencia" checked={config.trendline ?? false} onChange={(v) => update({trendline: v})} />
+            )}
+          </div>
+
+          {/* ---- DATA LABELS ---- */}
+          {config.type !== 'table' && (
+            <div className="pt-3 border-t border-border-subtle">
+              <label className="text-xs font-semibold text-muted uppercase tracking-widest block mb-2 font-display">Etiquetas de datos</label>
+              <Toggle label="Mostrar etiquetas de datos" checked={config.showDataLabels ?? true} onChange={(v) => update({showDataLabels: v})} />
+              {(config.showDataLabels ?? true) && (
+                <div className="mt-2 space-y-2">
+                  {config.type === 'bar' && (
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">Posición</label>
+                      <select
+                        value={config.dataLabelPosition ?? 'auto'}
+                        onChange={(e) => update({dataLabelPosition: e.target.value as 'auto' | 'inside' | 'outside' | 'center'})}
+                        className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      >
+                        <option value="auto">Automática</option>
+                        <option value="outside">Fuera de la barra</option>
+                        <option value="center">Centro</option>
+                        <option value="inside">Dentro</option>
+                      </select>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <NumberInput label="Tamaño" value={config.dataLabelFontSize} min={6} max={24} onChange={(v) => update({dataLabelFontSize: v})} />
+                    <ColorInput label="Color" value={config.dataLabelColor} onChange={(v) => update({dataLabelColor: v || undefined})} />
+                  </div>
+                </div>
+              )}
             </div>
           )}
-          {/* Bar-chart avatars (single & multi series) */}
+
+          {/* ---- AVATARS ---- */}
           {config.type === 'bar' && (
-            <div className="pt-2 border-t border-border-subtle space-y-3">
+            <div className="pt-3 border-t border-border-subtle space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium block font-display">Avatares (imágenes)</label>
                 {config.avatarField && (
@@ -647,8 +774,96 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
               )}
             </div>
           )}
+
+          {/* ---- TOOLTIPS ---- */}
+          {config.type !== 'table' && (
+            <div className="pt-3 border-t border-border-subtle">
+              <label className="text-xs font-semibold text-muted uppercase tracking-widest block mb-2 font-display">Tooltips</label>
+              <Toggle label="Mostrar tooltip al pasar el cursor" checked={config.tooltipEnabled ?? true} onChange={(v) => update({tooltipEnabled: v})} />
+            </div>
+          )}
+
+          {/* ---- REFERENCE LINES ---- */}
+          {isCartesian && (
+            <div className="pt-3 border-t border-border-subtle">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-semibold text-muted uppercase tracking-widest font-display">Líneas de referencia</label>
+                <button
+                  onClick={() => update({referenceLines: [...(config.referenceLines ?? []), {value: 0, dash: false}]})}
+                  className="text-xs text-amber-500 hover:text-amber-400 font-medium"
+                >
+                  + Agregar
+                </button>
+              </div>
+              {(config.referenceLines ?? []).length === 0 && (
+                <p className="text-[10px] text-muted">Marcadores horizontales en un valor del eje Y (ej: promedio, objetivo).</p>
+              )}
+              {(config.referenceLines ?? []).map((rl, i) => (
+                <div key={i} className="flex items-center gap-1.5 mb-1.5">
+                  <input
+                    type="number"
+                    value={rl.value}
+                    onChange={(e) => {
+                      const next = [...(config.referenceLines ?? [])];
+                      next[i] = {...next[i], value: Number(e.target.value)};
+                      update({referenceLines: next});
+                    }}
+                    className="w-16 bg-elevated border border-border-default rounded-lg px-2 py-1 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                  <input
+                    type="color"
+                    value={rl.color ?? '#f59e0b'}
+                    onChange={(e) => {
+                      const next = [...(config.referenceLines ?? [])];
+                      next[i] = {...next[i], color: e.target.value};
+                      update({referenceLines: next});
+                    }}
+                    className="w-7 h-7 rounded cursor-pointer border border-border-default bg-transparent"
+                    aria-label={`Color línea ${i + 1}`}
+                  />
+                  <label className="flex items-center gap-1 text-[10px] text-muted">
+                    <input
+                      type="checkbox"
+                      checked={rl.dash ?? false}
+                      onChange={(e) => {
+                        const next = [...(config.referenceLines ?? [])];
+                        next[i] = {...next[i], dash: e.target.checked};
+                        update({referenceLines: next});
+                      }}
+                    />
+                    guión
+                  </label>
+                  <input
+                    type="text"
+                    value={rl.label ?? ''}
+                    onChange={(e) => {
+                      const next = [...(config.referenceLines ?? [])];
+                      next[i] = {...next[i], label: e.target.value};
+                      update({referenceLines: next});
+                    }}
+                    placeholder="etiqueta"
+                    className="flex-1 bg-elevated border border-border-default rounded-lg px-2 py-1 text-[10px] font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                  <button
+                    onClick={() => {
+                      const next = [...(config.referenceLines ?? [])];
+                      next.splice(i, 1);
+                      update({referenceLines: next});
+                    }}
+                    className="text-muted hover:text-red-500 px-1 text-xs"
+                    aria-label="Eliminar línea de referencia"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ---- PIE / SCATTER SPECIFIC ---- */}
           {config.type === 'pie' && (
-            <>
+            <div className="pt-3 border-t border-border-subtle">
+              <label className="text-xs font-semibold text-muted uppercase tracking-widest block mb-2 font-display">Segmentos</label>
               <Toggle label="Donut" checked={(config.innerRadius ?? 0) > 0} onChange={(v) => update({innerRadius: v ? 66 : 0})} />
               {(config.innerRadius ?? 0) > 0 && (
                 <div>
@@ -676,49 +891,34 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
                   <option value="none">Ninguna</option>
                 </select>
               </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Máx. segmentos</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={50}
-                  value={config.sliceLimit ?? ''}
-                  onChange={(e) => update({sliceLimit: e.target.value ? Number(e.target.value) : undefined})}
-                  placeholder="Sin límite"
-                  className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-                />
-              </div>
-            </>
-          )}
-          {config.type === 'scatter' && (
-            <Toggle label="Línea de tendencia" checked={config.trendline ?? false} onChange={(v) => update({trendline: v})} />
-          )}
-          {(config.type === 'line' || config.type === 'area') && (
-            <Toggle label="Línea discontinua" checked={config.lineDash ?? false} onChange={(v) => update({lineDash: v})} />
+              <NumberInput label="Máx. segmentos" value={config.sliceLimit} min={1} max={50} onChange={(v) => update({sliceLimit: v})} />
+            </div>
           )}
 
-          {/* Legend + markers */}
+          {/* ---- LEGEND & MARKERS ---- */}
           {config.type === 'bar' || config.type === 'line' || config.type === 'area' ? (
-            <>
+            <div className="pt-3 border-t border-border-subtle">
+              <label className="text-xs font-semibold text-muted uppercase tracking-widest block mb-2 font-display">Leyenda y puntos</label>
               <Toggle label="Mostrar leyenda" checked={config.showLegend ?? true} onChange={(v) => update({showLegend: v})} />
-              <div>
-                <label className="text-sm font-medium mb-1 block">Posición de leyenda</label>
-                <select
-                  value={config.legendPosition ?? 'bottom'}
-                  onChange={(e) => update({legendPosition: e.target.value as LegendPosition})}
-                  className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-                >
-                  <option value="top">Arriba</option>
-                  <option value="bottom">Abajo</option>
-                  <option value="right">Derecha</option>
-                </select>
-              </div>
-            </>
+              {(config.showLegend ?? true) && (
+                <div className="mt-1">
+                  <label className="text-sm font-medium mb-1 block">Posición de leyenda</label>
+                  <select
+                    value={config.legendPosition ?? 'bottom'}
+                    onChange={(e) => update({legendPosition: e.target.value as LegendPosition})}
+                    className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  >
+                    <option value="top">Arriba</option>
+                    <option value="bottom">Abajo</option>
+                    <option value="right">Derecha</option>
+                  </select>
+                </div>
+              )}
+              {(config.type === 'line' || config.type === 'area') && (
+                <Toggle label="Mostrar puntos" checked={config.showMarkers ?? true} onChange={(v) => update({showMarkers: v})} />
+              )}
+            </div>
           ) : null}
-          {config.type === 'line' || config.type === 'area' ? (
-            <Toggle label="Mostrar puntos" checked={config.showMarkers ?? true} onChange={(v) => update({showMarkers: v})} />
-          ) : null}
-          {config.type !== 'table' && <Toggle label="Mostrar etiquetas de datos" checked={config.showDataLabels ?? true} onChange={(v) => update({showDataLabels: v})} />}
         </div>
       )}
     </div>
