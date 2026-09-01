@@ -2,7 +2,7 @@
 
 import type {ChartConfig} from '@/lib/chart-config';
 import {formatValue, resolveChartStyle, prepareSeries, colorFor} from '@/lib/chart-data';
-import {SvgHeader, SvgLegend, headerHeight, legendReserve, frameRect, frameFilter, nextSvgId, type LegendItem} from './chart-frame';
+import {SvgHeader, SvgLegend, headerHeight, legendReserve, frameRect, type LegendItem} from './chart-frame';
 
 type Props = {
   data: Record<string, unknown>[];
@@ -72,7 +72,6 @@ export function PieChart({data, config}: Props) {
   const outerR = Math.min((availW - 24) / 2, (height - topInset - bottomInset - 24) / 2, 190);
   const innerFrac = isDonut ? Math.max(0.15, Math.min((config.innerRadius ?? 50) / 100, 0.85)) : 0;
   const innerR = innerFrac * outerR;
-  const shadowId = nextSvgId('f');
 
   let cumAngle = -Math.PI / 2;
 
@@ -90,8 +89,7 @@ export function PieChart({data, config}: Props) {
   return (
     <div className="relative w-full">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
-        <defs>{frameFilter(shadowId, config.canvasShadow ?? false)}</defs>
-        {frameRect(config, shadowId)}
+        {frameRect(config)}
         {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
         {showLegend && legendItems.length > 0 && <SvgLegend items={legendItems} position={config.legendPosition ?? 'bottom'} width={width} height={height} st={st} config={config} headerOffset={headerH} />}
         {visible.map((s) => {

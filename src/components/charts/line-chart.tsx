@@ -2,7 +2,7 @@
 
 import type {ChartConfig} from '@/lib/chart-config';
 import {prepareSeries, prepareMultiSeries, formatValue, resolveChartStyle, resolveYDomain, type PreparedMultiSeries} from '@/lib/chart-data';
-import {SvgHeader, SvgLegend, headerHeight, legendReserve, frameRect, frameFilter, nextSvgId, type LegendItem} from './chart-frame';
+import {SvgHeader, SvgLegend, headerHeight, legendReserve, frameRect, type LegendItem} from './chart-frame';
 
 type Props = {
   data: Record<string, unknown>[];
@@ -40,10 +40,10 @@ function MultiLine({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
   const showLegend = config.showLegend ?? true;
   const legendPosition = config.legendPosition ?? 'bottom';
   const smooth = config.lineSmooth ?? false;
-  const shadowId = nextSvgId('f');
   const catColor = config.xLabelFont?.color ?? st.textColor;
   const catSize = config.xLabelFont?.size ?? st.labelFontSize;
   const catFamily = config.xLabelFont?.fontFamily ?? undefined;
+  const catWeight = config.xLabelFont?.weight ?? 400;
   const xAxisColor = config.xLabelFont?.color ?? st.axisColor;
   const yAxisColor = config.yLabelFont?.color ?? st.axisColor;
   const xAxisFamily = config.xLabelFont?.fontFamily;
@@ -51,6 +51,7 @@ function MultiLine({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
   const yTickFamily = config.yLabelFont?.fontFamily;
   const yTickSize = config.yLabelFont?.size ?? 10;
   const yTickColor = config.yLabelFont?.color ?? st.textColor;
+  const yTickWeight = config.yLabelFont?.weight ?? 400;
 
   const toX = (i: number) => margin.left + (i / Math.max(n - 1, 1)) * plotW;
   const toY = (v: number) => margin.top + plotH - ((v - domain.yMin) / yRange) * plotH;
@@ -68,8 +69,7 @@ function MultiLine({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
   return (
     <div className="relative w-full">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
-        <defs>{frameFilter(shadowId, config.canvasShadow ?? false)}</defs>
-        {frameRect(config, shadowId)}
+        {frameRect(config)}
         {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
         {showLegend && legendItems.length > 0 && <SvgLegend items={legendItems} position={legendPosition} width={width} height={height} st={st} config={config} headerOffset={headerH} />}
           {config.showGrid !== false && tickValues.map((v, i) => {
@@ -77,7 +77,7 @@ function MultiLine({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
             return (
               <g key={i}>
                 <line x1={margin.left} y1={y} x2={width - margin.right} y2={y} stroke={st.gridColor} strokeWidth={1} />
-                <text x={margin.left - 8} y={y + 4} textAnchor="end" fill={yTickColor} fontSize={yTickSize} fontFamily={yTickFamily}>{formatValue(v, numFmt)}</text>
+                <text x={margin.left - 8} y={y + 4} textAnchor="end" fill={yTickColor} fontSize={yTickSize} fontFamily={yTickFamily} fontWeight={yTickWeight}>{formatValue(v, numFmt)}</text>
               </g>
             );
           })}
@@ -103,6 +103,7 @@ function MultiLine({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
                 fill={catColor}
                 fontSize={catSize}
                 fontFamily={catFamily}
+                fontWeight={catWeight}
                 transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${cx}, ${height - margin.bottom + 14})` : undefined}
               >
                 {cat.length > 10 ? cat.slice(0, 10) + '…' : cat}
@@ -131,10 +132,10 @@ function SingleLine({data, config}: Props) {
   const labelAngle = config.labelAngle ?? (n > 8 ? -30 : 0);
   const showMarkers = config.showMarkers ?? true;
   const smooth = config.lineSmooth ?? false;
-  const shadowId = nextSvgId('f');
   const catColor = config.xLabelFont?.color ?? st.textColor;
   const catSize = config.xLabelFont?.size ?? st.labelFontSize;
   const catFamily = config.xLabelFont?.fontFamily ?? undefined;
+  const catWeight = config.xLabelFont?.weight ?? 400;
   const xAxisColor = config.xLabelFont?.color ?? st.axisColor;
   const yAxisColor = config.yLabelFont?.color ?? st.axisColor;
   const xAxisFamily = config.xLabelFont?.fontFamily;
@@ -142,6 +143,7 @@ function SingleLine({data, config}: Props) {
   const yTickFamily = config.yLabelFont?.fontFamily;
   const yTickSize = config.yLabelFont?.size ?? 10;
   const yTickColor = config.yLabelFont?.color ?? st.textColor;
+  const yTickWeight = config.yLabelFont?.weight ?? 400;
 
   if (n === 0) {
     return <div className="flex items-center justify-center h-48 text-muted text-sm">Sin datos para este gráfico</div>;
@@ -156,15 +158,14 @@ function SingleLine({data, config}: Props) {
   return (
     <div className="relative w-full">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
-        <defs>{frameFilter(shadowId, config.canvasShadow ?? false)}</defs>
-        {frameRect(config, shadowId)}
+        {frameRect(config)}
         {headerHeight(config, st) > 0 && <SvgHeader config={config} st={st} width={width} />}
       {config.showGrid !== false && tickValues.map((v, i) => {
         const y = toY(v);
         return (
           <g key={i}>
             <line x1={margin.left} y1={y} x2={width - margin.right} y2={y} stroke={st.gridColor} strokeWidth={1} />
-            <text x={margin.left - 8} y={y + 4} textAnchor="end" fill={yTickColor} fontSize={yTickSize} fontFamily={yTickFamily}>{formatValue(v, numFmt)}</text>
+            <text x={margin.left - 8} y={y + 4} textAnchor="end" fill={yTickColor} fontSize={yTickSize} fontFamily={yTickFamily} fontWeight={yTickWeight}>{formatValue(v, numFmt)}</text>
           </g>
         );
       })}
@@ -182,6 +183,7 @@ function SingleLine({data, config}: Props) {
           fill={catColor}
           fontSize={catSize}
           fontFamily={catFamily}
+          fontWeight={catWeight}
           transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${toX(i)}, ${height - margin.bottom + 14})` : undefined}
         >
           {p.label.length > 10 ? p.label.slice(0, 10) + '…' : p.label}

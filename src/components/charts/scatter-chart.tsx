@@ -2,7 +2,7 @@
 
 import type {ChartConfig} from '@/lib/chart-config';
 import {formatValue, resolveChartStyle, resolveYDomain, resolveXDomain, colorFor} from '@/lib/chart-data';
-import {SvgHeader, SvgLegend, headerHeight, legendReserve, frameRect, frameFilter, nextSvgId, type LegendItem} from './chart-frame';
+import {SvgHeader, SvgLegend, headerHeight, legendReserve, frameRect, type LegendItem} from './chart-frame';
 
 type Props = {
   data: Record<string, unknown>[];
@@ -66,7 +66,6 @@ export function ScatterChart({data, config}: Props) {
   const xLabel = config.xLabel ?? xField;
   const yLabel = config.yLabel ?? yField;
 
-  const shadowId = nextSvgId('f');
   const showLegend = config.showLegend ?? true;
   const xAxisColor = config.xLabelFont?.color ?? st.axisColor;
   const yAxisColor = config.yLabelFont?.color ?? st.axisColor;
@@ -75,9 +74,11 @@ export function ScatterChart({data, config}: Props) {
   const yTickFamily = config.yLabelFont?.fontFamily;
   const yTickSize = config.yLabelFont?.size ?? 10;
   const yTickColor = config.yLabelFont?.color ?? st.textColor;
+  const yTickWeight = config.yLabelFont?.weight ?? 400;
   const xTickFamily = config.xLabelFont?.fontFamily;
   const xTickSize = config.xLabelFont?.size ?? 10;
   const xTickColor = config.xLabelFont?.color ?? st.textColor;
+  const xTickWeight = config.xLabelFont?.weight ?? 400;
   const pointColor = (p: (typeof points)[number]) => (p.label && catColors.has(p.label) ? catColors.get(p.label)! : colorFor(config, p.label, 0));
 
   // Optional linear trendline via least squares.
@@ -99,8 +100,7 @@ export function ScatterChart({data, config}: Props) {
   return (
     <div className="relative w-full">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
-        <defs>{frameFilter(shadowId, config.canvasShadow ?? false)}</defs>
-        {frameRect(config, shadowId)}
+        {frameRect(config)}
         {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
         {showLegend !== false && legendItems.length > 0 && <SvgLegend items={legendItems} position={config.legendPosition ?? 'bottom'} width={width} height={height} st={st} config={config} headerOffset={headerH} />}
       {config.showGrid !== false && yDom.ticks.map((v, i) => {
@@ -108,7 +108,7 @@ export function ScatterChart({data, config}: Props) {
         return (
           <g key={`y-${i}`}>
             <line x1={margin.left} y1={y} x2={margin.left + plotW} y2={y} stroke={st.gridColor} strokeWidth={1} />
-            <text x={margin.left - 8} y={y + 4} textAnchor="end" fill={yTickColor} fontSize={yTickSize} fontFamily={yTickFamily}>{formatValue(v, numFmt)}</text>
+            <text x={margin.left - 8} y={y + 4} textAnchor="end" fill={yTickColor} fontSize={yTickSize} fontFamily={yTickFamily} fontWeight={yTickWeight}>{formatValue(v, numFmt)}</text>
           </g>
         );
       })}
@@ -117,7 +117,7 @@ export function ScatterChart({data, config}: Props) {
         return (
           <g key={`x-${i}`}>
             <line x1={x} y1={margin.top} x2={x} y2={margin.top + plotH} stroke={st.gridColor} strokeWidth={1} />
-            <text x={x} y={margin.top + plotH + 14} textAnchor="middle" fill={xTickColor} fontSize={xTickSize} fontFamily={xTickFamily}>{formatValue(v, numFmt)}</text>
+            <text x={x} y={margin.top + plotH + 14} textAnchor="middle" fill={xTickColor} fontSize={xTickSize} fontFamily={xTickFamily} fontWeight={xTickWeight}>{formatValue(v, numFmt)}</text>
           </g>
         );
       })}
@@ -139,8 +139,8 @@ export function ScatterChart({data, config}: Props) {
         />
       ))}
 
-      <text x={width / 2} y={height - 8} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily}>{xLabel}</text>
-      <text x={14} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} transform={`rotate(-90, 14, ${height / 2})`}>{yLabel}</text>
+      <text x={width / 2} y={height - 8} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{xLabel}</text>
+      <text x={14} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 14, ${height / 2})`}>{yLabel}</text>
     </svg>
     </div>
   );

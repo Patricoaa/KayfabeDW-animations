@@ -11,13 +11,28 @@ export type GroupMode = 'grouped' | 'stacked' | 'stacked-percent';
 export type AvatarShape = 'circle' | 'rounded';
 export type AvatarPosition = 'above' | 'below' | 'inside' | 'beside-label' | 'replace-label' | 'bar-end' | 'bar-start';
 
+export type FontWeight = 400 | 500 | 600 | 700;
+
+// Category label placement. `*out` places labels outside the bar/column
+// (below start, beside center, above/after end); `*in` places them over the
+// bar body. 'axis' (default) keeps labels on the axis line.
+export type CategoryLabelPosition = 'axis' | 'start-out' | 'center-out' | 'end-out' | 'start-in' | 'center-in' | 'end-in';
+
 // Per-section text style. Every field is optional: empty sections "inherit"
 // from the general chart typography (style.fontFamily / textColor / labelFontSize).
 export type SectionFont = {
   fontFamily?: string;
   color?: string;
   size?: number;
+  weight?: FontWeight;
 };
+
+export const FONT_WEIGHTS: {value: FontWeight; label: string}[] = [
+  {value: 400, label: 'Regular'},
+  {value: 500, label: 'Medio'},
+  {value: 600, label: 'Semibold'},
+  {value: 700, label: 'Negrita'},
+];
 
 export type ChartFilterOp = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'is_empty' | 'is_not_empty';
 
@@ -163,11 +178,8 @@ export type ChartConfig = {
   dataLabelColor?: string;
   dataLabelFontFamily?: string;
 
-  // Category (x) label placement + its own font. `categoryLabelPosition`
-  // only applies to bar charts: 'axis' keeps labels on the axis line,
-  // 'start'/'inside'/'end' move them next to / inside each bar, and 'beside'
-  // places them just outside the outer end of each bar.
-  categoryLabelPosition?: 'axis' | 'start' | 'inside' | 'end' | 'beside';
+  // Category (x) label placement + its own font. Only applies to bar charts.
+  categoryLabelPosition?: CategoryLabelPosition;
 
   // Per-section font overrides (inherit general typography when unset).
   headerFont?: SectionFont;
@@ -186,7 +198,6 @@ export type ChartConfig = {
   canvasBorderColor?: string;
   canvasBorderWidth?: number;
   canvasBorderRadius?: number;
-  canvasShadow?: boolean;
   canvasPreset?: string;
 
   // Horizontal reference / target lines drawn over the plot.
@@ -198,7 +209,7 @@ export type ChartConfig = {
   configVersion?: number;
 };
 
-export const CHART_CONFIG_VERSION = 12;
+export const CHART_CONFIG_VERSION = 13;
 
 export const DEFAULT_CHART_CONFIG: ChartConfig = {
   type: 'bar',
@@ -244,11 +255,16 @@ export const DEFAULT_CHART_CONFIG: ChartConfig = {
 };
 
 export function applyChartDefaults(config: Partial<ChartConfig>): ChartConfig {
-  // V12: gradient bar fill was removed from the product. Strip any legacy
-  // value so old saved configs render with a solid bar again.
-  if (config && 'barGradient' in config) {
-    const {barGradient: _drop, ...rest} = config;
-    return {...DEFAULT_CHART_CONFIG, ...rest};
+  // V12: gradient bar fill was removed from the product. V13: the canvas
+  // shadow was removed. Strip any legacy value so old saved configs render clean.
+  if (!config) return DEFAULT_CHART_CONFIG;
+  let clean = config;
+  if ('barGradient' in clean || 'canvasShadow' in clean) {
+    const legacy = clean as Partial<ChartConfig> & Record<string, unknown>;
+    const {barGradient, canvasShadow, ...rest} = legacy;
+    void barGradient;
+    void canvasShadow;
+    clean = rest as Partial<ChartConfig>;
   }
-  return {...DEFAULT_CHART_CONFIG, ...config};
+  return {...DEFAULT_CHART_CONFIG, ...clean};
 }

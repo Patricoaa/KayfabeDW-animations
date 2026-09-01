@@ -3,7 +3,7 @@
 import {useState} from 'react';
 import type {ChartConfig, NumberFormat} from '@/lib/chart-config';
 import {prepareSeries, prepareMultiSeries, formatValue, colorFor, resolveChartStyle, resolveYDomain, type PreparedMultiSeries} from '@/lib/chart-data';
-import {SvgHeader, SvgLegend, roundedRectPath, headerHeight, legendReserve, frameRect, frameFilter, type LegendItem} from './chart-frame';
+import {SvgHeader, SvgLegend, roundedRectPath, headerHeight, legendReserve, frameRect, type LegendItem} from './chart-frame';
 
 type Props = {
   data: Record<string, unknown>[];
@@ -205,6 +205,8 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const yTickFamily = config.yLabelFont?.fontFamily;
   const yTickSize = config.yLabelFont?.size ?? 10;
   const yTickColor = config.yLabelFont?.color ?? st.textColor;
+  const yTickWeight = config.yLabelFont?.weight ?? 400;
+  const catWeight = config.xLabelFont?.weight ?? 400;
   const radius = config.barRadius ?? 2;
   const borderW = config.barBorderWidth ?? 0;
   const borderColor = config.barBorderColor ?? '#ffffff';
@@ -212,7 +214,6 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const dlSize = config.dataLabelFontSize ?? 10;
   const dlColor = config.dataLabelColor ?? '#ccc';
   const tooltipEnabled = config.tooltipEnabled ?? true;
-  const shadowId = `f-${svgNs++}`;
 
   const [tip, setTip] = useState<TooltipState | null>(null);
   const catTip = (ci: number, cat: string, frac: {x: number; y: number}): TooltipState => ({
@@ -272,10 +273,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
     return (
       <div className="relative w-full">
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
-          <defs>
-            {frameFilter(shadowId, config.canvasShadow ?? false)}
-          </defs>
-          {frameRect(config, shadowId)}
+          {frameRect(config)}
           {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
           {showLegend && legendItems.length > 0 && <SvgLegend items={legendItems} position={legendPosition} width={width} height={height} st={st} config={config} headerOffset={headerH} />}
               {config.showGrid !== false && tickValues.map((v, i) => {
@@ -283,7 +281,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                 return (
                   <g key={i}>
                     {i > 0 && <line x1={x} y1={marginAdj.top} x2={x} y2={marginAdj.top + plotH} stroke={st.gridColor} strokeWidth={1} />}
-                    <text x={x} y={marginAdj.top + plotH + 14} textAnchor="middle" fill={yTickColor} fontSize={yTickSize} fontFamily={yTickFamily}>
+                    <text x={x} y={marginAdj.top + plotH + 14} textAnchor="middle" fill={yTickColor} fontSize={yTickSize} fontFamily={yTickFamily} fontWeight={yTickWeight}>
                       {formatValue(v, numFmt)}
                     </text>
                   </g>
@@ -292,10 +290,10 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
               {referenceLinesSvg(true, true, domain, yRange, marginAdj, plotW, plotH, config)}
 
               {config.xLabel && (
-                <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily}>{config.xLabel}</text>
+                <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{config.xLabel}</text>
               )}
               {config.yLabel && (
-                <text x={14} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} transform={`rotate(-90, 14, ${height / 2})`}>
+                <text x={14} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 14, ${height / 2})`}>
                   {config.yLabel}
                 </text>
               )}
@@ -346,12 +344,15 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                       }
                       const fill = barFill(s.color, config, val < 0);
                       const rectW = Math.max(w, 0);
-                      const rEnds = (stacked || stackedPercent) && !!config.barRadiusEndsOnly;
-                      const pillLast = si === nS - 1;
-                      return rEnds ? (
+                      const rEnds = !!config.barRadiusEndsOnly;
+                      const lastVis = stacked || stackedPercent
+                        ? multi.series.reduce<number>((acc, s2, si2) => (s2.values[ci] ?? 0) > 0 ? si2 : acc, -1)
+                        : nS;
+                      const pill = rEnds && lastVis >= 0 && ((stacked || stackedPercent) ? si === lastVis : val > 0);
+                      return pill ? (
                         <path
                           key={`${ci}-${si}`}
-                          d={roundedRectPath(x, y, rectW, hh, pillLast ? radius : 0, {tr: pillLast, br: pillLast})}
+                          d={roundedRectPath(x, y, rectW, hh, radius, {tr: true, br: true})}
                           fill={fill}
                           stroke={borderW > 0 ? borderColor : 'none'}
                           strokeWidth={borderW}
@@ -415,28 +416,35 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                 const cy = bandY + catBandH / 2;
                 const img = multi.categoryImages?.[ci] ?? null;
                 const hasImg = avatarActive && !!img;
-                const maxEndX = stacked || stackedPercent
+                const colStart = marginAdj.left;
+                const colEnd = stacked || stackedPercent
                   ? marginAdj.left + ((stackedPercent ? 1 : (stackTotal![ci] || 1)) / (stackedPercent ? 1 : yRange)) * plotW
                   : marginAdj.left + (Math.max(...multi.series.map((s) => s.values[ci] ?? 0), 0) / yRange) * plotW;
-                const labelAt = catPos === 'start'
-                  ? {x: marginAdj.left + 3, anchor: 'start' as const}
-                  : catPos === 'inside'
-                    ? {x: marginAdj.left + plotW / 2, anchor: 'middle' as const}
-                    : (catPos === 'end' || catPos === 'beside')
-                      ? {x: maxEndX + 4, anchor: 'start' as const}
-                      : {x: marginAdj.left - 8, anchor: 'end' as const};
+                const midX = (colStart + colEnd) / 2;
+                const labelAt = catPos === 'axis' || catPos === 'start-out'
+                  ? {x: colStart - 8, y: cy + 3, anchor: 'end' as const}
+                  : catPos === 'end-out'
+                    ? {x: colEnd + 4, y: cy + 3, anchor: 'start' as const}
+                    : catPos === 'center-out'
+                      ? {x: midX, y: cy + catBandH / 2 + 10, anchor: 'middle' as const}
+                      : catPos === 'start-in'
+                        ? {x: colStart + 8, y: cy + 3, anchor: 'start' as const}
+                        : catPos === 'end-in'
+                          ? {x: Math.max(colEnd - 8, colStart + 8), y: cy + 3, anchor: 'end' as const}
+                          : {x: midX, y: cy + 3, anchor: 'middle' as const};
 
               if (!hasImg) {
                 return (
                   <text
                     key={ci}
                     x={labelAt.x}
-                    y={cy + 3}
+                    y={labelAt.y}
                     textAnchor={labelAt.anchor}
                     fill={catColor}
                     fontSize={catSize}
                     fontFamily={catFamily}
-                    transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${labelAt.x}, ${cy + 3})` : undefined}
+                    fontWeight={catWeight}
+                    transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${labelAt.x}, ${labelAt.y})` : undefined}
                   >
                     {cat.length > 16 ? cat.slice(0, 16) + '…' : cat}
                   </text>
@@ -447,10 +455,10 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                 const total = stackXBase ? (stackTotal![ci] || 1) : yRange;
                 const barEndX = stacked || stackedPercent
                   ? marginAdj.left + ((stackXBase![ci][nS - 1] + Math.max(multi.series[nS - 1].values[ci] ?? 0, 0)) / total) * plotW
-                  : maxEndX;
+                  : colEnd;
                 return (
                   <g key={ci}>
-                    <text x={marginAdj.left - 8} y={cy + 3} textAnchor="end" fill={catColor} fontSize={catSize} fontFamily={catFamily}>
+                    <text x={marginAdj.left - 8} y={cy + 3} textAnchor="end" fill={catColor} fontSize={catSize} fontFamily={catFamily} fontWeight={catWeight}>
                       {cat.length > 16 ? cat.slice(0, 16) + '…' : cat}
                     </text>
                     <Avatar href={img!} cx={barEndX + (config.showDataLabels !== false ? 52 : 10) + avatarSize / 2} cy={cy} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
@@ -468,7 +476,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
               return (
                 <g key={ci}>
                   <Avatar href={img!} cx={marginAdj.left - 8 - avatarSize / 2} cy={cy} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
-                  <text x={marginAdj.left - 8 - avatarSize - 6} y={cy + 3} textAnchor="end" fill={catColor} fontSize={catSize} fontFamily={catFamily}>
+                  <text x={marginAdj.left - 8 - avatarSize - 6} y={cy + 3} textAnchor="end" fill={catColor} fontSize={catSize} fontFamily={catFamily} fontWeight={catWeight}>
                     {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
                   </text>
                 </g>
@@ -502,10 +510,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   return (
     <div className="relative w-full">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
-        <defs>
-          {frameFilter(shadowId, config.canvasShadow ?? false)}
-        </defs>
-        {frameRect(config, shadowId)}
+        {frameRect(config)}
         {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
         {showLegend && legendItems.length > 0 && <SvgLegend items={legendItems} position={legendPosition} width={width} height={height} st={st} config={config} headerOffset={headerH} />}
             {config.showGrid !== false && tickValues.map((v, i) => {
@@ -522,10 +527,10 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
             {referenceLinesSvg(true, false, domain, yRange, marginAdj, plotW, plotH, config)}
 
             {config.xLabel && (
-              <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily}>{config.xLabel}</text>
+              <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{config.xLabel}</text>
             )}
             {config.yLabel && (
-              <text x={16} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} transform={`rotate(-90, 16, ${height / 2})`}>
+              <text x={16} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 16, ${height / 2})`}>
                 {config.yLabel}
               </text>
             )}
@@ -574,12 +579,15 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
               }
 const fill = barFill(s.color, config, val < 0);
                 const rectH = Math.max(hh, 0);
-                const rEnds = (stacked || stackedPercent) && !!config.barRadiusEndsOnly;
-                const pillLast = si === nS - 1;
-                return rEnds ? (
+                const rEnds = !!config.barRadiusEndsOnly;
+                const lastVis = stacked || stackedPercent
+                  ? multi.series.reduce<number>((acc, s2, si2) => (s2.values[ci] ?? 0) > 0 ? si2 : acc, -1)
+                  : nS;
+                const pill = rEnds && lastVis >= 0 && ((stacked || stackedPercent) ? si === lastVis : val > 0);
+                return pill ? (
                   <path
                     key={`${ci}-${si}`}
-                    d={roundedRectPath(x, y, w, rectH, pillLast ? radius : 0, {tl: pillLast, tr: pillLast})}
+                    d={roundedRectPath(x, y, w, rectH, radius, val < 0 ? {bl: true, br: true} : {tl: true, tr: true})}
                     fill={fill}
                     stroke={borderW > 0 ? borderColor : 'none'}
                     strokeWidth={borderW}
@@ -656,46 +664,35 @@ const fill = barFill(s.color, config, val < 0);
             }
 
             if (!hasImg) {
-              if (catPos === 'end' || catPos === 'beside') {
-                let topY = marginAdj.top + plotH;
-                if (stackedPercent) {
-                  topY = marginAdj.top;
-                } else if (stacked) {
-                  topY = marginAdj.top + plotH - ((multi.series.reduce((a, s) => a + Math.max(s.values[ci] ?? 0, 0), 0)) / yRange) * plotH;
-                } else {
-                  const maxInCat = Math.max(...multi.series.map((s) => s.values[ci] ?? 0), 0);
-                  topY = marginAdj.top + plotH - (maxInCat / yRange) * plotH;
-                }
-                return (
-                  <text key={ci} x={cx} y={topY - 4} textAnchor="middle" fill={catColor} fontSize={catSize} fontFamily={catFamily} transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${cx}, ${topY - 4})` : undefined}>
-                    {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
-                  </text>
-                );
-              }
-              if (catPos === 'inside') {
-                return (
-                  <text key={ci} x={cx} y={marginAdj.top + plotH / 2} textAnchor="middle" fill={catColor} fontSize={catSize} fontFamily={catFamily} transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${cx}, ${marginAdj.top + plotH / 2})` : undefined}>
-                    {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
-                  </text>
-                );
-              }
-              if (catPos === 'start') {
-                return (
-                  <text key={ci} x={cx} y={marginAdj.top + plotH - 4} textAnchor="middle" fill={catColor} fontSize={catSize} fontFamily={catFamily} transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${cx}, ${marginAdj.top + plotH - 4})` : undefined}>
-                    {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
-                  </text>
-                );
-              }
+              const colBottom = marginAdj.top + plotH;
+              const colTop = stackedPercent
+                ? marginAdj.top
+                : stacked
+                  ? marginAdj.top + plotH - ((multi.series.reduce((a, s) => a + Math.max(s.values[ci] ?? 0, 0), 0)) / yRange) * plotH
+                  : marginAdj.top + plotH - (Math.max(...multi.series.map((s) => s.values[ci] ?? 0), 0) / yRange) * plotH;
+              const midY = (colTop + colBottom) / 2;
+              const labelAt = catPos === 'axis' || catPos === 'start-out'
+                ? {x: cx, y: height - marginAdj.bottom + 14, anchor: 'middle' as const}
+                : catPos === 'end-out'
+                  ? {x: cx, y: colTop - 4, anchor: 'middle' as const}
+                  : catPos === 'center-out'
+                    ? {x: cx + barBlockW / 2 + 8, y: midY, anchor: 'start' as const}
+                    : catPos === 'start-in'
+                      ? {x: cx, y: colBottom - 10, anchor: 'middle' as const}
+                      : catPos === 'end-in'
+                        ? {x: cx, y: Math.min(colTop + 12, colBottom - 10), anchor: 'middle' as const}
+                        : {x: cx, y: midY, anchor: 'middle' as const};
               return (
                 <text
                   key={ci}
-                  x={cx}
-                  y={height - marginAdj.bottom + 14}
-                  textAnchor="middle"
+                  x={labelAt.x}
+                  y={labelAt.y}
+                  textAnchor={labelAt.anchor}
                   fill={catColor}
                   fontSize={catSize}
                   fontFamily={catFamily}
-                  transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${cx}, ${height - marginAdj.bottom + 14})` : undefined}
+                  fontWeight={catWeight}
+                  transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${labelAt.x}, ${labelAt.y})` : undefined}
                 >
                   {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
                 </text>
@@ -706,7 +703,7 @@ if (avatarPos === 'above') {
                 return (
                   <g key={ci}>
                     <Avatar href={img!} cx={cx} cy={barTop - avatarSize / 2 - 4} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
-                    <text x={cx} y={height - marginAdj.bottom + 14} textAnchor="middle" fill={catColor} fontSize={catSize} fontFamily={catFamily}>
+                    <text x={cx} y={height - marginAdj.bottom + 14} textAnchor="middle" fill={catColor} fontSize={catSize} fontFamily={catFamily} fontWeight={catWeight}>
                       {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
                     </text>
                   </g>
@@ -730,6 +727,7 @@ if (avatarPos === 'above') {
                   fill={catColor}
                   fontSize={catSize}
                   fontFamily={catFamily}
+                  fontWeight={catWeight}
                 >
                   {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
                 </text>
@@ -782,11 +780,12 @@ function SingleBar({data, config}: Props) {
   const dlSize = config.dataLabelFontSize ?? 10;
   const dlColor = config.dataLabelColor ?? '#ccc';
   const tooltipEnabled = config.tooltipEnabled ?? true;
-  const shadowId = `f-${svgNs++}`;
   const labelAngle = config.labelAngle ?? (n > 8 ? -30 : 0);
   const yTickFamily = config.yLabelFont?.fontFamily;
   const yTickSize = config.yLabelFont?.size ?? 10;
   const yTickColor = config.yLabelFont?.color ?? st.textColor;
+  const yTickWeight = config.yLabelFont?.weight ?? 400;
+  const catWeight = config.xLabelFont?.weight ?? 400;
   const [tip, setTip] = useState<TooltipState | null>(null);
 
   const marginAdj = {...margin};
@@ -814,17 +813,14 @@ function SingleBar({data, config}: Props) {
     return (
       <div className="relative">
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
-          <defs>
-            {frameFilter(shadowId, config.canvasShadow ?? false)}
-          </defs>
-          {frameRect(config, shadowId)}
+          {frameRect(config)}
           {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
           {config.showGrid !== false && tickValues.map((v, i) => {
             const x = marginAdj.left + ((v - domain.yMin) / yRange) * plotW2;
             return (
               <g key={i}>
                 {i > 0 && <line x1={x} y1={marginAdj.top} x2={x} y2={marginAdj.top + plotH2} stroke={st.gridColor} strokeWidth={1} />}
-                <text x={x} y={marginAdj.top + plotH2 + 14} textAnchor="middle" fill={yTickColor} fontSize={yTickSize} fontFamily={yTickFamily}>
+                <text x={x} y={marginAdj.top + plotH2 + 14} textAnchor="middle" fill={yTickColor} fontSize={yTickSize} fontFamily={yTickFamily} fontWeight={yTickWeight}>
                   {formatValue(v, numFmt)}
                 </text>
               </g>
@@ -832,8 +828,8 @@ function SingleBar({data, config}: Props) {
           })}
           {referenceLinesSvg(false, true, domain, yRange, marginAdj, plotW2, plotH2, config)}
 
-          {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily}>{config.xLabel}</text>}
-          {config.yLabel && <text x={14} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} transform={`rotate(-90, 14, ${height / 2})`}>{config.yLabel}</text>}
+          {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{config.xLabel}</text>}
+          {config.yLabel && <text x={14} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 14, ${height / 2})`}>{config.yLabel}</text>}
 
           {prepared.items.map((d, i) => {
             const y = marginAdj.top + gap + i * (barH + gap);
@@ -842,15 +838,20 @@ function SingleBar({data, config}: Props) {
             const color = colorFor(config, d.label, i);
             const img = avatarUrl(d.raw);
             const endX = marginAdj.left + bw;
+            const midX = (marginAdj.left + endX) / 2;
             const labelAt = avatarActive && avatarPos === 'beside-label' && img
-              ? {x: marginAdj.left - 8 - avatarSize - 6, anchor: 'end' as const}
-              : catPos === 'start'
-                ? {x: marginAdj.left + 3, anchor: 'start' as const}
-                : catPos === 'inside'
-                  ? {x: marginAdj.left + bw / 2, anchor: 'middle' as const}
-                  : (catPos === 'end' || catPos === 'beside')
-                    ? {x: endX + 4, anchor: 'start' as const}
-                    : {x: marginAdj.left - 8, anchor: 'end' as const};
+              ? {x: marginAdj.left - 8 - avatarSize - 6, y: y + barH / 2 + 3, anchor: 'end' as const}
+              : catPos === 'axis' || catPos === 'start-out'
+                ? {x: marginAdj.left - 8, y: y + barH / 2 + 3, anchor: 'end' as const}
+                : catPos === 'end-out'
+                  ? {x: endX + 4, y: y + barH / 2 + 3, anchor: 'start' as const}
+                  : catPos === 'center-out'
+                    ? {x: midX, y: y + barH + 8, anchor: 'middle' as const}
+                    : catPos === 'start-in'
+                      ? {x: marginAdj.left + 8, y: y + barH / 2 + 3, anchor: 'start' as const}
+                      : catPos === 'end-in'
+                        ? {x: Math.max(endX - 8, marginAdj.left + 8), y: y + barH / 2 + 3, anchor: 'end' as const}
+                        : {x: midX, y: y + barH / 2 + 3, anchor: 'middle' as const};
             const barEndAvatar = avatarActive && avatarPos === 'bar-end' && !!img;
             const labelExtra = barEndAvatar ? avatarSize + 10 : 6;
             return (
@@ -861,7 +862,11 @@ function SingleBar({data, config}: Props) {
                 onMouseLeave={tooltipEnabled ? () => setTip(null) : undefined}
                 fontFamily={config.dataLabelFontFamily ?? undefined}
               >
-                <rect x={marginAdj.left} y={y} width={bw} height={barH} fill={barFill(color, config, d.value < 0)} rx={radius} stroke={borderW > 0 ? borderColor : 'none'} strokeWidth={borderW} opacity={st.globalOpacity} />
+                {bw > 0 && (config.barRadiusEndsOnly ?? false) ? (
+                  <path d={roundedRectPath(marginAdj.left, y, bw, barH, radius, {tr: true, br: true})} fill={barFill(color, config, d.value < 0)} stroke={borderW > 0 ? borderColor : 'none'} strokeWidth={borderW} opacity={st.globalOpacity} />
+                ) : (
+                  <rect x={marginAdj.left} y={y} width={bw} height={barH} fill={barFill(color, config, d.value < 0)} rx={radius} stroke={borderW > 0 ? borderColor : 'none'} strokeWidth={borderW} opacity={st.globalOpacity} />
+                )}
                 {config.showDataLabels !== false && dlPos === 'center' && (
                   <text x={marginAdj.left + bw / 2} y={y + barH / 2 + 3} textAnchor="middle" fill={dlColor} fontSize={dlSize} pointerEvents="none">
                     {formatValue(d.value, numFmt)}
@@ -887,7 +892,7 @@ function SingleBar({data, config}: Props) {
                   <Avatar href={img} cx={marginAdj.left - 8 - avatarSize / 2} cy={y + barH / 2} clipId={`bh-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
                 )}
                 {!(avatarActive && avatarPos === 'replace-label' && img) && (
-                  <text x={labelAt.x} y={y + barH / 2 + 3} textAnchor={labelAt.anchor} fill={catColor} fontSize={catSize} fontFamily={catFamily} transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${labelAt.x}, ${y + barH / 2 + 3})` : undefined}>
+                  <text x={labelAt.x} y={labelAt.y} textAnchor={labelAt.anchor} fill={catColor} fontSize={catSize} fontFamily={catFamily} fontWeight={catWeight} transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${labelAt.x}, ${labelAt.y})` : undefined}>
                     {d.label.length > 16 ? d.label.slice(0, 16) + '…' : d.label}
                   </text>
                 )}
@@ -908,17 +913,14 @@ function SingleBar({data, config}: Props) {
   return (
     <div className="relative">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
-        <defs>
-          {frameFilter(shadowId, config.canvasShadow ?? false)}
-        </defs>
-        {frameRect(config, shadowId)}
+        {frameRect(config)}
         {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
         {config.showGrid !== false && tickValues.map((v, i) => {
           const y = marginAdj.top + plotH2 - ((v - domain.yMin) / yRange) * plotH2;
           return (
             <g key={i}>
               {i > 0 && <line x1={marginAdj.left} y1={y} x2={width - marginAdj.right} y2={y} stroke={st.gridColor} strokeWidth={1} />}
-              <text x={marginAdj.left - 8} y={y + 4} textAnchor="end" fill={yTickColor} fontSize={yTickSize} fontFamily={yTickFamily}>
+              <text x={marginAdj.left - 8} y={y + 4} textAnchor="end" fill={yTickColor} fontSize={yTickSize} fontFamily={yTickFamily} fontWeight={yTickWeight}>
                 {formatValue(v, numFmt)}
               </text>
             </g>
@@ -926,8 +928,8 @@ function SingleBar({data, config}: Props) {
         })}
         {referenceLinesSvg(false, false, domain, yRange, marginAdj, plotW2, plotH2, config)}
 
-        {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily}>{config.xLabel}</text>}
-        {config.yLabel && <text x={16} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text>}
+        {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{config.xLabel}</text>}
+        {config.yLabel && <text x={16} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text>}
 
         {prepared.items.map((d, i) => {
           const x = marginAdj.left + gap + i * (barWidth + gap);
@@ -937,15 +939,20 @@ function SingleBar({data, config}: Props) {
           const labelY = height - marginAdj.bottom + 14;
           const topY = marginAdj.top + plotH2 - barH;
           const barCenterY = topY + barH / 2;
+          const colBottom = marginAdj.top + plotH2;
           const labelAt = avatarActive && avatarPos === 'beside-label' && img
             ? {x: x + barWidth / 2 + avatarSize + 6, y: labelY, anchor: 'middle' as const}
-            : (catPos === 'end' || catPos === 'beside')
-              ? {x: x + barWidth / 2, y: topY - 6, anchor: 'middle' as const}
-              : catPos === 'inside'
-                ? {x: x + barWidth / 2, y: barCenterY, anchor: 'middle' as const}
-                : catPos === 'start'
-                  ? {x: x + barWidth / 2, y: marginAdj.top + plotH2 - 4, anchor: 'middle' as const}
-                  : {x: x + barWidth / 2, y: labelY, anchor: 'middle' as const};
+            : catPos === 'axis' || catPos === 'start-out'
+              ? {x: x + barWidth / 2, y: labelY, anchor: 'middle' as const}
+              : catPos === 'end-out'
+                ? {x: x + barWidth / 2, y: topY - 6, anchor: 'middle' as const}
+                : catPos === 'center-out'
+                  ? {x: x + barWidth + 8, y: barCenterY, anchor: 'start' as const}
+                  : catPos === 'start-in'
+                    ? {x: x + barWidth / 2, y: Math.max(colBottom - 10, topY + 10), anchor: 'middle' as const}
+                    : catPos === 'end-in'
+                      ? {x: x + barWidth / 2, y: Math.min(topY + 12, colBottom - 10), anchor: 'middle' as const}
+                      : {x: x + barWidth / 2, y: barCenterY, anchor: 'middle' as const};
           return (
 <g
             key={i}
@@ -954,7 +961,11 @@ function SingleBar({data, config}: Props) {
             onMouseLeave={tooltipEnabled ? () => setTip(null) : undefined}
             fontFamily={config.dataLabelFontFamily ?? undefined}
           >
-              <rect x={x} y={topY} width={barWidth} height={Math.max(barH, 0)} fill={barFill(color, config, d.value < 0)} rx={radius} stroke={borderW > 0 ? borderColor : 'none'} strokeWidth={borderW} opacity={st.globalOpacity} />
+              {barH > 0 && (config.barRadiusEndsOnly ?? false) ? (
+                <path d={roundedRectPath(x, topY, barWidth, barH, radius, d.value < 0 ? {bl: true, br: true} : {tl: true, tr: true})} fill={barFill(color, config, d.value < 0)} stroke={borderW > 0 ? borderColor : 'none'} strokeWidth={borderW} opacity={st.globalOpacity} />
+              ) : (
+                <rect x={x} y={topY} width={barWidth} height={Math.max(barH, 0)} fill={barFill(color, config, d.value < 0)} rx={radius} stroke={borderW > 0 ? borderColor : 'none'} strokeWidth={borderW} opacity={st.globalOpacity} />
+              )}
               {config.showDataLabels !== false && dlPos === 'center' && (
                 <text x={x + barWidth / 2} y={barCenterY + 3} textAnchor="middle" fill={dlColor} fontSize={dlSize} pointerEvents="none">
                   {formatValue(d.value, numFmt)}
@@ -990,6 +1001,7 @@ function SingleBar({data, config}: Props) {
                   fill={catColor}
                   fontSize={catSize}
                   fontFamily={catFamily}
+                  fontWeight={catWeight}
                   transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${labelAt.x}, ${labelAt.y})` : undefined}
                 >
                   {d.label.length > 12 ? d.label.slice(0, 12) + '…' : d.label}

@@ -10,9 +10,9 @@ export function nextSvgId(prefix: string): string {
   return `${prefix}-${frameNs++}`;
 }
 
-// Canvas: background, border and shadow as a full-canvas rect so exports
-// include the "frame" (shared by every chart type).
-export function frameRect(config: ChartConfig, shadowId?: string) {
+// Canvas: background and border as a full-canvas rect so exports include the
+// "frame" (shared by every chart type).
+export function frameRect(config: ChartConfig) {
   const w = config.width ?? 600;
   const h = config.height ?? 380;
   return (
@@ -25,17 +25,7 @@ export function frameRect(config: ChartConfig, shadowId?: string) {
       fill={config.canvasBackground ?? 'none'}
       stroke={(config.canvasBorderWidth ?? 0) > 0 ? (config.canvasBorderColor ?? '#333') : 'none'}
       strokeWidth={config.canvasBorderWidth ?? 0}
-      filter={config.canvasShadow ? `url(#${shadowId})` : undefined}
     />
-  );
-}
-
-export function frameFilter(shadowId: string, enabled: boolean) {
-  if (!enabled) return null;
-  return (
-    <filter id={shadowId} x="-5%" y="-5%" width="115%" height="115%">
-      <feDropShadow dx="0" dy="5" stdDeviation="7" floodColor="#000000" floodOpacity="0.35" />
-    </filter>
   );
 }
 
@@ -103,12 +93,12 @@ export function SvgHeader({config, st, width}: {config: ChartConfig; st: Resolve
   return (
     <g fontFamily={family} textAnchor="middle">
       {title && (
-        <text x={width / 2} y={y} fill={titleColor} fontSize={titleSize} fontWeight={600}>
+        <text x={width / 2} y={y} fill={titleColor} fontSize={titleSize} fontWeight={config.headerFont?.weight ?? 700}>
           {title}
         </text>
       )}
       {sub && (
-        <text x={width / 2} y={y + subSize + 2} fill={subColor} fontSize={subSize} fontFamily={subFamily}>
+        <text x={width / 2} y={y + subSize + 2} fill={subColor} fontSize={subSize} fontFamily={subFamily} fontWeight={config.subtitleFont?.weight ?? 400}>
           {sub}
         </text>
       )}
@@ -149,6 +139,7 @@ export function SvgLegend({
   const gap = 14;
   const family = config.legendFont?.fontFamily ?? st.fontFamily;
   const color = config.legendFont?.color ?? st.textColor;
+  const weight = config.legendFont?.weight ?? 500;
 
   if (position === 'right') {
     const x = width - 112;
@@ -159,7 +150,7 @@ export function SvgLegend({
           const el = (
             <g key={it.label} transform={`translate(${x}, ${y})`}>
               <rect x={0} y={-6} width={sw} height={sw} rx={2} fill={it.color} />
-              <text x={sw + 6} y={0} fontSize={fs} fill={color}>{truncate(it.label, 15)}</text>
+              <text x={sw + 6} y={0} fontSize={fs} fill={color} fontWeight={weight}>{truncate(it.label, 15)}</text>
             </g>
           );
           y += 16;
@@ -187,7 +178,7 @@ export function SvgLegend({
         const el = (
           <g key={it.label} transform={`translate(${x}, ${y})`}>
             <rect x={0} y={-6} width={sw} height={sw} rx={2} fill={it.color} />
-            <text x={sw + 6} y={0} fontSize={fs} fill={color}>{truncate(it.label, 24)}</text>
+            <text x={sw + 6} y={0} fontSize={fs} fill={color} fontWeight={weight}>{truncate(it.label, 24)}</text>
           </g>
         );
         x += sw + 6 + textWidth(it.label, fs) + gap;
