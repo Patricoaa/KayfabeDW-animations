@@ -104,6 +104,7 @@ export function SvgHeader({config, st, width}: {config: ChartConfig; st: Resolve
   const title = config.title;
   const sub = config.subtitle;
   if (!title && !sub) return null;
+  const hidden = config.hiddenElements ?? [];
   const family = config.headerFont?.fontFamily ?? st.fontFamily;
   const subFamily = config.subtitleFont?.fontFamily ?? family;
   const titleSize = config.headerFont?.size ?? st.titleFontSize;
@@ -114,19 +115,31 @@ export function SvgHeader({config, st, width}: {config: ChartConfig; st: Resolve
   const titleLines = textLines(title, titleSize, maxW, config.headerFont?.overflow);
   const subLines = textLines(sub, subSize, maxW, config.subtitleFont?.overflow);
   const titleH = titleLines.length * titleSize;
+  const titleOx = config.titleOffset?.x ?? 0;
+  const titleOy = config.titleOffset?.y ?? 0;
+  const subOx = config.subtitleOffset?.x ?? 0;
+  const subOy = config.subtitleOffset?.y ?? 0;
   let y = 4 + titleSize;
   return (
     <g fontFamily={family} textAnchor="middle">
-      {title && titleLines.map((ln, i) => (
-        <text key={`t-${i}`} x={width / 2} y={y + i * (titleSize + 2)} fill={titleColor} fontSize={titleSize} fontWeight={config.headerFont?.weight ?? 700}>
-          {ln}
-        </text>
-      ))}
-      {sub && subLines.map((ln, i) => (
-        <text key={`s-${i}`} x={width / 2} y={4 + titleH + (titleLines.length > 0 ? 2 : 0) + subSize + i * (subSize + 2)} fill={subColor} fontSize={subSize} fontFamily={subFamily} fontWeight={config.subtitleFont?.weight ?? 400}>
-          {ln}
-        </text>
-      ))}
+      {title && !hidden.includes('title') && (
+        <g data-editable="title" data-element-name="Título" transform={`translate(${titleOx}, ${titleOy})`}>
+          {titleLines.map((ln, i) => (
+            <text key={`t-${i}`} x={width / 2} y={y + i * (titleSize + 2)} fill={titleColor} fontSize={titleSize} fontWeight={config.headerFont?.weight ?? 700}>
+              {ln}
+            </text>
+          ))}
+        </g>
+      )}
+      {sub && !hidden.includes('subtitle') && (
+        <g data-editable="subtitle" data-element-name="Subtítulo" transform={`translate(${subOx}, ${subOy})`}>
+          {subLines.map((ln, i) => (
+            <text key={`s-${i}`} x={width / 2} y={4 + titleH + (titleLines.length > 0 ? 2 : 0) + subSize + i * (subSize + 2)} fill={subColor} fontSize={subSize} fontFamily={subFamily} fontWeight={config.subtitleFont?.weight ?? 400}>
+              {ln}
+            </text>
+          ))}
+        </g>
+      )}
     </g>
   );
 }
@@ -159,6 +172,9 @@ export function SvgLegend({
   headerOffset?: number;
 }) {
   if (items.length === 0) return null;
+  const hidden = config.hiddenElements ?? [];
+  const legendOx = config.legendOffset?.x ?? 0;
+  const legendOy = config.legendOffset?.y ?? 0;
   const fs = config.legendFont?.size ?? 10;
   const sw = Math.max(6, Math.round(fs * 0.8));
   const gap = 14;
@@ -171,7 +187,7 @@ export function SvgLegend({
     const x = width - 112;
     let y = 10;
     return (
-      <g fontFamily={family}>
+      <g fontFamily={family} data-editable="legend" data-element-name="Leyenda" transform={`translate(${legendOx}, ${legendOy})`} style={hidden.includes('legend') ? {display: 'none'} : undefined}>
         {items.slice(0, 60).map((it) => {
           const el = (
             <g key={it.label} transform={`translate(${x}, ${y})`}>
@@ -199,7 +215,7 @@ export function SvgLegend({
   let x = Math.max(0, (width - used) / 2);
   const y = position === 'top' ? headerOffset + 13 : height - 8;
   return (
-    <g fontFamily={family}>
+    <g fontFamily={family} data-editable="legend" data-element-name="Leyenda" transform={`translate(${legendOx}, ${legendOy})`} style={hidden.includes('legend') ? {display: 'none'} : undefined}>
       {items2.map((it) => {
         const el = (
           <g key={it.label} transform={`translate(${x}, ${y})`}>

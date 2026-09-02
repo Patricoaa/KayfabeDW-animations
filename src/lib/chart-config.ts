@@ -230,6 +230,17 @@ export type ChartConfig = {
   // Hover tooltips.
   tooltipEnabled?: boolean;
 
+  // Interactive canvas: position offsets (SVG units, relative to computed position)
+  titleOffset?: { x?: number; y?: number };
+  subtitleOffset?: { x?: number; y?: number };
+  legendOffset?: { x?: number; y?: number };
+  xLabelOffset?: { x?: number; y?: number };
+  yLabelOffset?: { x?: number; y?: number };
+
+  // Interactive canvas: element visibility & lock
+  hiddenElements?: string[];
+  lockedElements?: string[];
+
   configVersion?: number;
 };
 
@@ -272,6 +283,8 @@ export const DEFAULT_CHART_CONFIG: ChartConfig = {
   categoryLabelPosition: 'axis',
   barRadiusEndsOnly: false,
   canvasBorderRadius: 0,
+  hiddenElements: [],
+  lockedElements: [],
   canvasBorderWidth: 0,
   tooltipEnabled: true,
   configVersion: CHART_CONFIG_VERSION,

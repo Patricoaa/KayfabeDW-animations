@@ -10,6 +10,7 @@ type Props = {
 };
 
 export function ScatterChart({data, config}: Props) {
+  const hidden = config.hiddenElements ?? [];
   const xField = config.xField ?? '';
   const yField = config.yField ?? '';
   const colorField = config.colorField ?? '';
@@ -139,8 +140,8 @@ export function ScatterChart({data, config}: Props) {
         />
       ))}
 
-      <text x={width / 2} y={height - 8} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{xLabel}</text>
-      <text x={14} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 14, ${height / 2})`}>{yLabel}</text>
+      {!hidden.includes('xLabel') && <g data-editable="xLabel"><text x={width / 2} y={height - 8} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{xLabel}</text></g>}
+      {!hidden.includes('yLabel') && <g data-editable="yLabel"><text x={14} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 14, ${height / 2})`}>{yLabel}</text></g>}
     </svg>
     </div>
   );
