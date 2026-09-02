@@ -6,19 +6,26 @@ import type {ReactNode} from 'react';
 
 export type LegendItem = {label: string; color: string};
 
-// Builds the legend items from data series, applying any per-series text
-// override (config.legendItems[].overrideLabel) without breaking color
-// matching (which keys on the original `label`).
+// Builds the legend items from data series, applying any per-item text
+// override without breaking color matching (which keys on the original
+// `label`). Resolution order for the visible text:
+//   1. config.legendTextOverrides[label]   (applies to ALL chart types, incl.
+//      category-based legends from pie/scatter)
+//   2. config.legendItems[].overrideLabel  (legacy per-series override)
+//   3. the original label.
 export function legendItemsFrom<T>(
   series: T[],
-  config: {legendItems?: {label: string; color: string; overrideLabel?: string}[]},
+  config: {legendItems?: {label: string; color: string; overrideLabel?: string}[]; legendTextOverrides?: Record<string, string>},
   labelOf: (s: T) => string,
   colorOf: (s: T) => string,
 ): LegendItem[] {
   const ovs = new Map((config.legendItems ?? []).map((li) => [li.label, li.overrideLabel]));
   return series.map((s) => {
     const key = labelOf(s);
-    return {label: (ovs.get(key)?.trim() || key), color: colorOf(s)};
+    const text = config.legendTextOverrides?.[key]?.trim()
+      || ovs.get(key)?.trim()
+      || key;
+    return {label: text, color: colorOf(s)};
   });
 }
 

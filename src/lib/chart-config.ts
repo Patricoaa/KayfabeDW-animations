@@ -10,6 +10,10 @@ export type GroupMode = 'grouped' | 'stacked' | 'stacked-percent';
 
 export type AvatarShape = 'circle' | 'rounded';
 export type AvatarPosition = 'axis-start' | 'bar-end' | 'inside-start' | 'inside-end';
+// Per-avatar frame adjustment: `zoom` scales the source image inside the fixed
+// frame (1 = fit/crop, >1 = zoom in). `focusX`/`focusY` (-1..1) shift the
+// visible crop within the frame (0 = centered).
+export type AvatarCrop = {zoom?: number; focusX?: number; focusY?: number};
 
 export type FontWeight = 400 | 500 | 600 | 700;
 
@@ -161,6 +165,10 @@ export type ChartConfig = {
   // el texto visible en la leyenda sin romper el matching de color.
   seriesField?: string;
   legendItems?: {label: string; color: string; overrideLabel?: string}[];
+  // V18: texto visible en la leyenda por label original (aplica a TODOS los
+  // tipos, incluidos los leyendas por categoría de pie/scatter). Tiene prioridad
+  // sobre `legendItems[].overrideLabel`. Vale solo para display; no afecta matching.
+  legendTextOverrides?: Record<string, string>;
   showMarkers?: boolean;
   // F2: visual style overrides. All fields optional; the renderers resolve
   // against sensible defaults via resolveChartStyle in chart-data.
@@ -197,6 +205,12 @@ export type ChartConfig = {
   avatarRadius?: number;
   avatarSize?: number;
   avatarPosition?: AvatarPosition;
+  // V18: separación del avatar respecto a la barra/eje (px) cuando se ancla en
+  // `axis-start`/`bar-end` (fuera) o pegado al extremo en `inside-*`.
+  avatarOffset?: number;
+  // V18: ajuste de recorte por categoría (zoom del encuadre + foco X/Y dentro del
+  // marco). Key = valor ORIGINAL de la categoría. Solo display.
+  avatarCrops?: Record<string, AvatarCrop>;
 
   // F7: optional second dataset column rendered as a small description line
   // under each category label (like `avatarField` but text). Its font is
@@ -276,7 +290,7 @@ export type ChartConfig = {
   configVersion?: number;
 };
 
-export const CHART_CONFIG_VERSION = 17;
+export const CHART_CONFIG_VERSION = 18;
 
 export const DEFAULT_CHART_CONFIG: ChartConfig = {
   type: 'bar',

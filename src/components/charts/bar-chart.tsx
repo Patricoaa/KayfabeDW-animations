@@ -1,7 +1,7 @@
 'use client';
 
 import {useState, type ReactNode} from 'react';
-import type {ChartConfig, NumberFormat, TextOverflow} from '@/lib/chart-config';
+import type {ChartConfig, NumberFormat, TextOverflow, AvatarCrop, AvatarPosition} from '@/lib/chart-config';
 import {prepareSeries, prepareMultiSeries, formatValue, colorFor, resolvedCategoryLabel, resolvedCategorySub, resolveChartStyle, resolveYDomain, type PreparedMultiSeries} from '@/lib/chart-data';
 import {SvgHeader, SvgLegend, roundedRectPath, headerHeight, legendReserve, frameRect, Zone, legendItemsFrom, type LegendItem} from './chart-frame';
 
@@ -235,12 +235,52 @@ function resolveAvatarRadius(config: ChartConfig, size: number): number {
   return Math.min(Math.max(Math.round(size * 0.25), 4), 24);
 }
 
+// Bar-anchored avatar placement. Both helpers derive the avatar center FROM the
+// bar's edge coordinates (never canvas constants) plus the `offset` gap, so the
+// avatar tracks its bar when gap/category-gap/spacing controls move the bars.
+// Convention: the bar's "start" is the axis side and "end" is the value tip.
+const avatarGeom = {axisStart: 'axis-start' as const, barEnd: 'bar-end' as const, insideStart: 'inside-start' as const, insideEnd: 'inside-end' as const};
+
+// Horizontal bar: runs barStartX..barEndX along X at row center y.
+function hAvatarX(pos: AvatarPosition, size: number, offset: number, barStartX: number, barEndX: number): number {
+  switch (pos) {
+    case avatarGeom.axisStart: return barStartX - offset - size / 2;
+    case avatarGeom.barEnd: return barEndX + offset + size / 2;
+    case avatarGeom.insideStart: return barStartX + size / 2 + Math.min(offset, size / 2);
+    case avatarGeom.insideEnd: return barEndX - size / 2 - Math.min(offset, size / 2);
+  }
+  return barEndX + offset + size / 2;
+}
+
+// Vertical bar: runs tipY (top, value tip) .. axisY (bottom, axis). Value grows
+// upward, so the SVG-y signs are inverted relative to horizontal.
+function vAvatarY(pos: AvatarPosition, size: number, offset: number, tipY: number, axisY: number): number {
+  const lo = Math.min(tipY, axisY) + size / 2 + Math.min(offset, size / 2);
+  const hi = Math.max(tipY, axisY) - size / 2 - Math.min(offset, size / 2);
+  const clamp = (v: number) => (lo < hi ? Math.min(Math.max(v, lo), hi) : v);
+  switch (pos) {
+    case avatarGeom.axisStart: return Math.max(axisY + offset + size / 2, lo);
+    case avatarGeom.barEnd: return Math.min(tipY - offset - size / 2, hi);
+    case avatarGeom.insideStart: return clamp(axisY - size / 2 - Math.min(offset, size / 2));
+    case avatarGeom.insideEnd: return clamp(tipY + size / 2 + Math.min(offset, size / 2));
+  }
+  return Math.min(tipY - offset - size / 2, hi);
+}
+
 function Avatar({
-  href, cx, cy, clipId, shape, size, radius,
+  href, cx, cy, clipId, shape, size, radius, crop,
 }: {
   href: string; cx: number; cy: number; clipId: string;
   shape: string | undefined; size: number; radius: number;
+  crop?: AvatarCrop;
 }) {
+  const zoom = Math.max(crop?.zoom ?? 1, 0.1);
+  const fx = Math.max(Math.min(crop?.focusX ?? 0, 1), -1);
+  const fy = Math.max(Math.min(crop?.focusY ?? 0, 1), -1);
+  const vw = size * zoom;
+  const vh = size * zoom;
+  const imgX = cx - vw / 2 + fx * (vw - size) / 2;
+  const imgY = cy - vh / 2 + fy * (vh - size) / 2;
   return (
     <g>
       <defs>
@@ -254,10 +294,10 @@ function Avatar({
       </defs>
       <image
         href={href}
-        x={cx - size / 2}
-        y={cy - size / 2}
-        width={size}
-        height={size}
+        x={imgX}
+        y={imgY}
+        width={vw}
+        height={vh}
         preserveAspectRatio="xMidYMid slice"
         clipPath={`url(#${clipId})`}
       />
@@ -279,6 +319,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const avatarShape = config.avatarShape ?? 'rounded';
   const avatarRadius = resolveAvatarRadius(config, avatarSize);
   const avatarPos = config.avatarPosition ?? 'bar-end';
+  const avatarOffset = config.avatarOffset ?? 4;
   const avatarActive = !!avatarField;
 
   const width = config.width ?? 600;
@@ -374,11 +415,11 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   // --- HORIZONTAL LAYOUT ---
   if (horizontal) {
     const marginAdj = {...margin};
-    if (avatarActive && avatarPos === 'bar-end' || avatarPos === 'inside-end') {
-      marginAdj.right += avatarSize / 2 + 16;
+    if (avatarActive && avatarPos === 'bar-end') {
+      marginAdj.right += avatarOffset + avatarSize / 2 + 8;
     }
     if (avatarActive && avatarPos === 'axis-start') {
-      marginAdj.left += avatarSize / 2 + 16;
+      marginAdj.left += avatarOffset + avatarSize / 2 + 8;
     }
     // Label-dependent avatars and long axis labels sit left of the bar row;
     // reserve the space so they are never clipped outside the SVG.
@@ -613,17 +654,16 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                   return showText ? renderLabel(labelAt) : null;
                 }
 
+                const crop = (config.avatarCrops ?? {})[cat];
                 if (avatarPos === 'bar-end' || avatarPos === 'inside-end') {
                   const total = stackXBase ? (stackTotal![ci] || 1) : yRange;
                   const barEndX = stacked || stackedPercent
                     ? marginAdj.left + ((stackXBase![ci][nS - 1] + Math.max(multi.series[nS - 1].values[ci] ?? 0, 0)) / total) * plotW
                     : colEnd;
-                  const cx = avatarPos === 'inside-end'
-                    ? Math.max(colStart + avatarSize / 2 + 4, barEndX - 8 - avatarSize / 2)
-                    : barEndX + (config.showDataLabels !== false ? 52 : 10) + avatarSize / 2;
+                  const cx = hAvatarX(avatarPos, avatarSize, avatarOffset, colStart, barEndX);
                   return (
                     <g key={ci}>
-                      <Avatar href={img!} cx={cx} cy={cy} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
+                      <Avatar href={img!} cx={cx} cy={cy} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} crop={crop} />
                       {showText && renderLabel(labelAt)}
                     </g>
                   );
@@ -632,7 +672,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                 if (avatarPos === 'axis-start') {
                   return (
                     <g key={ci}>
-                      <Avatar href={img!} cx={colStart - 8 - avatarSize / 2} cy={cy} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
+                      <Avatar href={img!} cx={hAvatarX(avatarPos, avatarSize, avatarOffset, colStart, colEnd)} cy={cy} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} crop={crop} />
                       {showText && renderLabel(labelAt)}
                     </g>
                   );
@@ -643,7 +683,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                 if (avatarPos === 'inside-start') {
                   return (
                     <g key={ci}>
-                      <Avatar href={img!} cx={colStart + avatarSize / 2 + 4} cy={cy} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
+                      <Avatar href={img!} cx={hAvatarX(avatarPos, avatarSize, avatarOffset, colStart, colEnd)} cy={cy} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} crop={crop} />
                       {showText && renderLabel(labelAt)}
                     </g>
                   );
@@ -653,7 +693,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                 // the axis, keeping the axis label visible.
                 return (
                   <g key={ci}>
-                    <Avatar href={img!} cx={colStart - 8 - avatarSize / 2} cy={cy} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
+                    <Avatar href={img!} cx={hAvatarX('axis-start', avatarSize, avatarOffset, colStart, colEnd)} cy={cy} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} crop={crop} />
                     {showText && renderLabel(labelAt)}
                   </g>
                 );
@@ -668,13 +708,13 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   // --- VERTICAL LAYOUT (default) ---
   const marginAdj = {...margin};
   if (avatarActive && avatarPos === 'bar-end') {
-    marginAdj.top += avatarSize + 10;
+    marginAdj.top += avatarOffset + avatarSize + 6;
   }
   // 'inside-start' sits at the lower (axis) end of the bar; reserve a little
   // below so the lower half of the avatar never clips. 'axis-start' is also
   // drawn below the axis line, so keep a small clearance for it too.
   if (avatarActive && (avatarPos === 'inside-start' || avatarPos === 'axis-start')) {
-    marginAdj.bottom += avatarSize / 2 + 8;
+    marginAdj.bottom += avatarOffset + avatarSize / 2 + 6;
   }
   if (catBlock && catPos.endsWith('-out')) {
     const descEst = descField ? estLabelWidth(maxDesc, descSize, descOv) : 0;
@@ -928,11 +968,12 @@ const fill = barFill(s.color, config, val < 0);
             }
 
             const axisY = height - marginAdj.bottom + 14;
+            const crop = (config.avatarCrops ?? {})[cat];
 
             if (avatarPos === 'bar-end') {
               return (
                 <g key={ci}>
-                  <Avatar href={img!} cx={blockCenterX} cy={barTop - avatarSize / 2 - 4} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
+                  <Avatar href={img!} cx={blockCenterX} cy={vAvatarY('bar-end', avatarSize, avatarOffset, barTop, axisY)} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} crop={crop} />
                   {showText && renderLabel({x: blockCenterX, y: axisY, anchor: 'middle'}, 12)}
                 </g>
               );
@@ -943,7 +984,7 @@ const fill = barFill(s.color, config, val < 0);
             if (avatarPos === 'inside-end') {
               return (
                 <g key={ci}>
-                  <Avatar href={img!} cx={blockCenterX} cy={barTop} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
+                  <Avatar href={img!} cx={blockCenterX} cy={vAvatarY('inside-end', avatarSize, avatarOffset, barTop, axisY)} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} crop={crop} />
                   {showText && renderLabel({x: blockCenterX, y: axisY, anchor: 'middle'}, 12)}
                 </g>
               );
@@ -954,7 +995,7 @@ const fill = barFill(s.color, config, val < 0);
             if (avatarPos === 'axis-start') {
               return (
                 <g key={ci}>
-                  <Avatar href={img!} cx={blockCenterX} cy={axisY + avatarSize / 2 + 8} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
+                  <Avatar href={img!} cx={blockCenterX} cy={vAvatarY('axis-start', avatarSize, avatarOffset, barTop, axisY)} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} crop={crop} />
                   {showText && renderLabel({x: blockCenterX, y: axisY, anchor: 'middle'}, 12)}
                 </g>
               );
@@ -965,13 +1006,13 @@ const fill = barFill(s.color, config, val < 0);
             if (avatarPos === 'inside-start') {
               return (
                 <g key={ci}>
-                  <Avatar href={img!} cx={blockCenterX} cy={Math.max(barTop, axisY - avatarSize / 2 + 4)} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
+                  <Avatar href={img!} cx={blockCenterX} cy={vAvatarY('inside-start', avatarSize, avatarOffset, barTop, axisY)} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} crop={crop} />
                   {showText && renderLabel({x: blockCenterX, y: axisY, anchor: 'middle'}, 12)}
                 </g>
               );
             }
             return (
-              <Avatar key={ci} href={img!} cx={blockCenterX} cy={barTop - avatarSize / 2 - 4} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
+              <Avatar key={ci} href={img!} cx={blockCenterX} cy={vAvatarY('bar-end', avatarSize, avatarOffset, barTop, axisY)} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} crop={crop} />
             );
           })}
         </Zone>
@@ -1014,6 +1055,7 @@ function SingleBar({data, config}: Props) {
   const avatarShape = config.avatarShape ?? 'rounded';
   const avatarRadius = resolveAvatarRadius(config, avatarSize);
   const avatarPos = config.avatarPosition ?? 'bar-end';
+  const avatarOffset = config.avatarOffset ?? 4;
 
   const radius = config.barRadius ?? 2;
   const borderW = config.barBorderWidth ?? 0;
@@ -1055,10 +1097,10 @@ function SingleBar({data, config}: Props) {
 
   const marginAdj = {...margin};
   if (avatarActive) {
-    if (!horizontal && avatarPos === 'bar-end') marginAdj.top += avatarSize + 10;
-    if (!horizontal && (avatarPos === 'axis-start' || avatarPos === 'inside-start')) marginAdj.bottom += avatarSize / 2 + 8;
-    if (horizontal && (avatarPos === 'bar-end' || avatarPos === 'inside-end')) marginAdj.right += avatarSize / 2 + 16;
-    if (horizontal && avatarPos === 'axis-start') marginAdj.left += avatarSize / 2 + 16;
+    if (!horizontal && avatarPos === 'bar-end') marginAdj.top += avatarOffset + avatarSize + 6;
+    if (!horizontal && (avatarPos === 'axis-start' || avatarPos === 'inside-start')) marginAdj.bottom += avatarOffset + avatarSize / 2 + 6;
+    if (horizontal && avatarPos === 'bar-end') marginAdj.right += avatarOffset + avatarSize / 2 + 8;
+    if (horizontal && avatarPos === 'axis-start') marginAdj.left += avatarOffset + avatarSize / 2 + 8;
   }
   // Reserve space for out-of-plot labels so they are never clipped.
   if (!horizontal && catBlock && catPos.endsWith('-out')) {
@@ -1174,14 +1216,15 @@ function SingleBar({data, config}: Props) {
 
             let avatarNode: ReactNode = null;
             const axisX = marginAdj.left;
+            const crop = (config.avatarCrops ?? {})[d.label];
             if (img && avatarPos === 'bar-end') {
-              avatarNode = <Avatar href={img} cx={endX + 8 + avatarSize / 2} cy={labelY} clipId={`bh-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />;
+              avatarNode = <Avatar href={img} cx={hAvatarX(avatarPos, avatarSize, avatarOffset, axisX, endX)} cy={labelY} clipId={`bh-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} crop={crop} />;
             } else if (img && avatarPos === 'inside-end') {
-              avatarNode = <Avatar href={img} cx={Math.max(axisX + avatarSize / 2 + 4, endX - 8 - avatarSize / 2)} cy={labelY} clipId={`bh-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />;
+              avatarNode = <Avatar href={img} cx={hAvatarX(avatarPos, avatarSize, avatarOffset, axisX, endX)} cy={labelY} clipId={`bh-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} crop={crop} />;
             } else if (img && avatarPos === 'axis-start') {
-              avatarNode = <Avatar href={img} cx={axisX - 8 - avatarSize / 2} cy={labelY} clipId={`bh-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />;
+              avatarNode = <Avatar href={img} cx={hAvatarX(avatarPos, avatarSize, avatarOffset, axisX, endX)} cy={labelY} clipId={`bh-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} crop={crop} />;
             } else if (img && avatarPos === 'inside-start') {
-              avatarNode = <Avatar href={img} cx={axisX + avatarSize / 2 + 4} cy={labelY} clipId={`bh-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />;
+              avatarNode = <Avatar href={img} cx={hAvatarX(avatarPos, avatarSize, avatarOffset, axisX, endX)} cy={labelY} clipId={`bh-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} crop={crop} />;
             }
 
             let catTextNode: ReactNode = null;
@@ -1298,14 +1341,15 @@ function SingleBar({data, config}: Props) {
 
           let avatarNode: ReactNode = null;
           const axisStartY = marginAdj.top + plotH2;
+          const crop = (config.avatarCrops ?? {})[d.label];
           if (img && avatarPos === 'bar-end') {
-            avatarNode = <Avatar href={img} cx={centerX} cy={topY - avatarSize / 2 - 4} clipId={`bv-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />;
+            avatarNode = <Avatar href={img} cx={centerX} cy={vAvatarY(avatarPos, avatarSize, avatarOffset, topY, axisStartY)} clipId={`bv-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} crop={crop} />;
           } else if (img && avatarPos === 'inside-end') {
-            avatarNode = <Avatar href={img} cx={centerX} cy={Math.max(topY, axisStartY - avatarSize / 2 + 6)} clipId={`bv-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />;
+            avatarNode = <Avatar href={img} cx={centerX} cy={vAvatarY(avatarPos, avatarSize, avatarOffset, topY, axisStartY)} clipId={`bv-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} crop={crop} />;
           } else if (img && avatarPos === 'axis-start') {
-            avatarNode = <Avatar href={img} cx={centerX} cy={axisStartY + avatarSize / 2 + 8} clipId={`bv-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />;
+            avatarNode = <Avatar href={img} cx={centerX} cy={vAvatarY(avatarPos, avatarSize, avatarOffset, topY, axisStartY)} clipId={`bv-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} crop={crop} />;
           } else if (img && avatarPos === 'inside-start') {
-            avatarNode = <Avatar href={img} cx={centerX} cy={Math.max(topY, axisStartY - avatarSize / 2 + 4)} clipId={`bv-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />;
+            avatarNode = <Avatar href={img} cx={centerX} cy={vAvatarY(avatarPos, avatarSize, avatarOffset, topY, axisStartY)} clipId={`bv-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} crop={crop} />;
           }
 
           let catTextNode: ReactNode = null;

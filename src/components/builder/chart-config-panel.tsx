@@ -2,7 +2,7 @@
 
 import React, {useEffect, useState} from 'react';
 import {BarChart3, PieChart, LineChart, AreaChart, ScatterChart, Table2, ChevronDown} from 'lucide-react';
-import type {ChartConfig, ChartType, NumberFormat, SortBy, ChartFilter, ChartFilterOp, LegendPosition, ChartStyle, AvatarShape, AvatarPosition, SectionFont, CategoryLabelPosition, TextLayout} from '@/lib/chart-config';
+import type {ChartConfig, ChartType, NumberFormat, SortBy, ChartFilter, ChartFilterOp, LegendPosition, ChartStyle, AvatarShape, AvatarPosition, AvatarCrop, SectionFont, CategoryLabelPosition, TextLayout} from '@/lib/chart-config';
 import {FONT_PRESETS, PALETTES} from '@/lib/chart-config';
 import {pickColor, colorFor} from '@/lib/chart-data';
 import {TextControls} from '@/components/builder/text-controls';
@@ -115,18 +115,26 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
     update({legendItems: items});
   };
 
-  const setSeriesLabel = (index: number, overrideLabel: string) => {
-    const items = [...(config.legendItems ?? [])];
-    if (!items[index]) return;
-    const trimmed = overrideLabel.trim();
-    const next = {...items[index]};
-    if (trimmed === '') delete next.overrideLabel;
-    else next.overrideLabel = trimmed;
-    items[index] = next;
-    update({legendItems: items});
+const setLegendTextOverride = (label: string, value?: string) => {
+    const next = {...(config.legendTextOverrides ?? {})};
+    if (value && value.trim()) next[label] = value.trim();
+    else delete next[label];
+    update({legendTextOverrides: next});
   };
 
-  const legendLabels = (config.legendItems ?? []).map((li) => li.overrideLabel ?? '');
+  // Visible-title overrides keyed by the ORIGINAL label. Resolution matches
+  // legendItemsFrom: legendTextOverrides > legendItems[].overrideLabel > label.
+  const legendOverrideValue = (label: string): string =>
+    config.legendTextOverrides?.[label]?.trim()
+    || (config.legendItems ?? []).find((li) => li.label === label)?.overrideLabel?.trim()
+    || '';
+
+  const setAvatarCrop = (label: string, patch?: Partial<AvatarCrop>) => {
+    const next = {...(config.avatarCrops ?? {})};
+    if (patch) next[label] = {...(next[label] ?? {}), ...patch};
+    else delete next[label];
+    update({avatarCrops: next});
+  };
 
   // Keep `legendItems` in sync with the real series names in the dataset.
   // Without this the per-series color pickers never render — the core reason
@@ -166,6 +174,14 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
       if (catLabels.length < 50 && !catLabels.includes(lab)) catLabels.push(lab);
     }
   }
+  // Labels shown in the legend, for the "Texto de la leyenda" override block.
+  // Multi-series use the detected series names (legendItems); everything else
+  // (pie slices, scatter categories, single-series bars) uses the categories.
+  const legendOverrideLabels: string[] =
+    config.seriesField && legendItems.length > 0
+      ? legendItems.map((li) => li.label)
+      : catLabels;
+
   const setColorOverride = (label: string, value?: string) => {
     const next = {...(config.colorOverrides ?? {})};
     if (value) next[label] = value;
@@ -485,13 +501,7 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
                       className="w-8 h-8 rounded cursor-pointer border border-border-default bg-transparent"
                       aria-label={`Color de ${li.label}`}
                     />
-                    <input
-                      value={legendLabels[i] ?? li.label}
-                      onChange={(e) => setSeriesLabel(i, e.target.value)}
-                      placeholder={'Texto (opcional)'}
-                      className="min-w-0 flex-1 text-xs rounded border border-border-default bg-transparent px-2 py-1.5 text-secondary focus:outline-none focus:border-accent"
-                      aria-label={`Texto de ${li.label}`}
-                    />
+                    <span className="min-w-0 flex-1 text-xs text-secondary truncate">{li.label}</span>
                   </div>
                 ))}
               </div>
@@ -982,6 +992,47 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
               <TextControls value={config.legendFont} onChange={setLegendFont} />
             </div>
           </div>
+          {legendOverrideLabels.length > 0 && (
+            <div className="pt-1 border-t border-border-subtle">
+              <div className="flex items-center justify-between mb-0.5">
+                <label className="text-sm font-medium block">Texto de la leyenda</label>
+                {Object.keys(config.legendTextOverrides ?? {}).length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => update({legendTextOverrides: undefined})}
+                    className="text-[10px] text-muted hover:text-red-500"
+                  >
+                    Limpiar todas
+                  </button>
+                )}
+              </div>
+              <p className="text-[10px] text-muted mb-1.5">Renombra cada elemento de la leyenda sin cambiar su color ni datos.</p>
+              <div className="space-y-1.5">
+                {legendOverrideLabels.map((label) => (
+                  <div key={label} className="flex items-center gap-2">
+                    <span className="text-xs text-secondary truncate w-24 shrink-0" title={label}>{label}</span>
+                    <input
+                      type="text"
+                      value={legendOverrideValue(label)}
+                      placeholder="Texto de leyenda"
+                      onChange={(e) => setLegendTextOverride(label, e.target.value || undefined)}
+                      className="flex-1 min-w-0 bg-elevated border border-border-default rounded px-2 py-1 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    />
+                    {legendOverrideValue(label) && (
+                      <button
+                        type="button"
+                        onClick={() => setLegendTextOverride(label)}
+                        className="text-muted hover:text-red-500 px-1 text-xs"
+                        aria-label={`Restablecer texto de ${label}`}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </Section>
       )}
 
@@ -1127,6 +1178,40 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
                 </select>
                 <p className="text-[10px] text-muted pt-1">«Inicio» es el lado del eje; «final» es la punta del valor. In/out deciden si solapa la barra o queda fuera.</p>
               </div>
+              <NumberInput label="Separación del gráfico" value={config.avatarOffset} min={0} max={48} step={1} onChange={(v) => update({avatarOffset: v})} />
+              {catLabels.length > 0 && (
+                <div className="pt-2 border-t border-border-subtle">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <label className="text-sm font-medium block">Ajustar avatares por categoría</label>
+                    {Object.keys(config.avatarCrops ?? {}).length > 0 && (
+                      <button type="button" onClick={() => update({avatarCrops: undefined})} className="text-[10px] text-muted hover:text-red-500">
+                        Limpiar todas
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-muted mb-1.5">Zoom y foco del recorte dentro del marco de cada avatar.</p>
+                  <div className="space-y-2">
+                    {catLabels.map((label) => {
+                      const cr = config.avatarCrops?.[label];
+                      return (
+                        <div key={label} className="border border-border-subtle rounded p-2">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs text-secondary truncate" title={label}>{label}</span>
+                            {cr && (
+                              <button type="button" onClick={() => setAvatarCrop(label)} className="text-muted hover:text-red-500 text-xs" aria-label={`Resetear recorte de ${label}`}>✕</button>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <NumberInput label="Zoom" value={cr?.zoom} min={0.5} max={3} step={0.05} onChange={(v) => setAvatarCrop(label, {...cr, zoom: v})} />
+                            <NumberInput label="Foco X" value={cr ? (cr.focusX ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setAvatarCrop(label, {...cr, focusX: (v ?? 0) / 100})} />
+                            <NumberInput label="Foco Y" value={cr ? (cr.focusY ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setAvatarCrop(label, {...cr, focusY: (v ?? 0) / 100})} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               <p className="text-[10px] text-muted">Las imágenes se muestran en el preview y en el SVG descargado; puede que no aparezcan al exportar a PNG.</p>
             </>
           )}
