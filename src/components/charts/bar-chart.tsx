@@ -3,7 +3,7 @@
 import {useState, type ReactNode} from 'react';
 import type {ChartConfig, NumberFormat, TextOverflow} from '@/lib/chart-config';
 import {prepareSeries, prepareMultiSeries, formatValue, colorFor, resolvedCategoryLabel, resolvedCategorySub, resolveChartStyle, resolveYDomain, type PreparedMultiSeries} from '@/lib/chart-data';
-import {SvgHeader, SvgLegend, roundedRectPath, headerHeight, legendReserve, frameRect, type LegendItem} from './chart-frame';
+import {SvgHeader, SvgLegend, roundedRectPath, headerHeight, legendReserve, frameRect, Zone, type LegendItem} from './chart-frame';
 
 type Props = {
   data: Record<string, unknown>[];
@@ -417,29 +417,35 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
       <div className="relative w-full">
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
           {frameRect(config)}
-          {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
-          {showLegend && legendItems.length > 0 && <SvgLegend items={legendItems} position={legendPosition} width={width} height={height} st={st} config={config} headerOffset={headerH} />}
-              {config.showGrid !== false && tickValues.map((v, i) => {
-                const x = marginAdj.left + ((v - domain.yMin) / yRange) * plotW;
-                return (
-                  <g key={i}>
-                    {i > 0 && <line x1={x} y1={marginAdj.top} x2={x} y2={marginAdj.top + plotH} stroke={st.gridColor} strokeWidth={1} />}
-                    <text x={x} y={marginAdj.top + plotH + 14} textAnchor="middle" fill={yTickColor} fontSize={yTickSize} fontFamily={yTickFamily} fontWeight={yTickWeight}>
-                      {formatValue(v, numFmt)}
-                    </text>
-                  </g>
-                );
-              })}
-              {referenceLinesSvg(true, true, domain, yRange, marginAdj, plotW, plotH, config)}
-
-              {config.xLabel && (
-                <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{config.xLabel}</text>
-              )}
-              {config.yLabel && (
-                <text x={14} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 14, ${height / 2})`}>
-                  {config.yLabel}
-                </text>
-              )}
+          <Zone id="header">
+            {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
+            {showLegend && legendItems.length > 0 && <SvgLegend items={legendItems} position={legendPosition} width={width} height={height} st={st} config={config} headerOffset={headerH} />}
+          </Zone>
+          <Zone id="footer">
+            {config.showGrid !== false && tickValues.map((v, i) => {
+              const x = marginAdj.left + ((v - domain.yMin) / yRange) * plotW;
+              return (
+                <g key={i}>
+                  {i > 0 && <line x1={x} y1={marginAdj.top} x2={x} y2={marginAdj.top + plotH} stroke={st.gridColor} strokeWidth={1} />}
+                  <text x={x} y={marginAdj.top + plotH + 14} textAnchor="middle" fill={yTickColor} fontSize={yTickSize} fontFamily={yTickFamily} fontWeight={yTickWeight}>
+                    {formatValue(v, numFmt)}
+                  </text>
+                </g>
+              );
+            })}
+            {config.xLabel && (
+              <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{config.xLabel}</text>
+            )}
+          </Zone>
+          <Zone id="left-axis">
+            {config.yLabel && (
+              <text x={14} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 14, ${height / 2})`}>
+                {config.yLabel}
+              </text>
+            )}
+          </Zone>
+          <Zone id="plot">
+            {referenceLinesSvg(true, true, domain, yRange, marginAdj, plotW, plotH, config)}
 
               {multi.categories.map((cat, ci) => {
                 const bandY = marginAdj.top + ci * catBandH;
@@ -567,7 +573,8 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                   </g>
                 );
               })}
-
+          </Zone>
+          <Zone id="labels">
               {multi.categories.map((cat, ci) => {
                 const bandY = marginAdj.top + ci * catBandH;
                 const cy = bandY + catBandH / 2;
@@ -688,6 +695,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                   <Avatar key={ci} href={img!} cx={colStart - 8 - avatarSize / 2} cy={cy} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
                 );
               })}
+          </Zone>
           </svg>
           {tooltipEnabled && <HoverTooltip tip={tip} />}
         </div>
@@ -751,8 +759,11 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
     <div className="relative w-full">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
         {frameRect(config)}
-        {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
-        {showLegend && legendItems.length > 0 && <SvgLegend items={legendItems} position={legendPosition} width={width} height={height} st={st} config={config} headerOffset={headerH} />}
+        <Zone id="header">
+          {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
+          {showLegend && legendItems.length > 0 && <SvgLegend items={legendItems} position={legendPosition} width={width} height={height} st={st} config={config} headerOffset={headerH} />}
+        </Zone>
+        <Zone id="left-axis">
             {config.showGrid !== false && tickValues.map((v, i) => {
               const y = marginAdj.top + plotH - ((v - domain.yMin) / yRange) * plotH;
               return (
@@ -764,17 +775,14 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                 </g>
               );
             })}
-            {referenceLinesSvg(true, false, domain, yRange, marginAdj, plotW, plotH, config)}
-
-            {config.xLabel && (
-              <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{config.xLabel}</text>
-            )}
             {config.yLabel && (
               <text x={16} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 16, ${height / 2})`}>
                 {config.yLabel}
               </text>
             )}
-
+        </Zone>
+        <Zone id="plot">
+            {referenceLinesSvg(true, false, domain, yRange, marginAdj, plotW, plotH, config)}
             {multi.categories.map((cat, ci) => {
               const bandX = marginAdj.left + ci * catBand;
               const total = stacked || stackedPercent ? totalLabel(ci) : 0;
@@ -898,7 +906,13 @@ const fill = barFill(s.color, config, val < 0);
               </g>
               );
             })}
-
+        </Zone>
+        <Zone id="footer">
+            {config.xLabel && (
+              <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{config.xLabel}</text>
+            )}
+        </Zone>
+        <Zone id="labels">
           {multi.categories.map((cat, ci) => {
             const bandX = marginAdj.left + ci * catBand;
             const blockCenterX = bandX + barBandX + barBlockW / 2;
@@ -1016,6 +1030,7 @@ const fill = barFill(s.color, config, val < 0);
               <Avatar key={ci} href={img!} cx={blockCenterX} cy={axisY} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
             );
           })}
+        </Zone>
         </svg>
         {tooltipEnabled && <HoverTooltip tip={tip} />}
     </div>
@@ -1161,22 +1176,28 @@ function SingleBar({data, config}: Props) {
       <div className="relative">
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
           {frameRect(config)}
-          {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
-          {config.showGrid !== false && tickValues.map((v, i) => {
-            const x = marginAdj.left + ((v - domain.yMin) / yRange) * plotW2;
-            return (
-              <g key={i}>
-                {i > 0 && <line x1={x} y1={marginAdj.top} x2={x} y2={marginAdj.top + plotH2} stroke={st.gridColor} strokeWidth={1} />}
-                <text x={x} y={marginAdj.top + plotH2 + 14} textAnchor="middle" fill={yTickColor} fontSize={yTickSize} fontFamily={yTickFamily} fontWeight={yTickWeight}>
-                  {formatValue(v, numFmt)}
-                </text>
-              </g>
-            );
-          })}
-          {referenceLinesSvg(false, true, domain, yRange, marginAdj, plotW2, plotH2, config)}
-
-          {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{config.xLabel}</text>}
-          {config.yLabel && <text x={14} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 14, ${height / 2})`}>{config.yLabel}</text>}
+          <Zone id="header">
+            {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
+          </Zone>
+          <Zone id="footer">
+            {config.showGrid !== false && tickValues.map((v, i) => {
+              const x = marginAdj.left + ((v - domain.yMin) / yRange) * plotW2;
+              return (
+                <g key={i}>
+                  {i > 0 && <line x1={x} y1={marginAdj.top} x2={x} y2={marginAdj.top + plotH2} stroke={st.gridColor} strokeWidth={1} />}
+                  <text x={x} y={marginAdj.top + plotH2 + 14} textAnchor="middle" fill={yTickColor} fontSize={yTickSize} fontFamily={yTickFamily} fontWeight={yTickWeight}>
+                    {formatValue(v, numFmt)}
+                  </text>
+                </g>
+              );
+            })}
+            {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{config.xLabel}</text>}
+          </Zone>
+          <Zone id="left-axis">
+            {config.yLabel && <text x={14} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 14, ${height / 2})`}>{config.yLabel}</text>}
+          </Zone>
+          <Zone id="plot">
+            {referenceLinesSvg(false, true, domain, yRange, marginAdj, plotW2, plotH2, config)}
 
           {prepared.items.map((d, i) => {
             const y = marginAdj.top + gap + i * (barH + gap);
@@ -1301,6 +1322,7 @@ function SingleBar({data, config}: Props) {
               </g>
             );
           })}
+          </Zone>
         </svg>
         {tooltipEnabled && <HoverTooltip tip={tip} />}
       </div>
@@ -1316,24 +1338,26 @@ function SingleBar({data, config}: Props) {
     <div className="relative">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
         {frameRect(config)}
-        {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
-        {config.showGrid !== false && tickValues.map((v, i) => {
-          const y = marginAdj.top + plotH2 - ((v - domain.yMin) / yRange) * plotH2;
-          return (
-            <g key={i}>
-              {i > 0 && <line x1={marginAdj.left} y1={y} x2={width - marginAdj.right} y2={y} stroke={st.gridColor} strokeWidth={1} />}
-              <text x={marginAdj.left - 8} y={y + 4} textAnchor="end" fill={yTickColor} fontSize={yTickSize} fontFamily={yTickFamily} fontWeight={yTickWeight}>
-                {formatValue(v, numFmt)}
-              </text>
-            </g>
-          );
-        })}
-        {referenceLinesSvg(false, false, domain, yRange, marginAdj, plotW2, plotH2, config)}
-
-        {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{config.xLabel}</text>}
-        {config.yLabel && <text x={16} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text>}
-
-        {prepared.items.map((d, i) => {
+        <Zone id="header">
+          {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
+        </Zone>
+        <Zone id="left-axis">
+          {config.showGrid !== false && tickValues.map((v, i) => {
+            const y = marginAdj.top + plotH2 - ((v - domain.yMin) / yRange) * plotH2;
+            return (
+              <g key={i}>
+                {i > 0 && <line x1={marginAdj.left} y1={y} x2={width - marginAdj.right} y2={y} stroke={st.gridColor} strokeWidth={1} />}
+                <text x={marginAdj.left - 8} y={y + 4} textAnchor="end" fill={yTickColor} fontSize={yTickSize} fontFamily={yTickFamily} fontWeight={yTickWeight}>
+                  {formatValue(v, numFmt)}
+                </text>
+              </g>
+            );
+          })}
+          {config.yLabel && <text x={16} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text>}
+        </Zone>
+        <Zone id="plot">
+          {referenceLinesSvg(false, false, domain, yRange, marginAdj, plotW2, plotH2, config)}
+          {prepared.items.map((d, i) => {
           const x = marginAdj.left + gap + i * (barWidth + gap);
           const barH = ((d.value - domain.yMin) / yRange) * plotH2;
           const color = colorFor(config, d.label, i);
@@ -1443,6 +1467,10 @@ function SingleBar({data, config}: Props) {
             </g>
           );
         })}
+        </Zone>
+        <Zone id="footer">
+          {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{config.xLabel}</text>}
+        </Zone>
       </svg>
       {tooltipEnabled && <HoverTooltip tip={tip} />}
     </div>

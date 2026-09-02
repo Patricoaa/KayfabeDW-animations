@@ -2,8 +2,17 @@
 
 import type {ChartConfig, TextOverflow} from '@/lib/chart-config';
 import type {ResolvedChartStyle} from '@/lib/chart-data';
+import type {ReactNode} from 'react';
 
 export type LegendItem = {label: string; color: string};
+
+// Semantic zone wrapper so the SVG is structured by visual region
+// (header / left-axis / plot / right-axis / footer) instead of flat children.
+// Positions are unchanged; this only groups DOM for clarity and enables
+// zone-level styling or toggling.
+export function Zone({id, children}: {id: string; children: ReactNode}) {
+  return <g id={`zone-${id}`} data-zone={id}>{children}</g>;
+}
 
 let frameNs = 0;
 export function nextSvgId(prefix: string): string {
