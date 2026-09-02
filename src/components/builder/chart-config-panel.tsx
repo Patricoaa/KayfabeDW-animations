@@ -996,6 +996,54 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
         </div>
       </Section>
 
+      {/* ============ ESPACIADO ============ */}
+      <Section title="Espaciado">
+        <SliderNumberInput
+          label="Header (abajo)"
+          value={config.spacing?.headerPadding ?? 0}
+          min={0}
+          max={60}
+          onChange={(v) => update({spacing: {...(config.spacing ?? {}), headerPadding: v}})}
+        />
+        <SliderNumberInput
+          label="Leyenda"
+          value={config.spacing?.legendSpacing ?? 0}
+          min={0}
+          max={40}
+          onChange={(v) => update({spacing: {...(config.spacing ?? {}), legendSpacing: v}})}
+        />
+        <div className="pt-1 border-t border-border-subtle mt-2">
+          <SliderNumberInput
+            label="Margen superior"
+            value={config.spacing?.plotMarginTop ?? 24}
+            min={0}
+            max={100}
+            onChange={(v) => update({spacing: {...(config.spacing ?? {}), plotMarginTop: v}})}
+          />
+          <SliderNumberInput
+            label="Margen derecho"
+            value={config.spacing?.plotMarginRight ?? 24}
+            min={0}
+            max={100}
+            onChange={(v) => update({spacing: {...(config.spacing ?? {}), plotMarginRight: v}})}
+          />
+          <SliderNumberInput
+            label="Margen inferior"
+            value={config.spacing?.plotMarginBottom ?? 66}
+            min={0}
+            max={100}
+            onChange={(v) => update({spacing: {...(config.spacing ?? {}), plotMarginBottom: v}})}
+          />
+          <SliderNumberInput
+            label="Margen izquierdo"
+            value={config.spacing?.plotMarginLeft ?? 66}
+            min={0}
+            max={100}
+            onChange={(v) => update({spacing: {...(config.spacing ?? {}), plotMarginLeft: v}})}
+          />
+        </div>
+      </Section>
+
       {/* ============ AVATAR ============ */}
       {config.type === 'bar' && (
         <Section title="Avatar">
@@ -1118,6 +1166,34 @@ function NumberInput({label, value, min, max, step = 1, onChange}: {label: strin
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value ? Number(e.target.value) : undefined)}
         className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+      />
+    </div>
+  );
+}
+
+function SliderNumberInput({label, value, min, max, step = 1, onChange}: {label: string; value: number; min: number; max: number; step?: number; onChange: (v: number) => void}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <label className="text-sm font-medium">{label}</label>
+        <input
+          type="number"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value) || 0)}
+          className="w-16 bg-elevated border border-border-default rounded px-2 py-1 text-xs text-right font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+        />
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full h-1.5 bg-border-subtle rounded-lg appearance-none cursor-pointer accent-amber-500"
       />
     </div>
   );

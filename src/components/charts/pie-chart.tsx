@@ -64,12 +64,16 @@ export function PieChart({data, config}: Props) {
   const headerH = headerHeight(config, st, config.width ?? 600);
   const legendR = legendReserve(config, legendItems);
   const showLegend = config.showLegend ?? true;
-  const availW = width - 24 - legendR.right;
-  const topInset = headerH + legendR.top + 24;
-  const bottomInset = legendR.bottom + 24;
+  const sp = config.spacing ?? {};
+  const padTop = sp.plotMarginTop ?? 24;
+  const padRight = sp.plotMarginRight ?? 24;
+  const padBottom = sp.plotMarginBottom ?? 24;
+  const availW = width - padRight - legendR.right;
+  const topInset = headerH + legendR.top + padTop + (sp.headerPadding ?? 0) + (sp.legendSpacing ?? 0);
+  const bottomInset = legendR.bottom + padBottom + (sp.legendSpacing ?? 0);
   const plotCX = availW / 2;
   const plotCY = topInset + (height - topInset - bottomInset) / 2;
-  const outerR = Math.min((availW - 24) / 2, (height - topInset - bottomInset - 24) / 2, 190);
+  const outerR = Math.min((availW - padRight) / 2, (height - topInset - bottomInset - padBottom) / 2, 190);
   const innerFrac = isDonut ? Math.max(0.15, Math.min((config.innerRadius ?? 50) / 100, 0.85)) : 0;
   const innerR = innerFrac * outerR;
 

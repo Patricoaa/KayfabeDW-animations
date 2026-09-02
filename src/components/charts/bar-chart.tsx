@@ -286,7 +286,8 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const legendItems: LegendItem[] = multi.series.map((s) => ({label: s.name, color: s.color}));
   const headerH = headerHeight(config, st, config.width ?? 600);
   const legendR = legendReserve(config, legendItems);
-  const margin = {top: 24 + headerH + legendR.top, right: 24 + legendR.right, bottom: 66 + legendR.bottom, left: 66};
+  const sp = config.spacing ?? {};
+  const margin = {top: (sp.plotMarginTop ?? 24) + headerH + legendR.top + (sp.headerPadding ?? 0) + (sp.legendSpacing ?? 0), right: (sp.plotMarginRight ?? 24) + legendR.right + (sp.legendSpacing ?? 0), bottom: (sp.plotMarginBottom ?? 66) + legendR.bottom + (sp.legendSpacing ?? 0), left: (sp.plotMarginLeft ?? 66)};
   const nCat = multi.categories.length;
   const nS = multi.series.length;
   const maxVal = Math.max(multi.max, 0) || 1;
@@ -1029,7 +1030,8 @@ function SingleBar({data, config}: Props) {
   const width = config.width ?? 600;
   const height = config.height ?? 380;
   const headerH = headerHeight(config, st, config.width ?? 600);
-  const margin = {top: 24 + headerH, right: 24, bottom: 66, left: 66};
+  const sp = config.spacing ?? {};
+  const margin = {top: (sp.plotMarginTop ?? 24) + headerH + (sp.headerPadding ?? 0), right: (sp.plotMarginRight ?? 24), bottom: (sp.plotMarginBottom ?? 66), left: (sp.plotMarginLeft ?? 66)};
   const plotW = width - margin.left - margin.right;
   const plotH = height - margin.top - margin.bottom;
   const maxVal = Math.max(prepared.max, 0) || 1;

@@ -224,6 +224,16 @@ export type ChartConfig = {
   canvasBorderRadius?: number;
   canvasPreset?: string;
 
+  // Spacing / margin overrides per zone.
+  spacing?: {
+    headerPadding?: number;
+    legendSpacing?: number;
+    plotMarginTop?: number;
+    plotMarginRight?: number;
+    plotMarginBottom?: number;
+    plotMarginLeft?: number;
+  };
+
   // Horizontal reference / target lines drawn over the plot.
   referenceLines?: {value: number; label?: string; color?: string; dash?: boolean}[];
 
@@ -273,6 +283,14 @@ export const DEFAULT_CHART_CONFIG: ChartConfig = {
   barRadiusEndsOnly: false,
   canvasBorderRadius: 0,
   canvasBorderWidth: 0,
+  spacing: {
+    headerPadding: 0,
+    legendSpacing: 0,
+    plotMarginTop: 24,
+    plotMarginRight: 24,
+    plotMarginBottom: 66,
+    plotMarginLeft: 66,
+  },
   tooltipEnabled: true,
   configVersion: CHART_CONFIG_VERSION,
 };
