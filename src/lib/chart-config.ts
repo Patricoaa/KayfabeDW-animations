@@ -9,7 +9,6 @@ export type LegendPosition = 'top' | 'right' | 'bottom';
 export type GroupMode = 'grouped' | 'stacked' | 'stacked-percent';
 
 export type AvatarShape = 'circle' | 'rounded';
-export type AvatarPosition = 'axis-start' | 'bar-end' | 'inside-start' | 'inside-end';
 // Per-avatar frame adjustment: `zoom` scales the source image inside the fixed
 // frame (1 = fit/crop, >1 = zoom in). `focusX`/`focusY` (-1..1) shift the
 // visible crop within the frame (0 = centered).
@@ -204,10 +203,14 @@ export type ChartConfig = {
   avatarShape?: AvatarShape;
   avatarRadius?: number;
   avatarSize?: number;
-  avatarPosition?: AvatarPosition;
-  // V18: separación del avatar respecto a la barra/eje (px) cuando se ancla en
-  // `axis-start`/`bar-end` (fuera) o pegado al extremo en `inside-*`.
-  avatarOffset?: number;
+  // V19: posición del avatar por coordenadas GLOBALES (px) respecto a la punta del
+  // valor de cada barra (bar-end). `avatarOffsetX` va a lo largo del eje de valor
+  // (positivo = más allá de la punta; negativo = hacia el eje). `avatarOffsetY` va
+  // perpendicular (en horizontal: +/- arriba/abajo; en vertical, y de SVG crece hacia
+  // abajo: positivo = hacia la base, negativo = más arriba de la punta). Reemplazan
+  // el enum `avatarPosition` y el slider `avatarOffset` (V14/V18).
+  avatarOffsetX?: number;
+  avatarOffsetY?: number;
   // V18: ajuste de recorte por categoría (zoom del encuadre + foco X/Y dentro del
   // marco). Key = valor ORIGINAL de la categoría. Solo display.
   avatarCrops?: Record<string, AvatarCrop>;
@@ -290,7 +293,7 @@ export type ChartConfig = {
   configVersion?: number;
 };
 
-export const CHART_CONFIG_VERSION = 18;
+export const CHART_CONFIG_VERSION = 19;
 
 export const DEFAULT_CHART_CONFIG: ChartConfig = {
   type: 'bar',
@@ -318,7 +321,8 @@ export const DEFAULT_CHART_CONFIG: ChartConfig = {
   groupMode: 'grouped',
   avatarShape: 'rounded',
   avatarSize: 24,
-  avatarPosition: 'bar-end',
+  avatarOffsetX: 0,
+  avatarOffsetY: 0,
   barRadius: 2,
   barBorderWidth: 0,
   barGap: 2,
@@ -355,22 +359,14 @@ export function applyChartDefaults(config: Partial<ChartConfig>): ChartConfig {
     void canvasShadow;
     clean = rest as Partial<ChartConfig>;
   }
-  const validAvatarPositions = ['axis-start', 'bar-end', 'inside-start', 'inside-end'];
-  // Old V14 positions -> new bar-anchored positions.
-  const avatarMap: Record<string, AvatarPosition> = {
-    above: 'bar-end',
-    'bar-end': 'bar-end',
-    'beside-label': 'inside-end',
-    'after-label': 'inside-end',
-    'inside-label': 'inside-start',
-    'inside-bar': 'inside-end',
-  };
+  const stale = clean as Partial<ChartConfig> & Record<string, unknown>;
+  // V19: avatar position is now per-coordinate (`avatarOffsetX`/`avatarOffsetY`)
+  // anchored to the bar tip; the old fixed-position enum and separación slider
+  // are dropped. Saved `avatarPosition` selections reset to the bar-end (0,0).
+  if ('avatarPosition' in stale || 'avatarOffset' in stale) {
+    delete stale.avatarPosition;
+    delete stale.avatarOffset;
+  }
   const remapped = {...DEFAULT_CHART_CONFIG, ...clean};
-  if (remapped.avatarPosition !== undefined && remapped.avatarPosition in avatarMap) {
-    remapped.avatarPosition = avatarMap[remapped.avatarPosition];
-  }
-  if (remapped.avatarPosition !== undefined && !validAvatarPositions.includes(remapped.avatarPosition)) {
-    remapped.avatarPosition = 'bar-end';
-  }
   return remapped;
 }

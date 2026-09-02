@@ -2,7 +2,7 @@
 
 import React, {useEffect, useState} from 'react';
 import {BarChart3, PieChart, LineChart, AreaChart, ScatterChart, Table2, ChevronDown} from 'lucide-react';
-import type {ChartConfig, ChartType, NumberFormat, SortBy, ChartFilter, ChartFilterOp, LegendPosition, ChartStyle, AvatarShape, AvatarPosition, AvatarCrop, SectionFont, CategoryLabelPosition, TextLayout} from '@/lib/chart-config';
+import type {ChartConfig, ChartType, NumberFormat, SortBy, ChartFilter, ChartFilterOp, LegendPosition, ChartStyle, AvatarShape, AvatarCrop, SectionFont, CategoryLabelPosition, TextLayout} from '@/lib/chart-config';
 import {FONT_PRESETS, PALETTES} from '@/lib/chart-config';
 import {pickColor, colorFor} from '@/lib/chart-data';
 import {TextControls} from '@/components/builder/text-controls';
@@ -181,6 +181,27 @@ const setLegendTextOverride = (label: string, value?: string) => {
     config.seriesField && legendItems.length > 0
       ? legendItems.map((li) => li.label)
       : catLabels;
+
+  // First valid avatar image URL per category (mirrors the chart's categoryImages
+  // so the crop-grid preview thumbnails show the real source image).
+  const categoryImageMap = new Map<string, string>();
+  if (config.avatarField && catCol) {
+    for (const row of data ?? []) {
+      const rawCat = row[catCol];
+      const lab = rawCat === null || rawCat === undefined || String(rawCat) === '' ? '(vacío)' : String(rawCat);
+      if (categoryImageMap.has(lab)) continue;
+      const rawImg = row[config.avatarField];
+      if (
+        typeof rawImg === 'string' &&
+        (rawImg.trim().startsWith('http://') ||
+          rawImg.trim().startsWith('https://') ||
+          rawImg.trim().startsWith('data:image/') ||
+          rawImg.trim().startsWith('/'))
+      ) {
+        categoryImageMap.set(lab, rawImg.trim());
+      }
+    }
+  }
 
   const setColorOverride = (label: string, value?: string) => {
     const next = {...(config.colorOverrides ?? {})};
@@ -1165,20 +1186,13 @@ const setLegendTextOverride = (label: string, value?: string) => {
                 <NumberInput label="Radio de esquina (vacío = auto)" value={config.avatarRadius} min={0} max={40} step={1} onChange={(v) => update({avatarRadius: v})} />
               )}
               <div>
-                <label className="text-sm font-medium mb-1 block">Posición</label>
-                <select
-                  value={config.avatarPosition ?? 'bar-end'}
-                  onChange={(e) => update({avatarPosition: e.target.value as AvatarPosition})}
-                  className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-                >
-                  <option value="axis-start">Al inicio (eje)</option>
-                  <option value="bar-end">Al final (punta)</option>
-                  <option value="inside-start">Dentro (inicio)</option>
-                  <option value="inside-end">Dentro (final)</option>
-                </select>
-                <p className="text-[10px] text-muted pt-1">«Inicio» es el lado del eje; «final» es la punta del valor. In/out deciden si solapa la barra o queda fuera.</p>
+                <label className="text-sm font-medium mb-1 block">Posición (coordenadas, px)</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <NumberInput label="Offset X" value={config.avatarOffsetX} min={-128} max={128} step={1} onChange={(v) => update({avatarOffsetX: v})} />
+                  <NumberInput label="Offset Y" value={config.avatarOffsetY} min={-128} max={128} step={1} onChange={(v) => update({avatarOffsetY: v})} />
+                </div>
+                <p className="text-[10px] text-muted pt-1">Desplazamiento global en px respecto a la punta del valor de cada barra. X va a lo largo del eje de valor (positivo: más allá de la punta; negativo: hacia el eje); Y va perpendicular.</p>
               </div>
-              <NumberInput label="Separación del gráfico" value={config.avatarOffset} min={0} max={48} step={1} onChange={(v) => update({avatarOffset: v})} />
               {catLabels.length > 0 && (
                 <div className="pt-2 border-t border-border-subtle">
                   <div className="flex items-center justify-between mb-0.5">
@@ -1193,6 +1207,28 @@ const setLegendTextOverride = (label: string, value?: string) => {
                   <div className="space-y-2">
                     {catLabels.map((label) => {
                       const cr = config.avatarCrops?.[label];
+                      const imgUrl = categoryImageMap.get(label);
+                      const zoom = Math.max(cr?.zoom ?? 1, 1.2);
+                      const fx = Math.max(Math.min(cr?.focusX ?? 0, 1), -1);
+                      const fy = Math.max(Math.min(cr?.focusY ?? 0, 1), -1);
+                      const PREVIEW = 44;
+                      const posScale = PREVIEW / 2 - (PREVIEW * zoom) / 2;
+                      const imgStyle = imgUrl
+                        ? {
+                            width: PREVIEW * zoom,
+                            height: PREVIEW * zoom,
+                            transform: `translate(${posScale + fx * (PREVIEW * zoom - PREVIEW) / 2}px, ${posScale + fy * (PREVIEW * zoom - PREVIEW) / 2}px)`,
+                          }
+                        : undefined;
+                      const clipStyle = imgUrl
+                        ? {
+                            width: PREVIEW,
+                            height: PREVIEW,
+                            borderRadius: (config.avatarShape ?? 'rounded') === 'circle' ? '50%' : `${PREVIEW * 0.25}px`,
+                            overflow: 'hidden' as const,
+                            boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.2)',
+                          }
+                        : undefined;
                       return (
                         <div key={label} className="border border-border-subtle rounded p-2">
                           <div className="flex items-center justify-between mb-1">
@@ -1201,10 +1237,23 @@ const setLegendTextOverride = (label: string, value?: string) => {
                               <button type="button" onClick={() => setAvatarCrop(label)} className="text-muted hover:text-red-500 text-xs" aria-label={`Resetear recorte de ${label}`}>✕</button>
                             )}
                           </div>
-                          <div className="grid grid-cols-3 gap-2">
-                            <NumberInput label="Zoom" value={cr?.zoom} min={0.5} max={3} step={0.05} onChange={(v) => setAvatarCrop(label, {...cr, zoom: v})} />
-                            <NumberInput label="Foco X" value={cr ? (cr.focusX ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setAvatarCrop(label, {...cr, focusX: (v ?? 0) / 100})} />
-                            <NumberInput label="Foco Y" value={cr ? (cr.focusY ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setAvatarCrop(label, {...cr, focusY: (v ?? 0) / 100})} />
+                          <div className="flex items-start gap-3">
+                            <div className="shrink-0 mt-1">
+                              {imgUrl ? (
+                                <div style={clipStyle}>
+                                  <img src={imgUrl} alt="" style={{...imgStyle, objectFit: 'cover', maxWidth: 'none'}} />
+                                </div>
+                              ) : (
+                                <div style={{...clipStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-elevated)'}}>
+                                  <span className="text-muted">sin img</span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 flex-1">
+                              <NumberInput label="Zoom" value={cr?.zoom} min={0.5} max={3} step={0.05} onChange={(v) => setAvatarCrop(label, {...cr, zoom: v})} />
+                              <NumberInput label="Foco X" value={cr ? (cr.focusX ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setAvatarCrop(label, {...cr, focusX: (v ?? 0) / 100})} />
+                              <NumberInput label="Foco Y" value={cr ? (cr.focusY ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setAvatarCrop(label, {...cr, focusY: (v ?? 0) / 100})} />
+                            </div>
                           </div>
                         </div>
                       );
