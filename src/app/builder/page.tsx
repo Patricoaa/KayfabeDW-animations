@@ -31,6 +31,7 @@ import dynamic from 'next/dynamic';
 import {ChartConfigPanel} from '@/components/builder/chart-config-panel';
 import type {ColumnMeta} from '@/components/builder/chart-config-panel';
 import {ChartPreview} from '@/components/charts/chart-preview';
+import CanvasZoom from '@/components/builder/static-canvas';
 import {TemplatePicker} from '@/components/builder/template-picker';
 import {AnimationPreview} from '@/components/builder/animation-preview';
 import {BuilderNav} from '@/components/builder/builder-nav';
@@ -690,10 +691,10 @@ function BuilderContent() {
               )
             ) : outputMode === 'static' ? (
               <div className="h-full flex flex-col">
-                <div className="flex-1 overflow-auto flex items-center justify-center p-8">
-                  <div ref={staticExportRef} className="w-full max-w-4xl">
+                <CanvasZoom contentWidth={chartConfig.width ?? 600} contentHeight={chartConfig.height ?? 380}>
+                  <div ref={staticExportRef} className="w-full">
                     {filteredData.length === 0 ? (
-                      <div className="text-center text-muted text-sm font-body">
+                      <div className="text-center text-muted text-sm font-body p-6">
                         {data.length > 0
                           ? 'Ninguna fila coincide con el filtro del gráfico'
                           : 'Cargá datos en el canvas para ver tu gráfico'}
@@ -702,7 +703,7 @@ function BuilderContent() {
                       <ChartPreview data={filteredData} config={chartConfig} />
                     )}
                   </div>
-                </div>
+                </CanvasZoom>
                 <div className="flex items-center justify-center gap-2 px-6 py-3 border-t border-border-default bg-card shrink-0">
                   <button
                     onClick={() => handleStaticExport('svg')}

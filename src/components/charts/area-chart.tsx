@@ -1,7 +1,7 @@
 'use client';
 
 import type {ChartConfig} from '@/lib/chart-config';
-import {prepareSeries, prepareMultiSeries, formatValue, resolveChartStyle, resolveYDomain, type PreparedMultiSeries} from '@/lib/chart-data';
+import {prepareSeries, prepareMultiSeries, formatValue, resolvedCategoryLabel, resolveChartStyle, resolveYDomain, type PreparedMultiSeries} from '@/lib/chart-data';
 import {SvgHeader, SvgLegend, headerHeight, legendReserve, frameRect, type LegendItem} from './chart-frame';
 
 type Props = {
@@ -92,6 +92,7 @@ function MultiArea({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
             )}
           {n > 0 && multi.categories.map((cat, i) => {
             const cx = toX(i);
+            const catText = resolvedCategoryLabel(config, cat);
             return (
               <text
                 key={i}
@@ -104,7 +105,7 @@ function MultiArea({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
                 fontWeight={catWeight}
                 transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${cx}, ${height - margin.bottom + 14})` : undefined}
               >
-                {cat.length > 10 ? cat.slice(0, 10) + '…' : cat}
+                {catText.length > 10 ? catText.slice(0, 10) + '…' : catText}
               </text>
             );
           })}
@@ -173,7 +174,9 @@ function SingleArea({data, config}: Props) {
       <path d={area} fill={color} opacity={st.globalOpacity * 0.25} />
       <path d={line} fill="none" stroke={color} strokeWidth={st.lineWidth} strokeLinejoin="round" strokeDasharray={config.lineDash ? '6 4' : undefined} />
       {showMarkers && pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={st.pointSize} fill={color} stroke="#111" strokeWidth={1.5} opacity={st.pointOpacity} />)}
-      {n > 0 && prepared.items.map((p, i) => (
+      {n > 0 && prepared.items.map((p, i) => {
+        const catText = resolvedCategoryLabel(config, p.label);
+        return (
         <text
           key={i}
           x={toX(i)}
@@ -185,9 +188,10 @@ function SingleArea({data, config}: Props) {
           fontWeight={catWeight}
           transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${toX(i)}, ${height - margin.bottom + 14})` : undefined}
         >
-          {p.label.length > 10 ? p.label.slice(0, 10) + '…' : p.label}
+          {catText.length > 10 ? catText.slice(0, 10) + '…' : catText}
         </text>
-      ))}
+      );
+      })}
     </svg>
     </div>
   );

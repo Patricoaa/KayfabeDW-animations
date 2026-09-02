@@ -193,6 +193,40 @@ export function colorFor(config: ChartConfig, label: string | number | null | un
   return pickColor(config.colors, index);
 }
 
+export type CategoryTextOverride = {label?: string; sub?: string};
+
+// Normalizes a raw `categoryTextOverrides` entry for a category, or undefined
+// when the category has no custom text. Display-only.
+export function resolveCategoryTextOverride(
+  config: ChartConfig,
+  category: string | number | null | undefined,
+): CategoryTextOverride | undefined {
+  const key = category === null || category === undefined ? '' : String(category);
+  const ov = config.categoryTextOverrides?.[key];
+  if (typeof ov === 'string') return {label: ov};
+  if (ov && typeof ov === 'object') return {label: ov.label, sub: ov.sub};
+  return undefined;
+}
+
+// Display label for a category after applying per-category text overrides.
+export function resolvedCategoryLabel(config: ChartConfig, category: string | number | null | undefined): string {
+  const fallback = category === null || category === undefined ? '(vacío)' : String(category);
+  const ov = resolveCategoryTextOverride(config, category);
+  return ov?.label && ov.label.trim() !== '' ? ov.label : fallback;
+}
+
+// Description/subtitle line for a category. When the override defines a `sub`
+// string it wins ('' explicitly hides the line); otherwise the fallback stays.
+export function resolvedCategorySub(
+  config: ChartConfig,
+  category: string | number | null | undefined,
+  fallback: string | null | undefined,
+): string | null {
+  const ov = resolveCategoryTextOverride(config, category);
+  if (ov && typeof ov.sub === 'string') return ov.sub;
+  return fallback ?? null;
+}
+
 export type ResolvedChartStyle = {
   fontFamily: string;
   titleFontSize: number;

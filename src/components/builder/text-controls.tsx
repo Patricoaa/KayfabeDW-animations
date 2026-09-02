@@ -5,7 +5,7 @@ import {
 } from '@/lib/chart-config';
 import type {FontWeight, SectionFont, TextOverflow} from '@/lib/chart-config';
 
-function ColorInput({label, value, onChange}: {label: string; value?: string; onChange: (v: string) => void}) {
+function ColorInput({label, value, onChange}: {label: string; value?: string; onChange: (v?: string) => void}) {
   return (
     <div>
       <label className="text-sm font-medium mb-1 block">{label}</label>
@@ -15,14 +15,16 @@ function ColorInput({label, value, onChange}: {label: string; value?: string; on
           value={value ?? '#888888'}
           onChange={(e) => onChange(e.target.value)}
           className="w-9 h-9 rounded cursor-pointer border border-border-default bg-transparent"
+          title="Elegir color"
         />
-        <input
-          type="text"
-          value={value ?? ''}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="Heredar"
-          className="flex-1 bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-        />
+        <button
+          type="button"
+          onClick={() => onChange(undefined)}
+          title="Restablecer (heredar del tema)"
+          className="flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors bg-elevated border border-border-default text-secondary hover:bg-card-hover"
+        >
+          Auto
+        </button>
       </div>
     </div>
   );

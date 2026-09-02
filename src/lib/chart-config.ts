@@ -9,7 +9,7 @@ export type LegendPosition = 'top' | 'right' | 'bottom';
 export type GroupMode = 'grouped' | 'stacked' | 'stacked-percent';
 
 export type AvatarShape = 'circle' | 'rounded';
-export type AvatarPosition = 'above' | 'bar-end' | 'beside-label' | 'after-label';
+export type AvatarPosition = 'above' | 'bar-end' | 'beside-label' | 'after-label' | 'inside-label' | 'inside-bar';
 
 export type FontWeight = 400 | 500 | 600 | 700;
 
@@ -190,9 +190,17 @@ export type ChartConfig = {
 
   // Data labels (independent of the series/axis text colors).
   dataLabelPosition?: 'auto' | 'inside' | 'outside' | 'center';
+  // V16: migrated to a SectionFont (`dataLabelFont`). The flat fields below
+  // are kept only as legacy fallbacks when reading old saved configs.
   dataLabelFontSize?: number;
   dataLabelColor?: string;
   dataLabelFontFamily?: string;
+  dataLabelFont?: SectionFont;
+
+  // Per-category display overrides for the x-axis labels and their description
+  // lines (subtitles), keyed by the ORIGINAL category value. Display-only; they
+  // never affect color assignment, sorting or aggregation keys.
+  categoryTextOverrides?: Record<string, string | {label?: string; sub?: string}>;
 
   // Category (x) label placement + its own font. Only applies to bar charts.
   categoryLabelPosition?: CategoryLabelPosition;
@@ -225,7 +233,7 @@ export type ChartConfig = {
   configVersion?: number;
 };
 
-export const CHART_CONFIG_VERSION = 15;
+export const CHART_CONFIG_VERSION = 16;
 
 export const DEFAULT_CHART_CONFIG: ChartConfig = {
   type: 'bar',
@@ -281,7 +289,7 @@ export function applyChartDefaults(config: Partial<ChartConfig>): ChartConfig {
     void canvasShadow;
     clean = rest as Partial<ChartConfig>;
   }
-  const validAvatarPositions = ['above', 'bar-end', 'beside-label', 'after-label'];
+  const validAvatarPositions = ['above', 'bar-end', 'beside-label', 'after-label', 'inside-label', 'inside-bar'];
   const remapped = {...DEFAULT_CHART_CONFIG, ...clean};
   if (remapped.avatarPosition !== undefined && !validAvatarPositions.includes(remapped.avatarPosition)) {
     remapped.avatarPosition = 'beside-label';

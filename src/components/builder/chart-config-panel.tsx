@@ -159,11 +159,20 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
     else delete next[label];
     update({colorOverrides: next});
   };
+  const setCategoryTextOverride = (label: string, ov?: {label?: string; sub?: string}) => {
+    const next = {...(config.categoryTextOverrides ?? {})};
+    const labelVal = ov?.label ?? '';
+    const hasSub = ov?.sub !== undefined;
+    if (labelVal || hasSub) next[label] = hasSub ? {label: labelVal || undefined, sub: ov.sub} : labelVal;
+    else delete next[label];
+    update({categoryTextOverrides: next});
+  };
   const setHeaderFont = (patch: Partial<SectionFont>) => update({headerFont: {...(config.headerFont ?? {}), ...patch}});
   const setSubtitleFont = (patch: Partial<SectionFont>) => update({subtitleFont: {...(config.subtitleFont ?? {}), ...patch}});
   const setXLabelFont = (patch: Partial<SectionFont>) => update({xLabelFont: {...(config.xLabelFont ?? {}), ...patch}});
   const setYLabelFont = (patch: Partial<SectionFont>) => update({yLabelFont: {...(config.yLabelFont ?? {}), ...patch}});
   const setLegendFont = (patch: Partial<SectionFont>) => update({legendFont: {...(config.legendFont ?? {}), ...patch}});
+  const setDataLabelFont = (patch: Partial<SectionFont>) => update({dataLabelFont: {...(config.dataLabelFont ?? {}), ...patch}});
   const setCategoryDescriptionFont = (patch: Partial<SectionFont>) => update({categoryDescriptionFont: {...(config.categoryDescriptionFont ?? {}), ...patch}});
 
   // RRSS-oriented canvas presets. Presets write width/height (and the preset
@@ -636,13 +645,11 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
                   </select>
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-2">
-                <NumberInput label="Tamaño" value={config.dataLabelFontSize} min={6} max={24} onChange={(v) => update({dataLabelFontSize: v})} />
-                <ColorInput label="Color" value={config.dataLabelColor} onChange={(v) => update({dataLabelColor: v || undefined})} />
-              </div>
               <div>
-                <label className="text-sm font-medium mb-1 block">Fuente de etiquetas</label>
-                <FontFamilySelect value={config.dataLabelFontFamily} onChange={(v) => update({dataLabelFontFamily: v || undefined})} />
+                <label className="text-xs font-semibold text-muted uppercase tracking-widest font-display">Tipografía de etiquetas</label>
+                <div className="mt-1.5">
+                  <TextControls value={config.dataLabelFont} onChange={setDataLabelFont} />
+                </div>
               </div>
             </>
           )}
@@ -726,6 +733,61 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
             <div className="grid grid-cols-2 gap-2">
               <NumberInput label="X mín." value={config.xMin} min={-1e9} max={1e9} onChange={(v) => update({xMin: v})} />
               <NumberInput label="X máx." value={config.xMax} min={-1e9} max={1e9} onChange={(v) => update({xMax: v})} />
+            </div>
+          )}
+
+          {(config.type === 'bar' || config.type === 'line' || config.type === 'area') && catLabels.length > 0 && (
+            <div className="pt-1 border-t border-border-subtle">
+              <div className="flex items-center justify-between mb-0.5">
+                <label className="text-sm font-medium block">Etiquetas personalizadas</label>
+                {Object.keys(config.categoryTextOverrides ?? {}).length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => update({categoryTextOverrides: undefined})}
+                    className="text-[10px] text-muted hover:text-red-500"
+                  >
+                    Limpiar todas
+                  </button>
+                )}
+              </div>
+              <p className="text-[10px] text-muted mb-1.5">Renombra la etiqueta del eje X y su subtítulo por categoría.</p>
+              <div className="space-y-1.5">
+                {catLabels.map((label) => {
+                  const raw = config.categoryTextOverrides?.[label];
+                  const resolved = typeof raw === 'string' ? {label: raw, sub: undefined} : raw;
+                  return (
+                    <div key={label} className="flex items-center gap-2">
+                      <span className="text-xs text-secondary truncate w-20 shrink-0" title={label}>{label}</span>
+                      <input
+                        type="text"
+                        value={resolved?.label ?? ''}
+                        placeholder="Etiqueta"
+                        onChange={(e) => setCategoryTextOverride(label, {label: e.target.value, sub: resolved?.sub})}
+                        className="flex-1 min-w-0 bg-elevated border border-border-default rounded px-2 py-1 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      />
+                      {config.categoryDescriptionField && (
+                        <input
+                          type="text"
+                          value={resolved?.sub ?? ''}
+                          placeholder="Subtítulo"
+                          onChange={(e) => setCategoryTextOverride(label, {label: resolved?.label, sub: e.target.value || undefined})}
+                          className="flex-1 min-w-0 bg-elevated border border-border-default rounded px-2 py-1 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+                        />
+                      )}
+                      {raw && (
+                        <button
+                          type="button"
+                          onClick={() => setCategoryTextOverride(label)}
+                          className="text-muted hover:text-red-500 px-1 text-xs"
+                          aria-label={`Restablecer etiqueta de ${label}`}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -983,12 +1045,12 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
                   onChange={(e) => update({avatarPosition: e.target.value as AvatarPosition})}
                   className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
                 >
-                  <option value="above">Sobre la barra</option>
-                  <option value="bar-end">Al final de la barra</option>
-                  <option value="beside-label">Junto a la etiqueta</option>
+                  <option value="beside-label">Antes de la etiqueta</option>
                   <option value="after-label">Después de la etiqueta</option>
+                  <option value="inside-label">Dentro de la etiqueta</option>
+                  <option value="inside-bar">Dentro de la barra</option>
                 </select>
-                <p className="text-[10px] text-muted pt-1">En vertical, sobre la barra y al final de la barra quedan sobre el extremo de la columna.</p>
+                <p className="text-[10px] text-muted pt-1">En vertical, sobre la barra y dentro de la barra quedan sobre el extremo de la columna.</p>
               </div>
               <p className="text-[10px] text-muted">Las imágenes se muestran en el preview y en el SVG descargado; puede que no aparezcan al exportar a PNG.</p>
             </>
@@ -1309,20 +1371,5 @@ function Toggle({
         />
       </span>
     </label>
-  );
-}
-
-function FontFamilySelect({value, onChange}: {value?: string; onChange: (v: string) => void}) {
-  return (
-    <select
-      value={value ?? ''}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-    >
-      <option value="">Heredar (por defecto)</option>
-      {FONT_PRESETS.map((f) => (
-        <option key={f.name} value={f.family}>{f.name}</option>
-      ))}
-    </select>
   );
 }
