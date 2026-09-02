@@ -2,9 +2,10 @@
 
 import React, {useEffect, useState} from 'react';
 import {BarChart3, PieChart, LineChart, AreaChart, ScatterChart, Table2, ChevronDown} from 'lucide-react';
-import type {ChartConfig, ChartType, NumberFormat, SortBy, ChartFilter, ChartFilterOp, LegendPosition, ChartStyle, AvatarShape, AvatarPosition, SectionFont, CategoryLabelPosition, FontWeight} from '@/lib/chart-config';
-import {FONT_PRESETS, FONT_WEIGHTS, PALETTES} from '@/lib/chart-config';
+import type {ChartConfig, ChartType, NumberFormat, SortBy, ChartFilter, ChartFilterOp, LegendPosition, ChartStyle, AvatarShape, AvatarPosition, SectionFont, CategoryLabelPosition} from '@/lib/chart-config';
+import {FONT_PRESETS, PALETTES} from '@/lib/chart-config';
 import {pickColor, colorFor} from '@/lib/chart-data';
+import {TextControls} from '@/components/builder/text-controls';
 
 // Metadata for a selected column available to the axis selectors: its alias
 // (the value used as a row key), its origin table, the bare column name, and
@@ -163,6 +164,7 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
   const setXLabelFont = (patch: Partial<SectionFont>) => update({xLabelFont: {...(config.xLabelFont ?? {}), ...patch}});
   const setYLabelFont = (patch: Partial<SectionFont>) => update({yLabelFont: {...(config.yLabelFont ?? {}), ...patch}});
   const setLegendFont = (patch: Partial<SectionFont>) => update({legendFont: {...(config.legendFont ?? {}), ...patch}});
+  const setCategoryDescriptionFont = (patch: Partial<SectionFont>) => update({categoryDescriptionFont: {...(config.categoryDescriptionFont ?? {}), ...patch}});
 
   // RRSS-oriented canvas presets. Presets write width/height (and the preset
   // key for record-keeping); "personalizado" leaves them as edited.
@@ -231,6 +233,16 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
             {config.type !== 'table' && (
               <>
                 <FieldSelect label="Eje X / Categoría" value={config.xField ?? ''} options={fieldMeta} fallback={columns} onChange={(v) => update({xField: v})} />
+                {(config.type === 'bar' || config.type === 'line' || config.type === 'area') && (
+                  <FieldSelect
+                    label="Descripción (opcional)"
+                    value={config.categoryDescriptionField ?? ''}
+                    options={fieldMeta}
+                    fallback={columns}
+                    onChange={(v) => update({categoryDescriptionField: v || undefined})}
+                    optional
+                  />
+                )}
                 <FieldSelect label="Eje Y / Valor" value={config.yField ?? ''} options={fieldMeta} fallback={columns} role="numeric" onChange={(v) => update({yField: v})} />
                 <FieldSelect
                   label="Serie (opcional)"
@@ -391,13 +403,13 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
           <div className="pt-1 border-t border-border-subtle">
             <label className="text-xs font-semibold text-muted uppercase tracking-widest font-display">Fuente del título</label>
             <div className="mt-2">
-              <FontControls value={config.headerFont} onChange={setHeaderFont} />
+              <TextControls value={config.headerFont} onChange={setHeaderFont} />
             </div>
           </div>
           <div className="pt-1 border-t border-border-subtle">
             <label className="text-xs font-semibold text-muted uppercase tracking-widest font-display">Fuente del subtítulo</label>
             <div className="mt-2">
-              <FontControls value={config.subtitleFont} onChange={setSubtitleFont} />
+              <TextControls value={config.subtitleFont} onChange={setSubtitleFont} />
             </div>
           </div>
         </Section>
@@ -671,7 +683,7 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
           <div className="pt-1 border-t border-border-subtle">
             <label className="text-xs font-semibold text-muted uppercase tracking-widest font-display">Fuente de etiquetas</label>
             <div className="mt-2">
-              <FontControls value={config.xLabelFont} onChange={setXLabelFont} />
+              <TextControls value={config.xLabelFont} onChange={setXLabelFont} />
             </div>
           </div>
 
@@ -716,6 +728,15 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
               <NumberInput label="X máx." value={config.xMax} min={-1e9} max={1e9} onChange={(v) => update({xMax: v})} />
             </div>
           )}
+
+          {(config.type === 'bar' || config.type === 'line' || config.type === 'area') && config.categoryDescriptionField && (
+            <div className="pt-1 border-t border-border-subtle">
+              <label className="text-xs font-semibold text-muted uppercase tracking-widest font-display">Fuente de la descripción</label>
+              <div className="mt-2">
+                <TextControls value={config.categoryDescriptionFont} onChange={setCategoryDescriptionFont} />
+              </div>
+            </div>
+          )}
         </Section>
       )}
 
@@ -735,7 +756,7 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
           <div className="pt-1 border-t border-border-subtle">
             <label className="text-xs font-semibold text-muted uppercase tracking-widest font-display">Fuente de etiquetas</label>
             <div className="mt-2">
-              <FontControls value={config.yLabelFont} onChange={setYLabelFont} />
+              <TextControls value={config.yLabelFont} onChange={setYLabelFont} />
             </div>
           </div>
 
@@ -869,7 +890,7 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
           <div className="pt-1 border-t border-border-subtle">
             <label className="text-xs font-semibold text-muted uppercase tracking-widest font-display">Fuente de la leyenda</label>
             <div className="mt-2">
-              <FontControls value={config.legendFont} onChange={setLegendFont} />
+              <TextControls value={config.legendFont} onChange={setLegendFont} />
             </div>
           </div>
         </Section>
@@ -1303,53 +1324,5 @@ function FontFamilySelect({value, onChange}: {value?: string; onChange: (v: stri
         <option key={f.name} value={f.family}>{f.name}</option>
       ))}
     </select>
-  );
-}
-
-function WeightControl({value, onChange}: {value?: FontWeight; onChange: (v?: FontWeight) => void}) {
-  return (
-    <div>
-      <label className="text-xs font-semibold text-muted uppercase tracking-widest font-display">Peso</label>
-      <div className="flex gap-1 mt-1.5">
-        <button
-          type="button"
-          onClick={() => onChange(undefined)}
-          className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
-            value === undefined ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover'
-          }`}
-        >
-          Auto
-        </button>
-        {FONT_WEIGHTS.map((w) => (
-          <button
-            key={w.value}
-            type="button"
-            onClick={() => onChange(w.value)}
-            style={{fontWeight: w.value}}
-            className={`flex-1 px-2 py-1.5 rounded text-xs transition-colors ${
-              value === w.value ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover'
-            }`}
-          >
-            {w.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function FontControls({value, onChange}: {value?: SectionFont; onChange: (patch: Partial<SectionFont>) => void}) {
-  return (
-    <div className="space-y-2">
-      <WeightControl value={value?.weight} onChange={(w) => onChange({weight: w})} />
-      <div>
-        <label className="text-sm font-medium mb-1 block">Familia</label>
-        <FontFamilySelect value={value?.fontFamily} onChange={(v) => onChange({fontFamily: v || undefined})} />
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <NumberInput label="Tamaño" value={value?.size} min={6} max={40} onChange={(v) => onChange({size: v})} />
-        <ColorInput label="Color" value={value?.color} onChange={(v) => onChange({color: v || undefined})} />
-      </div>
-    </div>
   );
 }

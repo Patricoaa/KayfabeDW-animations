@@ -13,6 +13,14 @@ export type AvatarPosition = 'above' | 'bar-end' | 'beside-label' | 'after-label
 
 export type FontWeight = 400 | 500 | 600 | 700;
 
+// How text that exceeds its box/limit is treated per section.
+export type TextOverflow = 'truncate' | 'wrap' | 'none';
+export const TEXT_OVERFLOWS: {value: TextOverflow; label: string}[] = [
+  {value: 'truncate', label: 'Recortar'},
+  {value: 'wrap', label: 'Envolver'},
+  {value: 'none', label: 'Sin límite'},
+];
+
 // Category label placement. 'hide' draws no category label; `*out` places
 // labels beside the bar/column (start, center, end); `*in` places them over
 // the bar body. 'axis' (default) keeps labels on the axis line.
@@ -25,6 +33,7 @@ export type SectionFont = {
   color?: string;
   size?: number;
   weight?: FontWeight;
+  overflow?: TextOverflow;
 };
 
 export const FONT_WEIGHTS: {value: FontWeight; label: string}[] = [
@@ -161,6 +170,12 @@ export type ChartConfig = {
   avatarSize?: number;
   avatarPosition?: AvatarPosition;
 
+  // F7: optional second dataset column rendered as a small description line
+  // under each category label (like `avatarField` but text). Its font is
+  // configured from the Eje X / Categoría section via `categoryDescriptionFont`.
+  categoryDescriptionField?: string;
+  categoryDescriptionFont?: SectionFont;
+
   // F6: granular bar styling (Flourish-like editor).
   barRadius?: number;              // corner radius of bars (px)
   barBorderColor?: string;         // stroke around each bar
@@ -210,7 +225,7 @@ export type ChartConfig = {
   configVersion?: number;
 };
 
-export const CHART_CONFIG_VERSION = 14;
+export const CHART_CONFIG_VERSION = 15;
 
 export const DEFAULT_CHART_CONFIG: ChartConfig = {
   type: 'bar',

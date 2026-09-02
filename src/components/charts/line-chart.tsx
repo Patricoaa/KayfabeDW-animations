@@ -25,7 +25,7 @@ function MultiLine({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
   const width = config.width ?? 600;
   const height = config.height ?? 380;
   const legendItems: LegendItem[] = multi.series.map((s) => ({label: s.name, color: s.color}));
-  const headerH = headerHeight(config, st);
+  const headerH = headerHeight(config, st, config.width ?? 600);
   const legendR = legendReserve(config, legendItems);
   const margin = {top: 24 + headerH + legendR.top, right: 24 + legendR.right, bottom: 66 + legendR.bottom, left: 66};
   const plotW = width - margin.left - margin.right;
@@ -120,7 +120,7 @@ function SingleLine({data, config}: Props) {
   const st = resolveChartStyle(config.style);
   const width = config.width ?? 600;
   const height = config.height ?? 380;
-  const margin = {top: 24 + headerHeight(config, st), right: 24, bottom: 66, left: 66};
+  const margin = {top: 24 + headerHeight(config, st, config.width ?? 600), right: 24, bottom: 66, left: 66};
   const plotW = width - margin.left - margin.right;
   const plotH = height - margin.top - margin.bottom;
   const n = prepared.items.length;
@@ -159,7 +159,7 @@ function SingleLine({data, config}: Props) {
     <div className="relative w-full">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
         {frameRect(config)}
-        {headerHeight(config, st) > 0 && <SvgHeader config={config} st={st} width={width} />}
+        {headerHeight(config, st, config.width ?? 600) > 0 && <SvgHeader config={config} st={st} width={width} />}
       {config.showGrid !== false && tickValues.map((v, i) => {
         const y = toY(v);
         return (

@@ -46,7 +46,7 @@ export function ScatterChart({data, config}: Props) {
     }
   }
   const legendItems: LegendItem[] = cats.map((c) => ({label: c, color: catColors.get(c)!}));
-  const headerH = headerHeight(config, st);
+  const headerH = headerHeight(config, st, config.width ?? 600);
   const legendR = legendReserve(config, legendItems);
   const margin = {top: 24 + headerH + legendR.top, right: 24 + legendR.right, bottom: 66 + legendR.bottom, left: 66};
   const plotW = width - margin.left - margin.right;

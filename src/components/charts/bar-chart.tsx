@@ -1,7 +1,7 @@
 'use client';
 
 import {useState, type ReactNode} from 'react';
-import type {ChartConfig, NumberFormat} from '@/lib/chart-config';
+import type {ChartConfig, NumberFormat, TextOverflow} from '@/lib/chart-config';
 import {prepareSeries, prepareMultiSeries, formatValue, colorFor, resolveChartStyle, resolveYDomain, type PreparedMultiSeries} from '@/lib/chart-data';
 import {SvgHeader, SvgLegend, roundedRectPath, headerHeight, legendReserve, frameRect, type LegendItem} from './chart-frame';
 
@@ -137,6 +137,87 @@ function estTextWidth(text: string, size: number): number {
   return Math.min(text.length, 16) * size * 0.58 + 2;
 }
 
+// Width estimate honoring the section's overflow setting, used to reserve
+// canvas margins so out-of-plot labels/avatars are never clipped.
+function estLabelWidth(text: string, size: number, overflow?: TextOverflow, cap = 16): number {
+  const ov = overflow ?? 'truncate';
+  const len = ov === 'none' ? text.length : Math.min(text.length, cap);
+  return len * size * 0.58 + 2;
+}
+
+function descOfRow(descField: string | undefined, raw?: Record<string, unknown>): string | null {
+  if (!descField) return null;
+  const v = raw?.[descField];
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim();
+  return s ? s : null;
+}
+
+function descOf(desc: string | null | undefined): string | null {
+  if (!desc) return null;
+  const s = String(desc).trim();
+  return s ? s : null;
+}
+
+function wrapLines(text: string, maxLine: number, max: number): string[] {
+  const chars = [...text];
+  const lines: string[] = [];
+  for (let i = 0; i < chars.length && lines.length < max; i += maxLine) {
+    lines.push(chars.slice(i, i + maxLine).join(''));
+  }
+  return lines;
+}
+
+type FontLike = {size: number; color: string; family?: string; weight: number};
+
+// Renders section text honoring its overflow setting: 'truncate' (ellipsis at
+// `cap`), 'none' (full text), 'wrap' (multi-line tspans, best-effort when not
+// rotated). Rotated labels always truncate to keep the layout legible.
+function catLabel(
+  text: string,
+  opts: {
+    x: number;
+    y: number;
+    anchor: 'start' | 'middle' | 'end';
+    font: FontLike;
+    overflow?: TextOverflow;
+    rotate?: number;
+    cap: number;
+  },
+): ReactNode {
+  const ov = opts.overflow ?? 'truncate';
+  const rot = opts.rotate !== undefined && opts.rotate !== 0;
+  const base = {
+    x: opts.x,
+    y: opts.y,
+    textAnchor: opts.anchor,
+    fill: opts.font.color,
+    fontSize: opts.font.size,
+    fontFamily: opts.font.family,
+    fontWeight: opts.font.weight,
+  };
+  const cut = (t: string) => (t.length > opts.cap ? t.slice(0, opts.cap) + '…' : t);
+  if (rot) {
+    return (
+      <text {...base} transform={`rotate(${opts.rotate}, ${opts.x}, ${opts.y})`}>
+        {cut(text)}
+      </text>
+    );
+  }
+  if (ov === 'none') return <text {...base}>{text}</text>;
+  if (ov === 'truncate') return <text {...base}>{cut(text)}</text>;
+  const lines = wrapLines(text, opts.cap, 2);
+  if (lines.join('').length < text.length) lines[lines.length - 1] += '…';
+  const lh = opts.font.size + 1.5;
+  return (
+    <text {...base}>
+      {lines.map((ln, i) => (
+        <tspan key={i} x={opts.x} dy={i === 0 ? 0 : lh}>{ln}</tspan>
+      ))}
+    </text>
+  );
+}
+
 // Rounded-rect avatar radius defaults to a quarter of the size unless the user
 // pinned an explicit radius; circles ignore the radius entirely.
 function resolveAvatarRadius(config: ChartConfig, size: number): number {
@@ -194,7 +275,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const width = config.width ?? 600;
   const height = config.height ?? 380;
   const legendItems: LegendItem[] = multi.series.map((s) => ({label: s.name, color: s.color}));
-  const headerH = headerHeight(config, st);
+  const headerH = headerHeight(config, st, config.width ?? 600);
   const legendR = legendReserve(config, legendItems);
   const margin = {top: 24 + headerH + legendR.top, right: 24 + legendR.right, bottom: 66 + legendR.bottom, left: 66};
   const nCat = multi.categories.length;
@@ -221,6 +302,25 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const yTickWeight = config.yLabelFont?.weight ?? 400;
   const catWeight = config.xLabelFont?.weight ?? 400;
   const radius = config.barRadius ?? 2;
+  const descField = config.categoryDescriptionField;
+  const descSize = config.categoryDescriptionFont?.size ?? Math.max(7, catSize - 3);
+  const descOv = config.categoryDescriptionFont?.overflow;
+  const catOv = config.xLabelFont?.overflow;
+  const catFont: FontLike = {size: catSize, color: catColor, family: catFamily, weight: catWeight};
+  const descFont: FontLike = {
+    size: descSize,
+    color: config.categoryDescriptionFont?.color ?? catColor,
+    family: config.categoryDescriptionFont?.fontFamily ?? undefined,
+    weight: config.categoryDescriptionFont?.weight ?? 400,
+  };
+  const catBlock = catPos !== 'hide';
+  const maxCat = multi.categories.reduce((m, c) => (c.length > m.length ? c : m), '');
+  const maxDesc = descField
+    ? multi.categoryDescriptions?.reduce<string>((m, d) => {
+        const t = descOf(d);
+        return t && t.length > m.length ? t : m;
+      }, '') ?? ''
+    : '';
   const borderW = config.barBorderWidth ?? 0;
   const borderColor = config.barBorderColor ?? '#ffffff';
   const dlPos = config.dataLabelPosition ?? 'auto';
@@ -265,6 +365,16 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
     }
     if (avatarActive && avatarPos === 'above') {
       marginAdj.top += avatarSize + 10;
+    }
+    // Label-dependent avatars and long axis labels sit left of the bar row;
+    // reserve the space so they are never clipped outside the SVG.
+    const catEst = estLabelWidth(maxCat, catSize, catOv);
+    const descEst = descField ? estLabelWidth(maxDesc, descSize, descOv) : 0;
+    const labelEst = Math.max(catEst, descEst);
+    if (avatarActive && (avatarPos === 'beside-label' || avatarPos === 'after-label') && catBlock) {
+      marginAdj.left += labelEst + avatarSize + 16;
+    } else if (catBlock && catPos === 'axis') {
+      marginAdj.left += labelEst + 8;
     }
     const plotW = width - marginAdj.left - marginAdj.right;
     const plotH = height - marginAdj.top - marginAdj.bottom;
@@ -446,6 +556,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                 const img = multi.categoryImages?.[ci] ?? null;
                 const hasImg = avatarActive && !!img;
                 const showText = catPos !== 'hide';
+                const desc = descOf(multi.categoryDescriptions?.[ci]);
                 const colStart = marginAdj.left;
                 const colEnd = stacked || stackedPercent
                   ? marginAdj.left + ((stackedPercent ? 1 : (stackTotal![ci] || 1)) / (stackedPercent ? 1 : yRange)) * plotW
@@ -465,14 +576,18 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                           : catPos === 'end-in'
                             ? {x: Math.max(colEnd - 8, colStart + 8), y: cy + 3, anchor: 'end' as const}
                             : {x: midX, y: cy + 3, anchor: 'middle' as const};
-                const catText = (
-                  <text x={labelAt.x} y={labelAt.y} textAnchor={labelAt.anchor} fill={catColor} fontSize={catSize} fontFamily={catFamily} fontWeight={catWeight} transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${labelAt.x}, ${labelAt.y})` : undefined}>
-                    {cat.length > 16 ? cat.slice(0, 16) + '…' : cat}
-                  </text>
-                );
+                const renderLabel = (p: {x: number; y: number; anchor: 'start' | 'middle' | 'end'} | null, focusCap = 16) => {
+                  if (!p) return null;
+                  return (
+                    <g key={`lb-${ci}`}>
+                      {catLabel(cat, {...p, font: catFont, overflow: catOv, cap: focusCap, rotate: labelAngle})}
+                      {desc && catLabel(desc, {x: p.x, y: p.y + catSize + 2, anchor: p.anchor, font: descFont, overflow: descOv, cap: 20})}
+                    </g>
+                  );
+                };
 
                 if (!hasImg) {
-                  return showText ? catText : null;
+                  return showText ? renderLabel(labelAt) : null;
                 }
 
                 if (avatarPos === 'bar-end') {
@@ -483,7 +598,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                   return (
                     <g key={ci}>
                       <Avatar href={img!} cx={barEndX + (config.showDataLabels !== false ? 52 : 10) + avatarSize / 2} cy={cy} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
-                      {showText && catText}
+                      {showText && renderLabel(labelAt)}
                     </g>
                   );
                 }
@@ -492,7 +607,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                   return (
                     <g key={ci}>
                       <Avatar href={img!} cx={midX} cy={bandY + bandInset - avatarSize / 2 - 4} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
-                      {showText && catText}
+                      {showText && renderLabel(labelAt)}
                     </g>
                   );
                 }
@@ -509,9 +624,8 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                   return (
                     <g key={ci}>
                       <Avatar href={img!} cx={avatarCx} cy={cy} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
-                      <text x={labelX} y={cy + 3} textAnchor="end" fill={catColor} fontSize={catSize} fontFamily={catFamily} fontWeight={catWeight}>
-                        {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
-                      </text>
+                      {catLabel(cat, {x: labelX, y: cy + 3, anchor: 'end', font: catFont, overflow: catOv, cap: 12, rotate: labelAngle})}
+                      {desc && catLabel(desc, {x: labelX, y: cy + 3 + catSize + 2, anchor: 'end', font: descFont, overflow: descOv, cap: 20})}
                     </g>
                   );
                 }
@@ -527,8 +641,23 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
 
   // --- VERTICAL LAYOUT (default) ---
   const marginAdj = {...margin};
-  if (avatarActive && (avatarPos === 'above' || avatarPos === 'bar-end') && labelAngle === 0) {
+  if (avatarActive && (avatarPos === 'above' || avatarPos === 'bar-end')) {
     marginAdj.top += avatarSize + 10;
+  }
+  // Beside/after-label avatars straddle the column edges; reserve a half
+  // avatar on both sides so first/last columns never clip.
+  if (avatarActive && (avatarPos === 'beside-label' || avatarPos === 'after-label') && catBlock) {
+    marginAdj.left += avatarSize / 2 + 8;
+    marginAdj.right += avatarSize / 2 + 8;
+  }
+  if (catBlock && catPos.endsWith('-out')) {
+    const descEst = descField ? estLabelWidth(maxDesc, descSize, descOv) : 0;
+    marginAdj.right += Math.max(estLabelWidth(maxCat, catSize, catOv), descEst) + 8;
+  }
+  // Descriptions render as extra small lines under the category label.
+  if (descField && catBlock) {
+    const descLines = descOv === 'wrap' ? 2 : 1;
+    marginAdj.bottom += descLines * (descSize + 1.5) + 6;
   }
   const plotW = width - marginAdj.left - marginAdj.right;
   const plotH = height - marginAdj.top - marginAdj.bottom;
@@ -697,10 +826,11 @@ const fill = barFill(s.color, config, val < 0);
 
           {multi.categories.map((cat, ci) => {
             const bandX = marginAdj.left + ci * catBand;
-            const cx = bandX + catBand / 2;
+            const blockCenterX = bandX + barBandX + barBlockW / 2;
             const img = multi.categoryImages?.[ci] ?? null;
-            const hasImg = avatarActive && !!img && labelAngle === 0;
+            const hasImg = avatarActive && !!img;
             const showText = catPos !== 'hide';
+            const desc = descOf(multi.categoryDescriptions?.[ci]);
 
             let barTop = marginAdj.top + plotH;
             if (hasImg && (avatarPos === 'above' || avatarPos === 'bar-end')) {
@@ -714,6 +844,16 @@ const fill = barFill(s.color, config, val < 0);
               }
             }
 
+            const renderLabel = (p: {x: number; y: number; anchor: 'start' | 'middle' | 'end'} | null, focusCap = 12) => {
+              if (!p) return null;
+              return (
+                <g key={`lb-${ci}`}>
+                  {catLabel(cat, {...p, font: catFont, overflow: catOv, cap: focusCap, rotate: labelAngle})}
+                  {desc && catLabel(desc, {x: p.x, y: p.y + catSize + 2, anchor: p.anchor, font: descFont, overflow: descOv, cap: 20})}
+                </g>
+              );
+            };
+
             if (!hasImg) {
               const colBottom = marginAdj.top + plotH;
               const colTop = stackedPercent
@@ -725,65 +865,52 @@ const fill = barFill(s.color, config, val < 0);
               const labelAt = catPos === 'hide'
                 ? null
                 : catPos === 'axis'
-                  ? {x: cx, y: height - marginAdj.bottom + 14, anchor: 'middle' as const}
+                  ? {x: blockCenterX, y: height - marginAdj.bottom + 14, anchor: 'middle' as const}
                   : catPos === 'start-out'
-                    ? {x: cx + barBlockW / 2 + 8, y: colBottom - 4, anchor: 'start' as const}
+                    ? {x: blockCenterX + barBlockW / 2 + 8, y: colBottom - 4, anchor: 'start' as const}
                     : catPos === 'end-out'
-                      ? {x: cx + barBlockW / 2 + 8, y: Math.max(colTop + 6, marginAdj.top + 8), anchor: 'start' as const}
+                      ? {x: blockCenterX + barBlockW / 2 + 8, y: Math.max(colTop + 6, marginAdj.top + 8), anchor: 'start' as const}
                       : catPos === 'center-out'
-                        ? {x: cx + barBlockW / 2 + 8, y: midY, anchor: 'start' as const}
+                        ? {x: blockCenterX + barBlockW / 2 + 8, y: midY, anchor: 'start' as const}
                         : catPos === 'start-in'
-                          ? {x: cx, y: colBottom - 10, anchor: 'middle' as const}
+                          ? {x: blockCenterX, y: colBottom - 10, anchor: 'middle' as const}
                           : catPos === 'end-in'
-                            ? {x: cx, y: Math.min(colTop + 12, colBottom - 10), anchor: 'middle' as const}
-                            : {x: cx, y: midY, anchor: 'middle' as const};
-              if (!labelAt) return null;
-              return (
-                <text
-                  key={ci}
-                  x={labelAt.x}
-                  y={labelAt.y}
-                  textAnchor={labelAt.anchor}
-                  fill={catColor}
-                  fontSize={catSize}
-                  fontFamily={catFamily}
-                  fontWeight={catWeight}
-                  transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${labelAt.x}, ${labelAt.y})` : undefined}
-                >
-                  {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
-                </text>
-              );
+                            ? {x: blockCenterX, y: Math.min(colTop + 12, colBottom - 10), anchor: 'middle' as const}
+                            : {x: blockCenterX, y: midY, anchor: 'middle' as const};
+              if (!showText || !labelAt) return null;
+              return renderLabel(labelAt);
             }
 
             const axisY = height - marginAdj.bottom + 14;
-            const catText = (
-              <text x={cx} y={axisY} textAnchor="middle" fill={catColor} fontSize={catSize} fontFamily={catFamily} fontWeight={catWeight}>
-                {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
-              </text>
-            );
 
             if (avatarPos === 'above' || avatarPos === 'bar-end') {
               return (
                 <g key={ci}>
-                  <Avatar href={img!} cx={cx} cy={barTop - avatarSize / 2 - 4} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
-                  {showText && catText}
+                  <Avatar href={img!} cx={blockCenterX} cy={barTop - avatarSize / 2 - 4} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
+                  {showText && renderLabel({x: blockCenterX, y: axisY, anchor: 'middle'}, 12)}
                 </g>
               );
             }
 
-            if (showText) {
+            if (avatarPos === 'beside-label' || avatarPos === 'after-label') {
               const beside = avatarPos === 'beside-label';
+              const avatarCx = beside ? blockCenterX - avatarSize / 2 - 4 : blockCenterX + avatarSize / 2 + 4;
+              if (showText) {
+                const textX = beside ? blockCenterX + avatarSize / 2 + 4 : blockCenterX - avatarSize / 2 - 4;
+                return (
+                  <g key={ci}>
+                    <Avatar href={img!} cx={avatarCx} cy={axisY} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
+                    {catLabel(cat, {x: textX, y: axisY, anchor: 'middle', font: catFont, overflow: catOv, cap: 12})}
+                    {desc && catLabel(desc, {x: textX, y: axisY + catSize + 2, anchor: 'middle', font: descFont, overflow: descOv, cap: 20})}
+                  </g>
+                );
+              }
               return (
-                <g key={ci}>
-                  <Avatar href={img!} cx={beside ? cx - avatarSize / 2 - 4 : cx + avatarSize / 2 + 4} cy={axisY} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
-                  <text x={beside ? cx + avatarSize / 2 + 4 : cx - avatarSize / 2 - 4} y={axisY} textAnchor="middle" fill={catColor} fontSize={catSize} fontFamily={catFamily} fontWeight={catWeight}>
-                    {cat.length > 12 ? cat.slice(0, 12) + '…' : cat}
-                  </text>
-                </g>
+                <Avatar key={ci} href={img!} cx={avatarCx} cy={axisY} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
               );
             }
             return (
-              <Avatar key={ci} href={img!} cx={cx} cy={axisY} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
+              <Avatar key={ci} href={img!} cx={blockCenterX} cy={axisY} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
             );
           })}
         </svg>
@@ -799,7 +926,7 @@ function SingleBar({data, config}: Props) {
   const numFmt = config.numberFormat ?? 'short';
   const width = config.width ?? 600;
   const height = config.height ?? 380;
-  const headerH = headerHeight(config, st);
+  const headerH = headerHeight(config, st, config.width ?? 600);
   const margin = {top: 24 + headerH, right: 24, bottom: 66, left: 66};
   const plotW = width - margin.left - margin.right;
   const plotH = height - margin.top - margin.bottom;
@@ -838,13 +965,54 @@ function SingleBar({data, config}: Props) {
   const yTickColor = config.yLabelFont?.color ?? st.textColor;
   const yTickWeight = config.yLabelFont?.weight ?? 400;
   const catWeight = config.xLabelFont?.weight ?? 400;
+  const catOv = config.xLabelFont?.overflow;
+  const descField = config.categoryDescriptionField;
+  const descSize = config.categoryDescriptionFont?.size ?? Math.max(7, catSize - 3);
+  const descOv = config.categoryDescriptionFont?.overflow;
+  const catFont: FontLike = {size: catSize, color: catColor, family: catFamily, weight: catWeight};
+  const descFont: FontLike = {
+    size: descSize,
+    color: config.categoryDescriptionFont?.color ?? catColor,
+    family: config.categoryDescriptionFont?.fontFamily ?? undefined,
+    weight: config.categoryDescriptionFont?.weight ?? 400,
+  };
+  const catBlock = catPos !== 'hide';
+  const maxLabel = prepared.items.reduce((m, it) => (it.label.length > m.length ? it.label : m), '');
+  const maxDesc = descField
+    ? prepared.items.reduce<string>((m, it) => {
+        const t = descOfRow(descField, it.raw);
+        return t && t.length > m.length ? t : m;
+      }, '')
+    : '';
   const [tip, setTip] = useState<TooltipState | null>(null);
 
   const marginAdj = {...margin};
   if (avatarActive) {
     if (!horizontal && (avatarPos === 'above' || avatarPos === 'bar-end')) marginAdj.top += avatarSize + 10;
+    if (avatarActive && !horizontal && (avatarPos === 'beside-label' || avatarPos === 'after-label') && catBlock) {
+      marginAdj.left += avatarSize / 2 + 8;
+      marginAdj.right += avatarSize / 2 + 8;
+    }
     if (horizontal && avatarPos === 'bar-end') marginAdj.right += avatarSize + 14;
     if (horizontal && avatarPos === 'above') marginAdj.top += avatarSize + 10;
+  }
+  // Reserve space for out-of-plot labels so they are never clipped.
+  if (!horizontal && catBlock && catPos.endsWith('-out')) {
+    const descEst = descField ? estLabelWidth(maxDesc, descSize, descOv) : 0;
+    marginAdj.right += Math.max(estLabelWidth(maxLabel, catSize, catOv), descEst) + 8;
+  }
+  if (!horizontal && descField && catBlock) {
+    const descLines = descOv === 'wrap' ? 2 : 1;
+    marginAdj.bottom += descLines * (descSize + 1.5) + 6;
+  }
+  if (horizontal && catBlock) {
+    const descEst = descField ? estLabelWidth(maxDesc, descSize, descOv) : 0;
+    const labelEst = Math.max(estLabelWidth(maxLabel, catSize, catOv), descEst);
+    if (avatarActive && (avatarPos === 'beside-label' || avatarPos === 'after-label')) {
+      marginAdj.left += labelEst + avatarSize + 16;
+    } else if (catPos === 'axis') {
+      marginAdj.left += labelEst + 8;
+    }
   }
   const plotW2 = width - marginAdj.left - marginAdj.right;
   const plotH2 = height - marginAdj.top - marginAdj.bottom;
@@ -913,8 +1081,18 @@ function SingleBar({data, config}: Props) {
             const barEndAvatar = avatarActive && avatarPos === 'bar-end' && !!img;
             const labelExtra = barEndAvatar ? avatarSize + 10 : 6;
             const labelDependent = img && (avatarPos === 'beside-label' || avatarPos === 'after-label');
+            const desc = descOfRow(config.categoryDescriptionField, d.raw);
+            const renderLabel = (p: {x: number; y: number; anchor: 'start' | 'middle' | 'end'} | null) => {
+              if (!p || !showText) return null;
+              return (
+                <g key={`lb-${i}`}>
+                  {catLabel(d.label, {...p, font: catFont, overflow: catOv, cap: 16, rotate: labelAngle})}
+                  {desc && catLabel(desc, {x: p.x, y: p.y + catSize + 2, anchor: p.anchor, font: descFont, overflow: descOv, cap: 20})}
+                </g>
+              );
+            };
 
-            let avatarNode = null;
+            let avatarNode: ReactNode = null;
             if (img && avatarPos === 'bar-end') {
               avatarNode = <Avatar href={img} cx={endX + labelExtra + avatarSize / 2} cy={labelY} clipId={`bh-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />;
             } else if (img && avatarPos === 'above') {
@@ -927,15 +1105,19 @@ function SingleBar({data, config}: Props) {
 
             let catTextNode: ReactNode = null;
             if (labelDependent) {
-              if (!showText) {
-                // Avatar centers on the axis slot on its own.
-              } else if (avatarPos === 'beside-label') {
-                catTextNode = <text x={marginAdj.left - 8} y={labelY} textAnchor="end" fill={catColor} fontSize={catSize} fontFamily={catFamily} fontWeight={catWeight}>{d.label.length > 16 ? d.label.slice(0, 16) + '…' : d.label}</text>;
-              } else {
-                catTextNode = <text x={marginAdj.left - 8 - avatarSize - 6} y={labelY} textAnchor="end" fill={catColor} fontSize={catSize} fontFamily={catFamily} fontWeight={catWeight}>{d.label.length > 16 ? d.label.slice(0, 16) + '…' : d.label}</text>;
+              if (showText) {
+                const anchorEndX = avatarPos === 'beside-label'
+                  ? marginAdj.left - 8
+                  : marginAdj.left - 8 - avatarSize - 6;
+                catTextNode = (
+                  <g key={`lb-${i}`}>
+                    {catLabel(d.label, {x: anchorEndX, y: labelY, anchor: 'end', font: catFont, overflow: catOv, cap: 16})}
+                    {desc && catLabel(desc, {x: anchorEndX, y: labelY + catSize + 2, anchor: 'end', font: descFont, overflow: descOv, cap: 20})}
+                  </g>
+                );
               }
             } else if (showText && labelAt) {
-              catTextNode = <text x={labelAt.x} y={labelAt.y} textAnchor={labelAt.anchor} fill={catColor} fontSize={catSize} fontFamily={catFamily} fontWeight={catWeight} transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${labelAt.x}, ${labelAt.y})` : undefined}>{d.label.length > 16 ? d.label.slice(0, 16) + '…' : d.label}</text>;
+              catTextNode = renderLabel(labelAt);
             }
 
             return (
@@ -1029,7 +1211,16 @@ function SingleBar({data, config}: Props) {
                         ? {x: x + barWidth / 2, y: Math.min(topY + 12, colBottom - 10), anchor: 'middle' as const}
                         : {x: x + barWidth / 2, y: barCenterY, anchor: 'middle' as const};
           const centerX = x + barWidth / 2;
-          const labelDependent = img && (avatarPos === 'beside-label' || avatarPos === 'after-label');
+          const desc = descOfRow(config.categoryDescriptionField, d.raw);
+          const renderLabel = (p: {x: number; y: number; anchor: 'start' | 'middle' | 'end'} | null) => {
+            if (!p || !showText) return null;
+            return (
+              <g key={`lb-${i}`}>
+                {catLabel(d.label, {...p, font: catFont, overflow: catOv, cap: 12, rotate: labelAngle})}
+                {desc && catLabel(desc, {x: p.x, y: p.y + catSize + 2, anchor: p.anchor, font: descFont, overflow: descOv, cap: 20})}
+              </g>
+            );
+          };
 
           let avatarNode: ReactNode = null;
           if (img && (avatarPos === 'above' || avatarPos === 'bar-end')) {
@@ -1041,13 +1232,19 @@ function SingleBar({data, config}: Props) {
           }
 
           let catTextNode: ReactNode = null;
-          if (labelDependent) {
+          if (img && (avatarPos === 'beside-label' || avatarPos === 'after-label')) {
             if (showText) {
-              const textX = avatarPos === 'beside-label' ? centerX + avatarSize / 2 + 6 : centerX - avatarSize / 2 - 6;
-              catTextNode = <text x={textX} y={labelY} textAnchor="middle" fill={catColor} fontSize={catSize} fontFamily={catFamily} fontWeight={catWeight}>{d.label.length > 12 ? d.label.slice(0, 12) + '…' : d.label}</text>;
+              const beside = avatarPos === 'beside-label';
+              const textX = beside ? centerX + avatarSize / 2 + 6 : centerX - avatarSize / 2 - 6;
+              catTextNode = (
+                <g key={`lb-${i}`}>
+                  {catLabel(d.label, {x: textX, y: labelY, anchor: 'middle', font: catFont, overflow: catOv, cap: 12})}
+                  {desc && catLabel(desc, {x: textX, y: labelY + catSize + 2, anchor: 'middle', font: descFont, overflow: descOv, cap: 20})}
+                </g>
+              );
             }
           } else if (showText && labelAt) {
-            catTextNode = <text x={labelAt.x} y={labelAt.y} textAnchor={labelAt.anchor} fill={catColor} fontSize={catSize} fontFamily={catFamily} fontWeight={catWeight} transform={labelAngle !== 0 ? `rotate(${labelAngle}, ${labelAt.x}, ${labelAt.y})` : undefined}>{d.label.length > 12 ? d.label.slice(0, 12) + '…' : d.label}</text>;
+            catTextNode = renderLabel(labelAt);
           }
 
           return (

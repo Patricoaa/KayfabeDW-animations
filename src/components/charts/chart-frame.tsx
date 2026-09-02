@@ -1,6 +1,6 @@
 'use client';
 
-import type {ChartConfig} from '@/lib/chart-config';
+import type {ChartConfig, TextOverflow} from '@/lib/chart-config';
 import type {ResolvedChartStyle} from '@/lib/chart-data';
 
 export type LegendItem = {label: string; color: string};
@@ -31,6 +31,22 @@ export function frameRect(config: ChartConfig) {
 
 function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 1) + '…' : s;
+}
+
+// Breaks a text into display lines honoring a font's overflow setting. 'auto'
+// behaves as 'none' for header text (single, full line).
+function textLines(s: string | undefined, fs: number, maxW: number, overflow?: TextOverflow): string[] {
+  if (!s) return [];
+  const cpl = Math.max(4, Math.floor(maxW / (fs * 0.62)));
+  const mode = overflow ?? 'none';
+  if (mode === 'none' || s.length <= cpl) return [s];
+  if (mode === 'wrap') {
+    const first = s.slice(0, cpl);
+    const rest = s.slice(cpl);
+    if (rest.length <= cpl) return [first, rest];
+    return [first, rest.slice(0, cpl - 1) + '…'];
+  }
+  return [s.slice(0, cpl - 1) + '…'];
 }
 
 // Estimated text width (px) for the SVG legend layout. Fonts are small and
@@ -69,14 +85,17 @@ export function roundedRectPath(
 
 // Vertical space (in SVG units) the header needs when placed at the top of the
 // canvas. Renderers add this to margin.top so the plot doesn't overlap.
-export function headerHeight(config: ChartConfig, st: ResolvedChartStyle): number {
+export function headerHeight(config: ChartConfig, st: ResolvedChartStyle, width = 600): number {
   const hasTitle = !!config.title;
   const hasSub = !!config.subtitle;
   if (!hasTitle && !hasSub) return 0;
   const titleSize = config.headerFont?.size ?? st.titleFontSize;
   const subSize = config.subtitleFont?.size ?? Math.max(8, titleSize - 3);
-  let h = titleSize + 8;
-  if (hasSub) h += subSize + 6;
+  const maxW = Math.max(120, width - 24);
+  const titleLines = textLines(config.title ?? '', titleSize, maxW, config.headerFont?.overflow).length;
+  const subLines = hasSub ? textLines(config.subtitle ?? '', subSize, maxW, config.subtitleFont?.overflow).length : 0;
+  let h = titleLines * titleSize + 8;
+  if (hasSub) h += subLines * subSize + 6;
   return h;
 }
 
@@ -91,19 +110,23 @@ export function SvgHeader({config, st, width}: {config: ChartConfig; st: Resolve
   const titleColor = config.headerFont?.color ?? st.textColor;
   const subSize = config.subtitleFont?.size ?? Math.max(8, titleSize - 3);
   const subColor = config.subtitleFont?.color ?? st.textColor;
+  const maxW = Math.max(120, width - 24);
+  const titleLines = textLines(title, titleSize, maxW, config.headerFont?.overflow);
+  const subLines = textLines(sub, subSize, maxW, config.subtitleFont?.overflow);
+  const titleH = titleLines.length * titleSize;
   let y = 4 + titleSize;
   return (
     <g fontFamily={family} textAnchor="middle">
-      {title && (
-        <text x={width / 2} y={y} fill={titleColor} fontSize={titleSize} fontWeight={config.headerFont?.weight ?? 700}>
-          {title}
+      {title && titleLines.map((ln, i) => (
+        <text key={`t-${i}`} x={width / 2} y={y + i * (titleSize + 2)} fill={titleColor} fontSize={titleSize} fontWeight={config.headerFont?.weight ?? 700}>
+          {ln}
         </text>
-      )}
-      {sub && (
-        <text x={width / 2} y={y + subSize + 2} fill={subColor} fontSize={subSize} fontFamily={subFamily} fontWeight={config.subtitleFont?.weight ?? 400}>
-          {sub}
+      ))}
+      {sub && subLines.map((ln, i) => (
+        <text key={`s-${i}`} x={width / 2} y={4 + titleH + (titleLines.length > 0 ? 2 : 0) + subSize + i * (subSize + 2)} fill={subColor} fontSize={subSize} fontFamily={subFamily} fontWeight={config.subtitleFont?.weight ?? 400}>
+          {ln}
         </text>
-      )}
+      ))}
     </g>
   );
 }
@@ -142,6 +165,7 @@ export function SvgLegend({
   const family = config.legendFont?.fontFamily ?? st.fontFamily;
   const color = config.legendFont?.color ?? st.textColor;
   const weight = config.legendFont?.weight ?? 500;
+  const labelOf = (s: string, max: number) => (config.legendFont?.overflow === 'none' ? s : truncate(s, max));
 
   if (position === 'right') {
     const x = width - 112;
@@ -152,7 +176,7 @@ export function SvgLegend({
           const el = (
             <g key={it.label} transform={`translate(${x}, ${y})`}>
               <rect x={0} y={-6} width={sw} height={sw} rx={2} fill={it.color} />
-              <text x={sw + 6} y={0} fontSize={fs} fill={color} fontWeight={weight}>{truncate(it.label, 15)}</text>
+              <text x={sw + 6} y={0} fontSize={fs} fill={color} fontWeight={weight}>{labelOf(it.label, 15)}</text>
             </g>
           );
           y += 16;
@@ -180,7 +204,7 @@ export function SvgLegend({
         const el = (
           <g key={it.label} transform={`translate(${x}, ${y})`}>
             <rect x={0} y={-6} width={sw} height={sw} rx={2} fill={it.color} />
-            <text x={sw + 6} y={0} fontSize={fs} fill={color} fontWeight={weight}>{truncate(it.label, 24)}</text>
+            <text x={sw + 6} y={0} fontSize={fs} fill={color} fontWeight={weight}>{labelOf(it.label, 24)}</text>
           </g>
         );
         x += sw + 6 + textWidth(it.label, fs) + gap;

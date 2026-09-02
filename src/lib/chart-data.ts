@@ -357,6 +357,7 @@ export type PreparedMultiSeries = {
   max: number;
   categoryTotals: number[];
   categoryImages?: (string | null)[];
+  categoryDescriptions?: (string | null)[];
 };
 
 const AGGREGATES = ['sum', 'avg', 'count', 'min', 'max', 'count_distinct'] as const;
@@ -416,6 +417,8 @@ export function prepareMultiSeries(
 
   const avatarField = config.avatarField;
   const categoryImages = new Map<string, string | null>();
+  const descField = config.categoryDescriptionField;
+  const categoryDescriptions = new Map<string, string | null>();
 
   for (const row of rows) {
     const cat = String(row[xField] ?? '');
@@ -433,6 +436,12 @@ export function prepareMultiSeries(
           ? rawImg.trim()
           : null;
       categoryImages.set(cat, img);
+    }
+    // Capture the first non-empty description for each category the same way.
+    if (descField && !categoryDescriptions.has(cat)) {
+      const rawDesc = row[descField];
+      const desc = rawDesc === null || rawDesc === undefined ? null : String(rawDesc);
+      categoryDescriptions.set(cat, desc ? desc : null);
     }
     if (isNaN(val)) continue;
     if (!catIndex.has(cat)) {
@@ -500,6 +509,7 @@ export function prepareMultiSeries(
     ),
     categoryTotals: orderedTotals.slice(0, limit),
     categoryImages: kept.map((cat) => categoryImages.get(cat) ?? null),
+    categoryDescriptions: kept.map((cat) => categoryDescriptions.get(cat) ?? null),
   };
 }
 
