@@ -289,8 +289,6 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const margin = {top: 24 + headerH + legendR.top, right: 24 + legendR.right, bottom: 66 + legendR.bottom, left: 66};
   const nCat = multi.categories.length;
   const nS = multi.series.length;
-  const hidden = config.hiddenElements ?? [];
-  const locked = config.lockedElements ?? [];
   const maxVal = Math.max(multi.max, 0) || 1;
   const domain = stackedPercent
     ? {yMin: 0, yMax: 1, ticks: [0, 0.25, 0.5, 0.75, 1]}
@@ -433,17 +431,13 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
               })}
               {referenceLinesSvg(true, true, domain, yRange, marginAdj, plotW, plotH, config)}
 
-              {config.xLabel && !hidden.includes('xLabel') && (
-                <g data-editable="xLabel" data-element-name="Eje X" transform={`translate(${config.xLabelOffset?.x ?? 0}, ${config.xLabelOffset?.y ?? 0})`}>
-                  <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{config.xLabel}</text>
-                </g>
+              {config.xLabel && (
+                <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{config.xLabel}</text>
               )}
-              {config.yLabel && !hidden.includes('yLabel') && (
-                <g data-editable="yLabel" data-element-name="Eje Y" transform={`translate(${config.yLabelOffset?.x ?? 0}, ${config.yLabelOffset?.y ?? 0})`}>
-                  <text x={14} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 14, ${height / 2})`}>
-                    {config.yLabel}
-                  </text>
-                </g>
+              {config.yLabel && (
+                <text x={14} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 14, ${height / 2})`}>
+                  {config.yLabel}
+                </text>
               )}
 
               {multi.categories.map((cat, ci) => {
@@ -543,21 +537,17 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                         if (segW < dlSize * 1.6 || val === 0) return null;
                         const segX = marginAdj.left + (stackXBase[ci][si] / segTotal) * plotW + segW / 2;
                         return (
-                          <g key={`dl-${ci}-${si}`} data-editable="dataLabel">
-                            <text x={segX} y={cy + 3} textAnchor="middle" fontSize={dlSize} fill="#fff" pointerEvents="none">
-                              {formatValue(Math.round((val / segTotal) * 100 * 10) / 10 / 100, numFmt)}
-                            </text>
-                          </g>
+                          <text key={`dl-${ci}-${si}`} x={segX} y={cy + 3} textAnchor="middle" fontSize={dlSize} fill="#fff" pointerEvents="none">
+                            {formatValue(Math.round((val / segTotal) * 100 * 10) / 10 / 100, numFmt)}
+                          </text>
                         );
                       })
                     )}
                     {config.showDataLabels !== false && !stackedPercent && (
                       stacked ? (
-                        <g data-editable="dataLabel">
-                          <text x={marginAdj.left + plotW - 4} y={cy + 3} textAnchor="end" fontSize={dlSize} fill={dlColor} pointerEvents="none">
-                            {formatValue(total, numFmt)}
-                          </text>
-                        </g>
+                        <text x={marginAdj.left + plotW - 4} y={cy + 3} textAnchor="end" fontSize={dlSize} fill={dlColor} pointerEvents="none">
+                          {formatValue(total, numFmt)}
+                        </text>
                       ) : (
                         multi.series.map((s, si) => {
                           const val = s.values[ci] ?? 0;
@@ -565,12 +555,10 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                           const offset = (catBandH - barH * nS) / 2;
                           const y = bandY + offset + si * (barH + barGap) + barH / 2 + 3;
                           const endX = marginAdj.left + bw;
-                           return (
-                            <g key={`dl-${ci}-${si}`} data-editable="dataLabel">
-                              <text x={endX + 6} y={y} textAnchor="start" fontSize={dlSize} fill={dlColor} pointerEvents="none">
-                                {formatValue(val, numFmt)}
-                              </text>
-                            </g>
+                          return (
+                            <text key={`dl-${ci}-${si}`} x={endX + 6} y={y} textAnchor="start" fontSize={dlSize} fill={dlColor} pointerEvents="none">
+                              {formatValue(val, numFmt)}
+                            </text>
                           );
                         })
                       )
@@ -608,7 +596,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                 const renderLabel = (p: {x: number; y: number; anchor: 'start' | 'middle' | 'end'} | null, focusCap = 16) => {
                   if (!p) return null;
                   return (
-                    <g key={`lb-${ci}`} data-editable={`catLabel-${ci}`} data-element-name={label}>
+                    <g key={`lb-${ci}`}>
                       {catLabel(label, {...p, font: catFont, overflow: catOv, cap: focusCap, rotate: labelAngle})}
                       {desc && catLabel(desc, {x: p.x, y: p.y + catSize + 2, anchor: p.anchor, font: descFont, overflow: descOv, cap: 20})}
                     </g>
@@ -666,7 +654,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                         : p.x;
                   const centerY = p ? p.y : cy + 3;
                   return (
-                    <g key={ci} data-editable={`catLabel-${ci}`} data-element-name={label}>
+                    <g key={ci}>
                       <Avatar href={img!} cx={centerX} cy={centerY} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
                       {showText && p && (
                         <>
@@ -688,7 +676,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                     ? colStart - 8 - estTextWidth(label, catSize) - 6 - avatarSize / 2
                     : colStart - 8 - avatarSize / 2;
                   return (
-                    <g key={ci} data-editable={`catLabel-${ci}`} data-element-name={label}>
+                    <g key={ci}>
                       <Avatar href={img!} cx={avatarCx} cy={cy} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
                       {catLabel(label, {x: labelX, y: cy + 3, anchor: 'end', font: catFont, overflow: catOv, cap: 12, rotate: labelAngle})}
                       {desc && catLabel(desc, {x: labelX, y: cy + 3 + catSize + 2, anchor: 'end', font: descFont, overflow: descOv, cap: 20})}
@@ -777,17 +765,13 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
             })}
             {referenceLinesSvg(true, false, domain, yRange, marginAdj, plotW, plotH, config)}
 
-            {config.xLabel && !hidden.includes('xLabel') && (
-              <g data-editable="xLabel" data-element-name="Eje X" transform={`translate(${config.xLabelOffset?.x ?? 0}, ${config.xLabelOffset?.y ?? 0})`}>
-                <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{config.xLabel}</text>
-              </g>
+            {config.xLabel && (
+              <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{config.xLabel}</text>
             )}
-            {config.yLabel && !hidden.includes('yLabel') && (
-              <g data-editable="yLabel" data-element-name="Eje Y" transform={`translate(${config.yLabelOffset?.x ?? 0}, ${config.yLabelOffset?.y ?? 0})`}>
-                <text x={16} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 16, ${height / 2})`}>
-                  {config.yLabel}
-                </text>
-              </g>
+            {config.yLabel && (
+              <text x={16} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 16, ${height / 2})`}>
+                {config.yLabel}
+              </text>
             )}
 
             {multi.categories.map((cat, ci) => {
@@ -885,21 +869,17 @@ const fill = barFill(s.color, config, val < 0);
                     if (segH < dlSize * 1.8 || val === 0) return null;
                     const segY = marginAdj.top + plotH - (stackBase[ci][si] / segTotal) * plotH - segH / 2;
                     return (
-                      <g key={`dl-${ci}-${si}`} data-editable="dataLabel">
-                        <text x={bandX + barBandX + barBlockW / 2} y={segY + dlSize / 2} textAnchor="middle" fontSize={dlSize} fill="#fff" pointerEvents="none">
-                          {formatValue(Math.round((val / segTotal) * 100 * 10) / 10 / 100, numFmt)}
-                        </text>
-                      </g>
+                      <text key={`dl-${ci}-${si}`} x={bandX + barBandX + barBlockW / 2} y={segY + dlSize / 2} textAnchor="middle" fontSize={dlSize} fill="#fff" pointerEvents="none">
+                        {formatValue(Math.round((val / segTotal) * 100 * 10) / 10 / 100, numFmt)}
+                      </text>
                     );
                   })
                 )}
                 {config.showDataLabels !== false && !stackedPercent && (
                   stacked ? (
-                    <g data-editable="dataLabel">
-                      <text x={bandX + barBandX + barBlockW / 2} y={marginAdj.top + plotH - (total / yRange) * plotH - 4} textAnchor="middle" fontSize={dlSize} fill={dlColor} pointerEvents="none">
-                        {formatValue(total, numFmt)}
-                      </text>
-                    </g>
+                    <text x={bandX + barBandX + barBlockW / 2} y={marginAdj.top + plotH - (total / yRange) * plotH - 4} textAnchor="middle" fontSize={dlSize} fill={dlColor} pointerEvents="none">
+                      {formatValue(total, numFmt)}
+                    </text>
                   ) : (
                     multi.series.map((s, si) => {
                       const val = s.values[ci] ?? 0;
@@ -907,11 +887,9 @@ const fill = barFill(s.color, config, val < 0);
                       const offset = (catBand - barW * nS) / 2;
                       const bx = bandX + offset + si * (barW + barGap);
                       return (
-                        <g key={`dl-${ci}-${si}`} data-editable="dataLabel">
-                          <text x={bx + barW / 2} y={marginAdj.top + plotH - h - 5} textAnchor="middle" fontSize={dlSize} fill={dlColor} pointerEvents="none">
-                            {formatValue(val, numFmt)}
-                          </text>
-                        </g>
+                        <text key={`dl-${ci}-${si}`} x={bx + barW / 2} y={marginAdj.top + plotH - h - 5} textAnchor="middle" fontSize={dlSize} fill={dlColor} pointerEvents="none">
+                          {formatValue(val, numFmt)}
+                        </text>
                       );
                     })
                   )
@@ -944,7 +922,7 @@ const fill = barFill(s.color, config, val < 0);
             const renderLabel = (p: {x: number; y: number; anchor: 'start' | 'middle' | 'end'} | null, focusCap = 12) => {
               if (!p) return null;
               return (
-                <g key={`lb-${ci}`} data-editable={`catLabel-${ci}`} data-element-name={label}>
+                <g key={`lb-${ci}`}>
                   {catLabel(label, {...p, font: catFont, overflow: catOv, cap: focusCap, rotate: labelAngle})}
                   {desc && catLabel(desc, {x: p.x, y: p.y + catSize + 2, anchor: p.anchor, font: descFont, overflow: descOv, cap: 20})}
                 </g>
@@ -1004,7 +982,7 @@ const fill = barFill(s.color, config, val < 0);
             if (avatarPos === 'inside-label') {
               if (showText) {
                 return (
-                  <g key={ci} data-editable={`catLabel-${ci}`} data-element-name={label}>
+                  <g key={ci}>
                     <Avatar href={img!} cx={blockCenterX} cy={axisY} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
                     {catLabel(label, {x: blockCenterX, y: axisY, anchor: 'middle', font: catFont, overflow: catOv, cap: 12})}
                     {desc && catLabel(desc, {x: blockCenterX, y: axisY + catSize + 2, anchor: 'middle', font: descFont, overflow: descOv, cap: 20})}
@@ -1022,7 +1000,7 @@ const fill = barFill(s.color, config, val < 0);
               if (showText) {
                 const textX = beside ? blockCenterX + avatarSize / 2 + 4 : blockCenterX - avatarSize / 2 - 4;
                 return (
-                  <g key={ci} data-editable={`catLabel-${ci}`} data-element-name={label}>
+                  <g key={ci}>
                     <Avatar href={img!} cx={avatarCx} cy={axisY} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} />
                     {catLabel(label, {x: textX, y: axisY, anchor: 'middle', font: catFont, overflow: catOv, cap: 12})}
                     {desc && catLabel(desc, {x: textX, y: axisY + catSize + 2, anchor: 'middle', font: descFont, overflow: descOv, cap: 20})}
@@ -1047,8 +1025,6 @@ function SingleBar({data, config}: Props) {
   const prepared = prepareSeries(data, config);
   const st = resolveChartStyle(config.style);
   const horizontal = config.horizontal ?? false;
-  const hidden = config.hiddenElements ?? [];
-  const locked = config.lockedElements ?? [];
   const numFmt = config.numberFormat ?? 'short';
   const width = config.width ?? 600;
   const height = config.height ?? 380;
@@ -1197,8 +1173,8 @@ function SingleBar({data, config}: Props) {
           })}
           {referenceLinesSvg(false, true, domain, yRange, marginAdj, plotW2, plotH2, config)}
 
-          {config.xLabel && !hidden.includes('xLabel') && <g data-editable="xLabel" data-element-name="Eje X" transform={`translate(${config.xLabelOffset?.x ?? 0}, ${config.xLabelOffset?.y ?? 0})`}><text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{config.xLabel}</text></g>}
-          {config.yLabel && !hidden.includes('yLabel') && <g data-editable="yLabel" data-element-name="Eje Y" transform={`translate(${config.yLabelOffset?.x ?? 0}, ${config.yLabelOffset?.y ?? 0})`}><text x={14} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 14, ${height / 2})`}>{config.yLabel}</text></g>}
+          {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{config.xLabel}</text>}
+          {config.yLabel && <text x={14} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 14, ${height / 2})`}>{config.yLabel}</text>}
 
           {prepared.items.map((d, i) => {
             const y = marginAdj.top + gap + i * (barH + gap);
@@ -1241,7 +1217,7 @@ function SingleBar({data, config}: Props) {
             const renderLabel = (p: {x: number; y: number; anchor: 'start' | 'middle' | 'end'} | null) => {
               if (!p || !showText) return null;
               return (
-                <g key={`lb-${i}`} data-editable={`catLabel-${i}`} data-element-name={label}>
+                <g key={`lb-${i}`}>
                   {catLabel(label, {...p, font: catFont, overflow: catOv, cap: 16, rotate: labelAngle})}
                   {desc && catLabel(desc, {x: p.x, y: p.y + catSize + 2, anchor: p.anchor, font: descFont, overflow: descOv, cap: 20})}
                 </g>
@@ -1267,7 +1243,7 @@ function SingleBar({data, config}: Props) {
             if (img && avatarPos === 'inside-label') {
               if (showText) {
                 catTextNode = (
-                  <g key={`lb-${i}`} data-editable={`catLabel-${i}`} data-element-name={label}>
+                  <g key={`lb-${i}`}>
                     {catLabel(label, {x: innerCenterX, y: labelY, anchor: 'middle', font: catFont, overflow: catOv, cap: 16, rotate: labelAngle})}
                     {desc && catLabel(desc, {x: innerCenterX, y: labelY + catSize + 2, anchor: 'middle', font: descFont, overflow: descOv, cap: 20})}
                   </g>
@@ -1279,7 +1255,7 @@ function SingleBar({data, config}: Props) {
                   ? marginAdj.left - 8
                   : marginAdj.left - 8 - avatarSize - 6;
                 catTextNode = (
-                  <g key={`lb-${i}`} data-editable={`catLabel-${i}`} data-element-name={label}>
+                  <g key={`lb-${i}`}>
                     {catLabel(label, {x: anchorEndX, y: labelY, anchor: 'end', font: catFont, overflow: catOv, cap: 16})}
                     {desc && catLabel(desc, {x: anchorEndX, y: labelY + catSize + 2, anchor: 'end', font: descFont, overflow: descOv, cap: 20})}
                   </g>
@@ -1304,25 +1280,19 @@ function SingleBar({data, config}: Props) {
                   <rect x={marginAdj.left} y={y} width={bw} height={barH} fill={barFill(color, config, d.value < 0)} rx={radius} stroke={borderW > 0 ? borderColor : 'none'} strokeWidth={borderW} opacity={st.globalOpacity} />
                 )}
                 {config.showDataLabels !== false && dlPos === 'center' && (
-                  <g data-editable="dataLabel">
-                    <text x={marginAdj.left + bw / 2} y={labelY} textAnchor="middle" fill={dlColor} fontSize={dlSize} pointerEvents="none">
-                      {formatValue(d.value, numFmt)}
-                    </text>
-                  </g>
+                  <text x={marginAdj.left + bw / 2} y={labelY} textAnchor="middle" fill={dlColor} fontSize={dlSize} pointerEvents="none">
+                    {formatValue(d.value, numFmt)}
+                  </text>
                 )}
                 {config.showDataLabels !== false && dlPos === 'inside' && (
-                  <g data-editable="dataLabel">
-                    <text x={marginAdj.left + 8} y={labelY} textAnchor="start" fill={dlColor} fontSize={dlSize} pointerEvents="none">
-                      {formatValue(d.value, numFmt)}
-                    </text>
-                  </g>
+                  <text x={marginAdj.left + 8} y={labelY} textAnchor="start" fill={dlColor} fontSize={dlSize} pointerEvents="none">
+                    {formatValue(d.value, numFmt)}
+                  </text>
                 )}
                 {config.showDataLabels !== false && dlPos !== 'center' && dlPos !== 'inside' && (
-                  <g data-editable="dataLabel">
-                    <text x={endX + labelExtra} y={labelY} textAnchor="start" fill={dlColor} fontSize={dlSize} pointerEvents="none">
-                      {formatValue(d.value, numFmt)}
-                    </text>
-                  </g>
+                  <text x={endX + labelExtra} y={labelY} textAnchor="start" fill={dlColor} fontSize={dlSize} pointerEvents="none">
+                    {formatValue(d.value, numFmt)}
+                  </text>
                 )}
                 {avatarNode}
                 {catTextNode}
@@ -1358,8 +1328,8 @@ function SingleBar({data, config}: Props) {
         })}
         {referenceLinesSvg(false, false, domain, yRange, marginAdj, plotW2, plotH2, config)}
 
-        {config.xLabel && !hidden.includes('xLabel') && <g data-editable="xLabel" data-element-name="Eje X" transform={`translate(${config.xLabelOffset?.x ?? 0}, ${config.xLabelOffset?.y ?? 0})`}><text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{config.xLabel}</text></g>}
-        {config.yLabel && !hidden.includes('yLabel') && <g data-editable="yLabel" data-element-name="Eje Y" transform={`translate(${config.yLabelOffset?.x ?? 0}, ${config.yLabelOffset?.y ?? 0})`}><text x={16} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text></g>}
+        {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{config.xLabel}</text>}
+        {config.yLabel && <text x={16} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text>}
 
         {prepared.items.map((d, i) => {
           const x = marginAdj.left + gap + i * (barWidth + gap);
@@ -1392,7 +1362,7 @@ function SingleBar({data, config}: Props) {
           const renderLabel = (p: {x: number; y: number; anchor: 'start' | 'middle' | 'end'} | null) => {
             if (!p || !showText) return null;
             return (
-              <g key={`lb-${i}`} data-editable={`catLabel-${i}`} data-element-name={label}>
+              <g key={`lb-${i}`}>
                 {catLabel(label, {...p, font: catFont, overflow: catOv, cap: 12, rotate: labelAngle})}
                 {desc && catLabel(desc, {x: p.x, y: p.y + catSize + 2, anchor: p.anchor, font: descFont, overflow: descOv, cap: 20})}
               </g>
@@ -1416,7 +1386,7 @@ function SingleBar({data, config}: Props) {
           if (img && avatarPos === 'inside-label') {
             if (showText) {
               catTextNode = (
-                <g key={`lb-${i}`} data-editable={`catLabel-${i}`} data-element-name={label}>
+                <g key={`lb-${i}`}>
                   {catLabel(label, {x: centerX, y: labelY, anchor: 'middle', font: catFont, overflow: catOv, cap: 12})}
                   {desc && catLabel(desc, {x: centerX, y: labelY + catSize + 2, anchor: 'middle', font: descFont, overflow: descOv, cap: 20})}
                 </g>
@@ -1427,7 +1397,7 @@ function SingleBar({data, config}: Props) {
               const beside = avatarPos === 'beside-label';
               const textX = beside ? centerX + avatarSize / 2 + 6 : centerX - avatarSize / 2 - 6;
               catTextNode = (
-                <g key={`lb-${i}`} data-editable={`catLabel-${i}`} data-element-name={label}>
+                <g key={`lb-${i}`}>
                   {catLabel(label, {x: textX, y: labelY, anchor: 'middle', font: catFont, overflow: catOv, cap: 12})}
                   {desc && catLabel(desc, {x: textX, y: labelY + catSize + 2, anchor: 'middle', font: descFont, overflow: descOv, cap: 20})}
                 </g>
@@ -1452,25 +1422,19 @@ function SingleBar({data, config}: Props) {
                 <rect x={x} y={topY} width={barWidth} height={Math.max(barH, 0)} fill={barFill(color, config, d.value < 0)} rx={radius} stroke={borderW > 0 ? borderColor : 'none'} strokeWidth={borderW} opacity={st.globalOpacity} />
               )}
               {config.showDataLabels !== false && dlPos === 'center' && (
-                <g data-editable="dataLabel">
-                  <text x={centerX} y={barCenterY + 3} textAnchor="middle" fill={dlColor} fontSize={dlSize} pointerEvents="none">
-                    {formatValue(d.value, numFmt)}
-                  </text>
-                </g>
+                <text x={centerX} y={barCenterY + 3} textAnchor="middle" fill={dlColor} fontSize={dlSize} pointerEvents="none">
+                  {formatValue(d.value, numFmt)}
+                </text>
               )}
               {config.showDataLabels !== false && dlPos === 'inside' && (
-                <g data-editable="dataLabel">
-                  <text x={centerX} y={topY + dlSize + 2} textAnchor="middle" fill={dlColor} fontSize={dlSize} pointerEvents="none">
-                    {formatValue(d.value, numFmt)}
-                  </text>
-                </g>
+                <text x={centerX} y={topY + dlSize + 2} textAnchor="middle" fill={dlColor} fontSize={dlSize} pointerEvents="none">
+                  {formatValue(d.value, numFmt)}
+                </text>
               )}
               {config.showDataLabels !== false && dlPos !== 'center' && dlPos !== 'inside' && (
-                <g data-editable="dataLabel">
-                  <text x={centerX} y={topY - 6} textAnchor="middle" fill={dlColor} fontSize={dlSize} pointerEvents="none">
-                    {formatValue(d.value, numFmt)}
-                  </text>
-                </g>
+                <text x={centerX} y={topY - 6} textAnchor="middle" fill={dlColor} fontSize={dlSize} pointerEvents="none">
+                  {formatValue(d.value, numFmt)}
+                </text>
               )}
               {avatarNode}
               {catTextNode}

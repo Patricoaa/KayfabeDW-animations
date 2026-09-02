@@ -1,9 +1,8 @@
 'use client';
 
-import {useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject, type ReactNode} from 'react';
+import {useCallback, useEffect, useLayoutEffect, useRef, useState} from 'react';
+import type {ReactNode} from 'react';
 import {Minus, Plus, Maximize} from 'lucide-react';
-import {InteractionLayer} from './interaction-layer';
-import type {ChartConfig} from '@/lib/chart-config';
 
 const MIN_S = 0.25;
 const MAX_S = 3;
@@ -21,22 +20,10 @@ export default function CanvasZoom({
   children,
   contentWidth,
   contentHeight,
-  editMode,
-  svgRef,
-  config,
-  onConfigChange,
-  activeElement,
-  onSelectElement,
 }: {
   children: ReactNode;
   contentWidth?: number;
   contentHeight?: number;
-  editMode?: boolean;
-  svgRef?: RefObject<SVGSVGElement | null>;
-  config?: ChartConfig;
-  onConfigChange?: (patch: Partial<ChartConfig>) => void;
-  activeElement?: string | null;
-  onSelectElement?: (id: string | null) => void;
 }) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -115,41 +102,14 @@ export default function CanvasZoom({
             className="relative shrink-0"
             style={{width: w || '100%', height: h || '100%'}}
           >
-            {editMode && (
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{border: '1px dashed #cbd5e1', borderRadius: 2, zIndex: 5}}
-              >
-                <span className="absolute bottom-0.5 right-1 text-[9px] text-slate-400 pointer-events-none select-none">
-                  {w && h ? `${w} × ${h}` : ''}
-                </span>
-              </div>
-            )}
             <div
-              className="h-full relative"
+              className="h-full"
               style={{
                 transform: `scale(${scale})`,
                 transformOrigin: 'center center',
               }}
             >
-              <div ref={(el) => {
-                if (!svgRef) return;
-                const svg = el?.querySelector('svg') as SVGSVGElement | null;
-                Object.assign(svgRef, {current: svg});
-              }} className="h-full">
-                {children}
-              </div>
-              {editMode && svgRef && config && onConfigChange && onSelectElement && (
-                <InteractionLayer
-                  svgRef={svgRef}
-                  config={config}
-                  onConfigChange={onConfigChange}
-                  activeElement={activeElement ?? null}
-                  onSelectElement={onSelectElement}
-                  hiddenElements={config.hiddenElements}
-                  lockedElements={config.lockedElements}
-                />
-              )}
+              {children}
             </div>
           </div>
         </div>

@@ -32,7 +32,6 @@ import {ChartConfigPanel} from '@/components/builder/chart-config-panel';
 import type {ColumnMeta} from '@/components/builder/chart-config-panel';
 import {ChartPreview} from '@/components/charts/chart-preview';
 import CanvasZoom from '@/components/builder/static-canvas';
-import {ElementsPanel} from '@/components/builder/elements-panel';
 import {TemplatePicker} from '@/components/builder/template-picker';
 import {AnimationPreview} from '@/components/builder/animation-preview';
 import {BuilderNav} from '@/components/builder/builder-nav';
@@ -105,13 +104,6 @@ function BuilderContent() {
   // "Usar datos canónicos de la plantilla (reemplaza tu query)".
   const [preferTemplateProps, setPreferTemplateProps] = useState(false);
   const [duration, setDuration] = useState(10);
-
-  // Interactive canvas state
-  const svgRef = useRef<SVGSVGElement | null>(null);
-  const [activeElement, setActiveElement] = useState<string | null>(null);
-  const [editMode, setEditMode] = useState(false);
-  const undoStackRef = useRef<ChartConfig[]>([]);
-  const redoStackRef = useRef<ChartConfig[]>([]);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editIdRef = useRef<string | null>(editId);
@@ -389,45 +381,6 @@ function BuilderContent() {
       setTemplateLoading(false);
     }
   }, [activeTemplate, templateOptions, data.length, addToast]);
-
-  // Interactive canvas: undo-aware config change
-  const handleCanvasConfigChange = useCallback((patch: Partial<ChartConfig>) => {
-    setChartConfig((prev) => {
-      undoStackRef.current = [...undoStackRef.current.slice(-49), prev];
-      redoStackRef.current = [];
-      return {...prev, ...patch};
-    });
-  }, []);
-
-  // Undo/Redo keyboard shortcuts
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
-        const stack = undoStackRef.current;
-        if (stack.length === 0) return;
-        e.preventDefault();
-        const prev = stack[stack.length - 1];
-        undoStackRef.current = stack.slice(0, -1);
-        setChartConfig((current) => {
-          redoStackRef.current = [...redoStackRef.current, current];
-          return prev;
-        });
-      }
-      if (e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey) {
-        const stack = redoStackRef.current;
-        if (stack.length === 0) return;
-        e.preventDefault();
-        const next = stack[stack.length - 1];
-        redoStackRef.current = stack.slice(0, -1);
-        setChartConfig((current) => {
-          undoStackRef.current = [...undoStackRef.current, current];
-          return next;
-        });
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
 
   // E2E: Static export (SVG / PNG)
   const [staticExporting, setStaticExporting] = useState<'none' | 'svg' | 'png'>('none');
@@ -738,16 +691,7 @@ function BuilderContent() {
               )
             ) : outputMode === 'static' ? (
               <div className="h-full flex flex-col">
-                <CanvasZoom
-                  contentWidth={chartConfig.width ?? 600}
-                  contentHeight={chartConfig.height ?? 380}
-                  editMode={editMode}
-                  svgRef={svgRef}
-                  config={chartConfig}
-                  onConfigChange={handleCanvasConfigChange}
-                  activeElement={activeElement}
-                  onSelectElement={setActiveElement}
-                >
+                <CanvasZoom contentWidth={chartConfig.width ?? 600} contentHeight={chartConfig.height ?? 380}>
                   <div ref={staticExportRef} className="w-full">
                     {filteredData.length === 0 ? (
                       <div className="text-center text-muted text-sm font-body p-6">
@@ -846,27 +790,7 @@ function BuilderContent() {
             </div>
 
             {outputMode === 'static' && (
-              <>
-                <div className="flex items-center gap-2 mb-2">
-                  <button
-                    type="button"
-                    onClick={() => { setEditMode((v) => !v); if (editMode) setActiveElement(null); }}
-                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
-                      editMode
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-elevated text-secondary hover:bg-card-hover'
-                    }`}
-                  >
-                    {editMode ? '✂ Editando en canvas' : '✏ Editar en canvas'}
-                  </button>
-                </div>
-                <ElementsPanel
-                  config={chartConfig}
-                  onConfigChange={handleCanvasConfigChange}
-                  activeElement={activeElement}
-                  onSelectElement={setActiveElement}
-                />
-                <ChartConfigPanel
+              <ChartConfigPanel
                 config={chartConfig}
                 onChange={setChartConfig}
                 columns={columns}
@@ -875,7 +799,6 @@ function BuilderContent() {
                 fieldMeta={fieldMeta}
                 data={filteredData}
               />
-              </>
             )}
             {outputMode === 'animated' && (
               <>

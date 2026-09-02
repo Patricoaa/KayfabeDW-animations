@@ -10,18 +10,17 @@ type Props = {
 };
 
 export function AreaChart({data, config}: Props) {
-  const hidden = config.hiddenElements ?? [];
   if (config.seriesField) {
     const multi = prepareMultiSeries(data, config);
     if (multi.series.length === 0 || multi.categories.length === 0) {
       return <div className="flex items-center justify-center h-48 text-muted text-sm">Sin datos para este gráfico</div>;
     }
-    return <MultiArea multi={multi} config={config} hidden={hidden} />;
+    return <MultiArea multi={multi} config={config} />;
   }
   return <SingleArea data={data} config={config} />;
 }
 
-function MultiArea({multi, config, hidden}: {multi: PreparedMultiSeries; config: ChartConfig; hidden: string[]}) {
+function MultiArea({multi, config}: {multi: PreparedMultiSeries; config: ChartConfig}) {
   const st = resolveChartStyle(config.style);
   const width = config.width ?? 600;
   const height = config.height ?? 380;
@@ -81,8 +80,8 @@ function MultiArea({multi, config, hidden}: {multi: PreparedMultiSeries; config:
               </g>
             );
           })}
-          {!hidden.includes('xLabel') && config.xLabel && <g data-editable="xLabel"><text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily}>{config.xLabel}</text></g>}
-          {!hidden.includes('yLabel') && config.yLabel && <g data-editable="yLabel"><text x={16} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text></g>}
+          {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily}>{config.xLabel}</text>}
+          {config.yLabel && <text x={16} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text>}
           {seriesPaths.map((s) => <path key={s.name} d={s.area} fill={s.color} opacity={st.globalOpacity * 0.25} />)}
           {seriesPaths.map((s) => <path key={s.name} d={s.line} fill="none" stroke={s.color} strokeWidth={st.lineWidth} strokeLinejoin="round" strokeDasharray={config.lineDash ? '6 4' : undefined} />)}
           {showMarkers &&
@@ -97,8 +96,6 @@ function MultiArea({multi, config, hidden}: {multi: PreparedMultiSeries; config:
             return (
               <text
                 key={i}
-                data-editable={`catLabel-${i}`}
-                data-element-name={cat}
                 x={cx}
                 y={height - margin.bottom + 14}
                 textAnchor="middle"
@@ -118,7 +115,6 @@ function MultiArea({multi, config, hidden}: {multi: PreparedMultiSeries; config:
 }
 
 function SingleArea({data, config}: Props) {
-  const hidden = config.hiddenElements ?? [];
   const prepared = prepareSeries(data, config);
   const st = resolveChartStyle(config.style);
   const width = config.width ?? 600;
@@ -173,8 +169,8 @@ function SingleArea({data, config}: Props) {
           </g>
         );
       })}
-      {!hidden.includes('xLabel') && config.xLabel && <g data-editable="xLabel"><text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily}>{config.xLabel}</text></g>}
-      {!hidden.includes('yLabel') && config.yLabel && <g data-editable="yLabel"><text x={16} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text></g>}
+      {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily}>{config.xLabel}</text>}
+      {config.yLabel && <text x={16} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text>}
       <path d={area} fill={color} opacity={st.globalOpacity * 0.25} />
       <path d={line} fill="none" stroke={color} strokeWidth={st.lineWidth} strokeLinejoin="round" strokeDasharray={config.lineDash ? '6 4' : undefined} />
       {showMarkers && pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={st.pointSize} fill={color} stroke="#111" strokeWidth={1.5} opacity={st.pointOpacity} />)}
@@ -183,8 +179,6 @@ function SingleArea({data, config}: Props) {
         return (
         <text
           key={i}
-          data-editable={`catLabel-${i}`}
-          data-element-name={p.label}
           x={toX(i)}
           y={height - margin.bottom + 14}
           textAnchor="middle"
