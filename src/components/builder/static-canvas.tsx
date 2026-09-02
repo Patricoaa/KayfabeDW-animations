@@ -9,10 +9,11 @@ const MAX_S = 3;
 const PAD = 40;
 
 /**
- * Zoomable viewport for the static chart preview. Applies a CSS transform
- * around the children so the visuals scale freely, while the inner SVG keeps
- * its natural size (export reads user-space geometry, so SVG/PNG output stays
- * untouched). Wheel zooms around the pointer; the toolbar offers −/+,
+ * Zoomable viewport for the static chart preview. The chart is scaled around
+ * its own center, so the visualization always stays centered in the viewport
+ * regardless of the zoom level. Applies a CSS transform only, so the inner SVG
+ * keeps its natural size (export reads user-space geometry and stays
+ * untouched). Wheel zooms keeping the center pinned; the toolbar offers −/+,
  * a 25–300% slider, "100%" and "Ajustar". Default scale is "fit".
  */
 export default function CanvasZoom({
@@ -28,8 +29,6 @@ export default function CanvasZoom({
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [fitMode, setFitMode] = useState(true);
   const [scale, setScale] = useState(1);
-  const [tx, setTx] = useState(0);
-  const [ty, setTy] = useState(0);
   const [w, setW] = useState(contentWidth ?? 0);
   const [h, setH] = useState(contentHeight ?? 0);
 
@@ -45,43 +44,40 @@ export default function CanvasZoom({
 
   const computeFit = useCallback(() => {
     const vp = viewportRef.current;
-    if (!vp) return;
-    if (!w || !h || !fitMode) return;
+    if (!vp || !w || !h) return;
     const availW = Math.max(80, vp.clientWidth - PAD * 2);
     const availH = Math.max(80, vp.clientHeight - PAD * 2);
     setScale(Math.max(0.1, Math.min(1, availW / w, availH / h)));
-    setTx(0);
-    setTy(0);
-  }, [w, h, fitMode]);
+  }, [w, h]);
+
+  useEffect(() => {
+    if (fitMode) computeFit();
+  }, [fitMode, computeFit]);
 
   useEffect(() => {
     const vp = viewportRef.current;
     if (!vp) return;
-    const obs = new ResizeObserver(computeFit);
+    const obs = new ResizeObserver(() => {
+      if (fitMode) computeFit();
+    });
     obs.observe(vp);
     return () => obs.disconnect();
-  }, [computeFit]);
+  }, [computeFit, fitMode]);
 
-  const zoomAt = useCallback((next: number, px: number, py: number) => {
-    const vp = viewportRef.current;
-    const stage = stageRef.current;
-    if (!vp || !stage) return;
-    const s = Math.min(MAX_S, Math.max(MIN_S, next));
-    const r = stage.getBoundingClientRect();
-    const cx = (px - r.left - tx) / scale;
-    const cy = (py - r.top - ty) / scale;
+  // Scale around the chart center: exits "fit" and pins the center.
+  const zoomScaled = useCallback((factor: number) => {
     setFitMode(false);
-    setTx(px - r.left - cx * s);
-    setTy(py - r.top - cy * s);
-    setScale(s);
-  }, [tx, ty, scale]);
+    setScale((prev) => Math.min(MAX_S, Math.max(MIN_S, prev * factor)));
+  }, []);
 
-  const centerZoom = useCallback((next: number) => {
-    const vp = viewportRef.current;
-    if (!vp) return;
-    const r = vp.getBoundingClientRect();
-    zoomAt(next, r.left + r.width / 2, r.top + r.height / 2);
-  }, [zoomAt]);
+  const zoomAbsolute = useCallback((next: number) => {
+    setFitMode(false);
+    setScale(Math.min(MAX_S, Math.max(MIN_S, next)));
+  }, []);
+
+  const fitToViewport = useCallback(() => {
+    setFitMode(true);
+  }, []);
 
   useEffect(() => {
     const vp = viewportRef.current;
@@ -89,32 +85,28 @@ export default function CanvasZoom({
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const factor = Math.exp(-e.deltaY * 0.0016);
-      zoomAt(scale * factor, e.clientX, e.clientY);
+      zoomScaled(factor);
     };
     vp.addEventListener('wheel', onWheel, {passive: false});
     return () => vp.removeEventListener('wheel', onWheel);
-  }, [zoomAt, scale]);
-
-  const fitToViewport = useCallback(() => {
-    setFitMode(true);
-    computeFit();
-  }, [computeFit]);
+  }, [zoomScaled]);
 
   const pct = Math.round(scale * 100);
 
   return (
     <div className="flex-1 min-h-0 flex flex-col">
       <div ref={viewportRef} className="relative flex-1 overflow-hidden">
-        <div className="absolute inset-0 flex items-center justify-center">
+        <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
           <div
             ref={stageRef}
-            className="relative"
+            className="relative shrink-0"
             style={{width: w || '100%', height: h || '100%'}}
           >
             <div
+              className="h-full"
               style={{
-                transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
-                transformOrigin: '0 0',
+                transform: `scale(${scale})`,
+                transformOrigin: 'center center',
               }}
             >
               {children}
@@ -125,7 +117,7 @@ export default function CanvasZoom({
       <div className="flex items-center justify-center gap-2 px-4 py-2 border-t border-border-default bg-card shrink-0">
         <button
           type="button"
-          onClick={() => centerZoom(scale / 1.25)}
+          onClick={() => zoomScaled(1 / 1.25)}
           aria-label="Reducir"
           className="p-1.5 rounded-md text-secondary hover:bg-card-hover transition-colors"
         >
@@ -136,13 +128,13 @@ export default function CanvasZoom({
           min={MIN_S * 100}
           max={MAX_S * 100}
           value={pct}
-          onChange={(e) => centerZoom(Number(e.target.value) / 100)}
+          onChange={(e) => zoomAbsolute(Number(e.target.value) / 100)}
           className="w-32 accent-amber-500"
           aria-label="Zoom"
         />
         <button
           type="button"
-          onClick={() => centerZoom(1)}
+          onClick={() => zoomAbsolute(1)}
           className="px-2 py-1 rounded-md text-xs font-medium text-secondary hover:bg-card-hover transition-colors"
         >
           100%
@@ -158,7 +150,7 @@ export default function CanvasZoom({
         </button>
         <button
           type="button"
-          onClick={() => centerZoom(scale * 1.25)}
+          onClick={() => zoomScaled(1.25)}
           aria-label="Ampliar"
           className="p-1.5 rounded-md text-secondary hover:bg-card-hover transition-colors"
         >
