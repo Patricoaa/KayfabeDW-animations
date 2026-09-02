@@ -1191,7 +1191,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
                   <NumberInput label="Offset X" value={config.avatarOffsetX} min={-128} max={128} step={1} onChange={(v) => update({avatarOffsetX: v})} />
                   <NumberInput label="Offset Y" value={config.avatarOffsetY} min={-128} max={128} step={1} onChange={(v) => update({avatarOffsetY: v})} />
                 </div>
-                <p className="text-[10px] text-muted pt-1">Desplazamiento global en px respecto a la punta del valor de cada barra. X va a lo largo del eje de valor (positivo: más allá de la punta; negativo: hacia el eje); Y va perpendicular.</p>
+                <p className="text-[10px] text-muted pt-1">Desplazamiento global en px desde un punto FIJO del área del gráfico (el borde izquierdo en cada fila en horizontal; el borde superior en cada columna en vertical). Desacoplado de la barra: el tamaño/posición del avatar no mueve las barras ni el plot, y el layout de barras no lo afecta.</p>
               </div>
               {catLabels.length > 0 && (
                 <div className="pt-2 border-t border-border-subtle">
