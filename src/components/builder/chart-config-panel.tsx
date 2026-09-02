@@ -713,15 +713,19 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
             <div>
               <label className="text-sm font-medium mb-1 block">Posición de etiquetas de categoría</label>
               <select
-                value={config.categoryLabelPosition ?? 'axis'}
+                value={config.categoryLabelPosition?.endsWith('-out') && !config.horizontal ? 'axis' : (config.categoryLabelPosition ?? 'axis')}
                 onChange={(e) => update({categoryLabelPosition: e.target.value as CategoryLabelPosition})}
                 className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
               >
                 <option value="hide">Ocultar</option>
                 <option value="axis">En el eje</option>
-                <option value="start-out">Fuera · inicio</option>
-                <option value="center-out">Fuera · centro</option>
-                <option value="end-out">Fuera · final</option>
+                {config.horizontal && (
+                  <>
+                    <option value="start-out">Fuera · inicio</option>
+                    <option value="center-out">Fuera · centro</option>
+                    <option value="end-out">Fuera · final</option>
+                  </>
+                )}
                 <option value="start-in">Dentro · inicio</option>
                 <option value="center-in">Dentro · centro</option>
                 <option value="end-in">Dentro · final</option>

@@ -300,7 +300,8 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const catColor = config.xLabelFont?.color ?? st.textColor;
   const catSize = config.xLabelFont?.size ?? st.labelFontSize;
   const catFamily = config.xLabelFont?.fontFamily ?? undefined;
-  const catPos = config.categoryLabelPosition ?? 'axis';
+  const catPosRaw = config.categoryLabelPosition ?? 'axis';
+  const catPos = (!horizontal && catPosRaw.endsWith('-out')) ? 'axis' : catPosRaw;
   const xAxisColor = config.xLabelFont?.color ?? st.axisColor;
   const yAxisColor = config.yLabelFont?.color ?? st.axisColor;
   const xAxisFamily = config.xLabelFont?.fontFamily;
@@ -383,6 +384,9 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
     const catEst = estLabelWidth(maxCat, catSize, catOv);
     const descEst = descField ? estLabelWidth(maxDesc, descSize, descOv) : 0;
     const labelEst = Math.max(catEst, descEst);
+    if (catBlock && catPos.endsWith('-out') && labelAngle === 0) {
+      marginAdj.top += catSize + (descField ? descSize + 2 : 0) + 4;
+    }
     if (avatarActive && (avatarPos === 'beside-label' || avatarPos === 'after-label' || avatarPos === 'inside-label') && catBlock) {
       marginAdj.left += labelEst + avatarSize + 16;
     } else if (catBlock && catPos === 'axis') {
@@ -579,11 +583,11 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                 const labelAt = catPos === 'axis'
                   ? {x: colStart - 8, y: cy + 3, anchor: 'end' as const}
                   : catPos === 'start-out'
-                    ? {x: colStart + 4, y: cy + 3, anchor: 'start' as const}
+                    ? {x: colStart + 4, y: bandY - 3, anchor: 'start' as const}
                     : catPos === 'end-out'
-                      ? {x: colEnd, y: cy + 3, anchor: 'end' as const}
+                      ? {x: colEnd, y: bandY - 3, anchor: 'end' as const}
                       : catPos === 'center-out'
-                        ? {x: midX, y: cy + 3, anchor: 'middle' as const}
+                        ? {x: midX, y: bandY - 3, anchor: 'middle' as const}
                         : catPos === 'start-in'
                           ? {x: colStart + 8, y: cy + 3, anchor: 'start' as const}
                           : catPos === 'end-in'
@@ -1032,7 +1036,8 @@ function SingleBar({data, config}: Props) {
   const catColor = config.xLabelFont?.color ?? st.textColor;
   const catSize = config.xLabelFont?.size ?? st.labelFontSize;
   const catFamily = config.xLabelFont?.fontFamily ?? undefined;
-  const catPos = config.categoryLabelPosition ?? 'axis';
+  const catPosRaw = config.categoryLabelPosition ?? 'axis';
+  const catPos = (!horizontal && catPosRaw.endsWith('-out')) ? 'axis' : catPosRaw;
   const xAxisColor = config.xLabelFont?.color ?? st.axisColor;
   const yAxisColor = config.yLabelFont?.color ?? st.axisColor;
   const xAxisFamily = config.xLabelFont?.fontFamily;
@@ -1124,6 +1129,9 @@ function SingleBar({data, config}: Props) {
   if (horizontal && catBlock) {
     const descEst = descField ? estLabelWidth(maxDesc, descSize, descOv) : 0;
     const labelEst = Math.max(estLabelWidth(maxLabel, catSize, catOv), descEst);
+    if (catPos.endsWith('-out') && labelAngle === 0) {
+      marginAdj.top += catSize + (descField ? descSize + 2 : 0) + 4;
+    }
     if (avatarActive && (avatarPos === 'beside-label' || avatarPos === 'after-label' || avatarPos === 'inside-label')) {
       marginAdj.left += labelEst + avatarSize + 16;
     } else if (catPos === 'axis') {
@@ -1183,11 +1191,11 @@ function SingleBar({data, config}: Props) {
               : catPos === 'axis'
                 ? {x: marginAdj.left - 8, y: labelY, anchor: 'end' as const}
                 : catPos === 'start-out'
-                  ? {x: marginAdj.left + 4, y: labelY, anchor: 'start' as const}
+                  ? {x: marginAdj.left + 4, y: y - 4, anchor: 'start' as const}
                   : catPos === 'end-out'
-                    ? {x: endX, y: labelY, anchor: 'end' as const}
+                    ? {x: endX, y: y - 4, anchor: 'end' as const}
                     : catPos === 'center-out'
-                      ? {x: midX, y: labelY, anchor: 'middle' as const}
+                      ? {x: midX, y: y - 4, anchor: 'middle' as const}
                       : catPos === 'start-in'
                         ? {x: marginAdj.left + 8, y: labelY, anchor: 'start' as const}
                         : catPos === 'end-in'
