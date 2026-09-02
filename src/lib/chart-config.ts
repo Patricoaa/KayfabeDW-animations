@@ -9,7 +9,7 @@ export type LegendPosition = 'top' | 'right' | 'bottom';
 export type GroupMode = 'grouped' | 'stacked' | 'stacked-percent';
 
 export type AvatarShape = 'circle' | 'rounded';
-export type AvatarPosition = 'above' | 'bar-end' | 'beside-label' | 'after-label' | 'inside-label' | 'inside-bar';
+export type AvatarPosition = 'axis-start' | 'bar-end' | 'inside-start' | 'inside-end';
 
 export type FontWeight = 400 | 500 | 600 | 700;
 
@@ -34,6 +34,26 @@ export type SectionFont = {
   size?: number;
   weight?: FontWeight;
   overflow?: TextOverflow;
+};
+
+// Canva-style free-form placement for title/subtitle blocks. All fields are
+// optional; unset values fall back to the classic centered header behavior.
+export type TextLayout = {
+  // Horizontal anchor edge. 'left' = x px from the left edge; 'right' = x px
+  // from the right edge; 'center' = x is an offset from the canvas center.
+  anchor?: 'left' | 'center' | 'right';
+  x?: number;          // px along the anchor edge
+  y?: number;          // px from the top edge (0 = top)
+  rotation?: number;   // degrees, clockwise around the anchor point
+  align?: 'left' | 'center' | 'right'; // text alignment around the anchor x
+  letterSpacing?: number; // px between glyphs
+  lineHeight?: number;    // px between wrapped lines (default = size + 2)
+  opacity?: number;       // 0..1 text opacity
+  color?: string;         // overrides the section font color
+  bgColor?: string;       // background box fill (none if omitted)
+  bgOpacity?: number;     // background box opacity (default 1)
+  bgPadding?: number;     // padding around the text box
+  bgRadius?: number;      // corner radius of the background box
 };
 
 export const FONT_WEIGHTS: {value: FontWeight; label: string}[] = [
@@ -73,6 +93,12 @@ export const FONT_PRESETS: {name: string; family: string}[] = [
   {name: 'JetBrains Mono', family: 'var(--font-jetbrains-mono)'},
   {name: 'Playfair Display', family: 'var(--font-playfair-display)'},
   {name: 'Space Grotesk', family: 'var(--font-space-grotesk)'},
+  {name: 'Montserrat', family: 'var(--font-montserrat)'},
+  {name: 'Poppins', family: 'var(--font-poppins)'},
+  {name: 'Merriweather', family: 'var(--font-merriweather)'},
+  {name: 'Lora', family: 'var(--font-lora)'},
+  {name: 'Oswald', family: 'var(--font-oswald)'},
+  {name: 'Bebas Neue', family: 'var(--font-bebas-neue)'},
 ];
 
 export const PALETTES: {name: string; colors: string[]}[] = [
@@ -131,8 +157,10 @@ export type ChartConfig = {
   // F1: multi-series. `seriesField` groups rows into named series (grouped by
   // xField category); when unset the chart renders a single series using
   // yField. `legendItems` overrides the per-series colors shown in the legend.
+  // `label` is the series key used to match; `overrideLabel` (opcional) cambia
+  // el texto visible en la leyenda sin romper el matching de color.
   seriesField?: string;
-  legendItems?: {label: string; color: string}[];
+  legendItems?: {label: string; color: string; overrideLabel?: string}[];
   showMarkers?: boolean;
   // F2: visual style overrides. All fields optional; the renderers resolve
   // against sensible defaults via resolveChartStyle in chart-data.
@@ -212,6 +240,11 @@ export type ChartConfig = {
   yLabelFont?: SectionFont;
   legendFont?: SectionFont;
 
+  // Canva-style free-form placement for title/subtitle blocks. When set,
+  // overrides the classic centered header layout for that block.
+  titleLayout?: TextLayout;
+  subtitleLayout?: TextLayout;
+
   // Per-category/per-datum color overrides (label -> color), applied before
   // the palette for single-series bars, pie slices, scatter categories and
   // single-series lines/areas.
@@ -243,7 +276,7 @@ export type ChartConfig = {
   configVersion?: number;
 };
 
-export const CHART_CONFIG_VERSION = 16;
+export const CHART_CONFIG_VERSION = 17;
 
 export const DEFAULT_CHART_CONFIG: ChartConfig = {
   type: 'bar',
@@ -271,7 +304,7 @@ export const DEFAULT_CHART_CONFIG: ChartConfig = {
   groupMode: 'grouped',
   avatarShape: 'rounded',
   avatarSize: 24,
-  avatarPosition: 'above',
+  avatarPosition: 'bar-end',
   barRadius: 2,
   barBorderWidth: 0,
   barGap: 2,
@@ -296,8 +329,9 @@ export const DEFAULT_CHART_CONFIG: ChartConfig = {
 };
 
 export function applyChartDefaults(config: Partial<ChartConfig>): ChartConfig {
-  // V12: gradient bar fill was removed. V13: the canvas shadow was removed.
   // V14: avatar positions were reformulated (no more replace-label/below/inside).
+  // V15: avatar positions re-anchored to the bar (4 positions: axis-start, bar-end,
+  //      inside-start, inside-end).
   if (!config) return DEFAULT_CHART_CONFIG;
   let clean = config;
   if ('barGradient' in clean || 'canvasShadow' in clean) {
@@ -307,10 +341,22 @@ export function applyChartDefaults(config: Partial<ChartConfig>): ChartConfig {
     void canvasShadow;
     clean = rest as Partial<ChartConfig>;
   }
-  const validAvatarPositions = ['above', 'bar-end', 'beside-label', 'after-label', 'inside-label', 'inside-bar'];
+  const validAvatarPositions = ['axis-start', 'bar-end', 'inside-start', 'inside-end'];
+  // Old V14 positions -> new bar-anchored positions.
+  const avatarMap: Record<string, AvatarPosition> = {
+    above: 'bar-end',
+    'bar-end': 'bar-end',
+    'beside-label': 'inside-end',
+    'after-label': 'inside-end',
+    'inside-label': 'inside-start',
+    'inside-bar': 'inside-end',
+  };
   const remapped = {...DEFAULT_CHART_CONFIG, ...clean};
+  if (remapped.avatarPosition !== undefined && remapped.avatarPosition in avatarMap) {
+    remapped.avatarPosition = avatarMap[remapped.avatarPosition];
+  }
   if (remapped.avatarPosition !== undefined && !validAvatarPositions.includes(remapped.avatarPosition)) {
-    remapped.avatarPosition = 'beside-label';
+    remapped.avatarPosition = 'bar-end';
   }
   return remapped;
 }

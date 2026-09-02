@@ -1,10 +1,26 @@
 'use client';
 
-import type {ChartConfig, TextOverflow} from '@/lib/chart-config';
+import type {ChartConfig, TextOverflow, SectionFont, TextLayout} from '@/lib/chart-config';
 import type {ResolvedChartStyle} from '@/lib/chart-data';
 import type {ReactNode} from 'react';
 
 export type LegendItem = {label: string; color: string};
+
+// Builds the legend items from data series, applying any per-series text
+// override (config.legendItems[].overrideLabel) without breaking color
+// matching (which keys on the original `label`).
+export function legendItemsFrom<T>(
+  series: T[],
+  config: {legendItems?: {label: string; color: string; overrideLabel?: string}[]},
+  labelOf: (s: T) => string,
+  colorOf: (s: T) => string,
+): LegendItem[] {
+  const ovs = new Map((config.legendItems ?? []).map((li) => [li.label, li.overrideLabel]));
+  return series.map((s) => {
+    const key = labelOf(s);
+    return {label: (ovs.get(key)?.trim() || key), color: colorOf(s)};
+  });
+}
 
 // Semantic zone wrapper so the SVG is structured by visual region
 // (header / left-axis / plot / right-axis / footer) instead of flat children.
@@ -94,10 +110,14 @@ export function roundedRectPath(
 
 // Vertical space (in SVG units) the header needs when placed at the top of the
 // canvas. Renderers add this to margin.top so the plot doesn't overlap.
+// Free-form positioned titles (titleLayout/subtitleLayout with explicit y)
+// don't reserve space here — the user controls placement via spacing.
 export function headerHeight(config: ChartConfig, st: ResolvedChartStyle, width = 600): number {
   const hasTitle = !!config.title;
   const hasSub = !!config.subtitle;
   if (!hasTitle && !hasSub) return 0;
+  const freePlacement = !!config.titleLayout?.y || !!config.subtitleLayout?.y;
+  if (freePlacement) return 0;
   const titleSize = config.headerFont?.size ?? st.titleFontSize;
   const subSize = config.subtitleFont?.size ?? Math.max(8, titleSize - 3);
   const maxW = Math.max(120, width - 24);
@@ -106,6 +126,77 @@ export function headerHeight(config: ChartConfig, st: ResolvedChartStyle, width 
   let h = titleLines * titleSize + 8;
   if (hasSub) h += subLines * subSize + 6;
   return h;
+}
+
+// Renders one title/subtitle block with optional Canva-style placement.
+function TitleBlock({
+  text, font, baseColor, defaultWeight, width, layout,
+}: {
+  text: string;
+  font: SectionFont | undefined;
+  baseColor: string;
+  defaultWeight: number;
+  width: number;
+  layout?: TextLayout;
+}) {
+  const size = font?.size ?? 0;
+  const maxW = Math.max(120, width - 24);
+  const lines = textLines(text, size, maxW, font?.overflow ?? 'none');
+  const lineH = layout?.lineHeight ?? size + 2;
+  const ls = layout?.letterSpacing ?? 0;
+  const opacity = layout?.opacity ?? 1;
+  const color = layout?.color ?? font?.color ?? baseColor;
+  const family = font?.fontFamily;
+  const weight = font?.weight ?? defaultWeight;
+
+  // Anchor reference x (left edge of the text box).
+  let refX: number;
+  const align = layout?.align ?? 'center';
+  if (layout) {
+    const a = layout.anchor ?? 'center';
+    refX = a === 'left' ? (layout.x ?? 0) : a === 'right' ? width - (layout.x ?? 0) : width / 2 + (layout.x ?? 0);
+  } else {
+    refX = width / 2;
+  }
+
+  const textStart = align === 'left' ? refX : align === 'right' ? refX - textWidth(text, size) : refX - textWidth(text, size) / 2;
+  const top = (layout?.y ?? 0) + 4;
+  const bgPad = layout?.bgPadding ?? 4;
+  const lineTops = lines.map((_, i) => top + i * lineH + size / 2);
+
+  return (
+    <g
+      fontFamily={family}
+      fontWeight={weight}
+      transform={layout?.rotation ? `rotate(${layout.rotation}, ${refX}, ${layout.y ?? 0})` : undefined}
+      opacity={opacity}
+    >
+      {layout?.bgColor && (
+        <rect
+          x={textStart - bgPad}
+          y={top - bgPad}
+          width={textWidth(text, size) + bgPad * 2}
+          height={lines.length * lineH + bgPad * 2}
+          rx={layout.bgRadius ?? 4}
+          fill={layout.bgColor}
+          opacity={layout.bgOpacity ?? 1}
+        />
+      )}
+      {lines.map((ln, i) => (
+        <text
+          key={i}
+          x={align === 'right' ? textStart + textWidth(text, size) : textStart}
+          y={lineTops[i]}
+          fill={color}
+          fontSize={size}
+          textAnchor={align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle'}
+          letterSpacing={ls}
+        >
+          {ln}
+        </text>
+      ))}
+    </g>
+  );
 }
 
 // Title + subtitle drawn inside the SVG (so exports include them).
@@ -119,15 +210,30 @@ export function SvgHeader({config, st, width}: {config: ChartConfig; st: Resolve
   const titleColor = config.headerFont?.color ?? st.textColor;
   const subSize = config.subtitleFont?.size ?? Math.max(8, titleSize - 3);
   const subColor = config.subtitleFont?.color ?? st.textColor;
+
+  if (config.titleLayout?.y || config.subtitleLayout?.y) {
+    // Free-form placement: render each block independently at its own position.
+    return (
+      <g>
+        {title && (
+          <TitleBlock text={title} font={config.headerFont} baseColor={titleColor} defaultWeight={700} width={width} layout={config.titleLayout} />
+        )}
+        {sub && (
+          <TitleBlock text={sub} font={{...(config.subtitleFont ?? {}), fontFamily: subFamily}} baseColor={subColor} defaultWeight={400} width={width} layout={config.subtitleLayout} />
+        )}
+      </g>
+    );
+  }
+
   const maxW = Math.max(120, width - 24);
   const titleLines = textLines(title, titleSize, maxW, config.headerFont?.overflow);
   const subLines = textLines(sub, subSize, maxW, config.subtitleFont?.overflow);
   const titleH = titleLines.length * titleSize;
   let y = 4 + titleSize;
   return (
-    <g fontFamily={family} textAnchor="middle">
+    <g fontFamily={family} fontWeight={config.headerFont?.weight ?? 700} textAnchor="middle">
       {title && titleLines.map((ln, i) => (
-        <text key={`t-${i}`} x={width / 2} y={y + i * (titleSize + 2)} fill={titleColor} fontSize={titleSize} fontWeight={config.headerFont?.weight ?? 700}>
+        <text key={`t-${i}`} x={width / 2} y={y + i * (titleSize + 2)} fill={titleColor} fontSize={titleSize}>
           {ln}
         </text>
       ))}
@@ -169,7 +275,7 @@ export function SvgLegend({
 }) {
   if (items.length === 0) return null;
   const fs = config.legendFont?.size ?? 10;
-  const sw = Math.max(6, Math.round(fs * 0.8));
+  const sw = Math.max(6, Math.round(fs));
   const gap = 14;
   const family = config.legendFont?.fontFamily ?? st.fontFamily;
   const color = config.legendFont?.color ?? st.textColor;

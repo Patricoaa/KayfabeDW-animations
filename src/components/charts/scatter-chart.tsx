@@ -2,7 +2,7 @@
 
 import type {ChartConfig} from '@/lib/chart-config';
 import {formatValue, resolveChartStyle, resolveYDomain, resolveXDomain, colorFor} from '@/lib/chart-data';
-import {SvgHeader, SvgLegend, headerHeight, legendReserve, frameRect, type LegendItem} from './chart-frame';
+import {SvgHeader, SvgLegend, headerHeight, legendReserve, frameRect, legendItemsFrom, type LegendItem} from './chart-frame';
 
 type Props = {
   data: Record<string, unknown>[];
@@ -45,7 +45,7 @@ export function ScatterChart({data, config}: Props) {
       catColors.set(p.label, colorFor(config, p.label, cats.length - 1));
     }
   }
-  const legendItems: LegendItem[] = cats.map((c) => ({label: c, color: catColors.get(c)!}));
+  const legendItems: LegendItem[] = legendItemsFrom(cats, config, (c) => c, (c) => catColors.get(c)!);
   const headerH = headerHeight(config, st, config.width ?? 600);
   const legendR = legendReserve(config, legendItems);
   const sp = config.spacing ?? {};

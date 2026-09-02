@@ -2,7 +2,7 @@
 
 import type {ChartConfig} from '@/lib/chart-config';
 import {prepareSeries, prepareMultiSeries, formatValue, resolvedCategoryLabel, resolveChartStyle, resolveYDomain, type PreparedMultiSeries} from '@/lib/chart-data';
-import {SvgHeader, SvgLegend, headerHeight, legendReserve, frameRect, type LegendItem} from './chart-frame';
+import {SvgHeader, SvgLegend, headerHeight, legendReserve, frameRect, legendItemsFrom, type LegendItem} from './chart-frame';
 
 type Props = {
   data: Record<string, unknown>[];
@@ -24,7 +24,7 @@ function MultiArea({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
   const st = resolveChartStyle(config.style);
   const width = config.width ?? 600;
   const height = config.height ?? 380;
-  const legendItems: LegendItem[] = multi.series.map((s) => ({label: s.name, color: s.color}));
+  const legendItems: LegendItem[] = legendItemsFrom(multi.series, config, (s) => s.name, (s) => s.color);
   const headerH = headerHeight(config, st, config.width ?? 600);
   const legendR = legendReserve(config, legendItems);
   const sp = config.spacing ?? {};

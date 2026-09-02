@@ -2,7 +2,7 @@
 
 import type {ChartConfig} from '@/lib/chart-config';
 import {formatValue, resolveChartStyle, prepareSeries, colorFor} from '@/lib/chart-data';
-import {SvgHeader, SvgLegend, headerHeight, legendReserve, frameRect, type LegendItem} from './chart-frame';
+import {SvgHeader, SvgLegend, headerHeight, legendReserve, frameRect, legendItemsFrom, type LegendItem} from './chart-frame';
 
 type Props = {
   data: Record<string, unknown>[];
@@ -60,7 +60,7 @@ export function PieChart({data, config}: Props) {
   const colorAt = (label: string) => colorFor(config, label, labelIndex.get(label) ?? 0);
 
   // Header + legend reserves, then fit the pie in the remaining area.
-  const legendItems: LegendItem[] = visible.map((s) => ({label: s.label, color: colorAt(s.label)}));
+  const legendItems: LegendItem[] = legendItemsFrom(visible, config, (s) => s.label, (s) => colorAt(s.label));
   const headerH = headerHeight(config, st, config.width ?? 600);
   const legendR = legendReserve(config, legendItems);
   const showLegend = config.showLegend ?? true;

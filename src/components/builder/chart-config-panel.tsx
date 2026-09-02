@@ -2,7 +2,7 @@
 
 import React, {useEffect, useState} from 'react';
 import {BarChart3, PieChart, LineChart, AreaChart, ScatterChart, Table2, ChevronDown} from 'lucide-react';
-import type {ChartConfig, ChartType, NumberFormat, SortBy, ChartFilter, ChartFilterOp, LegendPosition, ChartStyle, AvatarShape, AvatarPosition, SectionFont, CategoryLabelPosition} from '@/lib/chart-config';
+import type {ChartConfig, ChartType, NumberFormat, SortBy, ChartFilter, ChartFilterOp, LegendPosition, ChartStyle, AvatarShape, AvatarPosition, SectionFont, CategoryLabelPosition, TextLayout} from '@/lib/chart-config';
 import {FONT_PRESETS, PALETTES} from '@/lib/chart-config';
 import {pickColor, colorFor} from '@/lib/chart-data';
 import {TextControls} from '@/components/builder/text-controls';
@@ -115,6 +115,19 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
     update({legendItems: items});
   };
 
+  const setSeriesLabel = (index: number, overrideLabel: string) => {
+    const items = [...(config.legendItems ?? [])];
+    if (!items[index]) return;
+    const trimmed = overrideLabel.trim();
+    const next = {...items[index]};
+    if (trimmed === '') delete next.overrideLabel;
+    else next.overrideLabel = trimmed;
+    items[index] = next;
+    update({legendItems: items});
+  };
+
+  const legendLabels = (config.legendItems ?? []).map((li) => li.overrideLabel ?? '');
+
   // Keep `legendItems` in sync with the real series names in the dataset.
   // Without this the per-series color pickers never render — the core reason
   // "Colores de serie" appeared dead. Colors come from the current palette.
@@ -169,6 +182,8 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
   };
   const setHeaderFont = (patch: Partial<SectionFont>) => update({headerFont: {...(config.headerFont ?? {}), ...patch}});
   const setSubtitleFont = (patch: Partial<SectionFont>) => update({subtitleFont: {...(config.subtitleFont ?? {}), ...patch}});
+  const setTitleLayout = (patch: Partial<TextLayout>) => update({titleLayout: {...(config.titleLayout ?? {}), ...patch}});
+  const setSubtitleLayout = (patch: Partial<TextLayout>) => update({subtitleLayout: {...(config.subtitleLayout ?? {}), ...patch}});
   const setXLabelFont = (patch: Partial<SectionFont>) => update({xLabelFont: {...(config.xLabelFont ?? {}), ...patch}});
   const setYLabelFont = (patch: Partial<SectionFont>) => update({yLabelFont: {...(config.yLabelFont ?? {}), ...patch}});
   const setLegendFont = (patch: Partial<SectionFont>) => update({legendFont: {...(config.legendFont ?? {}), ...patch}});
@@ -421,6 +436,8 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
               <TextControls value={config.subtitleFont} onChange={setSubtitleFont} />
             </div>
           </div>
+          <LayoutControls title="Posición del título" value={config.titleLayout} onChange={setTitleLayout} />
+          <LayoutControls title="Posición del subtítulo" value={config.subtitleLayout} onChange={setSubtitleLayout} />
         </Section>
       )}
 
@@ -468,7 +485,13 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
                       className="w-8 h-8 rounded cursor-pointer border border-border-default bg-transparent"
                       aria-label={`Color de ${li.label}`}
                     />
-                    <span className="text-xs text-secondary truncate">{li.label}</span>
+                    <input
+                      value={legendLabels[i] ?? li.label}
+                      onChange={(e) => setSeriesLabel(i, e.target.value)}
+                      placeholder={'Texto (opcional)'}
+                      className="min-w-0 flex-1 text-xs rounded border border-border-default bg-transparent px-2 py-1.5 text-secondary focus:outline-none focus:border-accent"
+                      aria-label={`Texto de ${li.label}`}
+                    />
                   </div>
                 ))}
               </div>
@@ -1093,16 +1116,16 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
               <div>
                 <label className="text-sm font-medium mb-1 block">Posición</label>
                 <select
-                  value={config.avatarPosition ?? 'above'}
+                  value={config.avatarPosition ?? 'bar-end'}
                   onChange={(e) => update({avatarPosition: e.target.value as AvatarPosition})}
                   className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
                 >
-                  <option value="beside-label">Antes de la etiqueta</option>
-                  <option value="after-label">Después de la etiqueta</option>
-                  <option value="inside-label">Dentro de la etiqueta</option>
-                  <option value="inside-bar">Dentro de la barra</option>
+                  <option value="axis-start">Al inicio (eje)</option>
+                  <option value="bar-end">Al final (punta)</option>
+                  <option value="inside-start">Dentro (inicio)</option>
+                  <option value="inside-end">Dentro (final)</option>
                 </select>
-                <p className="text-[10px] text-muted pt-1">En vertical, sobre la barra y dentro de la barra quedan sobre el extremo de la columna.</p>
+                <p className="text-[10px] text-muted pt-1">«Inicio» es el lado del eje; «final» es la punta del valor. In/out deciden si solapa la barra o queda fuera.</p>
               </div>
               <p className="text-[10px] text-muted">Las imágenes se muestran en el preview y en el SVG descargado; puede que no aparezcan al exportar a PNG.</p>
             </>
@@ -1195,6 +1218,60 @@ function SliderNumberInput({label, value, min, max, step = 1, onChange}: {label:
         onChange={(e) => onChange(Number(e.target.value))}
         className="w-full h-1.5 bg-border-subtle rounded-lg appearance-none cursor-pointer accent-amber-500"
       />
+    </div>
+  );
+}
+
+function LayoutControls({title, value, onChange}: {title: string; value?: TextLayout; onChange: (patch: Partial<TextLayout>) => void}) {
+  const set = (patch: Partial<TextLayout>) => onChange(patch);
+  return (
+    <div className="pt-3 border-t border-border-subtle">
+      <label className="text-xs font-semibold text-muted uppercase tracking-widest font-display">{title}</label>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-sm font-medium mb-1 block">Ancla</label>
+          <select
+            value={value?.anchor ?? 'center'}
+            onChange={(e) => set({anchor: e.target.value as TextLayout['anchor']})}
+            className="w-full bg-elevated border border-border-default rounded-lg px-2 py-1 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+          >
+            <option value="left">Izquierda</option>
+            <option value="center">Centro</option>
+            <option value="right">Derecha</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-sm font-medium mb-1 block">Alineación</label>
+          <select
+            value={value?.align ?? 'center'}
+            onChange={(e) => set({align: e.target.value as TextLayout['align']})}
+            className="w-full bg-elevated border border-border-default rounded-lg px-2 py-1 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+          >
+            <option value="left">Izquierda</option>
+            <option value="center">Centro</option>
+            <option value="right">Derecha</option>
+          </select>
+        </div>
+        <NumberInput label="X (px)" value={value?.x} min={-600} max={600} onChange={(v) => set({x: v})} />
+        <NumberInput label="Y (px)" value={value?.y} min={-600} max={600} onChange={(v) => set({y: v})} />
+        <NumberInput label="Rotación (°)" value={value?.rotation} min={-180} max={180} onChange={(v) => set({rotation: v})} />
+        <NumberInput label="Espaciado (px)" value={value?.letterSpacing} min={-4} max={20} step={0.5} onChange={(v) => set({letterSpacing: v})} />
+        <NumberInput label="Opacidad" value={value?.opacity} min={0} max={1} step={0.05} onChange={(v) => set({opacity: v})} />
+        <NumberInput label="Alto línea" value={value?.lineHeight} min={0} max={80} step={0.5} onChange={(v) => set({lineHeight: v})} />
+        <div className="col-span-2">
+          <label className="text-sm font-medium mb-1 block">Color de fondo (caja)</label>
+          <input
+            type="color"
+            value={value?.bgColor ?? '#000000'}
+            onChange={(e) => set({bgColor: e.target.value})}
+            className="w-10 h-8 rounded cursor-pointer border border-border-default bg-transparent"
+            aria-label="Color de fondo del título"
+          />
+        </div>
+        <NumberInput label="Padding caja" value={value?.bgPadding} min={0} max={40} onChange={(v) => set({bgPadding: v})} />
+        <NumberInput label="Radio caja" value={value?.bgRadius} min={0} max={40} onChange={(v) => set({bgRadius: v})} />
+        <NumberInput label="Opac. caja" value={value?.bgOpacity} min={0} max={1} step={0.05} onChange={(v) => set({bgOpacity: v})} />
+      </div>
     </div>
   );
 }
