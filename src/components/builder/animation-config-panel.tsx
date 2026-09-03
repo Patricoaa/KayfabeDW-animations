@@ -140,8 +140,27 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
           checked={value.showDateLabel ?? true}
           onChange={(v) => update({showDateLabel: v})}
         />
+        <div>
+          <label className="text-sm font-medium mb-1 block">Posición del eje X</label>
+          <div className="grid grid-cols-2 gap-1">
+            {(['bottom', 'top'] as const).map((pos) => (
+              <button
+                key={pos}
+                type="button"
+                onClick={() => update({axisPosition: pos})}
+                className={`px-2 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  (value.axisPosition ?? 'bottom') === pos
+                    ? 'bg-amber-500 text-black'
+                    : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
+                }`}
+              >
+                {pos === 'bottom' ? 'Abajo' : 'Arriba'}
+              </button>
+            ))}
+          </div>
+        </div>
         <p className="text-[10px] text-muted">
-          La fecha animada se superpone sobre la guía vertical y avanza con ella.
+          La fecha en pantalla se muestra abajo a la derecha como texto y es independiente de la línea de referencia.
         </p>
       </Section>
     </div>

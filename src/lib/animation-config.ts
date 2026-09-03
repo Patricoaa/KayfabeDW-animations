@@ -22,6 +22,7 @@ export type TimelineRaceConfig = {
   showYAxis?: boolean;
   showRefLine?: boolean;
   showDateLabel?: boolean;
+  axisPosition?: 'top' | 'bottom';
 };
 
 // Keyed by TemplateId. Templates not listed here (or with no entry) inherit

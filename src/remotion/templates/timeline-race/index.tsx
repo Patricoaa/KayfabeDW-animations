@@ -25,6 +25,7 @@ export type TimelineRaceProps = {
   showYAxis?: boolean;
   showRefLine?: boolean;
   showDateLabel?: boolean;
+  axisPosition?: 'top' | 'bottom';
 };
 
 function fmtDate(t: number, fmt: TimelineRaceProps['dateFormat'] = 'day'): string {
@@ -48,6 +49,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   showYAxis = true,
   showRefLine = true,
   showDateLabel = true,
+  axisPosition = 'bottom',
 }) => {
   const frame = useCurrentFrame();
   const {fps, durationInFrames} = useVideoConfig();
@@ -208,12 +210,35 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     );
   };
 
+  // ---- Date grid: N cells covering [min, max], filled as the guide passes ----
+  const GRID_COUNT = 10;
+  const gridCells = Array.from({length: GRID_COUNT}, (_, i) => {
+    const t = min + span * (i / GRID_COUNT);
+    const passed = guideT >= i / GRID_COUNT;
+    return {t, passed};
+  });
+
+  // On-screen date text (bottom-right), independent of the reference line.
+  const dateLabelText = fmtDate(min + span * guideT, dateFormat);
+
+  const axisStrip = (
+    <div style={{flexShrink: 0, marginTop: 8, paddingTop: 12, borderTop: '1px solid #1f2937', display: 'grid', gridTemplateColumns: `repeat(${GRID_COUNT}, 1fr)`, gap: 2}}>
+      {gridCells.map((cell, i) => (
+        <div key={i} style={{position: 'relative', fontSize: 13, color: cell.passed ? accentColor : '#64748b', fontVariantNumeric: 'tabular-nums', textAlign: 'center', backgroundColor: cell.passed ? `${accentColor}1a` : 'transparent', borderRadius: 4, padding: '2px 0'}}>
+          {fmtDate(cell.t, dateFormat)}
+        </div>
+      ))}
+    </div>
+  );
+
   return (
-    <div style={{width: '100%', height: '100%', backgroundColor: '#0a0a0a', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", padding: 56, paddingBottom: 84, boxSizing: 'border-box', overflow: 'hidden'}}>
+    <div style={{width: '100%', height: '100%', position: 'relative', backgroundColor: '#0a0a0a', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", padding: 56, paddingBottom: 84, boxSizing: 'border-box', overflow: 'hidden'}}>
       <div style={{opacity: fadeIn, transform: `translateY(${titleY}px)`, flexShrink: 0}}>
         <div style={{fontSize: 42, fontWeight: 800, color: '#ffffff'}}>{title || 'Timeline Race'}</div>
         <div style={{marginTop: 14, height: 4, width: 160, backgroundColor: accentColor, borderRadius: 2}} />
       </div>
+
+      {axisPosition === 'top' && axisStrip}
 
       {/* Rows */}
       <div style={{flex: 1, position: 'relative', marginTop: 36, overflow: 'hidden'}}>
@@ -222,28 +247,18 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
 
         {/* Sweeping guide line */}
         {showRefLine && (
-          <>
-            <div style={{position: 'absolute', top: 0, bottom: 0, left: guideX, width: 3, backgroundColor: accentColor, boxShadow: `0 0 12px 2px ${accentColor}55`, opacity: 0.9}} />
-            {showDateLabel && (
-              <div style={{position: 'absolute', left: guideX - 70, top: -6, width: 140, textAlign: 'center', opacity: 0.95}}>
-                <div style={{display: 'inline-block', backgroundColor: accentColor, color: '#0a0a0a', fontSize: 17, fontWeight: 800, padding: '5px 14px', borderRadius: 999, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap'}}>
-                  {fmtDate(min + span * guideT, dateFormat)}
-                </div>
-              </div>
-            )}
-          </>
+          <div style={{position: 'absolute', top: 0, bottom: 0, left: guideX, width: 3, backgroundColor: accentColor, boxShadow: `0 0 12px 2px ${accentColor}55`, opacity: 0.9}} />
         )}
       </div>
 
-      {/* Date axis with ticks */}
-      <div style={{flexShrink: 0, marginTop: 8, paddingTop: 12, borderTop: '1px solid #1f2937', display: 'flex', alignItems: 'flex-start'}}>
-        {[0, 0.25, 0.5, 0.75, 1].map((p) => (
-          <div key={p} style={{flex: 1, position: 'relative', fontSize: 15, color: '#64748b', fontVariantNumeric: 'tabular-nums'}}>
-            <div style={{position: 'absolute', left: 0, top: -12, height: 8, width: 1, backgroundColor: '#1f2937'}} />
-            {fmtDate(min + span * p, dateFormat)}
-          </div>
-        ))}
-      </div>
+      {axisPosition === 'bottom' && axisStrip}
+
+      {/* On-screen date (bottom-right, large, plain text) */}
+      {showDateLabel && (
+        <div style={{position: 'absolute', right: 44, bottom: 30, fontSize: 44, fontWeight: 800, color: accentColor, fontVariantNumeric: 'tabular-nums', textShadow: '0 0 20px rgba(0,0,0,0.6)', lineHeight: 1}}>
+          {dateLabelText}
+        </div>
+      )}
     </div>
   );
 };

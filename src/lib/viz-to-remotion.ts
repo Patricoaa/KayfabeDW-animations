@@ -150,6 +150,7 @@ function convertTimelineRace(
       showYAxis: tc?.showYAxis,
       showRefLine: tc?.showRefLine,
       showDateLabel: tc?.showDateLabel,
+      axisPosition: tc?.axisPosition,
     };
   }
 
@@ -207,6 +208,7 @@ function convertTimelineRace(
       showYAxis: tc?.showYAxis,
       showRefLine: tc?.showRefLine,
       showDateLabel: tc?.showDateLabel,
+      axisPosition: tc?.axisPosition,
     };
   }
 
@@ -229,6 +231,7 @@ function convertTimelineRace(
     showYAxis: tc?.showYAxis,
     showRefLine: tc?.showRefLine,
     showDateLabel: tc?.showDateLabel,
+      axisPosition: tc?.axisPosition,
   };
 }
 
