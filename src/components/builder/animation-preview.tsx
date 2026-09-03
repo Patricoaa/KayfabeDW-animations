@@ -174,33 +174,42 @@ export function AnimationPreview({
   }
 
   const Comp = LAZY_COMPONENTS[templateId];
+  const compW = width ?? entry?.meta.width ?? 1920;
+  const compH = height ?? entry?.meta.height ?? 1080;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Preview player */}
-      <div className="flex-1 flex items-center justify-center p-6 overflow-auto bg-card">
-        <div className="w-full max-w-4xl">
-          <div className="border border-border-default rounded-lg overflow-hidden">
-            {!mounted && (
-              <div className="p-8 text-muted text-sm text-center">Cargando preview...</div>
-            )}
-            {mounted && Comp && (
-              <React.Suspense fallback={<div className="p-8 text-muted text-sm text-center">Cargando template...</div>}>
-                <Player
-                  component={Comp}
-                  inputProps={remotionProps}
-                  durationInFrames={duration * fps}
-                  fps={fps}
-                  compositionWidth={width ?? entry?.meta.width ?? 1920}
-                  compositionHeight={height ?? entry?.meta.height ?? 1080}
-                  style={{width: '100%'}}
-                  controls
-                  acknowledgeRemotionLicense
-                />
-              </React.Suspense>
-            )}
-          </div>
-        </div>
+      {/* Preview player — fits fully inside the area (no scroll/zoom needed) by
+          constraining the player to the canvas aspect ratio and centering it. */}
+      <div className="flex-1 flex items-center justify-center p-6 bg-card overflow-hidden">
+        {!mounted && (
+          <div className="p-8 text-muted text-sm text-center">Cargando preview...</div>
+        )}
+        {mounted && Comp && (
+          <React.Suspense fallback={<div className="p-8 text-muted text-sm text-center">Cargando template...</div>}>
+            <div
+              className="border border-border-default rounded-lg overflow-hidden"
+              style={{
+                maxWidth: '100%',
+                maxHeight: '100%',
+                width: '100%',
+                aspectRatio: `${compW} / ${compH}`,
+              }}
+            >
+              <Player
+                component={Comp}
+                inputProps={remotionProps}
+                durationInFrames={duration * fps}
+                fps={fps}
+                compositionWidth={compW}
+                compositionHeight={compH}
+                style={{width: '100%', height: '100%'}}
+                controls
+                acknowledgeRemotionLicense
+              />
+            </div>
+          </React.Suspense>
+        )}
       </div>
 
       {/* Duración — configuración principal bajo el preview. Controla la
