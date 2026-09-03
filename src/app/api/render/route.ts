@@ -12,6 +12,7 @@ interface RenderBody {
   compositionId: string;
   inputProps: Record<string, unknown>;
   durationInFrames?: number;
+  format?: 'mp4' | 'gif';
 }
 
 const ENTRY = path.join(process.cwd(), 'src', 'remotion', 'index.ts');
@@ -119,14 +120,17 @@ export async function POST(req: Request) {
       composition.durationInFrames = body.durationInFrames;
     }
 
-    const tmpFile = path.join(os.tmpdir(), `render-${Date.now()}.mp4`);
-    console.log(`[render] Starting renderMedia to ${tmpFile}...`);
+    const codec = body.format === 'gif' ? 'gif' : 'h264';
+    const ext = body.format === 'gif' ? 'gif' : 'mp4';
+    const contentType = body.format === 'gif' ? 'image/gif' : 'video/mp4';
+    const tmpFile = path.join(os.tmpdir(), `render-${Date.now()}.${ext}`);
+    console.log(`[render] Starting renderMedia to ${tmpFile} (codec: ${codec})...`);
     await send({type: 'phase', phase: 'Rendering video...', progress: 0.2});
 
     await renderMedia({
       composition,
       serveUrl: bundleUrl,
-      codec: 'h264',
+      codec,
       outputLocation: tmpFile,
       inputProps: body.inputProps,
       browserExecutable: chromePath,
@@ -143,9 +147,9 @@ export async function POST(req: Request) {
     console.log(`[render] Video size: ${(videoBuffer.length / 1024 / 1024).toFixed(1)} MB`);
 
     const {url} = await put(
-      `renders/${body.compositionId}-${Date.now()}.mp4`,
+      `renders/${body.compositionId}-${Date.now()}.${ext}`,
       videoBuffer,
-      {access: 'public', contentType: 'video/mp4'},
+      {access: 'public', contentType},
     );
 
     try { fs.unlinkSync(tmpFile); } catch {}

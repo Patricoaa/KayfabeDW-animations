@@ -21,6 +21,7 @@ type AnimationPreviewProps = {
   templateProps?: Record<string, unknown> | null;
   preferTemplateProps?: boolean;
   duration?: number;
+  showExportBar?: boolean;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -61,6 +62,7 @@ export function AnimationPreview({
   templateProps: externalProps,
   preferTemplateProps = false,
   duration: externalDuration,
+  showExportBar = true,
 }: AnimationPreviewProps) {
   const [renderState, setRenderState] = useState<RenderState>({status: 'idle'});
   const [duration, setDuration] = useState(externalDuration ?? 10);
@@ -183,7 +185,8 @@ export function AnimationPreview({
         </div>
       </div>
 
-      {/* Export bar */}
+      {/* Export bar — hidden when showExportBar is false (step 2 in builder) */}
+      {showExportBar && (
       <div className="flex items-center gap-3 px-6 py-3 border-t border-border-subtle bg-elevated">
         {/* Duration control */}
         <div className="flex items-center gap-2">
@@ -271,6 +274,7 @@ export function AnimationPreview({
           </button>
         )}
       </div>
+      )}
     </div>
   );
 }

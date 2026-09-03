@@ -307,7 +307,7 @@ export type ChartConfig = {
   configVersion?: number;
 };
 
-export const CHART_CONFIG_VERSION = 21;
+export const CHART_CONFIG_VERSION = 22;
 
 export const DEFAULT_CHART_CONFIG: ChartConfig = {
   type: 'bar',
@@ -390,6 +390,11 @@ export function applyChartDefaults(config: Partial<ChartConfig>): ChartConfig {
     if (stale.categoryLabelPosition === 'hide') stale.categoryLabelsVisible = false;
     delete stale.categoryLabelPosition;
   }
+  // V21: text alignment (`align`) added to SectionFont; no data remap.
+  // V22: canvas background is always transparent (the "Color de fondo" control
+  //      was removed) and exports embed fonts + images losslessly. The
+  //      `canvasBackground` field is kept so old saved configs load cleanly but
+  //      is no longer rendered.
   const remapped = {...DEFAULT_CHART_CONFIG, ...clean};
   return remapped;
 }

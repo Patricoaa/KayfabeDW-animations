@@ -1,15 +1,11 @@
 'use client';
 
 import {Suspense, useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import Link from 'next/link';
 import {useSearchParams} from 'next/navigation';
 import {
   BarChart3,
   Film,
-  Image,
-  FileDown,
   Play,
-  Share2,
   Save,
   Check,
   Table2,
@@ -17,6 +13,8 @@ import {
   Clapperboard,
   ChevronRight,
   Database,
+  ArrowLeft,
+  Download,
 } from 'lucide-react';
 import type {QuerySpec} from '@/lib/query-spec';
 import {defaultQuerySpec} from '@/lib/query-spec';
@@ -24,9 +22,9 @@ import type {ChartConfig} from '@/lib/chart-config';
 import {DEFAULT_CHART_CONFIG, applyChartDefaults} from '@/lib/chart-config';
 import type {SchemaMetadata} from '@/lib/schema-metadata';
 import {getSchemaMetadata, getTableDepth, isNumericType} from '@/lib/schema-metadata';
-import {suggestBestTemplate, isGenericTemplate} from '@/lib/viz-to-remotion';
+import {suggestBestTemplate, isGenericTemplate, convertToRemotionProps} from '@/lib/viz-to-remotion';
 import {applyChartFilters} from '@/lib/chart-data';
-import {downloadChartSvg, downloadChartPng, sanitizeFilename, chartToDataUrl} from '@/lib/export-static';
+import {chartToDataUrl} from '@/lib/export-static';
 import dynamic from 'next/dynamic';
 import {ChartConfigPanel} from '@/components/builder/chart-config-panel';
 import type {ColumnMeta} from '@/components/builder/chart-config-panel';
@@ -36,6 +34,7 @@ import {TemplatePicker} from '@/components/builder/template-picker';
 import {AnimationPreview} from '@/components/builder/animation-preview';
 import {BuilderNav} from '@/components/builder/builder-nav';
 import {DataOptionsForm} from '@/components/builder/data-options-form';
+import {ExportPanel} from '@/components/builder/export-panel';
 import {TEMPLATES} from '@/remotion/generated/registry';
 import type {TemplateId} from '@/remotion/generated/registry';
 import {useToast} from '@/components/ui/toast';
@@ -382,28 +381,6 @@ function BuilderContent() {
     }
   }, [activeTemplate, templateOptions, data.length, addToast]);
 
-  // E2E: Static export (SVG / PNG)
-  const [staticExporting, setStaticExporting] = useState<'none' | 'svg' | 'png'>('none');
-  const handleStaticExport = useCallback(async (format: 'svg' | 'png') => {
-    if (!staticExportRef.current) return;
-    const filename = sanitizeFilename(vizName);
-    setStaticExporting(format);
-    try {
-      const ok = format === 'svg'
-        ? downloadChartSvg(staticExportRef.current, filename)
-        : await downloadChartPng(staticExportRef.current, filename);
-      if (ok) {
-        addToast(`Gráfico exportado (${format.toUpperCase()})`, 'success');
-      } else {
-        addToast('No se encontró el gráfico para exportar (cargá datos primero)', 'error');
-      }
-    } catch (e) {
-      addToast(`Error al exportar: ${e instanceof Error ? e.message : String(e)}`, 'error');
-    } finally {
-      setStaticExporting('none');
-    }
-  }, [vizName, addToast]);
-
   const handleSave = async () => {
     if (!spec.select || spec.select.length === 0) {
       addToast('Selecciona al menos una columna en el canvas antes de guardar', 'error');
@@ -490,6 +467,19 @@ function BuilderContent() {
     () => applyChartFilters(data, chartConfig.filters ?? []),
     [data, chartConfig.filters],
   );
+
+  // Compute Remotion input props for the animated export panel.
+  const convertedRemotionProps = useMemo(
+    () => (activeTemplate && filteredData.length > 0
+      ? convertToRemotionProps(chartConfig, filteredData, activeTemplate)
+      : null),
+    [chartConfig, filteredData, activeTemplate],
+  );
+  const remotionProps = useMemo(() => {
+    if (preferTemplateProps && templateProps) return templateProps;
+    if (convertedRemotionProps?.props) return convertedRemotionProps.props;
+    return templateProps ?? null;
+  }, [preferTemplateProps, templateProps, convertedRemotionProps]);
 
   // Fan-out metadata for the step-2 chart panel. `aliasToTable` maps each
   // selected column (by alias or bare name) back to its source table, so the
@@ -591,26 +581,6 @@ function BuilderContent() {
             <Save size={14} />
             {saving ? 'Guardando...' : saved ? 'Guardado' : 'Guardar'}
           </button>
-          <Link
-            href="/history"
-            className="px-4 h-9 bg-elevated hover:bg-card-hover rounded-lg text-sm font-semibold transition-colors flex items-center"
-            aria-label="Ir al historial de visualizaciones y renders"
-          >
-            Historial
-          </Link>
-          <button
-            onClick={() => {
-              const state = JSON.stringify({spec, chartConfig});
-              const encoded = btoa(encodeURIComponent(state));
-              const url = `${window.location.origin}/builder?share=${encoded}`;
-              navigator.clipboard.writeText(url);
-              addToast('Enlace copiado al portapapeles', 'success');
-            }}
-            className="px-3 h-9 bg-elevated hover:bg-card-hover rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5"
-            aria-label="Copiar enlace para compartir"
-          >
-            <Share2 size={14} />
-          </button>
         </div>
       </header>
 
@@ -690,42 +660,19 @@ function BuilderContent() {
                 </div>
               )
             ) : outputMode === 'static' ? (
-              <div className="h-full flex flex-col">
-                <CanvasZoom contentWidth={chartConfig.width ?? 600} contentHeight={chartConfig.height ?? 380}>
-                  <div ref={staticExportRef} className="w-full">
-                    {filteredData.length === 0 ? (
-                      <div className="text-center text-muted text-sm font-body p-6">
-                        {data.length > 0
-                          ? 'Ninguna fila coincide con el filtro del gráfico'
-                          : 'Cargá datos en el canvas para ver tu gráfico'}
-                      </div>
-                    ) : (
-                      <ChartPreview data={filteredData} config={chartConfig} />
-                    )}
-                  </div>
-                </CanvasZoom>
-                <div className="flex items-center justify-center gap-2 px-6 py-3 border-t border-border-default bg-card shrink-0">
-                  <button
-                    onClick={() => handleStaticExport('svg')}
-                    disabled={staticExporting !== 'none' || filteredData.length === 0}
-                    className="px-3 h-9 bg-elevated hover:bg-card-hover disabled:opacity-40 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
-                    aria-label="Exportar gráfico como SVG"
-                  >
-                    <FileDown size={14} /> SVG
-                  </button>
-                  <button
-                    onClick={() => handleStaticExport('png')}
-                    disabled={staticExporting !== 'none' || filteredData.length === 0}
-                    className="px-3 h-9 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
-                    aria-label="Exportar gráfico como PNG"
-                  >
-                    <Image size={14} /> PNG
-                  </button>
-                  <span className="ml-2 text-[10px] text-muted font-body">
-                    {filteredData.length === 0 ? 'Cargá datos para exportar' : `${filteredData.length} filas`}
-                  </span>
+              <CanvasZoom contentWidth={chartConfig.width ?? 600} contentHeight={chartConfig.height ?? 380}>
+                <div ref={staticExportRef} className="w-full">
+                  {filteredData.length === 0 ? (
+                    <div className="text-center text-muted text-sm font-body p-6">
+                      {data.length > 0
+                        ? 'Ninguna fila coincide con el filtro del gráfico'
+                        : 'Cargá datos en el canvas para ver tu gráfico'}
+                    </div>
+                  ) : (
+                    <ChartPreview data={filteredData} config={chartConfig} />
+                  )}
                 </div>
-              </div>
+              </CanvasZoom>
             ) : activeTemplate ? (
               <AnimationPreview
                 templateId={activeTemplate}
@@ -734,6 +681,7 @@ function BuilderContent() {
                 templateProps={templateProps}
                 preferTemplateProps={preferTemplateProps}
                 duration={duration}
+                showExportBar={false}
               />
             ) : (
               <div className="h-full flex items-center justify-center text-muted text-sm font-body">
@@ -743,8 +691,8 @@ function BuilderContent() {
           </div>
         </main>
 
-        {/* Right config panel — only shown in step 2 (Configurar) / step 3 (Exportar) */}
-        {view === 'result' && (
+        {/* Right config panel — step 2 (Configurar): full config sidebar */}
+        {view === 'result' && resultStep === 2 && (
         <aside className="fixed inset-x-0 bottom-12 z-10 mx-2 mb-2 h-[58vh] rounded-xl border border-border-default flex flex-col overflow-hidden bg-card md:static md:inset-auto md:mx-0 md:mb-0 md:h-auto md:w-[22rem] md:shrink-0 md:rounded-none md:border-x-0 md:border-b-0 md:border-t lg:md:w-96">
           <div className="flex items-center gap-2 px-4 h-10 border-b border-border-default shrink-0">
             <SlidersHorizontal size={14} className="text-amber-500" />
@@ -884,6 +832,39 @@ function BuilderContent() {
               </>
             )}
           </div>
+        </aside>
+        )}
+
+        {/* Right export panel — step 3 (Exportar) */}
+        {view === 'result' && resultStep === 3 && (
+        <aside className="fixed inset-x-0 bottom-12 z-10 mx-2 mb-2 h-[58vh] rounded-xl border border-border-default flex flex-col overflow-hidden bg-card md:static md:inset-auto md:mx-0 md:mb-0 md:h-auto md:w-[22rem] md:shrink-0 md:rounded-none md:border-x-0 md:border-b-0 md:border-t lg:md:w-96">
+          <div className="flex items-center justify-between px-4 h-10 border-b border-border-default shrink-0">
+            <div className="flex items-center gap-2">
+              <Download size={14} className="text-amber-500" />
+              <span className="text-micro font-semibold text-secondary uppercase tracking-widest font-display">
+                Exportar
+              </span>
+            </div>
+            <button
+              onClick={() => goResult(2)}
+              className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted hover:text-secondary hover:bg-card-hover transition-colors"
+              aria-label="Volver a configurar"
+            >
+              <ArrowLeft size={12} /> Configurar
+            </button>
+          </div>
+
+          <ExportPanel
+            outputMode={outputMode}
+            staticExportRef={staticExportRef}
+            filteredData={filteredData}
+            chartConfig={chartConfig}
+            vizName={vizName}
+            templateId={outputMode === 'animated' ? activeTemplate : null}
+            duration={duration}
+            onDurationChange={setDuration}
+            remotionProps={outputMode === 'animated' ? remotionProps : null}
+          />
         </aside>
         )}
       </div>

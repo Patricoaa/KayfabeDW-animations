@@ -54,7 +54,7 @@ export function frameRect(config: ChartConfig) {
       width={w}
       height={h}
       rx={config.canvasBorderRadius ?? 0}
-      fill={config.canvasBackground ?? 'none'}
+      fill="none"
       stroke={(config.canvasBorderWidth ?? 0) > 0 ? (config.canvasBorderColor ?? '#333') : 'none'}
       strokeWidth={config.canvasBorderWidth ?? 0}
     />

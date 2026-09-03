@@ -192,6 +192,16 @@ const anchorOf = (a?: TextAlign): 'start' | 'middle' | 'end' =>
 const labelAnchor = (align: TextAlign | undefined, fallback: 'start' | 'middle' | 'end'): 'start' | 'middle' | 'end' =>
   align ? anchorOf(align) : fallback;
 
+// Positions a category label within its column slot so alignment is meaningful
+// (each label shifts inside its own band, never overlapping neighbours).
+// 'Auto' preserves the positional center anchor.
+function slotAlign(spanStart: number, spanEnd: number, fallback: 'start' | 'middle' | 'end', align?: TextAlign): {x: number; anchor: 'start' | 'middle' | 'end'} {
+  if (!align) return {x: (spanStart + spanEnd) / 2, anchor: fallback};
+  if (align === 'left') return {x: spanStart, anchor: 'start'};
+  if (align === 'right') return {x: spanEnd, anchor: 'end'};
+  return {x: (spanStart + spanEnd) / 2, anchor: 'middle'};
+}
+
 function catLabel(
   text: string,
   opts: {
@@ -292,7 +302,7 @@ function Avatar({
         y={imgY}
         width={vw}
         height={vh}
-        preserveAspectRatio="xMidYMid slice"
+        preserveAspectRatio="xMidYMid meet"
         clipPath={`url(#${clipId})`}
       />
       {/* Subtle outline of the clip shape so the chosen forma stays legible even
@@ -793,8 +803,9 @@ const fill = barFill(s.color, config, val < 0);
                     const segH = (val / segTotal) * plotH;
                     if (segH < dlSize * 1.8 || val === 0) return null;
                     const segY = marginAdj.top + plotH - (stackBase[ci][si] / segTotal) * plotH - segH / 2;
+                    const ds = slotAlign(bandX + barBandX, bandX + barBandX + barBlockW, 'middle', dlAlign);
                     return (
-                      <text key={`dl-${ci}-${si}`} x={bandX + barBandX + barBlockW / 2} y={segY + dlSize / 2} textAnchor={labelAnchor(dlAlign, 'middle')} fontSize={dlSize} fill="#fff" pointerEvents="none">
+                      <text key={`dl-${ci}-${si}`} x={ds.x} y={segY + dlSize / 2} textAnchor={ds.anchor} fontSize={dlSize} fill="#fff" pointerEvents="none">
                         {formatValue(Math.round((val / segTotal) * 100 * 10) / 10 / 100, numFmt)}
                       </text>
                     );
@@ -802,17 +813,23 @@ const fill = barFill(s.color, config, val < 0);
                 )}
                 {config.showDataLabels !== false && !stackedPercent && (
                   stacked ? (
-                    <text x={bandX + barBandX + barBlockW / 2} y={marginAdj.top + plotH - (total / yRange) * plotH - 4} textAnchor={labelAnchor(dlAlign, 'middle')} fontSize={dlSize} fill={dlColor} pointerEvents="none">
-                      {formatValue(total, numFmt)}
-                    </text>
+                    (() => {
+                      const ds = slotAlign(bandX + barBandX, bandX + barBandX + barBlockW, 'middle', dlAlign);
+                      return (
+                        <text x={ds.x} y={marginAdj.top + plotH - (total / yRange) * plotH - 4} textAnchor={ds.anchor} fontSize={dlSize} fill={dlColor} pointerEvents="none">
+                          {formatValue(total, numFmt)}
+                        </text>
+                      );
+                    })()
                   ) : (
                     multi.series.map((s, si) => {
                       const val = s.values[ci] ?? 0;
                       const h = Math.max((Math.abs(val) / yRange) * plotH, 0);
                       const offset = (catBand - barW * nS) / 2;
                       const bx = bandX + offset + si * (barW + barGap);
+                      const ds = slotAlign(bx, bx + barW, 'middle', dlAlign);
                       return (
-                        <text key={`dl-${ci}-${si}`} x={bx + barW / 2} y={marginAdj.top + plotH - h - 5} textAnchor={labelAnchor(dlAlign, 'middle')} fontSize={dlSize} fill={dlColor} pointerEvents="none">
+                        <text key={`dl-${ci}-${si}`} x={ds.x} y={marginAdj.top + plotH - h - 5} textAnchor={ds.anchor} fontSize={dlSize} fill={dlColor} pointerEvents="none">
                           {formatValue(val, numFmt)}
                         </text>
                       );
@@ -855,8 +872,8 @@ const fill = barFill(s.color, config, val < 0);
               if (!p) return null;
               return (
                 <g key={`lb-${ci}`}>
-                  {catLabel(label, {...p, anchor: labelAnchor(config.xLabelFont?.align, p.anchor), font: catFont, overflow: catOv, cap: focusCap, rotate: labelAngle})}
-                  {desc && catLabel(desc, {x: p.x, y: p.y + catSize + 2, anchor: labelAnchor(config.xLabelFont?.align, p.anchor), font: descFont, overflow: descOv, cap: 20})}
+                  {catLabel(label, {...p, font: catFont, overflow: catOv, cap: focusCap, rotate: labelAngle})}
+                  {desc && catLabel(desc, {x: p.x, y: p.y + catSize + 2, anchor: p.anchor, font: descFont, overflow: descOv, cap: 20})}
                 </g>
               );
             };
@@ -872,7 +889,10 @@ const fill = barFill(s.color, config, val < 0);
               // Label anchored to a FIXED plot point at this category's slot:
               // vertical → the plot bottom edge at the band center. Global X/Y
               // offsets shift it (Offset X: right = +, Offset Y: down = +).
-              const labelAt = {x: marginAdj.left + bandX + catBand / 2 + catLabelOffX, y: colBottom + catLabelOffY, anchor: 'middle' as const};
+              const labelAt = (() => {
+                const slot = slotAlign(marginAdj.left + bandX, marginAdj.left + bandX + catBand, 'middle', config.xLabelFont?.align);
+                return {x: slot.x + catLabelOffX, y: colBottom + catLabelOffY, anchor: slot.anchor};
+              })();
               if (!showText || !labelAt) return null;
               return renderLabel(labelAt);
             }
@@ -885,10 +905,11 @@ const fill = barFill(s.color, config, val < 0);
             // Bar height/length and intra-category gap never affect it.
             const cx = avatarCx(bandX + catBand / 2, avatarOffsetX);
             const cy = avatarCy(marginAdj.top, avatarOffsetY);
+            const avatarSlot = slotAlign(marginAdj.left + bandX, marginAdj.left + bandX + catBand, 'middle', config.xLabelFont?.align);
             return (
               <g key={ci}>
                 <Avatar href={img!} cx={cx} cy={cy} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} crop={crop} />
-                {showText && renderLabel({x: marginAdj.left + bandX + catBand / 2 + catLabelOffX, y: marginAdj.top + plotH + catLabelOffY, anchor: 'middle'}, 12)}
+                {showText && renderLabel({x: avatarSlot.x + catLabelOffX, y: marginAdj.top + plotH + catLabelOffY, anchor: avatarSlot.anchor}, 12)}
               </g>
             );
           })}
@@ -1133,15 +1154,18 @@ function SingleBar({data, config}: Props) {
           const centerX = x + barWidth / 2;
           // Label anchored to a FIXED plot point at this column: vertical → the
           // plot bottom edge at the column center. Global X/Y offsets shift it.
-          const labelAt = {x: centerX + catLabelOffX, y: colBottom + catLabelOffY, anchor: 'middle' as const};
+          const labelAt = (() => {
+            const slot = slotAlign(x, x + barWidth, 'middle', config.xLabelFont?.align);
+            return {x: slot.x + catLabelOffX, y: colBottom + catLabelOffY, anchor: slot.anchor};
+          })();
           const label = resolvedCategoryLabel(config, d.label);
           const desc = descOf(resolvedCategorySub(config, d.label, descOfRow(config.categoryDescriptionField, d.raw)));
           const renderLabel = (p: {x: number; y: number; anchor: 'start' | 'middle' | 'end'} | null) => {
             if (!p || !showText) return null;
             return (
               <g key={`lb-${i}`}>
-                {catLabel(label, {...p, anchor: labelAnchor(config.xLabelFont?.align, p.anchor), font: catFont, overflow: catOv, cap: 12, rotate: labelAngle})}
-                {desc && catLabel(desc, {x: p.x, y: p.y + catSize + 2, anchor: labelAnchor(config.xLabelFont?.align, p.anchor), font: descFont, overflow: descOv, cap: 20})}
+                {catLabel(label, {...p, font: catFont, overflow: catOv, cap: 12, rotate: labelAngle})}
+                {desc && catLabel(desc, {x: p.x, y: p.y + catSize + 2, anchor: p.anchor, font: descFont, overflow: descOv, cap: 20})}
               </g>
             );
           };

@@ -1080,7 +1080,6 @@ const setLegendTextOverride = (label: string, value?: string) => {
           </div>
         </div>
         <div className="pt-1 border-t border-border-subtle">
-          <ColorInput label="Color de fondo" value={config.canvasBackground} onChange={(v) => update({canvasBackground: v || undefined})} />
           <div className="grid grid-cols-2 gap-2 mt-2">
             <NumberInput label="Borde (grosor)" value={config.canvasBorderWidth} min={0} max={8} onChange={(v) => update({canvasBorderWidth: v})} />
             {(config.canvasBorderWidth ?? 0) > 0 && (
@@ -1241,7 +1240,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
                             <div className="shrink-0 mt-1">
                               {imgUrl ? (
                                 <div style={clipStyle}>
-                                  <img src={imgUrl} alt="" style={{...imgStyle, objectFit: 'cover', maxWidth: 'none'}} />
+                                  <img src={imgUrl} alt="" style={{...imgStyle, objectFit: 'contain', maxWidth: 'none'}} />
                                 </div>
                               ) : (
                                 <div style={{...clipStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-elevated)'}}>
