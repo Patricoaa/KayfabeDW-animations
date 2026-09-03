@@ -17,6 +17,11 @@ export type TimelineRaceConfig = {
   dateField?: string;
   valueField?: string;
   dateFormat?: DateFormat;
+  title?: string;
+  maxRows?: number;
+  showYAxis?: boolean;
+  showRefLine?: boolean;
+  showDateLabel?: boolean;
 };
 
 // Keyed by TemplateId. Templates not listed here (or with no entry) inherit

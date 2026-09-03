@@ -44,6 +44,22 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
 
   return (
     <div className="space-y-3">
+      <Section title="Header" defaultOpen>
+        <div>
+          <label className="text-sm font-medium mb-1 block">Título</label>
+          <input
+            type="text"
+            value={value.title ?? ''}
+            onChange={(e) => update({title: e.target.value || undefined})}
+            placeholder="Título de la animación"
+            className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+          />
+          <p className="text-[10px] text-muted mt-0.5">
+            Si se deja vacío se usa el título de la visualización.
+          </p>
+        </div>
+      </Section>
+
       <Section title="Datos" defaultOpen>
         <FieldSelect
           label="Participante / etiqueta"
@@ -61,9 +77,6 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
           optional
           onChange={(v) => update({imageField: v || undefined})}
         />
-      </Section>
-
-      <Section title="Eje X" defaultOpen>
         <FieldSelect
           label="Campo de fecha"
           value={value.dateField ?? ''}
@@ -72,6 +85,31 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
           role="date"
           onChange={(v) => update({dateField: v || undefined})}
         />
+        <FieldSelect
+          label="Campo de valor acumulado"
+          value={value.valueField ?? ''}
+          options={fieldMeta}
+          fallback={columns}
+          role="numeric"
+          onChange={(v) => update({valueField: v || undefined})}
+        />
+        <div>
+          <label className="text-sm font-medium mb-1 block">Máximo de participantes</label>
+          <input
+            type="number"
+            min={0}
+            max={50}
+            value={value.maxRows ?? 0}
+            onChange={(e) => update({maxRows: Number(e.target.value) || undefined})}
+            className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+          />
+          <p className="text-[10px] text-muted mt-0.5">
+            0 = sin límite. Limita la cantidad de participantes visibles en la carrera.
+          </p>
+        </div>
+      </Section>
+
+      <Section title="Eje X" defaultOpen>
         <div>
           <label className="text-sm font-medium mb-1 block">Formato de fecha</label>
           <select
@@ -87,24 +125,44 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
             Agrupa los datos por día, mes o año y re-agrega el valor acumulado en cada rango.
           </p>
         </div>
-      </Section>
-
-      <Section title="Eje Y / Valor">
-        <FieldSelect
-          label="Campo de valor acumulado"
-          value={value.valueField ?? ''}
-          options={fieldMeta}
-          fallback={columns}
-          role="numeric"
-          onChange={(v) => update({valueField: v || undefined})}
+        <Toggle
+          label="Mostrar eje Y"
+          checked={value.showYAxis ?? true}
+          onChange={(v) => update({showYAxis: v})}
+        />
+        <Toggle
+          label="Mostrar línea de referencia"
+          checked={value.showRefLine ?? true}
+          onChange={(v) => update({showRefLine: v})}
+        />
+        <Toggle
+          label="Mostrar fecha en pantalla"
+          checked={value.showDateLabel ?? true}
+          onChange={(v) => update({showDateLabel: v})}
         />
         <p className="text-[10px] text-muted">
-          Una guía vertical barre el eje de fechas de izquierda a derecha; al pasar la fecha de un
-          participante su valor acumulado salta y entra al ranking. Si un participante tiene varias
-          fechas, su valor se acumula a lo largo del tiempo.
+          La fecha animada se superpone sobre la guía vertical y avanza con ella.
         </p>
       </Section>
     </div>
+  );
+}
+
+function Toggle({label, checked, onChange}: {label: string; checked: boolean; onChange: (v: boolean) => void}) {
+  return (
+    <label className="flex items-center justify-between cursor-pointer">
+      <span className="text-sm font-medium">{label}</span>
+      <div className="relative">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          className="sr-only peer"
+        />
+        <div className="w-9 h-5 rounded-full bg-elevated border border-border-default peer-checked:bg-amber-500 transition-colors" />
+        <div className="absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
+      </div>
+    </label>
   );
 }
 

@@ -21,6 +21,10 @@ export type TimelineRaceProps = {
   dateMode?: boolean;
   domain?: [number, number];
   dateFormat?: 'day' | 'month' | 'year';
+  maxRows?: number;
+  showYAxis?: boolean;
+  showRefLine?: boolean;
+  showDateLabel?: boolean;
 };
 
 function fmtDate(t: number, fmt: TimelineRaceProps['dateFormat'] = 'day'): string {
@@ -40,6 +44,10 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   dateMode = false,
   domain,
   dateFormat = 'day',
+  maxRows,
+  showYAxis = true,
+  showRefLine = true,
+  showDateLabel = true,
 }) => {
   const frame = useCurrentFrame();
   const {fps, durationInFrames} = useVideoConfig();
@@ -56,8 +64,9 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   if (!dateMode) {
     const maxValue = Math.max(...rows.map((it) => it.value), 0);
     const ROW_H = rows.length <= 6 ? 110 : Math.max(56, 600 / rows.length);
-    const visible = rows.slice(0, 9);
+    const visible = (maxRows && maxRows > 0 ? rows.slice(0, maxRows) : rows).slice(0, 9);
     const leading = Math.max(...visible.map((it) => it.value), 0);
+    const winnerScale = interpolate(frame, [durationInFrames - 45, durationInFrames - 10], [1, 1.06], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
     return (
       <div style={{width: '100%', height: '100%', backgroundColor: '#0a0a0a', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", padding: 60, paddingBottom: 90, boxSizing: 'border-box'}}>
         <div style={{opacity: fadeIn, transform: `translateY(${titleY}px)`}}>
@@ -73,16 +82,15 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
             const barProgress = spring({fps, frame: frame - delay, config: {damping: 18, stiffness: 70}});
             const barWidth = (item.value / maxValue) * 1280 * barProgress;
             return (
-              <div key={`${item.label}-${index}`} style={{opacity: rowOpacity, transform: `translateX(${labelX}px)`, display: 'flex', alignItems: 'center', gap: 18}}>
+              <div key={`${item.label}-${index}`} style={{opacity: rowOpacity, transform: `translateX(${labelX}px) scale(${isLeader ? winnerScale : 1})`, display: 'flex', alignItems: 'center', gap: 18}}>
                 <div style={{width: 300, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12}}>
                   {item.image && <Avatar src={item.image} />}
                   <div style={{minWidth: 0}}>
                     <div style={{fontSize: 22, fontWeight: 700, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>{item.label}</div>
-                    {item.date != null && <div style={{fontSize: 15, color: '#94a3b8', marginTop: 2, fontVariantNumeric: 'tabular-nums'}}>{fmtDate(item.date)}</div>}
                   </div>
                 </div>
                 <div style={{flex: 1, height: ROW_H * 0.5, backgroundColor: '#1a1a1a', borderRadius: ROW_H * 0.25, overflow: 'hidden', display: 'flex'}}>
-                  <div style={{width: Math.max(0, barWidth), height: '100%', backgroundColor: isLeader ? accentColor : '#475569', borderRadius: ROW_H * 0.25, boxShadow: isLeader ? `0 0 16px ${accentColor}66` : 'none'}} />
+                  <div style={{width: Math.max(0, barWidth), height: '100%', backgroundColor: isLeader ? accentColor : '#475569', borderRadius: ROW_H * 0.25, boxShadow: isLeader ? `0 0 ${16 * winnerScale}px ${accentColor}66` : 'none'}} />
                 </div>
                 <div style={{width: 120, flexShrink: 0, textAlign: 'right'}}>
                   <span style={{fontSize: 22, fontWeight: 800, color: isLeader ? accentColor : '#ffffff', fontVariantNumeric: 'tabular-nums'}}>{item.value.toLocaleString()}</span>
@@ -106,9 +114,12 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const withDate = rows.filter((r) => r.date != null);
   const maxValue = Math.max(...withDate.map((it) => it.value), 0) || 1;
 
-  // Guide sweeps the bar track left→right over the duration (easing + hold ends).
-  const TRACK_LEFT = 320; // after the label/avatar column
-  const TRACK_RIGHT = 1280 - 110 - 24; // before the value column
+  // ---- Date axis track geometry ----
+  const LABEL_W = showYAxis ? 320 : 40;
+  const VALUE_W = showYAxis ? 110 : 110;
+  const TRACK_LEFT = LABEL_W; // after the label/avatar column
+  const TRACK_RIGHT = 1280 - VALUE_W - 24; // before the value column
+  const BAR_MAX_W = TRACK_RIGHT - TRACK_LEFT;
   const EASE = 26;
   const sweepFrames = Math.max(durationInFrames - EASE * 2, 1);
   const raw = interpolate(frame, [EASE, EASE + sweepFrames], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
@@ -144,34 +155,51 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
 
   const activeP = participants.filter((p) => p.active).sort((a, b) => b.current - a.current);
   const inactiveP = participants.filter((p) => !p.active).sort((a, b) => b.current - a.current);
-  const allP = [...activeP, ...inactiveP];
+  const allP = (maxRows && maxRows > 0 ? [...activeP, ...inactiveP].slice(0, maxRows) : [...activeP, ...inactiveP]);
+  const showInactive = !(maxRows && maxRows > 0 && allP.length >= maxRows);
+  const visibleActive = allP.filter((p) => p.active);
+  const visibleInactive = showInactive ? allP.filter((p) => !p.active) : [];
 
   const ROW_H = allP.length <= 6 ? 96 : Math.max(52, 560 / allP.length);
   const laneY = (index: number) => 40 + index * (ROW_H + 8);
 
+  // ---- Winner reveal: scale up + glow the leader as the race finishes ----
+  const raceFinished = guideT >= 0.99;
+  const finishStart = Math.max(0, durationInFrames - 60);
+  const winnerT = raceFinished
+    ? interpolate(frame, [finishStart, finishStart + 45], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'})
+    : 0;
+  const winnerScale = 1 + 0.05 * winnerT;
+  const dimOthers = 1 - 0.35 * winnerT;
+
   const renderRow = (p: {label: string; image?: string | null; current: number; active: boolean; firstX: number}, y: number) => {
     const display = p.active ? p.current : 0;
-    const isLeader = p.active && p.current === activeP[0]?.current;
-    const barW = (display / maxValue) * 940 * (p.active ? 1 : 0);
+    const isLeader = p.active && visibleActive[0] && p.current === visibleActive[0].current && visibleActive[0].current > 0;
+    const barW = (display / maxValue) * BAR_MAX_W * (p.active ? 1 : 0);
     const pop = spring({
       fps,
       frame: p.active ? frame - Math.max(0, Math.floor((p.firstX / 1.001) * sweepFrames)) : frame,
       config: {damping: 22, stiffness: 110},
       durationInFrames: 28,
     });
+    const scale = isLeader ? winnerScale : 1;
+    const dim = isLeader ? 1 : dimOthers;
     return (
-      <div key={p.label} style={{position: 'absolute', left: 0, right: 0, height: ROW_H, top: y, display: 'flex', alignItems: 'center', gap: 16, opacity: 1}}>
-        <div style={{width: 320, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, minWidth: 0}}>
-          {p.image && <Avatar src={p.image} />}
-          <div style={{minWidth: 0}}>
-            <div style={{fontSize: 21, fontWeight: 700, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>{p.label}</div>
-            {p.active && <div style={{fontSize: 14, color: '#64748b', fontVariantNumeric: 'tabular-nums'}}>{p.current.toLocaleString()}</div>}
-          </div>
+      <div key={p.label} style={{position: 'absolute', left: 0, right: 0, height: ROW_H, top: y, display: 'flex', alignItems: 'center', gap: 16, opacity: dim}}>
+        <div style={{width: LABEL_W, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, justifyContent: showYAxis ? 'flex-start' : 'flex-end'}}>
+          {showYAxis && (
+            <>
+              {p.image && <Avatar src={p.image} />}
+              <div style={{minWidth: 0, flex: 1}}>
+                <div style={{fontSize: 21, fontWeight: 700, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>{p.label}</div>
+              </div>
+            </>
+          )}
         </div>
         <div style={{flex: 1, height: ROW_H * 0.46, backgroundColor: '#171717', borderRadius: 999, overflow: 'hidden', display: 'flex', position: 'relative'}}>
-          <div style={{width: Math.max(0, barW * pop), height: '100%', backgroundColor: isLeader ? accentColor : '#3f3f46', borderRadius: 999, boxShadow: isLeader ? `0 0 16px ${accentColor}66` : 'none'}} />
+          <div style={{width: Math.max(0, barW * pop), height: '100%', backgroundColor: isLeader ? accentColor : '#3f3f46', borderRadius: 999, boxShadow: isLeader ? `0 0 ${18 * scale}px ${accentColor}99` : 'none', transform: `scaleY(${scale})`}} />
         </div>
-        <div style={{width: 110, flexShrink: 0, textAlign: 'right'}}>
+        <div style={{width: VALUE_W, flexShrink: 0, textAlign: 'right'}}>
           <span style={{fontSize: 21, fontWeight: 800, color: isLeader ? accentColor : '#ffffff', fontVariantNumeric: 'tabular-nums', opacity: p.active ? 1 : 0.25}}>
             {p.active ? p.current.toLocaleString() : '–'}
           </span>
@@ -189,11 +217,22 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
 
       {/* Rows */}
       <div style={{flex: 1, position: 'relative', marginTop: 36, overflow: 'hidden'}}>
-        {activeP.map((p, i) => renderRow(p, laneY(i)))}
-        {inactiveP.map((p, i) => renderRow(p, laneY(activeP.length + i)))}
+        {visibleActive.map((p, i) => renderRow(p, laneY(i)))}
+        {visibleInactive.map((p, i) => renderRow(p, laneY(visibleActive.length + i)))}
 
         {/* Sweeping guide line */}
-        <div style={{position: 'absolute', top: 0, bottom: 0, left: guideX, width: 3, backgroundColor: accentColor, boxShadow: `0 0 12px 2px ${accentColor}55`, opacity: 0.9}} />
+        {showRefLine && (
+          <>
+            <div style={{position: 'absolute', top: 0, bottom: 0, left: guideX, width: 3, backgroundColor: accentColor, boxShadow: `0 0 12px 2px ${accentColor}55`, opacity: 0.9}} />
+            {showDateLabel && (
+              <div style={{position: 'absolute', left: guideX - 70, top: -6, width: 140, textAlign: 'center', opacity: 0.95}}>
+                <div style={{display: 'inline-block', backgroundColor: accentColor, color: '#0a0a0a', fontSize: 17, fontWeight: 800, padding: '5px 14px', borderRadius: 999, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap'}}>
+                  {fmtDate(min + span * guideT, dateFormat)}
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Date axis with ticks */}

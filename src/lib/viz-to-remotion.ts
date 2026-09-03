@@ -111,7 +111,7 @@ function convertTimelineRace(
 ): Record<string, unknown> {
   const rows = data ?? [];
   if (rows.length === 0) {
-    return {title: config.title ?? '', items: [], accentColor: config.colors?.[0] ?? '#FFD700', dateMode: false};
+    return {title: (tc?.title || config.title) ?? '', items: [], accentColor: config.colors?.[0] ?? '#FFD700', dateMode: false};
   }
 
   // Explicit per-template column mapping wins; otherwise fall back to the
@@ -142,10 +142,14 @@ function convertTimelineRace(
     // Compat: simple parallel bar ordered by value (no sweeping guide).
     const sorted = [...items].sort((a, b) => b.value - a.value);
     return {
-      title: config.title ?? '',
+      title: (tc?.title || config.title) ?? '',
       items: sorted,
       accentColor: config.colors?.[0] ?? '#FFD700',
       dateMode: false,
+      maxRows: tc?.maxRows,
+      showYAxis: tc?.showYAxis,
+      showRefLine: tc?.showRefLine,
+      showDateLabel: tc?.showDateLabel,
     };
   }
 
@@ -194,11 +198,15 @@ function convertTimelineRace(
 
   if (steps.length === 0) {
     return {
-      title: config.title ?? '',
+      title: (tc?.title || config.title) ?? '',
       items: [],
       accentColor: config.colors?.[0] ?? '#FFD700',
       dateMode: true,
       domain: [min, max] as [number, number],
+      maxRows: tc?.maxRows,
+      showYAxis: tc?.showYAxis,
+      showRefLine: tc?.showRefLine,
+      showDateLabel: tc?.showDateLabel,
     };
   }
 
@@ -211,12 +219,16 @@ function convertTimelineRace(
   steps.sort((a, b) => a.label.localeCompare(b.label) || a.date - b.date);
 
   return {
-    title: config.title ?? '',
+    title: (tc?.title || config.title) ?? '',
     items: steps,
     accentColor: config.colors?.[0] ?? '#FFD700',
     dateMode: true,
     dateFormat: fmt,
     domain: [sMin, sMax] as [number, number],
+    maxRows: tc?.maxRows,
+    showYAxis: tc?.showYAxis,
+    showRefLine: tc?.showRefLine,
+    showDateLabel: tc?.showDateLabel,
   };
 }
 
