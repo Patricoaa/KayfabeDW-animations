@@ -59,11 +59,13 @@ export function PropertiesPanel({
 function FilterRow({
   filter,
   table,
+  connector,
   onUpdate,
   onRemove,
 }: {
   filter: FilterRule;
   table: TableInfo;
+  connector?: {value: FilterRule['logic'] | undefined; onToggle: (l: FilterRule['logic']) => void};
   onUpdate: (patch: Partial<FilterRule>) => void;
   onRemove: () => void;
 }) {
@@ -71,13 +73,36 @@ function FilterRow({
   const col = table.columns.find((c) => c.name === filter.column);
   const isNumeric = col ? isNumericType(col.type) : false;
   const isDate = col ? isDateType(col.type) : false;
+  const cLogic = connector?.value ?? 'AND';
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1 min-w-0">
+      {connector && (
+        <div className="flex items-center gap-0.5 shrink-0">
+          <button
+            onClick={() => connector.onToggle('AND')}
+            className={`text-[9px] font-semibold rounded px-1 py-0.5 transition-colors ${
+              cLogic === 'AND' ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover'
+            }`}
+            title="Concatenar con AND al filtro anterior"
+          >
+            AND
+          </button>
+          <button
+            onClick={() => connector.onToggle('OR')}
+            className={`text-[9px] font-semibold rounded px-1 py-0.5 transition-colors ${
+              cLogic === 'OR' ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover'
+            }`}
+            title="Concatenar con OR al filtro anterior"
+          >
+            OR
+          </button>
+        </div>
+      )}
       <select
         value={filter.column}
         onChange={(e) => onUpdate({column: e.target.value})}
-        className="flex-1 bg-elevated border border-border-default rounded px-1.5 py-0.5 text-[10px] font-body"
+        className="min-w-0 flex-1 bg-elevated border border-border-default rounded px-1.5 py-0.5 text-[10px] font-body"
       >
         {table.columns.map((c) => (
           <option key={c.name} value={c.name}>{c.name}</option>
@@ -86,7 +111,7 @@ function FilterRow({
       <select
         value={filter.op}
         onChange={(e) => onUpdate({op: e.target.value as FilterRule['op']})}
-        className="w-14 bg-elevated border border-border-default rounded px-1.5 py-0.5 text-[10px] font-mono"
+        className="w-12 shrink-0 bg-elevated border border-border-default rounded px-1 py-0.5 text-[10px] font-mono"
       >
         {ops.map((o) => (
           <option key={o} value={o}>{o}</option>
@@ -98,26 +123,26 @@ function FilterRow({
             type="date"
             value={filter.value ?? ''}
             onChange={(e) => onUpdate({value: e.target.value})}
-            className="flex-1 bg-elevated border border-border-default rounded px-1.5 py-0.5 text-[10px] font-body"
+            className="min-w-0 flex-1 bg-elevated border border-border-default rounded px-1.5 py-0.5 text-[10px] font-body"
           />
         ) : isNumeric ? (
           <input
             type="number"
             value={filter.value ?? ''}
             onChange={(e) => onUpdate({value: e.target.value})}
-            className="flex-1 bg-elevated border border-border-default rounded px-1.5 py-0.5 text-[10px] font-body"
+            className="min-w-0 flex-1 bg-elevated border border-border-default rounded px-1.5 py-0.5 text-[10px] font-body"
           />
         ) : (
           <input
             type="text"
             value={filter.value ?? ''}
             onChange={(e) => onUpdate({value: e.target.value})}
-            className="flex-1 bg-elevated border border-border-default rounded px-1.5 py-0.5 text-[10px] font-body"
+            className="min-w-0 flex-1 bg-elevated border border-border-default rounded px-1.5 py-0.5 text-[10px] font-body"
             placeholder="valor"
           />
         )
       )}
-      <button onClick={onRemove} className="p-0.5 text-muted hover:text-red-500 rounded" aria-label="Quitar filtro">
+      <button onClick={onRemove} className="p-0.5 shrink-0 text-muted hover:text-red-500 rounded" aria-label="Quitar filtro">
         <X size={11} />
       </button>
     </div>
@@ -388,39 +413,19 @@ function CrossTablePanel({
                         <div className="space-y-1 mt-1">
                           {colFilters.map(({f, idx}, pos) => {
                             const prev = pos > 0 ? colFilters[pos - 1] : null;
-                            const prevLogic = prev ? (prev.f.logic ?? 'AND') : 'AND';
                             return (
                               <div key={idx}>
-                                {pos > 0 && prev && (
-                                  <div className="flex items-center gap-1 justify-center py-0.5">
-                                    <span
-                                      className={`text-[9px] font-semibold rounded px-1.5 py-0.5 cursor-pointer transition-colors ${
-                                        prevLogic === 'AND'
-                                          ? 'bg-amber-500 text-black'
-                                          : 'bg-elevated text-secondary hover:bg-card-hover'
-                                      }`}
-                                      onClick={() => updateFilter(prev.idx, {logic: 'OR'})}
-                                      title="Concatenar con OR al filtro anterior"
-                                    >
-                                      AND
-                                    </span>
-                                    <span className="text-muted">/</span>
-                                    <span
-                                      className={`text-[9px] font-semibold rounded px-1.5 py-0.5 cursor-pointer transition-colors ${
-                                        prevLogic === 'OR'
-                                          ? 'bg-amber-500 text-black'
-                                          : 'bg-elevated text-secondary hover:bg-card-hover'
-                                      }`}
-                                      onClick={() => updateFilter(prev.idx, {logic: 'AND'})}
-                                      title="Concatenar con AND al filtro anterior"
-                                    >
-                                      OR
-                                    </span>
-                                  </div>
-                                )}
                                 <FilterRow
                                   filter={f}
                                   table={table}
+                                  connector={
+                                    pos > 0 && prev
+                                      ? {
+                                          value: prev.f.logic,
+                                          onToggle: (l) => updateFilter(prev.idx, {logic: l}),
+                                        }
+                                      : undefined
+                                  }
                                   onUpdate={(patch) => updateFilter(idx, patch)}
                                   onRemove={() => removeFilter(idx)}
                                 />
