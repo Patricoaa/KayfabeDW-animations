@@ -33,40 +33,35 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
         onChange={(v) => update({labelField: v || undefined})}
       />
       <FieldSelect
-        label="Inicio / posición"
-        value={value.startField ?? ''}
+        label="Imagen del participante (opcional)"
+        value={value.imageField ?? ''}
         options={fieldMeta}
         fallback={columns}
-        onChange={(v) => update({startField: v || undefined})}
-      />
-      <FieldSelect
-        label="Fin (opcional)"
-        value={value.endField ?? ''}
-        options={fieldMeta}
-        fallback={columns}
-        onChange={(v) => update({endField: v || undefined})}
+        role="any"
         optional
+        onChange={(v) => update({imageField: v || undefined})}
       />
       <FieldSelect
-        label="Valor / duración"
+        label="Fecha (eje X / guía)"
+        value={value.dateField ?? ''}
+        options={fieldMeta}
+        fallback={columns}
+        role="date"
+        onChange={(v) => update({dateField: v || undefined})}
+      />
+      <FieldSelect
+        label="Valor acumulado"
         value={value.valueField ?? ''}
         options={fieldMeta}
         fallback={columns}
         role="numeric"
         onChange={(v) => update({valueField: v || undefined})}
       />
-      <FieldSelect
-        label="Secundario (opcional)"
-        value={value.secondaryField ?? ''}
-        options={fieldMeta}
-        fallback={columns}
-        role="numeric"
-        onChange={(v) => update({secondaryField: v || undefined})}
-        optional
-      />
 
       <p className="text-[10px] text-muted">
-        Mapea las columnas del timeline. Si dejás un campo vacío, se usa la asignación del gráfico estático.
+        Una guía vertical barre el eje de fechas de izquierda a derecha; al pasar la fecha de un
+        participante, su valor acumulado salta y entra al ranking. Dejá la fecha vacía para usar
+        una vista de barras simples.
       </p>
     </div>
   );
@@ -85,12 +80,18 @@ function FieldSelect({
   value: string;
   options?: ColumnMeta[];
   fallback?: string[];
-  role?: 'any' | 'numeric';
+  role?: 'any' | 'numeric' | 'date';
   onChange: (v: string) => void;
   optional?: boolean;
 }) {
   const useMeta = options.length > 0;
   const numericList = options.filter((o) => o.isNumeric);
+
+  const pickList = useMeta
+    ? role === 'numeric'
+      ? numericList
+      : options
+    : fallback;
 
   return (
     <div>
@@ -101,17 +102,20 @@ function FieldSelect({
         className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
       >
         {optional && <option value="">Ninguno</option>}
-        {!useMeta &&
-          fallback.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        {useMeta &&
-          (role === 'numeric' ? numericList : options).map((o) => (
-            <option key={o.alias} value={o.alias}>
-              {o.alias}
+        {pickList.map((c) => {
+          const alias = typeof c === 'string' ? c : c.alias;
+          return (
+            <option key={alias} value={alias}>
+              {alias}
             </option>
-          ))}
+          );
+        })}
       </select>
+      {role === 'date' && useMeta && numericList.length === options.length && (
+        <p className="text-[10px] text-muted mt-0.5">
+          Si tu columna de fecha no se detecta, se intentará parsear en el render.
+        </p>
+      )}
     </div>
   );
 }

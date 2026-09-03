@@ -65,39 +65,99 @@ function convertWinStreak(data: Record<string, unknown>[], config: ChartConfig):
   };
 }
 
+// Resolve an image-URL column value to a usable avatar URL (mirrors the static
+// bar-chart avatar convention: only absolute/data/root-relative URLs count).
+function avatarUrlOf(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const t = value.trim();
+  if (t === '') return null;
+  if (t.startsWith('http://') || t.startsWith('https://') || t.startsWith('data:image/') || t.startsWith('/')) return t;
+  return null;
+}
+
+function parseDateValue(value: unknown): number | null {
+  if (value == null || value === '') return null;
+  if (typeof value === 'number') {
+    const t = new Date(value).getTime();
+    return isNaN(t) ? null : t;
+  }
+  const s = String(value).trim();
+  if (s === '') return null;
+  if (!isNaN(Number(s))) {
+    const n = Number(s);
+    if (n < 1e10) return null; // not an epoch ms; treat as non-date
+    const t = new Date(n).getTime();
+    return isNaN(t) ? null : t;
+  }
+  // ISO 8601 (with or without time)
+  const iso = Date.parse(s);
+  if (!isNaN(iso)) return iso;
+  // DD/MM/YYYY or DD-MM-YYYY (day first — common in es locales)
+  const dm = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})(?:\s+.*)?$/);
+  if (dm) {
+    const [_, d, mo, y] = dm;
+    let year = Number(y);
+    if (year < 100) year += 2000;
+    const t = new Date(year, Number(mo) - 1, Number(d)).getTime();
+    if (!isNaN(t)) return t;
+  }
+  return null;
+}
+
 function convertTimelineRace(
   data: Record<string, unknown>[],
   config: ChartConfig,
   tc?: TimelineRaceConfig,
 ): Record<string, unknown> {
-  // Explicit per-template column mapping wins; otherwise fall back to the
-  // inherited static xField/yField plus heuristic column detection for start /
-  // end / secondary so older saved data keeps rendering.
-  const labelField = tc?.labelField ?? config.xField;
-  const valueField = tc?.valueField ?? config.yField;
-  const startField = tc?.startField;
-  const endField = tc?.endField ?? Object.keys(data[0] ?? {}).find((k) =>
-    k.toLowerCase().includes('end') || k.toLowerCase().includes('fin'));
-  const secondaryField =
-    tc?.secondaryField ??
-    Object.keys(data[0] ?? {}).find((k) =>
-      k.toLowerCase().includes('defense') || k.toLowerCase().includes('defensa'));
-
   const rows = data ?? [];
+  if (rows.length === 0) {
+    return {title: config.title ?? '', items: [], accentColor: config.colors?.[0] ?? '#FFD700', dateMode: false};
+  }
+
+  // Explicit per-template column mapping wins; otherwise fall back to the
+  // inherited static xField/yField plus heuristic detection.
+  const labelField = tc?.labelField ?? config.xField ?? Object.keys(rows[0])[0];
+  const valueField = tc?.valueField ?? config.yField;
+  const imageField = tc?.imageField;
+  const startField =
+    tc?.dateField ??
+    Object.keys(rows[0]).find((k) =>
+      k.toLowerCase().includes('date') || k.toLowerCase().includes('fecha') ||
+      k.toLowerCase().includes('inicio') || k.toLowerCase().includes('start'));
+
   const items = rows
     .map((row) => ({
-      label: String(row[labelField ?? Object.keys(row)[0] ?? ''] ?? ''),
-      start: startField ? String(row[startField] ?? '') : String(row[labelField ?? ''] ?? ''),
-      end: endField ? (row[endField] != null ? String(row[endField]) : null) : null,
+      label: String(row[labelField] ?? ''),
+      image: imageField ? avatarUrlOf(row[imageField]) : null,
+      date: startField ? parseDateValue(row[startField]) : null,
       value: Number(row[valueField ?? Object.keys(row)[1] ?? ''] ?? 0),
-      secondary: secondaryField ? Number(row[secondaryField] ?? 0) : 0,
     }))
     .filter((it) => !isNaN(it.value));
+
+  // dateMode only when we actually parsed dates for at least two rows.
+  const dates = items.map((i) => i.date).filter((d): d is number => d != null);
+  const dateMode = dates.length >= 2;
+
+  if (!dateMode) {
+    // Compat: simple parallel bar ordered by value (no sweeping guide).
+    const sorted = [...items].sort((a, b) => b.value - a.value);
+    return {
+      title: config.title ?? '',
+      items: sorted,
+      accentColor: config.colors?.[0] ?? '#FFD700',
+      dateMode: false,
+    };
+  }
+
+  const min = Math.min(...dates);
+  const max = Math.max(...dates);
 
   return {
     title: config.title ?? '',
     items,
     accentColor: config.colors?.[0] ?? '#FFD700',
+    dateMode: true,
+    domain: [min, max] as [number, number],
   };
 }
 
