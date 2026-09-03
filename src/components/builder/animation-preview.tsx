@@ -7,6 +7,8 @@ import type {ChartConfig} from '@/lib/chart-config';
 import {convertToRemotionProps} from '@/lib/viz-to-remotion';
 import {TEMPLATES} from '@/remotion/generated/registry';
 import type {TemplateId} from '@/remotion/generated/registry';
+import {EXPORT_PRESETS} from '@/lib/export-presets';
+import type {ExportPresetId} from '@/lib/export-presets';
 
 type RenderState =
   | {status: 'idle'}
@@ -24,6 +26,8 @@ type AnimationPreviewProps = {
   onDurationChange?: (d: number) => void;
   width?: number;
   height?: number;
+  presetId?: ExportPresetId;
+  onPresetChange?: (id: ExportPresetId) => void;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -67,6 +71,8 @@ export function AnimationPreview({
   onDurationChange,
   width,
   height,
+  presetId,
+  onPresetChange,
 }: AnimationPreviewProps) {
   const [renderState, setRenderState] = useState<RenderState>({status: 'idle'});
   const [duration, setDuration] = useState(externalDuration ?? 10);
@@ -217,6 +223,34 @@ export function AnimationPreview({
           {duration}s · {duration * fps} frames
         </span>
       </div>
+
+      {/* Tamaño / preset — ajusta el canvas de la preview (paso 2) */}
+      {onPresetChange && (
+      <div className="flex items-center gap-3 px-6 py-3 border-t border-border-subtle bg-elevated">
+        <label className="text-xs font-medium text-secondary w-24 shrink-0 font-body">
+          Tamaño
+        </label>
+        <div className="flex flex-wrap gap-1.5">
+          {EXPORT_PRESETS.filter((p) => p.id !== 'custom').map((p) => (
+            <button
+              key={p.id}
+              onClick={() => onPresetChange(p.id)}
+              title={`${p.label} · ${p.width}×${p.height}`}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+                presetId === p.id
+                  ? 'bg-amber-500 text-black'
+                  : 'bg-card-hover text-secondary hover:bg-border-default'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <span className="text-[11px] text-muted font-mono ml-auto shrink-0">
+          {width}×{height}
+        </span>
+      </div>
+      )}
 
       {/* Export bar — hidden when showExportBar is false (step 2 in builder) */}
       {showExportBar && (

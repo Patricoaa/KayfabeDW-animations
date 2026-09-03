@@ -645,6 +645,8 @@ function BuilderContent() {
                 onDurationChange={setDuration}
                 width={exportSize.width}
                 height={exportSize.height}
+                presetId={exportPresetId}
+                onPresetChange={setExportPresetId}
               />
             ) : (
               <div className="h-full flex items-center justify-center text-muted text-sm font-body">
