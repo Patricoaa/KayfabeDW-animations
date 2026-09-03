@@ -1,4 +1,4 @@
-import {useCurrentFrame, useVideoConfig, interpolate, spring, Easing, Img, staticFile} from 'remotion';
+import {useCurrentFrame, useVideoConfig, interpolate, spring, Img, staticFile} from 'remotion';
 
 // A date-driven ranked bar race. Each participant has a `date` (timestamp on
 // the shared axis). A vertical guide sweeps left→right across the duration;
@@ -20,13 +20,16 @@ export type TimelineRaceProps = {
   accentColor?: string;
   dateMode?: boolean;
   domain?: [number, number];
+  dateFormat?: 'day' | 'month' | 'year';
 };
 
-function fmtDate(t: number): string {
+function fmtDate(t: number, fmt: TimelineRaceProps['dateFormat'] = 'day'): string {
   const d = new Date(t);
-  const dd = String(d.getDate()).padStart(2, '0');
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const y = d.getFullYear();
+  if (fmt === 'year') return String(y);
+  if (fmt === 'month') return `${mm}/${y}`;
+  const dd = String(d.getDate()).padStart(2, '0');
   return `${dd}/${mm}/${y}`;
 }
 
@@ -36,6 +39,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   accentColor = '#FFD700',
   dateMode = false,
   domain,
+  dateFormat = 'day',
 }) => {
   const frame = useCurrentFrame();
   const {fps, durationInFrames} = useVideoConfig();
@@ -111,44 +115,65 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const guideT = raw * raw * (3 - 2 * raw); // smoothstep easing
   const guideX = TRACK_LEFT + guideT * (TRACK_RIGHT - TRACK_LEFT);
 
-  // For each row, normalized x position of its date.
-  const placed = withDate.map((r) => ({...r, x: ((r.date as number) - min) / span}));
+  // ---- Group steps by participant (label) ----
+  // A participant may appear across multiple dates (steps); their row shows the
+  // cumulative value at the most recent step the guide has already passed.
+  const byLabel = new Map<string, {image?: string | null; steps: {x: number; value: number}[]}>();
+  for (const r of withDate) {
+    const x = ((r.date as number) - min) / span;
+    let entry = byLabel.get(r.label);
+    if (!entry) {
+      entry = {image: r.image, steps: []};
+      byLabel.set(r.label, entry);
+    }
+    entry.steps.push({x, value: r.value});
+  }
+  const participants = Array.from(byLabel.entries()).map(([label, e]) => {
+    const sorted = [...e.steps].sort((a, b) => a.x - b.x);
+    const passed = sorted.filter((s) => guideT >= s.x);
+    const current = passed.length > 0 ? passed[passed.length - 1].value : 0;
+    const firstX = sorted[0]?.x ?? 1;
+    return {
+      label,
+      image: e.image,
+      current,
+      active: passed.length > 0,
+      firstX,
+    };
+  });
 
-  // Active rows (guide passed their date) get ranked by value; inactive stay in
-  // their placeholder lane below. We keep a stable per-item slot so rows don't
-  // visually teleport: active rows derive a target index up top, inactive ones
-  // fill the remaining lanes beneath, ordered by value.
-  const active = placed.filter((r) => guideT >= r.x).sort((a, b) => b.value - a.value);
-  const inactive = placed.filter((r) => guideT < r.x).sort((a, b) => b.value - a.value);
+  const activeP = participants.filter((p) => p.active).sort((a, b) => b.current - a.current);
+  const inactiveP = participants.filter((p) => !p.active).sort((a, b) => b.current - a.current);
+  const allP = [...activeP, ...inactiveP];
 
-  const ROW_H = placed.length <= 6 ? 96 : Math.max(52, 560 / placed.length);
+  const ROW_H = allP.length <= 6 ? 96 : Math.max(52, 560 / allP.length);
   const laneY = (index: number) => 40 + index * (ROW_H + 8);
 
-  const renderRow = (item: {label: string; image?: string | null; value: number; x: number}, y: number, isActive: boolean) => {
-    const display = isActive ? item.value : 0;
-    const isLeader = isActive && item.value === active[0]?.value;
-    const barW = (display / maxValue) * 940 * (isActive ? 1 : 0);
+  const renderRow = (p: {label: string; image?: string | null; current: number; active: boolean; firstX: number}, y: number) => {
+    const display = p.active ? p.current : 0;
+    const isLeader = p.active && p.current === activeP[0]?.current;
+    const barW = (display / maxValue) * 940 * (p.active ? 1 : 0);
     const pop = spring({
       fps,
-      frame: isActive ? frame - Math.max(0, Math.floor((item.x / 1.001) * sweepFrames)) : frame,
+      frame: p.active ? frame - Math.max(0, Math.floor((p.firstX / 1.001) * sweepFrames)) : frame,
       config: {damping: 22, stiffness: 110},
       durationInFrames: 28,
     });
     return (
-      <div key={item.label} style={{position: 'absolute', left: 0, right: 0, height: ROW_H, top: y, display: 'flex', alignItems: 'center', gap: 16, opacity: 1}}>
+      <div key={p.label} style={{position: 'absolute', left: 0, right: 0, height: ROW_H, top: y, display: 'flex', alignItems: 'center', gap: 16, opacity: 1}}>
         <div style={{width: 320, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, minWidth: 0}}>
-          {item.image && <Avatar src={item.image} />}
+          {p.image && <Avatar src={p.image} />}
           <div style={{minWidth: 0}}>
-            <div style={{fontSize: 21, fontWeight: 700, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>{item.label}</div>
-            {isActive && <div style={{fontSize: 14, color: '#64748b', fontVariantNumeric: 'tabular-nums'}}>{item.value.toLocaleString()}</div>}
+            <div style={{fontSize: 21, fontWeight: 700, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>{p.label}</div>
+            {p.active && <div style={{fontSize: 14, color: '#64748b', fontVariantNumeric: 'tabular-nums'}}>{p.current.toLocaleString()}</div>}
           </div>
         </div>
         <div style={{flex: 1, height: ROW_H * 0.46, backgroundColor: '#171717', borderRadius: 999, overflow: 'hidden', display: 'flex', position: 'relative'}}>
           <div style={{width: Math.max(0, barW * pop), height: '100%', backgroundColor: isLeader ? accentColor : '#3f3f46', borderRadius: 999, boxShadow: isLeader ? `0 0 16px ${accentColor}66` : 'none'}} />
         </div>
         <div style={{width: 110, flexShrink: 0, textAlign: 'right'}}>
-          <span style={{fontSize: 21, fontWeight: 800, color: isLeader ? accentColor : '#ffffff', fontVariantNumeric: 'tabular-nums', opacity: isActive ? 1 : 0.25}}>
-            {isActive ? item.value.toLocaleString() : '–'}
+          <span style={{fontSize: 21, fontWeight: 800, color: isLeader ? accentColor : '#ffffff', fontVariantNumeric: 'tabular-nums', opacity: p.active ? 1 : 0.25}}>
+            {p.active ? p.current.toLocaleString() : '–'}
           </span>
         </div>
       </div>
@@ -164,8 +189,8 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
 
       {/* Rows */}
       <div style={{flex: 1, position: 'relative', marginTop: 36, overflow: 'hidden'}}>
-        {active.map((r, i) => renderRow(r, laneY(i), true))}
-        {inactive.map((r, i) => renderRow(r, laneY(active.length + i), false))}
+        {activeP.map((p, i) => renderRow(p, laneY(i)))}
+        {inactiveP.map((p, i) => renderRow(p, laneY(activeP.length + i)))}
 
         {/* Sweeping guide line */}
         <div style={{position: 'absolute', top: 0, bottom: 0, left: guideX, width: 3, backgroundColor: accentColor, boxShadow: `0 0 12px 2px ${accentColor}55`, opacity: 0.9}} />
@@ -176,7 +201,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
         {[0, 0.25, 0.5, 0.75, 1].map((p) => (
           <div key={p} style={{flex: 1, position: 'relative', fontSize: 15, color: '#64748b', fontVariantNumeric: 'tabular-nums'}}>
             <div style={{position: 'absolute', left: 0, top: -12, height: 8, width: 1, backgroundColor: '#1f2937'}} />
-            {fmtDate(min + span * p)}
+            {fmtDate(min + span * p, dateFormat)}
           </div>
         ))}
       </div>

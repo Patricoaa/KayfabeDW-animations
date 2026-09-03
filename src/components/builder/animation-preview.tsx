@@ -20,6 +20,8 @@ type AnimationPreviewProps = {
   config: ChartConfig;
   duration?: number;
   showExportBar?: boolean;
+  templateConfig?: import('@/lib/animation-config').AnimationTemplateConfig;
+  onDurationChange?: (d: number) => void;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -59,12 +61,22 @@ export function AnimationPreview({
   config,
   duration: externalDuration,
   showExportBar = true,
+  templateConfig,
+  onDurationChange,
 }: AnimationPreviewProps) {
   const [renderState, setRenderState] = useState<RenderState>({status: 'idle'});
   const [duration, setDuration] = useState(externalDuration ?? 10);
   const [mounted, setMounted] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   useEffect(() => setMounted(true), []);
+
+  // Keep the internal duration in sync when the parent controls it (the
+  // duration slider lives under the preview in the builder).
+  useEffect(() => {
+    if (externalDuration != null && externalDuration !== duration) {
+      setDuration(externalDuration);
+    }
+  }, [externalDuration]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const entry = TEMPLATES[templateId as TemplateId];
   const fps = entry?.meta.fps ?? 30;
@@ -73,9 +85,14 @@ export function AnimationPreview({
   // Convert query data into template props so the MP4 matches the static/preview
   // chart. (The canonical template data feature was removed.)
   const remotionProps = useMemo(
-    () => (data.length > 0 ? convertToRemotionProps(config, data, templateId)?.props ?? null : null),
-    [templateId, config, data],
+    () => (data.length > 0 ? convertToRemotionProps(config, data, templateId, templateConfig)?.props ?? null : null),
+    [templateId, config, data, templateConfig],
   );
+
+  const changeDuration = (d: number) => {
+    setDuration(d);
+    onDurationChange?.(d);
+  };
 
   const handleExport = async () => {
     if (!remotionProps) return;
@@ -173,25 +190,30 @@ export function AnimationPreview({
         </div>
       </div>
 
+      {/* Duración — configuración principal bajo el preview. Controla la
+          velocidad de la animación (inicio a fin). */}
+      <div className="flex items-center gap-4 px-6 py-3 border-t border-border-default bg-elevated">
+        <label htmlFor="duration-main-slider" className="text-xs font-medium text-secondary w-24 shrink-0 font-body">
+          Duración
+        </label>
+        <input
+          id="duration-main-slider"
+          type="range"
+          min={1}
+          max={20}
+          value={duration}
+          onChange={(e) => changeDuration(Number(e.target.value))}
+          className="flex-1 accent-amber-500"
+          aria-label="Duración de la animación en segundos"
+        />
+        <span className="text-sm text-secondary w-40 text-right font-mono shrink-0">
+          {duration}s · {duration * fps} frames
+        </span>
+      </div>
+
       {/* Export bar — hidden when showExportBar is false (step 2 in builder) */}
       {showExportBar && (
       <div className="flex items-center gap-3 px-6 py-3 border-t border-border-subtle bg-elevated">
-        {/* Duration control */}
-        <div className="flex items-center gap-2">
-          <label htmlFor="duration-slider" className="text-xs text-muted">Duración:</label>
-          <input
-            id="duration-slider"
-            type="range"
-            min={1}
-            max={20}
-            value={duration}
-            onChange={(e) => setDuration(Number(e.target.value))}
-            className="w-20 accent-amber-500"
-            aria-label="Duración de la animación en segundos"
-          />
-          <span className="text-xs text-secondary w-12 text-right">{duration}s</span>
-        </div>
-
         <div className="flex-1" />
 
         {/* Render status */}

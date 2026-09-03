@@ -152,12 +152,71 @@ function convertTimelineRace(
   const min = Math.min(...dates);
   const max = Math.max(...dates);
 
+  // ---- Accumulate per participant ----
+  // Group each participant's events by time period (day/month/year per
+  // dateFormat), then compute a running cumulative value so that when the
+  // sweeping guide crosses a participant's date, its bar jumps to the total
+  // up to that moment. Items are emitted as steps (label repeats); the
+  // template renders one row per distinct label.
+  const fmt = tc?.dateFormat ?? 'day';
+  const periodStart = (t: number, f: typeof fmt): number => {
+    const d = new Date(t);
+    if (f === 'year') return new Date(d.getFullYear(), 0, 1).getTime();
+    if (f === 'month') return new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  };
+
+  const byLabel = new Map<string, {image: string | null; steps: {period: number; value: number}[]}>();
+  for (const it of items) {
+    if (it.date == null || it.label === '') continue;
+    let entry = byLabel.get(it.label);
+    if (!entry) {
+      entry = {image: it.image, steps: []};
+      byLabel.set(it.label, entry);
+    }
+    entry.steps.push({period: periodStart(it.date, fmt), value: it.value});
+  }
+
+  const steps: {label: string; image: string | null; date: number; value: number}[] = [];
+  for (const [label, entry] of byLabel) {
+    // Sum values within each period.
+    const summed = new Map<number, number>();
+    for (const s of entry.steps) {
+      summed.set(s.period, (summed.get(s.period) ?? 0) + s.value);
+    }
+    const ordered = Array.from(summed.entries()).sort((a, b) => a[0] - b[0]);
+    let running = 0;
+    for (const [period, v] of ordered) {
+      running += v;
+      steps.push({label, image: entry.image, date: period, value: running});
+    }
+  }
+
+  if (steps.length === 0) {
+    return {
+      title: config.title ?? '',
+      items: [],
+      accentColor: config.colors?.[0] ?? '#FFD700',
+      dateMode: true,
+      domain: [min, max] as [number, number],
+    };
+  }
+
+  const stepDates = steps.map((s) => s.date);
+  const sMin = Math.min(...stepDates);
+  const sMax = Math.max(...stepDates);
+
+  // Stable sort by value (per-frame ranking happens in the template); here we
+  // keep steps grouped by label but ordered by date for a defined output.
+  steps.sort((a, b) => a.label.localeCompare(b.label) || a.date - b.date);
+
   return {
     title: config.title ?? '',
-    items,
+    items: steps,
     accentColor: config.colors?.[0] ?? '#FFD700',
     dateMode: true,
-    domain: [min, max] as [number, number],
+    dateFormat: fmt,
+    domain: [sMin, sMax] as [number, number],
   };
 }
 

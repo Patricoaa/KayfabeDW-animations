@@ -112,7 +112,6 @@ function BuilderContent() {
     ? suggestBestTemplate(chartConfig, data)
     : null;
   const activeTemplate = selectedTemplate ?? bestTemplate;
-  const templateEntry = activeTemplate ? TEMPLATES[activeTemplate as TemplateId] : null;
 
   // Load schema metadata
   useEffect(() => {
@@ -635,6 +634,8 @@ function BuilderContent() {
                 config={chartConfig}
                 duration={duration}
                 showExportBar={false}
+                templateConfig={templateConfig}
+                onDurationChange={setDuration}
               />
             ) : (
               <div className="h-full flex items-center justify-center text-muted text-sm font-body">
@@ -721,29 +722,6 @@ function BuilderContent() {
                     value={templateConfig['timeline-race'] ?? {}}
                     onChange={(tc) => setTemplateConfig((prev) => ({...prev, 'timeline-race': tc as TimelineRaceConfig}))}
                   />
-                )}
-
-                {/* Duration slider */}
-                {activeTemplate && templateEntry && (
-                  <div className="space-y-1.5 border-t border-border-default pt-3">
-                    <label htmlFor="duration-slider" className="text-sm font-medium mb-1 block font-body">
-                      Duración (segundos)
-                    </label>
-                    <div className="flex items-center gap-3">
-                      <input
-                        id="duration-slider"
-                        type="range"
-                        min={1}
-                        max={20}
-                        value={duration}
-                        onChange={(e) => setDuration(Number(e.target.value))}
-                        className="flex-1 accent-amber-500"
-                      />
-                      <span className="text-sm text-secondary w-20 text-right font-mono">
-                        {duration}s ({duration * (templateEntry.meta.fps ?? 30)} frames)
-                      </span>
-                    </div>
-                  </div>
                 )}
               </>
             )}
