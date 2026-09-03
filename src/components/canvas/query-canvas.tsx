@@ -846,7 +846,7 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
       </div>
 
       {/* Right panel — properties */}
-      <div className="w-64 shrink-0 min-h-0 border-l border-border-default overflow-y-auto p-3">
+      <div className="w-80 shrink-0 min-h-0 border-l border-border-default overflow-y-auto p-3">
         <PropertiesPanel
           spec={spec}
           meta={meta}

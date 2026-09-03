@@ -82,8 +82,13 @@ export function describeQuerySpec(spec: QuerySpec): string {
     spec.joins.forEach((j) => parts.push(`${j.type ?? 'INNER'} JOIN ${j.table} ON ${j.on}`));
   }
   if (spec.filters && spec.filters.length > 0) {
-    const filters = spec.filters.map((f) => `${f.column} ${f.op} ${f.value ?? ''}`);
-    parts.push(`WHERE ${filters.join(' AND ')}`);
+    const clauses: string[] = [];
+    spec.filters.forEach((f, i) => {
+      const clause = `${f.column} ${f.op} ${f.value ?? ''}`;
+      if (i > 0) clauses.push(spec.filters![i - 1].logic ?? 'AND');
+      clauses.push(clause);
+    });
+    parts.push(`WHERE ${clauses.join(' ')}`);
   }
   if (spec.groupBy && spec.groupBy.length > 0) {
     parts.push(`GROUP BY ${spec.groupBy.join(', ')}`);

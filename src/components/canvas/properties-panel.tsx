@@ -192,8 +192,13 @@ function buildSql(spec: QuerySpec): string[] {
     spec.joins.forEach((j) => parts.push(`${j.type ?? 'INNER'} JOIN ${j.table} ON ${j.on}`));
   }
   if (spec.filters && spec.filters.length > 0) {
-    const filters = spec.filters.map((f) => `${f.table ?? spec.table}.${f.column} ${f.op} ${f.value ?? ''}`);
-    parts.push(`WHERE ${filters.join(' AND ')}`);
+    const clauses: string[] = [];
+    spec.filters.forEach((f, i) => {
+      const clause = `${f.table ?? spec.table}.${f.column} ${f.op} ${f.value ?? ''}`;
+      if (i > 0) clauses.push((spec.filters?.[i - 1].logic ?? 'AND'));
+      clauses.push(clause);
+    });
+    parts.push(`WHERE ${clauses.join(' ')}`);
   }
   if (spec.groupBy && spec.groupBy.length > 0) {
     parts.push(`GROUP BY ${spec.groupBy.join(', ')}`);
@@ -220,7 +225,7 @@ function CrossTablePanel({
   const AGGREGATES = ['sum', 'avg', 'count', 'min', 'max', 'count_distinct'] as const;
 
   const addFilter = (table: TableInfo, colName: string) => {
-    const newFilter: FilterRule = {column: colName, op: '=', value: '', table: table.name};
+    const newFilter: FilterRule = {column: colName, op: '=', value: '', table: table.name, logic: 'AND'};
     onSpecChange({...spec, filters: [...(spec.filters ?? []), newFilter]});
   };
   const updateFilter = (idx: number, patch: Partial<FilterRule>) => {
@@ -381,15 +386,47 @@ function CrossTablePanel({
 
                       {colFilters.length > 0 && (
                         <div className="space-y-1 mt-1">
-                          {colFilters.map(({f, idx}) => (
-                            <FilterRow
-                              key={idx}
-                              filter={f}
-                              table={table}
-                              onUpdate={(patch) => updateFilter(idx, patch)}
-                              onRemove={() => removeFilter(idx)}
-                            />
-                          ))}
+                          {colFilters.map(({f, idx}, pos) => {
+                            const prev = pos > 0 ? colFilters[pos - 1] : null;
+                            const prevLogic = prev ? (prev.f.logic ?? 'AND') : 'AND';
+                            return (
+                              <div key={idx}>
+                                {pos > 0 && prev && (
+                                  <div className="flex items-center gap-1 justify-center py-0.5">
+                                    <span
+                                      className={`text-[9px] font-semibold rounded px-1.5 py-0.5 cursor-pointer transition-colors ${
+                                        prevLogic === 'AND'
+                                          ? 'bg-amber-500 text-black'
+                                          : 'bg-elevated text-secondary hover:bg-card-hover'
+                                      }`}
+                                      onClick={() => updateFilter(prev.idx, {logic: 'OR'})}
+                                      title="Concatenar con OR al filtro anterior"
+                                    >
+                                      AND
+                                    </span>
+                                    <span className="text-muted">/</span>
+                                    <span
+                                      className={`text-[9px] font-semibold rounded px-1.5 py-0.5 cursor-pointer transition-colors ${
+                                        prevLogic === 'OR'
+                                          ? 'bg-amber-500 text-black'
+                                          : 'bg-elevated text-secondary hover:bg-card-hover'
+                                      }`}
+                                      onClick={() => updateFilter(prev.idx, {logic: 'AND'})}
+                                      title="Concatenar con AND al filtro anterior"
+                                    >
+                                      OR
+                                    </span>
+                                  </div>
+                                )}
+                                <FilterRow
+                                  filter={f}
+                                  table={table}
+                                  onUpdate={(patch) => updateFilter(idx, patch)}
+                                  onRemove={() => removeFilter(idx)}
+                                />
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
