@@ -37,7 +37,16 @@ export type SectionFont = {
   size?: number;
   weight?: FontWeight;
   overflow?: TextOverflow;
+  align?: TextAlign;
 };
+
+export type TextAlign = 'left' | 'center' | 'right';
+
+export const TEXT_ALIGNS: {value: TextAlign; label: string}[] = [
+  {value: 'left', label: 'Izq'},
+  {value: 'center', label: 'Centro'},
+  {value: 'right', label: 'Der'},
+];
 
 // Canva-style free-form placement for title/subtitle blocks. All fields are
 // optional; unset values fall back to the classic centered header behavior.
@@ -298,7 +307,7 @@ export type ChartConfig = {
   configVersion?: number;
 };
 
-export const CHART_CONFIG_VERSION = 20;
+export const CHART_CONFIG_VERSION = 21;
 
 export const DEFAULT_CHART_CONFIG: ChartConfig = {
   type: 'bar',

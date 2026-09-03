@@ -1117,7 +1117,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
           />
           <SliderNumberInput
             label="Margen derecho"
-            value={config.spacing?.plotMarginRight ?? 24}
+            value={config.spacing?.plotMarginRight ?? 40}
             min={0}
             max={100}
             onChange={(v) => update({spacing: {...(config.spacing ?? {}), plotMarginRight: v}})}
@@ -1131,7 +1131,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
           />
           <SliderNumberInput
             label="Margen izquierdo"
-            value={config.spacing?.plotMarginLeft ?? 66}
+            value={config.spacing?.plotMarginLeft ?? 84}
             min={0}
             max={100}
             onChange={(v) => update({spacing: {...(config.spacing ?? {}), plotMarginLeft: v}})}

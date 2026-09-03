@@ -66,7 +66,7 @@ export function PieChart({data, config}: Props) {
   const showLegend = config.showLegend ?? true;
   const sp = config.spacing ?? {};
   const padTop = sp.plotMarginTop ?? 24;
-  const padRight = sp.plotMarginRight ?? 24;
+  const padRight = sp.plotMarginRight ?? 40;
   const padBottom = sp.plotMarginBottom ?? 24;
   const availW = width - padRight - legendR.right;
   const topInset = headerH + legendR.top + padTop + (sp.headerPadding ?? 0) + (sp.legendSpacing ?? 0);

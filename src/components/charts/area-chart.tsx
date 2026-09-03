@@ -2,7 +2,7 @@
 
 import type {ChartConfig} from '@/lib/chart-config';
 import {prepareSeries, prepareMultiSeries, formatValue, resolvedCategoryLabel, resolveChartStyle, resolveYDomain, type PreparedMultiSeries} from '@/lib/chart-data';
-import {SvgHeader, SvgLegend, headerHeight, legendReserve, frameRect, legendItemsFrom, type LegendItem} from './chart-frame';
+import {SvgHeader, SvgLegend, headerHeight, legendReserve, frameRect, legendItemsFrom, XAxisTitle, YAxisTitle, type LegendItem} from './chart-frame';
 
 type Props = {
   data: Record<string, unknown>[];
@@ -28,7 +28,7 @@ function MultiArea({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
   const headerH = headerHeight(config, st, config.width ?? 600);
   const legendR = legendReserve(config, legendItems);
   const sp = config.spacing ?? {};
-  const margin = {top: (sp.plotMarginTop ?? 24) + headerH + legendR.top + (sp.headerPadding ?? 0) + (sp.legendSpacing ?? 0), right: (sp.plotMarginRight ?? 24) + legendR.right + (sp.legendSpacing ?? 0), bottom: (sp.plotMarginBottom ?? 66) + legendR.bottom + (sp.legendSpacing ?? 0), left: (sp.plotMarginLeft ?? 66)};
+  const margin = {top: (sp.plotMarginTop ?? 24) + headerH + legendR.top + (sp.headerPadding ?? 0) + (sp.legendSpacing ?? 0), right: (sp.plotMarginRight ?? 40) + legendR.right + (sp.legendSpacing ?? 0), bottom: (sp.plotMarginBottom ?? 66) + legendR.bottom + (sp.legendSpacing ?? 0), left: (sp.plotMarginLeft ?? 84)};
   const plotW = width - margin.left - margin.right;
   const plotH = height - margin.top - margin.bottom;
   const n = multi.categories.length;
@@ -81,8 +81,8 @@ function MultiArea({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
               </g>
             );
           })}
-          {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily}>{config.xLabel}</text>}
-          {config.yLabel && <text x={16} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text>}
+          {config.xLabel && <XAxisTitle text={config.xLabel} width={width} height={height} color={xAxisColor} size={11} family={xAxisFamily} align={config.xLabelFont?.align} />}
+          {config.yLabel && <YAxisTitle text={config.yLabel} height={height} color={yAxisColor} size={11} family={yAxisFamily} align={config.yLabelFont?.align} x={16} />}
           {seriesPaths.map((s) => <path key={s.name} d={s.area} fill={s.color} opacity={st.globalOpacity * 0.25} />)}
           {seriesPaths.map((s) => <path key={s.name} d={s.line} fill="none" stroke={s.color} strokeWidth={st.lineWidth} strokeLinejoin="round" strokeDasharray={config.lineDash ? '6 4' : undefined} />)}
           {showMarkers &&
@@ -121,7 +121,7 @@ function SingleArea({data, config}: Props) {
   const width = config.width ?? 600;
   const height = config.height ?? 380;
   const sp = config.spacing ?? {};
-  const margin = {top: (sp.plotMarginTop ?? 24) + headerHeight(config, st, config.width ?? 600) + (sp.headerPadding ?? 0), right: (sp.plotMarginRight ?? 24), bottom: (sp.plotMarginBottom ?? 66), left: (sp.plotMarginLeft ?? 66)};
+  const margin = {top: (sp.plotMarginTop ?? 24) + headerHeight(config, st, config.width ?? 600) + (sp.headerPadding ?? 0), right: (sp.plotMarginRight ?? 40), bottom: (sp.plotMarginBottom ?? 66), left: (sp.plotMarginLeft ?? 84)};
   const plotW = width - margin.left - margin.right;
   const plotH = height - margin.top - margin.bottom;
   const n = prepared.items.length;
@@ -171,8 +171,8 @@ function SingleArea({data, config}: Props) {
           </g>
         );
       })}
-      {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily}>{config.xLabel}</text>}
-      {config.yLabel && <text x={16} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text>}
+      {config.xLabel && <XAxisTitle text={config.xLabel} width={width} height={height} color={xAxisColor} size={11} family={xAxisFamily} align={config.xLabelFont?.align} />}
+      {config.yLabel && <YAxisTitle text={config.yLabel} height={height} color={yAxisColor} size={11} family={yAxisFamily} align={config.yLabelFont?.align} x={16} />}
       <path d={area} fill={color} opacity={st.globalOpacity * 0.25} />
       <path d={line} fill="none" stroke={color} strokeWidth={st.lineWidth} strokeLinejoin="round" strokeDasharray={config.lineDash ? '6 4' : undefined} />
       {showMarkers && pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={st.pointSize} fill={color} stroke="#111" strokeWidth={1.5} opacity={st.pointOpacity} />)}

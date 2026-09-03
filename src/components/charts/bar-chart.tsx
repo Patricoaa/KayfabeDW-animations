@@ -1,9 +1,9 @@
 'use client';
 
 import {useState, type ReactNode} from 'react';
-import type {ChartConfig, NumberFormat, TextOverflow, AvatarCrop} from '@/lib/chart-config';
+import type {ChartConfig, NumberFormat, TextOverflow, TextAlign, AvatarCrop} from '@/lib/chart-config';
 import {prepareSeries, prepareMultiSeries, formatValue, colorFor, resolvedCategoryLabel, resolvedCategorySub, resolveChartStyle, resolveYDomain, type PreparedMultiSeries} from '@/lib/chart-data';
-import {SvgHeader, SvgLegend, roundedRectPath, headerHeight, legendReserve, frameRect, Zone, legendItemsFrom, type LegendItem} from './chart-frame';
+import {SvgHeader, SvgLegend, roundedRectPath, headerHeight, legendReserve, frameRect, Zone, legendItemsFrom, XAxisTitle, YAxisTitle, type LegendItem} from './chart-frame';
 
 type Props = {
   data: Record<string, unknown>[];
@@ -182,6 +182,16 @@ type FontLike = {size: number; color: string; family?: string; weight: number};
 // Renders section text honoring its overflow setting: 'truncate' (ellipsis at
 // `cap`), 'none' (full text), 'wrap' (multi-line tspans, best-effort when not
 // rotated). Rotated labels always truncate to keep the layout legible.
+// Maps a text-align to the SVG horizontal text anchor. Absent/auto falls back
+// to 'middle' (preserving existing centered defaults where align is unset).
+const anchorOf = (a?: TextAlign): 'start' | 'middle' | 'end' =>
+  a === 'left' ? 'start' : a === 'right' ? 'end' : 'middle';
+
+// Horizontal anchor for a label, honoring an explicit text-align override while
+// preserving the positional anchor when align is unset (Auto).
+const labelAnchor = (align: TextAlign | undefined, fallback: 'start' | 'middle' | 'end'): 'start' | 'middle' | 'end' =>
+  align ? anchorOf(align) : fallback;
+
 function catLabel(
   text: string,
   opts: {
@@ -319,7 +329,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const headerH = headerHeight(config, st, config.width ?? 600);
   const legendR = legendReserve(config, legendItems);
   const sp = config.spacing ?? {};
-  const margin = {top: (sp.plotMarginTop ?? 24) + headerH + legendR.top + (sp.headerPadding ?? 0) + (sp.legendSpacing ?? 0), right: (sp.plotMarginRight ?? 24) + legendR.right + (sp.legendSpacing ?? 0), bottom: (sp.plotMarginBottom ?? 66) + legendR.bottom + (sp.legendSpacing ?? 0), left: (sp.plotMarginLeft ?? 66)};
+  const margin = {top: (sp.plotMarginTop ?? 24) + headerH + legendR.top + (sp.headerPadding ?? 0) + (sp.legendSpacing ?? 0), right: (sp.plotMarginRight ?? 40) + legendR.right + (sp.legendSpacing ?? 0), bottom: (sp.plotMarginBottom ?? 66) + legendR.bottom + (sp.legendSpacing ?? 0), left: (sp.plotMarginLeft ?? 84)};
   const nCat = multi.categories.length;
   const nS = multi.series.length;
   const maxVal = Math.max(multi.max, 0) || 1;
@@ -372,6 +382,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const dlSize = dlFont?.size ?? config.dataLabelFontSize ?? 10;
   const dlColor = dlFont?.color ?? config.dataLabelColor ?? '#ccc';
   const dlFamily = dlFont?.fontFamily ?? config.dataLabelFontFamily;
+  const dlAlign = config.dataLabelFont?.align;
   const dlWeight = dlFont?.weight ?? 400;
   const tooltipEnabled = config.tooltipEnabled ?? true;
 
@@ -451,14 +462,12 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
               );
             })}
             {config.xLabel && (
-              <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{config.xLabel}</text>
+              <XAxisTitle text={config.xLabel} width={width} height={height} color={xAxisColor} size={11} family={xAxisFamily} weight={config.xLabelFont?.weight ?? 400} align={config.xLabelFont?.align} />
             )}
           </Zone>
           <Zone id="left-axis">
             {config.yLabel && (
-              <text x={14} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 14, ${height / 2})`}>
-                {config.yLabel}
-              </text>
+              <YAxisTitle text={config.yLabel} height={height} color={yAxisColor} size={11} family={yAxisFamily} weight={config.yLabelFont?.weight ?? 400} align={config.yLabelFont?.align} x={14} />
             )}
           </Zone>
           <Zone id="plot">
@@ -561,7 +570,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                         if (segW < dlSize * 1.6 || val === 0) return null;
                         const segX = marginAdj.left + (stackXBase[ci][si] / segTotal) * plotW + segW / 2;
                         return (
-                          <text key={`dl-${ci}-${si}`} x={segX} y={cy + 3} textAnchor="middle" fontSize={dlSize} fill="#fff" pointerEvents="none">
+                          <text key={`dl-${ci}-${si}`} x={segX} y={cy + 3} textAnchor={labelAnchor(dlAlign, 'middle')} fontSize={dlSize} fill="#fff" pointerEvents="none">
                             {formatValue(Math.round((val / segTotal) * 100 * 10) / 10 / 100, numFmt)}
                           </text>
                         );
@@ -569,7 +578,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                     )}
                     {config.showDataLabels !== false && !stackedPercent && (
                       stacked ? (
-                        <text x={marginAdj.left + plotW - 4} y={cy + 3} textAnchor="end" fontSize={dlSize} fill={dlColor} pointerEvents="none">
+                        <text x={marginAdj.left + plotW - 4} y={cy + 3} textAnchor={labelAnchor(dlAlign, 'end')} fontSize={dlSize} fill={dlColor} pointerEvents="none">
                           {formatValue(total, numFmt)}
                         </text>
                       ) : (
@@ -580,7 +589,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                           const y = bandY + offset + si * (barH + barGap) + barH / 2 + 3;
                           const endX = marginAdj.left + bw;
                           return (
-                            <text key={`dl-${ci}-${si}`} x={endX + 6} y={y} textAnchor="start" fontSize={dlSize} fill={dlColor} pointerEvents="none">
+                            <text key={`dl-${ci}-${si}`} x={endX + 6} y={y} textAnchor={labelAnchor(dlAlign, 'start')} fontSize={dlSize} fill={dlColor} pointerEvents="none">
                               {formatValue(val, numFmt)}
                             </text>
                           );
@@ -613,8 +622,8 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                   if (!p) return null;
                   return (
                     <g key={`lb-${ci}`}>
-                      {catLabel(label, {...p, font: catFont, overflow: catOv, cap: focusCap, rotate: labelAngle})}
-                      {desc && catLabel(desc, {x: p.x, y: p.y + catSize + 2, anchor: p.anchor, font: descFont, overflow: descOv, cap: 20})}
+                      {catLabel(label, {...p, anchor: labelAnchor(config.xLabelFont?.align, p.anchor), font: catFont, overflow: catOv, cap: focusCap, rotate: labelAngle})}
+                      {desc && catLabel(desc, {x: p.x, y: p.y + catSize + 2, anchor: labelAnchor(config.xLabelFont?.align, p.anchor), font: descFont, overflow: descOv, cap: 20})}
                     </g>
                   );
                 };
@@ -685,9 +694,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
               );
             })}
             {config.yLabel && (
-              <text x={16} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 16, ${height / 2})`}>
-                {config.yLabel}
-              </text>
+              <YAxisTitle text={config.yLabel} height={height} color={yAxisColor} size={11} family={yAxisFamily} weight={config.yLabelFont?.weight ?? 400} align={config.yLabelFont?.align} x={16} />
             )}
         </Zone>
         <Zone id="plot">
@@ -787,7 +794,7 @@ const fill = barFill(s.color, config, val < 0);
                     if (segH < dlSize * 1.8 || val === 0) return null;
                     const segY = marginAdj.top + plotH - (stackBase[ci][si] / segTotal) * plotH - segH / 2;
                     return (
-                      <text key={`dl-${ci}-${si}`} x={bandX + barBandX + barBlockW / 2} y={segY + dlSize / 2} textAnchor="middle" fontSize={dlSize} fill="#fff" pointerEvents="none">
+                      <text key={`dl-${ci}-${si}`} x={bandX + barBandX + barBlockW / 2} y={segY + dlSize / 2} textAnchor={labelAnchor(dlAlign, 'middle')} fontSize={dlSize} fill="#fff" pointerEvents="none">
                         {formatValue(Math.round((val / segTotal) * 100 * 10) / 10 / 100, numFmt)}
                       </text>
                     );
@@ -795,7 +802,7 @@ const fill = barFill(s.color, config, val < 0);
                 )}
                 {config.showDataLabels !== false && !stackedPercent && (
                   stacked ? (
-                    <text x={bandX + barBandX + barBlockW / 2} y={marginAdj.top + plotH - (total / yRange) * plotH - 4} textAnchor="middle" fontSize={dlSize} fill={dlColor} pointerEvents="none">
+                    <text x={bandX + barBandX + barBlockW / 2} y={marginAdj.top + plotH - (total / yRange) * plotH - 4} textAnchor={labelAnchor(dlAlign, 'middle')} fontSize={dlSize} fill={dlColor} pointerEvents="none">
                       {formatValue(total, numFmt)}
                     </text>
                   ) : (
@@ -805,7 +812,7 @@ const fill = barFill(s.color, config, val < 0);
                       const offset = (catBand - barW * nS) / 2;
                       const bx = bandX + offset + si * (barW + barGap);
                       return (
-                        <text key={`dl-${ci}-${si}`} x={bx + barW / 2} y={marginAdj.top + plotH - h - 5} textAnchor="middle" fontSize={dlSize} fill={dlColor} pointerEvents="none">
+                        <text key={`dl-${ci}-${si}`} x={bx + barW / 2} y={marginAdj.top + plotH - h - 5} textAnchor={labelAnchor(dlAlign, 'middle')} fontSize={dlSize} fill={dlColor} pointerEvents="none">
                           {formatValue(val, numFmt)}
                         </text>
                       );
@@ -818,7 +825,7 @@ const fill = barFill(s.color, config, val < 0);
         </Zone>
         <Zone id="footer">
             {config.xLabel && (
-              <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{config.xLabel}</text>
+              <XAxisTitle text={config.xLabel} width={width} height={height} color={xAxisColor} size={11} family={xAxisFamily} weight={config.xLabelFont?.weight ?? 400} align={config.xLabelFont?.align} />
             )}
         </Zone>
         <Zone id="labels">
@@ -848,8 +855,8 @@ const fill = barFill(s.color, config, val < 0);
               if (!p) return null;
               return (
                 <g key={`lb-${ci}`}>
-                  {catLabel(label, {...p, font: catFont, overflow: catOv, cap: focusCap, rotate: labelAngle})}
-                  {desc && catLabel(desc, {x: p.x, y: p.y + catSize + 2, anchor: p.anchor, font: descFont, overflow: descOv, cap: 20})}
+                  {catLabel(label, {...p, anchor: labelAnchor(config.xLabelFont?.align, p.anchor), font: catFont, overflow: catOv, cap: focusCap, rotate: labelAngle})}
+                  {desc && catLabel(desc, {x: p.x, y: p.y + catSize + 2, anchor: labelAnchor(config.xLabelFont?.align, p.anchor), font: descFont, overflow: descOv, cap: 20})}
                 </g>
               );
             };
@@ -901,7 +908,7 @@ function SingleBar({data, config}: Props) {
   const height = config.height ?? 380;
   const headerH = headerHeight(config, st, config.width ?? 600);
   const sp = config.spacing ?? {};
-  const margin = {top: (sp.plotMarginTop ?? 24) + headerH + (sp.headerPadding ?? 0), right: (sp.plotMarginRight ?? 24), bottom: (sp.plotMarginBottom ?? 66), left: (sp.plotMarginLeft ?? 66)};
+  const margin = {top: (sp.plotMarginTop ?? 24) + headerH + (sp.headerPadding ?? 0), right: (sp.plotMarginRight ?? 40), bottom: (sp.plotMarginBottom ?? 66), left: (sp.plotMarginLeft ?? 84)};
   const plotW = width - margin.left - margin.right;
   const plotH = height - margin.top - margin.bottom;
   const maxVal = Math.max(prepared.max, 0) || 1;
@@ -937,6 +944,7 @@ function SingleBar({data, config}: Props) {
   const dlSize = dlFont?.size ?? config.dataLabelFontSize ?? 10;
   const dlColor = dlFont?.color ?? config.dataLabelColor ?? '#ccc';
   const dlFamily = dlFont?.fontFamily ?? config.dataLabelFontFamily;
+  const dlAlign = config.dataLabelFont?.align;
   const dlWeight = dlFont?.weight ?? 400;
   const tooltipEnabled = config.tooltipEnabled ?? true;
   const labelAngle = config.labelAngle ?? (n > 8 ? -30 : 0);
@@ -996,10 +1004,10 @@ function SingleBar({data, config}: Props) {
                 </g>
               );
             })}
-            {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{config.xLabel}</text>}
+            {config.xLabel && <XAxisTitle text={config.xLabel} width={width} height={height} color={xAxisColor} size={11} family={xAxisFamily} weight={config.xLabelFont?.weight ?? 400} align={config.xLabelFont?.align} />}
           </Zone>
           <Zone id="left-axis">
-            {config.yLabel && <text x={14} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 14, ${height / 2})`}>{config.yLabel}</text>}
+            {config.yLabel && <YAxisTitle text={config.yLabel} height={height} color={yAxisColor} size={11} family={yAxisFamily} weight={config.yLabelFont?.weight ?? 400} align={config.yLabelFont?.align} x={14} />}
           </Zone>
           <Zone id="plot">
             {referenceLinesSvg(false, true, domain, yRange, marginAdj, plotW2, plotH2, config)}
@@ -1024,8 +1032,8 @@ function SingleBar({data, config}: Props) {
               if (!p || !showText) return null;
               return (
                 <g key={`lb-${i}`}>
-                  {catLabel(label, {...p, font: catFont, overflow: catOv, cap: 16, rotate: labelAngle})}
-                  {desc && catLabel(desc, {x: p.x, y: p.y + catSize + 2, anchor: p.anchor, font: descFont, overflow: descOv, cap: 20})}
+                  {catLabel(label, {...p, anchor: labelAnchor(config.xLabelFont?.align, p.anchor), font: catFont, overflow: catOv, cap: 16, rotate: labelAngle})}
+                  {desc && catLabel(desc, {x: p.x, y: p.y + catSize + 2, anchor: labelAnchor(config.xLabelFont?.align, p.anchor), font: descFont, overflow: descOv, cap: 20})}
                 </g>
               );
             };
@@ -1058,17 +1066,17 @@ function SingleBar({data, config}: Props) {
                   <rect x={marginAdj.left} y={y} width={bw} height={barH} fill={barFill(color, config, d.value < 0)} rx={radius} stroke={borderW > 0 ? borderColor : 'none'} strokeWidth={borderW} opacity={st.globalOpacity} />
                 )}
                 {config.showDataLabels !== false && dlPos === 'center' && (
-                  <text x={marginAdj.left + bw / 2} y={labelY} textAnchor="middle" fill={dlColor} fontSize={dlSize} pointerEvents="none">
+                  <text x={marginAdj.left + bw / 2} y={labelY} textAnchor={labelAnchor(dlAlign, 'middle')} fill={dlColor} fontSize={dlSize} pointerEvents="none">
                     {formatValue(d.value, numFmt)}
                   </text>
                 )}
                 {config.showDataLabels !== false && dlPos === 'inside' && (
-                  <text x={marginAdj.left + 8} y={labelY} textAnchor="start" fill={dlColor} fontSize={dlSize} pointerEvents="none">
+                  <text x={marginAdj.left + 8} y={labelY} textAnchor={labelAnchor(dlAlign, 'start')} fill={dlColor} fontSize={dlSize} pointerEvents="none">
                     {formatValue(d.value, numFmt)}
                   </text>
                 )}
                 {config.showDataLabels !== false && dlPos !== 'center' && dlPos !== 'inside' && (
-                  <text x={endX + labelExtra} y={labelY} textAnchor="start" fill={dlColor} fontSize={dlSize} pointerEvents="none">
+                  <text x={endX + labelExtra} y={labelY} textAnchor={labelAnchor(dlAlign, 'start')} fill={dlColor} fontSize={dlSize} pointerEvents="none">
                     {formatValue(d.value, numFmt)}
                   </text>
                 )}
@@ -1108,7 +1116,7 @@ function SingleBar({data, config}: Props) {
               </g>
             );
           })}
-          {config.yLabel && <text x={16} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 16, ${height / 2})`}>{config.yLabel}</text>}
+          {config.yLabel && <YAxisTitle text={config.yLabel} height={height} color={yAxisColor} size={11} family={yAxisFamily} weight={config.yLabelFont?.weight ?? 400} align={config.yLabelFont?.align} x={16} />}
         </Zone>
         <Zone id="plot">
           {referenceLinesSvg(false, false, domain, yRange, marginAdj, plotW2, plotH2, config)}
@@ -1132,8 +1140,8 @@ function SingleBar({data, config}: Props) {
             if (!p || !showText) return null;
             return (
               <g key={`lb-${i}`}>
-                {catLabel(label, {...p, font: catFont, overflow: catOv, cap: 12, rotate: labelAngle})}
-                {desc && catLabel(desc, {x: p.x, y: p.y + catSize + 2, anchor: p.anchor, font: descFont, overflow: descOv, cap: 20})}
+                {catLabel(label, {...p, anchor: labelAnchor(config.xLabelFont?.align, p.anchor), font: catFont, overflow: catOv, cap: 12, rotate: labelAngle})}
+                {desc && catLabel(desc, {x: p.x, y: p.y + catSize + 2, anchor: labelAnchor(config.xLabelFont?.align, p.anchor), font: descFont, overflow: descOv, cap: 20})}
               </g>
             );
           };
@@ -1167,17 +1175,17 @@ function SingleBar({data, config}: Props) {
                 <rect x={x} y={topY} width={barWidth} height={Math.max(barH, 0)} fill={barFill(color, config, d.value < 0)} rx={radius} stroke={borderW > 0 ? borderColor : 'none'} strokeWidth={borderW} opacity={st.globalOpacity} />
               )}
               {config.showDataLabels !== false && dlPos === 'center' && (
-                <text x={centerX} y={barCenterY + 3} textAnchor="middle" fill={dlColor} fontSize={dlSize} pointerEvents="none">
+                <text x={centerX} y={barCenterY + 3} textAnchor={labelAnchor(dlAlign, 'middle')} fill={dlColor} fontSize={dlSize} pointerEvents="none">
                   {formatValue(d.value, numFmt)}
                 </text>
               )}
               {config.showDataLabels !== false && dlPos === 'inside' && (
-                <text x={centerX} y={topY + dlSize + 2} textAnchor="middle" fill={dlColor} fontSize={dlSize} pointerEvents="none">
+                <text x={centerX} y={topY + dlSize + 2} textAnchor={labelAnchor(dlAlign, 'middle')} fill={dlColor} fontSize={dlSize} pointerEvents="none">
                   {formatValue(d.value, numFmt)}
                 </text>
               )}
               {config.showDataLabels !== false && dlPos !== 'center' && dlPos !== 'inside' && (
-                <text x={centerX} y={topY - 6} textAnchor="middle" fill={dlColor} fontSize={dlSize} pointerEvents="none">
+                <text x={centerX} y={topY - 6} textAnchor={labelAnchor(dlAlign, 'middle')} fill={dlColor} fontSize={dlSize} pointerEvents="none">
                   {formatValue(d.value, numFmt)}
                 </text>
               )}
@@ -1188,7 +1196,7 @@ function SingleBar({data, config}: Props) {
         })}
         </Zone>
         <Zone id="footer">
-          {config.xLabel && <text x={width / 2} y={height - 6} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{config.xLabel}</text>}
+          {config.xLabel && <XAxisTitle text={config.xLabel} width={width} height={height} color={xAxisColor} size={11} family={xAxisFamily} weight={config.xLabelFont?.weight ?? 400} align={config.xLabelFont?.align} />}
         </Zone>
       </svg>
       {tooltipEnabled && <HoverTooltip tip={tip} />}

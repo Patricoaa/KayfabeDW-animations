@@ -1,9 +1,10 @@
 import {
   FONT_PRESETS,
   FONT_WEIGHTS,
+  TEXT_ALIGNS,
   TEXT_OVERFLOWS,
 } from '@/lib/chart-config';
-import type {FontWeight, SectionFont, TextOverflow} from '@/lib/chart-config';
+import type {FontWeight, SectionFont, TextAlign, TextOverflow} from '@/lib/chart-config';
 
 function ColorInput({label, value, onChange}: {label: string; value?: string; onChange: (v?: string) => void}) {
   return (
@@ -129,10 +130,41 @@ export function FontFamilySelect({value, onChange}: {value?: string; onChange: (
   );
 }
 
+export function AlignControl({value, onChange}: {value?: TextAlign; onChange: (v?: TextAlign) => void}) {
+  return (
+    <div>
+      <label className="text-xs font-semibold text-muted uppercase tracking-widest font-display">Alineación</label>
+      <div className="flex gap-1 mt-1.5">
+        <button
+          type="button"
+          onClick={() => onChange(undefined)}
+          className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+            value === undefined ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover'
+          }`}
+        >
+          Auto
+        </button>
+        {TEXT_ALIGNS.map((a) => (
+          <button
+            key={a.value}
+            type="button"
+            onClick={() => onChange(a.value)}
+            className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+              value === a.value ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover'
+            }`}
+          >
+            {a.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /**
- * Reusable per-section text configuration: weight, family, size, color and
- * overflow. Mirror of the received `SectionFont`; every field "inherits"
- * from the general chart typography when left unset (Auto).
+ * Reusable per-section text configuration: weight, family, size, color,
+ * overflow and alignment. Mirror of the received `SectionFont`; every field
+ * "inherits" from the general chart typography when left unset (Auto).
  */
 export function TextControls({value, onChange}: {value?: SectionFont; onChange: (patch: Partial<SectionFont>) => void}) {
   return (
@@ -147,6 +179,7 @@ export function TextControls({value, onChange}: {value?: SectionFont; onChange: 
         <ColorInput label="Color" value={value?.color} onChange={(v) => onChange({color: v || undefined})} />
       </div>
       <OverflowControl value={value?.overflow} onChange={(v) => onChange({overflow: v})} />
+      <AlignControl value={value?.align} onChange={(v) => onChange({align: v})} />
     </div>
   );
 }

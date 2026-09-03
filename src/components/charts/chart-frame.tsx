@@ -1,6 +1,6 @@
 'use client';
 
-import type {ChartConfig, TextOverflow, SectionFont, TextLayout} from '@/lib/chart-config';
+import type {ChartConfig, TextOverflow, SectionFont, TextLayout, TextAlign} from '@/lib/chart-config';
 import type {ResolvedChartStyle} from '@/lib/chart-data';
 import type {ReactNode} from 'react';
 
@@ -63,6 +63,35 @@ export function frameRect(config: ChartConfig) {
 
 function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 1) + '…' : s;
+}
+
+// Maps a text-align setting to the SVG horizontal text anchor. Absent/auto
+// defaults to centered (the classic behavior for headers/legends).
+const anchorOf = (a?: TextAlign): 'start' | 'middle' | 'end' =>
+  a === 'left' ? 'start' : a === 'right' ? 'end' : 'middle';
+
+// Bottom x-axis title honoring the xLabel font's alignment (left/center/right).
+export function XAxisTitle({text, width, height, color, size, family, weight, align}: {
+  text: string; width: number; height: number; color: string; size: number; family?: string; weight?: number; align?: TextAlign;
+}) {
+  const a = anchorOf(align);
+  const x = a === 'start' ? 12 : a === 'end' ? width - 12 : width / 2;
+  return (
+    <text x={x} y={height - 6} textAnchor={a} fill={color} fontSize={size} fontFamily={family} fontWeight={weight}>{text}</text>
+  );
+}
+
+// Left y-axis title (rotated -90°) honoring the yLabel font's alignment.
+// For a vertical column, 'left' tips the text toward the plot top, 'right'
+// toward the plot bottom, 'center' keeps it vertically centered.
+export function YAxisTitle({text, height, color, size, family, weight, align, x = 14}: {
+  text: string; height: number; color: string; size: number; family?: string; weight?: number; align?: TextAlign; x?: number;
+}) {
+  const a = anchorOf(align);
+  const y = a === 'start' ? 12 : a === 'end' ? height - 12 : height / 2;
+  return (
+    <text x={x} y={y} textAnchor="middle" fill={color} fontSize={size} fontFamily={family} fontWeight={weight} transform={`rotate(-90, ${x}, ${y})`}>{text}</text>
+  );
 }
 
 // Breaks a text into display lines honoring a font's overflow setting. 'auto'
@@ -237,15 +266,19 @@ export function SvgHeader({config, st, width}: {config: ChartConfig; st: Resolve
   const subLines = textLines(sub, subSize, maxW, config.subtitleFont?.overflow);
   const titleH = titleLines.length * titleSize;
   let y = 4 + titleSize;
+  const titleAnchor = anchorOf(config.headerFont?.align);
+  const subAnchor = anchorOf(config.subtitleFont?.align);
+  const titleX = titleAnchor === 'start' ? 12 : titleAnchor === 'end' ? width - 12 : width / 2;
+  const subX = subAnchor === 'start' ? 12 : subAnchor === 'end' ? width - 12 : width / 2;
   return (
-    <g fontFamily={family} fontWeight={config.headerFont?.weight ?? 700} textAnchor="middle">
+    <g fontFamily={family} fontWeight={config.headerFont?.weight ?? 700}>
       {title && titleLines.map((ln, i) => (
-        <text key={`t-${i}`} x={width / 2} y={y + i * (titleSize + 2)} fill={titleColor} fontSize={titleSize}>
+        <text key={`t-${i}`} x={titleX} y={y + i * (titleSize + 2)} fill={titleColor} fontSize={titleSize} textAnchor={titleAnchor}>
           {ln}
         </text>
       ))}
       {sub && subLines.map((ln, i) => (
-        <text key={`s-${i}`} x={width / 2} y={4 + titleH + (titleLines.length > 0 ? 2 : 0) + subSize + i * (subSize + 2)} fill={subColor} fontSize={subSize} fontFamily={subFamily} fontWeight={config.subtitleFont?.weight ?? 400}>
+        <text key={`s-${i}`} x={subX} y={4 + titleH + (titleLines.length > 0 ? 2 : 0) + subSize + i * (subSize + 2)} fill={subColor} fontSize={subSize} fontFamily={subFamily} fontWeight={config.subtitleFont?.weight ?? 400} textAnchor={subAnchor}>
           {ln}
         </text>
       ))}
@@ -287,6 +320,7 @@ export function SvgLegend({
   const family = config.legendFont?.fontFamily ?? st.fontFamily;
   const color = config.legendFont?.color ?? st.textColor;
   const weight = config.legendFont?.weight ?? 500;
+  const align = config.legendFont?.align ?? 'center';
   const labelOf = (s: string, max: number) => (config.legendFont?.overflow === 'none' ? s : truncate(s, max));
 
   if (position === 'right') {
@@ -318,7 +352,8 @@ export function SvgLegend({
     used += w;
   }
 
-  let x = Math.max(0, (width - used) / 2);
+  const boxW = used;
+  let x = align === 'left' ? 12 : align === 'right' ? Math.max(0, width - 12 - boxW) : Math.max(0, (width - boxW) / 2);
   const y = position === 'top' ? headerOffset + 13 : height - 8;
   return (
     <g fontFamily={family}>
