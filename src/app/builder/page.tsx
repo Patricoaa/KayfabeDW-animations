@@ -22,7 +22,7 @@ import type {ChartConfig} from '@/lib/chart-config';
 import {DEFAULT_CHART_CONFIG, applyChartDefaults} from '@/lib/chart-config';
 import type {SchemaMetadata} from '@/lib/schema-metadata';
 import {getSchemaMetadata, getTableDepth, isNumericType} from '@/lib/schema-metadata';
-import {suggestBestTemplate, isGenericTemplate, convertToRemotionProps} from '@/lib/viz-to-remotion';
+import {suggestBestTemplate, convertToRemotionProps} from '@/lib/viz-to-remotion';
 import {applyChartFilters} from '@/lib/chart-data';
 import {chartToDataUrl} from '@/lib/export-static';
 import dynamic from 'next/dynamic';
@@ -33,7 +33,6 @@ import CanvasZoom from '@/components/builder/static-canvas';
 import {TemplatePicker} from '@/components/builder/template-picker';
 import {AnimationPreview} from '@/components/builder/animation-preview';
 import {BuilderNav} from '@/components/builder/builder-nav';
-import {DataOptionsForm} from '@/components/builder/data-options-form';
 import {ExportPanel} from '@/components/builder/export-panel';
 import {TEMPLATES} from '@/remotion/generated/registry';
 import type {TemplateId} from '@/remotion/generated/registry';
@@ -93,15 +92,6 @@ function BuilderContent() {
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(templateParam);
   const [meta, setMeta] = useState<SchemaMetadata | null>(null);
 
-  // Template-specific state
-  const [templateOptions, setTemplateOptions] = useState<Record<string, unknown>>({});
-  const [templateProps, setTemplateProps] = useState<Record<string, unknown> | null>(null);
-  const [templateLoading, setTemplateLoading] = useState(false);
-  const [templateError, setTemplateError] = useState<string | null>(null);
-  // When true, the canonical template data (externalProps) wins over the
-  // converted query data in the animated preview. Set when the user clicks
-  // "Usar datos canónicos de la plantilla (reemplaza tu query)".
-  const [preferTemplateProps, setPreferTemplateProps] = useState(false);
   const [duration, setDuration] = useState(10);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -190,7 +180,6 @@ function BuilderContent() {
             setSelectedTemplate(ac.templateId);
             setOutputMode('animated');
           }
-          if (ac.templateOptions) setTemplateOptions(ac.templateOptions);
           if (ac.duration) {
             setDuration(ac.duration);
             durationLoadedRef.current = true;
@@ -227,14 +216,6 @@ function BuilderContent() {
     }
     durationLoadedRef.current = false;
   }, [activeTemplate]);
-
-  // Clear template props when template changes
-  useEffect(() => {
-    setTemplateProps(null);
-    setTemplateOptions({});
-    setTemplateError(null);
-    setPreferTemplateProps(false);
-  }, [selectedTemplate]);
 
   const handleSpecChange = useCallback(
     (newSpec: QuerySpec) => {
@@ -306,7 +287,7 @@ function BuilderContent() {
           query_spec: spec,
           chart_config: chartConfig,
           animation_config: outputMode === 'animated' && activeTemplate
-            ? {templateId: activeTemplate, templateOptions, duration}
+            ? {templateId: activeTemplate, duration}
             : null,
           is_draft: true,
         }),
@@ -321,7 +302,7 @@ function BuilderContent() {
     } catch {
       // Silent — autosave is best-effort
     }
-  }, [spec, vizName, chartConfig, outputMode, activeTemplate, templateOptions, duration]);
+  }, [spec, vizName, chartConfig, outputMode, activeTemplate, duration]);
 
   useEffect(() => {
     if (saved || !spec.table || spec.select?.length === 0) return;
@@ -351,35 +332,6 @@ function BuilderContent() {
       setSelectedTemplate(templateParam);
     }
   }, [outputMode, templateParam, selectedTemplate]);
-
-  const loadTemplateData = useCallback(async () => {
-    if (!activeTemplate) return;
-    if (data.length > 0 && !confirm(
-      'Usar datos canónicos de la plantilla reemplaza los datos de tu consulta en la preview. ¿Continuar?',
-    )) {
-      return;
-    }
-    setTemplateLoading(true);
-    setTemplateError(null);
-    try {
-      const res = await fetch(`/api/templates/${activeTemplate}/data`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({options: templateOptions}),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
-      setTemplateProps(json.props);
-      setPreferTemplateProps(true);
-      addToast('Datos canónicos de la plantilla cargados', 'success');
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setTemplateError(msg);
-      addToast(`Error cargando datos: ${msg}`, 'error');
-    } finally {
-      setTemplateLoading(false);
-    }
-  }, [activeTemplate, templateOptions, data.length, addToast]);
 
   const handleSave = async () => {
     if (!spec.select || spec.select.length === 0) {
@@ -419,7 +371,7 @@ function BuilderContent() {
           query_spec: spec,
           chart_config: chartConfig,
           animation_config: outputMode === 'animated' && activeTemplate
-            ? {templateId: activeTemplate, templateOptions, duration}
+            ? {templateId: activeTemplate, duration}
             : null,
           thumbnail_url: thumbnailUrl,
           is_draft: false,
@@ -468,18 +420,14 @@ function BuilderContent() {
     [data, chartConfig.filters],
   );
 
-  // Compute Remotion input props for the animated export panel.
-  const convertedRemotionProps = useMemo(
+  // Compute Remotion input props for the animated preview/export from the
+  // user's query data (the canonical template data feature was removed).
+  const remotionProps = useMemo(
     () => (activeTemplate && filteredData.length > 0
-      ? convertToRemotionProps(chartConfig, filteredData, activeTemplate)
+      ? convertToRemotionProps(chartConfig, filteredData, activeTemplate)?.props ?? null
       : null),
     [chartConfig, filteredData, activeTemplate],
   );
-  const remotionProps = useMemo(() => {
-    if (preferTemplateProps && templateProps) return templateProps;
-    if (convertedRemotionProps?.props) return convertedRemotionProps.props;
-    return templateProps ?? null;
-  }, [preferTemplateProps, templateProps, convertedRemotionProps]);
 
   // Fan-out metadata for the step-2 chart panel. `aliasToTable` maps each
   // selected column (by alias or bare name) back to its source table, so the
@@ -646,7 +594,7 @@ function BuilderContent() {
           </div>
 
           {/* Data canvas OR live result */}
-          <div className="flex-1 min-h-0 overflow-hidden">
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
             {view === 'data' ? (
               meta ? (
                 <QueryCanvas spec={spec} onChange={handleSpecChange} meta={meta.tables} />
@@ -678,8 +626,6 @@ function BuilderContent() {
                 templateId={activeTemplate}
                 data={filteredData}
                 config={chartConfig}
-                templateProps={templateProps}
-                preferTemplateProps={preferTemplateProps}
                 duration={duration}
                 showExportBar={false}
               />
@@ -760,72 +706,25 @@ function BuilderContent() {
                   }}
                 />
 
-                {/* Template data options + duration */}
+                {/* Duration slider */}
                 {activeTemplate && templateEntry && (
-                  <div className="space-y-3 border-t border-border-default pt-3">
-                    {!isGenericTemplate(activeTemplate) ? (
-                      <>
-                        <label className="text-micro font-semibold text-muted uppercase tracking-widest font-display">
-                          Datos de plantilla
-                        </label>
-
-                        {templateEntry.meta.dataOptions.length > 0 && (
-                          <DataOptionsForm
-                            options={templateEntry.meta.dataOptions}
-                            values={templateOptions}
-                            onChange={(key, val) => setTemplateOptions((prev) => ({...prev, [key]: val}))}
-                          />
-                        )}
-
-                        <button
-                          onClick={loadTemplateData}
-                          disabled={templateLoading}
-                          title="Reemplaza los datos de tu consulta por los datos canónicos de la plantilla"
-                          className="w-full bg-amber-500 hover:bg-amber-400 disabled:bg-elevated disabled:text-muted text-black font-semibold py-2 rounded-lg transition-colors text-sm"
-                        >
-                          {templateLoading
-                            ? 'Cargando...'
-                            : 'Usar datos canónicos de la plantilla (reemplaza tu query)'}
-                        </button>
-
-                        {templateError && (
-                          <div className="p-2 bg-red-500/10 border border-red-500/30 rounded text-red-500 text-xs">
-                            {templateError}
-                          </div>
-                        )}
-
-                        {templateProps && (
-                          <div className="p-2 bg-emerald-500/10 border border-emerald-500/30 rounded text-emerald-600 text-xs">
-                            Datos cargados correctamente
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <p className="text-[10px] text-muted">
-                        Este template usa los datos de tu consulta automáticamente.
-                        Configurá los campos en el panel de gráfico.
-                      </p>
-                    )}
-
-                    {/* Duration slider */}
-                    <div>
-                      <label htmlFor="duration-slider" className="text-sm font-medium mb-1 block font-body">
-                        Duración (segundos)
-                      </label>
-                      <div className="flex items-center gap-3">
-                        <input
-                          id="duration-slider"
-                          type="range"
-                          min={1}
-                          max={20}
-                          value={duration}
-                          onChange={(e) => setDuration(Number(e.target.value))}
-                          className="flex-1 accent-amber-500"
-                        />
-                        <span className="text-sm text-secondary w-20 text-right font-mono">
-                          {duration}s ({duration * (templateEntry.meta.fps ?? 30)} frames)
-                        </span>
-                      </div>
+                  <div className="space-y-1.5 border-t border-border-default pt-3">
+                    <label htmlFor="duration-slider" className="text-sm font-medium mb-1 block font-body">
+                      Duración (segundos)
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        id="duration-slider"
+                        type="range"
+                        min={1}
+                        max={20}
+                        value={duration}
+                        onChange={(e) => setDuration(Number(e.target.value))}
+                        className="flex-1 accent-amber-500"
+                      />
+                      <span className="text-sm text-secondary w-20 text-right font-mono">
+                        {duration}s ({duration * (templateEntry.meta.fps ?? 30)} frames)
+                      </span>
                     </div>
                   </div>
                 )}

@@ -153,10 +153,6 @@ const CONVERTERS: Record<string, (data: Record<string, unknown>[], config: Chart
 
 const GENERIC_TEMPLATE_IDS = ['generic-bar', 'generic-line', 'generic-kpi'] as const;
 
-export function isGenericTemplate(templateId: string): boolean {
-  return (GENERIC_TEMPLATE_IDS as readonly string[]).includes(templateId);
-}
-
 export function getCompatibleTemplates(
   config: ChartConfig,
   data: Record<string, unknown>[],

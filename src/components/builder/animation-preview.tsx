@@ -18,8 +18,6 @@ type AnimationPreviewProps = {
   templateId: string;
   data: Record<string, unknown>[];
   config: ChartConfig;
-  templateProps?: Record<string, unknown> | null;
-  preferTemplateProps?: boolean;
   duration?: number;
   showExportBar?: boolean;
 };
@@ -59,8 +57,6 @@ export function AnimationPreview({
   templateId,
   data,
   config,
-  templateProps: externalProps,
-  preferTemplateProps = false,
   duration: externalDuration,
   showExportBar = true,
 }: AnimationPreviewProps) {
@@ -74,20 +70,12 @@ export function AnimationPreview({
   const fps = entry?.meta.fps ?? 30;
   const compositionId = entry?.meta.componentId ?? templateId;
 
-  // Convert query data into template props. When there's query data we prefer
-  // the converted (canonical) props so the MP4 matches the static chart;
-  // externalProps (template-canonical data) are only used when the user
-  // explicitly opted in via the "Usar datos canónicos de la plantilla" button.
-  const convertedProps = useMemo(
-    () => (data.length > 0 ? convertToRemotionProps(config, data, templateId) : null),
+  // Convert query data into template props so the MP4 matches the static/preview
+  // chart. (The canonical template data feature was removed.)
+  const remotionProps = useMemo(
+    () => (data.length > 0 ? convertToRemotionProps(config, data, templateId)?.props ?? null : null),
     [templateId, config, data],
   );
-
-  const remotionProps = useMemo(() => {
-    if (preferTemplateProps && externalProps) return externalProps;
-    if (convertedProps?.props) return convertedProps.props;
-    return externalProps ?? null;
-  }, [preferTemplateProps, externalProps, convertedProps]);
 
   const handleExport = async () => {
     if (!remotionProps) return;
