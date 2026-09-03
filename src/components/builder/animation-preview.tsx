@@ -36,8 +36,8 @@ const LAZY_COMPONENTS: Record<string, React.LazyExoticComponent<React.FC<any>>> 
   'win-streak': React.lazy(() =>
     import('@/remotion/templates/win-streak').then((m) => ({default: m.WinStreak})),
   ),
-  'timeline-reinados': React.lazy(() =>
-    import('@/remotion/templates/timeline-reinados').then((m) => ({default: m.TimelineReinados})),
+  'timeline-race': React.lazy(() =>
+    import('@/remotion/templates/timeline-race').then((m) => ({default: m.TimelineRace})),
   ),
   'heatmap-luchas': React.lazy(() =>
     import('@/remotion/templates/heatmap-luchas').then((m) => ({default: m.HeatmapLuchas})),

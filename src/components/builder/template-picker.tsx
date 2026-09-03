@@ -1,7 +1,7 @@
 'use client';
 
 import {useMemo} from 'react';
-import {BarChart3, Swords, Hash, Flame, Calendar, Map, Star} from 'lucide-react';
+import {BarChart3, Swords, Hash, Flame, Calendar, Map} from 'lucide-react';
 import type {ChartConfig} from '@/lib/chart-config';
 import {getCompatibleTemplates} from '@/lib/viz-to-remotion';
 import {TEMPLATES} from '@/remotion/generated/registry';
@@ -19,7 +19,7 @@ const TEMPLATE_ICONS: Record<string, typeof BarChart3> = {
   'head-to-head': Swords,
   'stats-kpi': Hash,
   'win-streak': Flame,
-  'timeline-reinados': Calendar,
+  'timeline-race': Calendar,
   'heatmap-luchas': Map,
 };
 
@@ -47,39 +47,24 @@ export function TemplatePicker({data, config, selectedTemplate, onSelect}: Templ
   return (
     <div className="space-y-2">
       <label className="text-micro font-semibold text-secondary uppercase tracking-widest font-display">
-        Templates ({templates.length})
+        Tipo de animación
       </label>
-      <p className="text-[9px] text-muted">
-        Score = qué tan bien coinciden tus datos con el template (más alto = mejor)
-      </p>
-      <div className="grid grid-cols-2 gap-1.5">
+      <div className="grid grid-cols-3 gap-1">
         {templates.map((t) => {
-          const entry = TEMPLATES[t.templateId as TemplateId];
           const Icon = TEMPLATE_ICONS[t.templateId] ?? BarChart3;
           const isSelected = selectedTemplate === t.templateId;
-          const isBest = t === templates[0];
-          const description = entry?.meta.description ?? '';
-
           return (
             <button
               key={t.templateId}
               onClick={() => onSelect(t.templateId)}
-              title={`${entry?.meta.name}: ${description}`}
-              className={`relative flex flex-col items-center gap-1 p-2 rounded-lg text-center transition-all ${
+              className={`flex flex-col items-center gap-0.5 p-2 rounded text-xs transition-colors ${
                 isSelected
-                  ? 'bg-amber-500/15 border border-amber-500/60 text-amber-500'
-                  : 'bg-elevated border border-border-default text-secondary hover:bg-card-hover hover:text-primary'
+                  ? 'bg-amber-500 text-black'
+                  : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
               }`}
             >
-              {isBest && (
-                <span className="absolute -top-1 -right-1 bg-amber-500 text-black rounded-full p-0.5" aria-label="Mejor coincidencia">
-                  <Star size={9} fill="currentColor" />
-                </span>
-              )}
-              <Icon size={18} className="text-amber-500" />
-              <span className="text-[10px] font-semibold leading-tight font-display">{t.label}</span>
-              <span className="text-[8px] opacity-60 leading-tight line-clamp-2">{description}</span>
-              <span className="text-[8px] opacity-40">score {t.score}</span>
+              <Icon size={16} />
+              <span className="leading-tight text-center">{t.label}</span>
             </button>
           );
         })}

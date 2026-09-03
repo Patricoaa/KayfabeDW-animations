@@ -32,10 +32,13 @@ import {ChartPreview} from '@/components/charts/chart-preview';
 import CanvasZoom from '@/components/builder/static-canvas';
 import {TemplatePicker} from '@/components/builder/template-picker';
 import {AnimationPreview} from '@/components/builder/animation-preview';
+import {AnimationConfigPanel} from '@/components/builder/animation-config-panel';
 import {BuilderNav} from '@/components/builder/builder-nav';
 import {ExportPanel} from '@/components/builder/export-panel';
 import {TEMPLATES} from '@/remotion/generated/registry';
 import type {TemplateId} from '@/remotion/generated/registry';
+import type {AnimationTemplateConfig, TimelineRaceConfig} from '@/lib/animation-config';
+import {emptyAnimationConfig} from '@/lib/animation-config';
 import {useToast} from '@/components/ui/toast';
 
 const QueryCanvas = dynamic(
@@ -93,6 +96,7 @@ function BuilderContent() {
   const [meta, setMeta] = useState<SchemaMetadata | null>(null);
 
   const [duration, setDuration] = useState(10);
+  const [templateConfig, setTemplateConfig] = useState<AnimationTemplateConfig>(emptyAnimationConfig());
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editIdRef = useRef<string | null>(editId);
@@ -183,6 +187,9 @@ function BuilderContent() {
           if (ac.duration) {
             setDuration(ac.duration);
             durationLoadedRef.current = true;
+          }
+          if (ac.templateConfig) {
+            setTemplateConfig({...emptyAnimationConfig(), ...ac.templateConfig});
           }
         }
         setSaved(true);
@@ -287,7 +294,7 @@ function BuilderContent() {
           query_spec: spec,
           chart_config: chartConfig,
           animation_config: outputMode === 'animated' && activeTemplate
-            ? {templateId: activeTemplate, duration}
+            ? {templateId: activeTemplate, duration, templateConfig: Object.keys(templateConfig).length > 0 ? templateConfig : null}
             : null,
           is_draft: true,
         }),
@@ -302,7 +309,7 @@ function BuilderContent() {
     } catch {
       // Silent — autosave is best-effort
     }
-  }, [spec, vizName, chartConfig, outputMode, activeTemplate, duration]);
+  }, [spec, vizName, chartConfig, outputMode, activeTemplate, duration, templateConfig]);
 
   useEffect(() => {
     if (saved || !spec.table || spec.select?.length === 0) return;
@@ -371,7 +378,7 @@ function BuilderContent() {
           query_spec: spec,
           chart_config: chartConfig,
           animation_config: outputMode === 'animated' && activeTemplate
-            ? {templateId: activeTemplate, duration}
+            ? {templateId: activeTemplate, duration, templateConfig: Object.keys(templateConfig).length > 0 ? templateConfig : null}
             : null,
           thumbnail_url: thumbnailUrl,
           is_draft: false,
@@ -424,9 +431,9 @@ function BuilderContent() {
   // user's query data (the canonical template data feature was removed).
   const remotionProps = useMemo(
     () => (activeTemplate && filteredData.length > 0
-      ? convertToRemotionProps(chartConfig, filteredData, activeTemplate)?.props ?? null
+      ? convertToRemotionProps(chartConfig, filteredData, activeTemplate, templateConfig)?.props ?? null
       : null),
-    [chartConfig, filteredData, activeTemplate],
+    [chartConfig, filteredData, activeTemplate, templateConfig],
   );
 
   // Fan-out metadata for the step-2 chart panel. `aliasToTable` maps each
@@ -705,6 +712,16 @@ function BuilderContent() {
                     setSelectedTemplate(id);
                   }}
                 />
+
+                {activeTemplate && (
+                  <AnimationConfigPanel
+                    templateId={activeTemplate}
+                    columns={columns}
+                    fieldMeta={fieldMeta}
+                    value={templateConfig['timeline-race'] ?? {}}
+                    onChange={(tc) => setTemplateConfig((prev) => ({...prev, 'timeline-race': tc as TimelineRaceConfig}))}
+                  />
+                )}
 
                 {/* Duration slider */}
                 {activeTemplate && templateEntry && (

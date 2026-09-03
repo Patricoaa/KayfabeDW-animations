@@ -3,6 +3,7 @@ import {TEMPLATES} from '@/remotion/generated/registry';
 import type {TemplateId} from '@/remotion/generated/registry';
 import {matchTemplates} from './profile-matcher';
 import {prepareSeries, toSeries, type CanonicalSeries} from './chart-data';
+import type {AnimationTemplateConfig, TimelineRaceConfig} from './animation-config';
 
 export type RemotionInputProps = {
   templateId: string;
@@ -64,29 +65,39 @@ function convertWinStreak(data: Record<string, unknown>[], config: ChartConfig):
   };
 }
 
-function convertTimelineReinados(data: Record<string, unknown>[], config: ChartConfig): Record<string, unknown> {
-  const prepared = prepareSeries(data, config);
-  const endCol = Object.keys(data[0] ?? {}).find((k) => k.toLowerCase().includes('end'));
-  const defensesCol = Object.keys(data[0] ?? {}).find((k) => k.toLowerCase().includes('defense'));
+function convertTimelineRace(
+  data: Record<string, unknown>[],
+  config: ChartConfig,
+  tc?: TimelineRaceConfig,
+): Record<string, unknown> {
+  // Explicit per-template column mapping wins; otherwise fall back to the
+  // inherited static xField/yField plus heuristic column detection for start /
+  // end / secondary so older saved data keeps rendering.
+  const labelField = tc?.labelField ?? config.xField;
+  const valueField = tc?.valueField ?? config.yField;
+  const startField = tc?.startField;
+  const endField = tc?.endField ?? Object.keys(data[0] ?? {}).find((k) =>
+    k.toLowerCase().includes('end') || k.toLowerCase().includes('fin'));
+  const secondaryField =
+    tc?.secondaryField ??
+    Object.keys(data[0] ?? {}).find((k) =>
+      k.toLowerCase().includes('defense') || k.toLowerCase().includes('defensa'));
 
-  const champion = prepared.items[0]?.label ?? '';
-  const title = config.title ?? '';
-
-  const reigns = prepared.items.map((item) => {
-    const raw = (item.raw ?? {}) as Record<string, unknown>;
-    return {
-      start: item.label,
-      end: endCol ? (raw[endCol] ? String(raw[endCol]) : null) : null,
-      days: item.value,
-      defenses: defensesCol ? Number(raw[defensesCol] ?? 0) : 0,
-    };
-  });
+  const rows = data ?? [];
+  const items = rows
+    .map((row) => ({
+      label: String(row[labelField ?? Object.keys(row)[0] ?? ''] ?? ''),
+      start: startField ? String(row[startField] ?? '') : String(row[labelField ?? ''] ?? ''),
+      end: endField ? (row[endField] != null ? String(row[endField]) : null) : null,
+      value: Number(row[valueField ?? Object.keys(row)[1] ?? ''] ?? 0),
+      secondary: secondaryField ? Number(row[secondaryField] ?? 0) : 0,
+    }))
+    .filter((it) => !isNaN(it.value));
 
   return {
-    championName: champion,
-    titleName: title,
-    reigns,
-    promotionColor: config.colors?.[0] ?? '#FFD700',
+    title: config.title ?? '',
+    items,
+    accentColor: config.colors?.[0] ?? '#FFD700',
   };
 }
 
@@ -139,12 +150,12 @@ function convertGenericKpi(data: Record<string, unknown>[], config: ChartConfig)
   };
 }
 
-const CONVERTERS: Record<string, (data: Record<string, unknown>[], config: ChartConfig) => Record<string, unknown>> = {
+const CONVERTERS: Record<string, (data: Record<string, unknown>[], config: ChartConfig, templateConfig?: unknown) => Record<string, unknown>> = {
   'ranking-barras': convertRankingBarras,
   'head-to-head': convertHeadToHead,
   'stats-kpi': convertStatsKpi,
   'win-streak': convertWinStreak,
-  'timeline-reinados': convertTimelineReinados,
+  'timeline-race': (data, config, tc) => convertTimelineRace(data, config, tc as TimelineRaceConfig | undefined),
   'heatmap-luchas': convertHeatmapLuchas,
   'generic-bar': convertGenericBar,
   'generic-line': convertGenericLine,
@@ -193,13 +204,16 @@ export function convertToRemotionProps(
   config: ChartConfig,
   data: Record<string, unknown>[],
   templateId: string,
+  templateConfig?: AnimationTemplateConfig,
 ): RemotionInputProps | null {
   const converter = CONVERTERS[templateId];
   if (!converter) return null;
 
+  const tc = templateId === 'timeline-race' ? templateConfig?.['timeline-race'] : undefined;
+
   return {
     templateId,
-    props: converter(data, config),
+    props: converter(data, config, tc),
   };
 }
 

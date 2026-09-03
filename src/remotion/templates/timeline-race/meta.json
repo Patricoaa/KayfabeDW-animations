@@ -1,0 +1,21 @@
+{
+  "id": "timeline-race",
+  "name": "Timeline Race",
+  "description": "Carrera horizontal cronológica de eventos o participantes",
+  "componentId": "TimelineRace",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "defaultDuration": 12,
+  "dataOptions": [],
+  "dataProfile": {
+    "requiredColumns": ["label", "value"],
+    "optionalColumns": ["start", "end", "secondary"],
+    "columnHints": {
+      "label": ["text"],
+      "value": ["number"]
+    },
+    "minRows": 2,
+    "rowMatch": "at_least"
+  }
+}
