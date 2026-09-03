@@ -248,7 +248,12 @@ export type ChartConfig = {
   categoryTextOverrides?: Record<string, string | {label?: string; sub?: string}>;
 
   // Category (x) label placement + its own font. Only applies to bar charts.
-  categoryLabelPosition?: CategoryLabelPosition;
+  // V20: placement is now by GLOBAL coordinates (px) from a fixed point of the
+  // plot area per category (bottom edge at band center in vertical; left edge at
+  // row center in horizontal), replacing the old `categoryLabelPosition` enum.
+  categoryLabelOffsetX?: number;
+  categoryLabelOffsetY?: number;
+  categoryLabelsVisible?: boolean;
 
   // Per-section font overrides (inherit general typography when unset).
   headerFont?: SectionFont;
@@ -293,7 +298,7 @@ export type ChartConfig = {
   configVersion?: number;
 };
 
-export const CHART_CONFIG_VERSION = 19;
+export const CHART_CONFIG_VERSION = 20;
 
 export const DEFAULT_CHART_CONFIG: ChartConfig = {
   type: 'bar',
@@ -330,7 +335,9 @@ export const DEFAULT_CHART_CONFIG: ChartConfig = {
   dataLabelPosition: 'auto',
   dataLabelFontSize: 10,
   dataLabelColor: '#cccccc',
-  categoryLabelPosition: 'axis',
+  categoryLabelOffsetX: 0,
+  categoryLabelOffsetY: 0,
+  categoryLabelsVisible: true,
   barRadiusEndsOnly: false,
   canvasBorderRadius: 0,
   canvasBorderWidth: 0,
@@ -366,6 +373,13 @@ export function applyChartDefaults(config: Partial<ChartConfig>): ChartConfig {
   if ('avatarPosition' in stale || 'avatarOffset' in stale) {
     delete stale.avatarPosition;
     delete stale.avatarOffset;
+  }
+  // V20: category label position is now per-coordinate (`categoryLabelOffsetX/Y`)
+  // from a fixed plot point. The old enum is dropped; `hide` maps to
+  // `categoryLabelsVisible:false`, other values reset to the anchor (0,0).
+  if ('categoryLabelPosition' in stale) {
+    if (stale.categoryLabelPosition === 'hide') stale.categoryLabelsVisible = false;
+    delete stale.categoryLabelPosition;
   }
   const remapped = {...DEFAULT_CHART_CONFIG, ...clean};
   return remapped;

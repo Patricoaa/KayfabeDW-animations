@@ -2,7 +2,7 @@
 
 import React, {useEffect, useState} from 'react';
 import {BarChart3, PieChart, LineChart, AreaChart, ScatterChart, Table2, ChevronDown} from 'lucide-react';
-import type {ChartConfig, ChartType, NumberFormat, SortBy, ChartFilter, ChartFilterOp, LegendPosition, ChartStyle, AvatarShape, AvatarCrop, SectionFont, CategoryLabelPosition, TextLayout} from '@/lib/chart-config';
+import type {ChartConfig, ChartType, NumberFormat, SortBy, ChartFilter, ChartFilterOp, LegendPosition, ChartStyle, AvatarShape, AvatarCrop, SectionFont, TextLayout} from '@/lib/chart-config';
 import {FONT_PRESETS, PALETTES} from '@/lib/chart-config';
 import {pickColor, colorFor} from '@/lib/chart-data';
 import {TextControls} from '@/components/builder/text-controls';
@@ -765,25 +765,25 @@ const setLegendTextOverride = (label: string, value?: string) => {
 
           {config.type === 'bar' && (
             <div>
-              <label className="text-sm font-medium mb-1 block">Posición de etiquetas de categoría</label>
-              <select
-                value={config.categoryLabelPosition?.endsWith('-out') && !config.horizontal ? 'axis' : (config.categoryLabelPosition ?? 'axis')}
-                onChange={(e) => update({categoryLabelPosition: e.target.value as CategoryLabelPosition})}
-                className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-              >
-                <option value="hide">Ocultar</option>
-                <option value="axis">En el eje</option>
-                {config.horizontal && (
-                  <>
-                    <option value="start-out">Fuera · inicio</option>
-                    <option value="center-out">Fuera · centro</option>
-                    <option value="end-out">Fuera · final</option>
-                  </>
-                )}
-                <option value="start-in">Dentro · inicio</option>
-                <option value="center-in">Dentro · centro</option>
-                <option value="end-in">Dentro · final</option>
-              </select>
+              <label className="text-sm font-medium mb-1 block">Etiquetas de categoría</label>
+              <p className="text-[10px] text-muted mb-2">Posición por coordenadas (px) desde un punto fijo del área del gráfico. En barras verticales el ancla es el borde inferior del centro de cada banda; en horizontales, el borde izquierdo del centro de cada fila.</p>
+              <div className="flex items-center gap-2 mb-3">
+                <input
+                  type="checkbox"
+                  checked={config.categoryLabelsVisible ?? true}
+                  onChange={(e) => update({categoryLabelsVisible: e.target.checked})}
+                  className="accent-amber-500 h-4 w-4"
+                />
+                <span className="text-sm">Mostrar etiquetas</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <NumberInput label="Offset X" value={config.categoryLabelOffsetX ?? 0} min={-128} max={128} step={1} onChange={(v) => update({categoryLabelOffsetX: v})} />
+                </div>
+                <div>
+                  <NumberInput label="Offset Y" value={config.categoryLabelOffsetY ?? 0} min={-128} max={128} step={1} onChange={(v) => update({categoryLabelOffsetY: v})} />
+                </div>
+              </div>
             </div>
           )}
 
@@ -1208,7 +1208,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
                     {catLabels.map((label) => {
                       const cr = config.avatarCrops?.[label];
                       const imgUrl = categoryImageMap.get(label);
-                      const zoom = Math.max(cr?.zoom ?? 1, 1.2);
+                      const zoom = Math.max(cr?.zoom ?? 1, 0.1);
                       const fx = Math.max(Math.min(cr?.focusX ?? 0, 1), -1);
                       const fy = Math.max(Math.min(cr?.focusY ?? 0, 1), -1);
                       const PREVIEW = 44;
@@ -1250,7 +1250,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
                               )}
                             </div>
                             <div className="grid grid-cols-3 gap-2 flex-1">
-                              <NumberInput label="Zoom" value={cr?.zoom} min={0.5} max={3} step={0.05} onChange={(v) => setAvatarCrop(label, {...cr, zoom: v})} />
+                              <NumberInput label="Zoom" value={cr?.zoom} min={0.1} max={3} step={0.05} onChange={(v) => setAvatarCrop(label, {...cr, zoom: v})} />
                               <NumberInput label="Foco X" value={cr ? (cr.focusX ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setAvatarCrop(label, {...cr, focusX: (v ?? 0) / 100})} />
                               <NumberInput label="Foco Y" value={cr ? (cr.focusY ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setAvatarCrop(label, {...cr, focusY: (v ?? 0) / 100})} />
                             </div>

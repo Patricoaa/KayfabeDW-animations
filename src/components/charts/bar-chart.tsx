@@ -235,13 +235,11 @@ function resolveAvatarRadius(config: ChartConfig, size: number): number {
   return Math.min(Math.max(Math.round(size * 0.25), 4), 24);
 }
 
-// Avatar placement: global coordinates anchored to the VALUE TIP of each bar.
-// The avatar center = (valueTipX + offsetX, valueTipY + offsetY). For horizontal
-// bars the tip is the X end at row center; for vertical bars the tip is the top of
-// the bar at column center (SVG y grows down, so a positive offsetY moves toward
-// the axis). These px offsets derive FROM the bar's real geometry (never canvas
-// constants), so the avatar tracks its bar when gap/category-gap/spacing controls
-// move the bars.
+// Avatar placement: global coordinates anchored to a FIXED point of the plot
+// area per category (left edge at row center in horizontal; top edge at band
+// center in vertical). The avatar center = (anchorX + offsetX, anchorY + offsetY).
+// Decoupled from the bar: bar length/gap/spacing never move it, and its size/
+// offset never reserves margins that shift the plot.
 function avatarCx(tipX: number, offsetX: number): number {
   return tipX + offsetX;
 }
@@ -256,9 +254,10 @@ function Avatar({
   shape: string | undefined; size: number; radius: number;
   crop?: AvatarCrop;
 }) {
-  // Effective zoom never drops below ~1.2 so there is always headroom for the
-  // X/Y focus to visibly pan the source image inside the (fixed) shape frame.
-  const zoom = Math.max(crop?.zoom ?? 1, 1.2);
+  // Zoom can go below 1 (zoom-out: image renders smaller than the frame,
+  // revealing the frame around it). Minimum floor avoids 0; panning (focus) is
+  // only meaningful while zoom > 1.
+  const zoom = Math.max(crop?.zoom ?? 1, 0.1);
   const fx = Math.max(Math.min(crop?.focusX ?? 0, 1), -1);
   const fy = Math.max(Math.min(crop?.focusY ?? 0, 1), -1);
   const vw = size * zoom;
@@ -334,8 +333,9 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const catColor = config.xLabelFont?.color ?? st.textColor;
   const catSize = config.xLabelFont?.size ?? st.labelFontSize;
   const catFamily = config.xLabelFont?.fontFamily ?? undefined;
-  const catPosRaw = config.categoryLabelPosition ?? 'axis';
-  const catPos = (!horizontal && catPosRaw.endsWith('-out')) ? 'axis' : catPosRaw;
+  const catLabelOffX = config.categoryLabelOffsetX ?? 0;
+  const catLabelOffY = config.categoryLabelOffsetY ?? 0;
+  const catLabelsVisible = config.categoryLabelsVisible ?? true;
   const xAxisColor = config.xLabelFont?.color ?? st.axisColor;
   const yAxisColor = config.yLabelFont?.color ?? st.axisColor;
   const xAxisFamily = config.xLabelFont?.fontFamily;
@@ -357,7 +357,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
     family: config.categoryDescriptionFont?.fontFamily ?? undefined,
     weight: config.categoryDescriptionFont?.weight ?? 400,
   };
-  const catBlock = catPos !== 'hide';
+  const catBlock = catLabelsVisible;
   const maxCat = multi.categories.reduce((m, c) => (c.length > m.length ? c : m), '');
   const maxDesc = descField
     ? multi.categoryDescriptions?.reduce<string>((m, d) => {
@@ -407,17 +407,9 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   // --- HORIZONTAL LAYOUT ---
   if (horizontal) {
     const marginAdj = {...margin};
-    // Label-dependent avatars and long axis labels sit left of the bar row;
-    // reserve the space so they are never clipped outside the SVG.
-    const catEst = estLabelWidth(maxCat, catSize, catOv);
-    const descEst = descField ? estLabelWidth(maxDesc, descSize, descOv) : 0;
-    const labelEst = Math.max(catEst, descEst);
-    if (catBlock && catPos.endsWith('-out') && labelAngle === 0) {
-      marginAdj.top += catSize + (descField ? descSize + 2 : 0) + 4;
-    }
-    if (catBlock && catPos === 'axis') {
-      marginAdj.left += labelEst + 8;
-    }
+    // Category labels are placed by absolute coordinates and no longer reserve
+    // margins, so label size/offset never moves the plot. The plot left edge is
+    // the fixed anchor for category labels on horizontal bars.
     const plotW = width - marginAdj.left - marginAdj.right;
     const plotH = height - marginAdj.top - marginAdj.bottom;
     const catBandH = plotH / Math.max(nCat, 1);
@@ -605,7 +597,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                 const cy = bandY + catBandH / 2;
                 const img = multi.categoryImages?.[ci] ?? null;
                 const hasImg = avatarActive && !!img;
-                const showText = catPos !== 'hide';
+                const showText = catLabelsVisible;
                 const label = resolvedCategoryLabel(config, cat);
                 const desc = descOf(resolvedCategorySub(config, cat, multi.categoryDescriptions?.[ci]));
                 const colStart = marginAdj.left;
@@ -613,19 +605,10 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                   ? marginAdj.left + ((stackedPercent ? 1 : (stackTotal![ci] || 1)) / (stackedPercent ? 1 : yRange)) * plotW
                   : marginAdj.left + (Math.max(...multi.series.map((s) => s.values[ci] ?? 0), 0) / yRange) * plotW;
                 const midX = (colStart + colEnd) / 2;
-                const labelAt = catPos === 'axis'
-                  ? {x: colStart - 8, y: cy + 3, anchor: 'end' as const}
-                  : catPos === 'start-out'
-                    ? {x: colStart + 4, y: bandY - 3, anchor: 'start' as const}
-                    : catPos === 'end-out'
-                      ? {x: colEnd, y: bandY - 3, anchor: 'end' as const}
-                      : catPos === 'center-out'
-                        ? {x: midX, y: bandY - 3, anchor: 'middle' as const}
-                        : catPos === 'start-in'
-                          ? {x: colStart + 8, y: cy + 3, anchor: 'start' as const}
-                          : catPos === 'end-in'
-                            ? {x: Math.max(colEnd - 8, colStart + 8), y: cy + 3, anchor: 'end' as const}
-                            : {x: midX, y: cy + 3, anchor: 'middle' as const};
+                // Label anchored to a FIXED plot point at this category's slot:
+                // horizontal → the plot left edge at the row center. Global X/Y
+                // offsets shift it (Offset X: right = +, Offset Y: down = +).
+                const labelAt = {x: marginAdj.left + catLabelOffX, y: cy + catLabelOffY, anchor: 'start' as const};
                 const renderLabel = (p: {x: number; y: number; anchor: 'start' | 'middle' | 'end'} | null, focusCap = 16) => {
                   if (!p) return null;
                   return (
@@ -663,27 +646,10 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
 
   // --- VERTICAL LAYOUT (default) ---
   const marginAdj = {...margin};
-  if (catBlock && catPos.endsWith('-out')) {
-    const descEst = descField ? estLabelWidth(maxDesc, descSize, descOv) : 0;
-    marginAdj.right += Math.max(estLabelWidth(maxCat, catSize, catOv), descEst) + 8;
-  }
-  // Descriptions render as extra small lines under the category label; with
-  // 'wrap' the bottom margin grows to fit up to MAX_WRAP_LINES lines so the
-  // wrapped category label and/or description are never clipped.
-  if (catBlock && labelAngle === 0) {
-    const catWrapExtra = catOv === 'wrap'
-      ? Math.max(0, estWrapLines(maxCat, 12) - 1) * (catSize + 1.5)
-      : 0;
-    const descLines = descField ? (descOv === 'wrap' ? estWrapLines(maxDesc, 20) : 1) : 0;
-    if (descLines > 0) {
-      marginAdj.bottom += catWrapExtra + descLines * (descSize + 1.5) + 6;
-    } else if (catWrapExtra > 0) {
-      marginAdj.bottom += catWrapExtra;
-    }
-  } else if (catBlock && descField) {
-    const descLines = descOv === 'wrap' ? 2 : 1;
-    marginAdj.bottom += descLines * (descSize + 1.5) + 6;
-  }
+  // Category labels / descriptions are placed by absolute coordinates and no
+  // longer reserve right/bottom margins, so label size/offset/overflow never
+  // move the plot. The plot bottom edge is the fixed anchor for category labels
+  // on vertical bars.
   const plotW = width - marginAdj.left - marginAdj.right;
   const plotH = height - marginAdj.top - marginAdj.bottom;
   const catBand = (width - marginAdj.left - marginAdj.right) / Math.max(nCat, 1);
@@ -861,7 +827,7 @@ const fill = barFill(s.color, config, val < 0);
             const blockCenterX = bandX + barBandX + barBlockW / 2;
             const img = multi.categoryImages?.[ci] ?? null;
             const hasImg = avatarActive && !!img;
-            const showText = catPos !== 'hide';
+            const showText = catLabelsVisible;
             const label = resolvedCategoryLabel(config, cat);
             const desc = descOf(resolvedCategorySub(config, cat, multi.categoryDescriptions?.[ci]));
 
@@ -896,21 +862,10 @@ const fill = barFill(s.color, config, val < 0);
                   ? marginAdj.top + plotH - ((multi.series.reduce((a, s) => a + Math.max(s.values[ci] ?? 0, 0), 0)) / yRange) * plotH
                   : marginAdj.top + plotH - (Math.max(...multi.series.map((s) => s.values[ci] ?? 0), 0) / yRange) * plotH;
               const midY = (colTop + colBottom) / 2;
-              const labelAt = catPos === 'hide'
-                ? null
-                : catPos === 'axis'
-                  ? {x: blockCenterX, y: height - marginAdj.bottom + 14, anchor: 'middle' as const}
-                  : catPos === 'start-out'
-                    ? {x: blockCenterX + barBlockW / 2 + 8, y: colBottom - 4, anchor: 'start' as const}
-                    : catPos === 'end-out'
-                      ? {x: blockCenterX + barBlockW / 2 + 8, y: Math.max(colTop + 6, marginAdj.top + 8), anchor: 'start' as const}
-                      : catPos === 'center-out'
-                        ? {x: blockCenterX + barBlockW / 2 + 8, y: midY, anchor: 'start' as const}
-                        : catPos === 'start-in'
-                          ? {x: blockCenterX, y: colBottom - 10, anchor: 'middle' as const}
-                          : catPos === 'end-in'
-                            ? {x: blockCenterX, y: Math.min(colTop + 12, colBottom - 10), anchor: 'middle' as const}
-                            : {x: blockCenterX, y: midY, anchor: 'middle' as const};
+              // Label anchored to a FIXED plot point at this category's slot:
+              // vertical → the plot bottom edge at the band center. Global X/Y
+              // offsets shift it (Offset X: right = +, Offset Y: down = +).
+              const labelAt = {x: marginAdj.left + bandX + catBand / 2 + catLabelOffX, y: colBottom + catLabelOffY, anchor: 'middle' as const};
               if (!showText || !labelAt) return null;
               return renderLabel(labelAt);
             }
@@ -926,7 +881,7 @@ const fill = barFill(s.color, config, val < 0);
             return (
               <g key={ci}>
                 <Avatar href={img!} cx={cx} cy={cy} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} crop={crop} />
-                {showText && renderLabel({x: blockCenterX, y: axisY, anchor: 'middle'}, 12)}
+                {showText && renderLabel({x: marginAdj.left + bandX + catBand / 2 + catLabelOffX, y: marginAdj.top + plotH + catLabelOffY, anchor: 'middle'}, 12)}
               </g>
             );
           })}
@@ -953,8 +908,9 @@ function SingleBar({data, config}: Props) {
   const catColor = config.xLabelFont?.color ?? st.textColor;
   const catSize = config.xLabelFont?.size ?? st.labelFontSize;
   const catFamily = config.xLabelFont?.fontFamily ?? undefined;
-  const catPosRaw = config.categoryLabelPosition ?? 'axis';
-  const catPos = (!horizontal && catPosRaw.endsWith('-out')) ? 'axis' : catPosRaw;
+  const catLabelOffX = config.categoryLabelOffsetX ?? 0;
+  const catLabelOffY = config.categoryLabelOffsetY ?? 0;
+  const catLabelsVisible = config.categoryLabelsVisible ?? true;
   const xAxisColor = config.xLabelFont?.color ?? st.axisColor;
   const yAxisColor = config.yLabelFont?.color ?? st.axisColor;
   const xAxisFamily = config.xLabelFont?.fontFamily;
@@ -1000,46 +956,10 @@ function SingleBar({data, config}: Props) {
     family: config.categoryDescriptionFont?.fontFamily ?? undefined,
     weight: config.categoryDescriptionFont?.weight ?? 400,
   };
-  const catBlock = catPos !== 'hide';
-  const maxLabel = prepared.items.reduce((m, it) => (it.label.length > m.length ? it.label : m), '');
-  const maxDesc = descField
-    ? prepared.items.reduce<string>((m, it) => {
-        const t = descOfRow(descField, it.raw);
-        return t && t.length > m.length ? t : m;
-      }, '')
-    : '';
-  const [tip, setTip] = useState<TooltipState | null>(null);
-
   const marginAdj = {...margin};
-  // Reserve space for out-of-plot labels so they are never clipped.
-  if (!horizontal && catBlock && catPos.endsWith('-out')) {
-    const descEst = descField ? estLabelWidth(maxDesc, descSize, descOv) : 0;
-    marginAdj.right += Math.max(estLabelWidth(maxLabel, catSize, catOv), descEst) + 8;
-  }
-  if (!horizontal && catBlock && labelAngle === 0) {
-    const catWrapExtra = catOv === 'wrap'
-      ? Math.max(0, estWrapLines(maxLabel, 12) - 1) * (catSize + 1.5)
-      : 0;
-    const descLines = descField ? (descOv === 'wrap' ? estWrapLines(maxDesc, 20) : 1) : 0;
-    if (descLines > 0) {
-      marginAdj.bottom += catWrapExtra + descLines * (descSize + 1.5) + 6;
-    } else if (catWrapExtra > 0) {
-      marginAdj.bottom += catWrapExtra;
-    }
-  } else if (!horizontal && descField && catBlock) {
-    const descLines = descOv === 'wrap' ? 2 : 1;
-    marginAdj.bottom += descLines * (descSize + 1.5) + 6;
-  }
-  if (horizontal && catBlock) {
-    const descEst = descField ? estLabelWidth(maxDesc, descSize, descOv) : 0;
-    const labelEst = Math.max(estLabelWidth(maxLabel, catSize, catOv), descEst);
-    if (catPos.endsWith('-out') && labelAngle === 0) {
-      marginAdj.top += catSize + (descField ? descSize + 2 : 0) + 4;
-    }
-    if (catPos === 'axis') {
-      marginAdj.left += labelEst + 8;
-    }
-  }
+  const [tip, setTip] = useState<TooltipState | null>(null);
+  // Category labels / descriptions are placed by absolute coordinates and no
+  // longer reserve margins, so label size/offset/overflow never move the plot.
   const plotW2 = width - marginAdj.left - marginAdj.right;
   const plotH2 = height - marginAdj.top - marginAdj.bottom;
 
@@ -1093,22 +1013,10 @@ function SingleBar({data, config}: Props) {
             const endX = marginAdj.left + bw;
             const midX = (marginAdj.left + endX) / 2;
             const labelY = y + barH / 2 + 3;
-            const showText = catPos !== 'hide';
-            const labelAt = catPos === 'hide'
-              ? null
-              : catPos === 'axis'
-                ? {x: marginAdj.left - 8, y: labelY, anchor: 'end' as const}
-                : catPos === 'start-out'
-                  ? {x: marginAdj.left + 4, y: y - 4, anchor: 'start' as const}
-                  : catPos === 'end-out'
-                    ? {x: endX, y: y - 4, anchor: 'end' as const}
-                    : catPos === 'center-out'
-                      ? {x: midX, y: y - 4, anchor: 'middle' as const}
-                      : catPos === 'start-in'
-                        ? {x: marginAdj.left + 8, y: labelY, anchor: 'start' as const}
-                        : catPos === 'end-in'
-                          ? {x: Math.max(endX - 8, marginAdj.left + 8), y: labelY, anchor: 'end' as const}
-                          : {x: midX, y: labelY, anchor: 'middle' as const};
+            const showText = catLabelsVisible;
+            // Label anchored to a FIXED plot point at this row: horizontal → the
+            // plot left edge at the row center. Global X/Y offsets shift it.
+            const labelAt = {x: marginAdj.left + catLabelOffX, y: labelY + catLabelOffY, anchor: 'start' as const};
             const labelExtra = avatarActive && !!img ? avatarSize + 10 : 6;
             const label = resolvedCategoryLabel(config, d.label);
             const desc = descOf(resolvedCategorySub(config, d.label, descOfRow(config.categoryDescriptionField, d.raw)));
@@ -1213,23 +1121,11 @@ function SingleBar({data, config}: Props) {
           const topY = marginAdj.top + plotH2 - barH;
           const barCenterY = topY + barH / 2;
           const colBottom = marginAdj.top + plotH2;
-          const showText = catPos !== 'hide';
-          const labelAt = catPos === 'hide'
-            ? null
-            : catPos === 'axis'
-              ? {x: x + barWidth / 2, y: labelY, anchor: 'middle' as const}
-              : catPos === 'start-out'
-                ? {x: x + barWidth + 8, y: colBottom - 4, anchor: 'start' as const}
-                : catPos === 'end-out'
-                  ? {x: x + barWidth + 8, y: Math.max(topY + 6, marginAdj.top + 8), anchor: 'start' as const}
-                  : catPos === 'center-out'
-                    ? {x: x + barWidth + 8, y: barCenterY, anchor: 'start' as const}
-                    : catPos === 'start-in'
-                      ? {x: x + barWidth / 2, y: Math.max(colBottom - 10, topY + 10), anchor: 'middle' as const}
-                      : catPos === 'end-in'
-                        ? {x: x + barWidth / 2, y: Math.min(topY + 12, colBottom - 10), anchor: 'middle' as const}
-                        : {x: x + barWidth / 2, y: barCenterY, anchor: 'middle' as const};
+          const showText = catLabelsVisible;
           const centerX = x + barWidth / 2;
+          // Label anchored to a FIXED plot point at this column: vertical → the
+          // plot bottom edge at the column center. Global X/Y offsets shift it.
+          const labelAt = {x: centerX + catLabelOffX, y: colBottom + catLabelOffY, anchor: 'middle' as const};
           const label = resolvedCategoryLabel(config, d.label);
           const desc = descOf(resolvedCategorySub(config, d.label, descOfRow(config.categoryDescriptionField, d.raw)));
           const renderLabel = (p: {x: number; y: number; anchor: 'start' | 'middle' | 'end'} | null) => {
