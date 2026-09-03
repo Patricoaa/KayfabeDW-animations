@@ -43,30 +43,6 @@ function fmtDate(t: number, fmt: TimelineRaceProps['dateFormat'] = 'day'): strin
   return `${dd}/${mm}/${y}`;
 }
 
-// A participant label should be a proper name, not an image/avatar URL. When a
-// URL sneaks into the label column (e.g. a column is mis-mapped as both the
-// label and the image), render a readable fallback instead of leaking the raw
-// URL next to the avatar in the video.
-function isUrlLike(s: string): boolean {
-  const t = String(s).trim();
-  return /^(https?:\/\/|data:image\/|data:application\/|blob:)/i.test(t);
-}
-function displayLabel(label: string): string | null {
-  const t = String(label ?? '').trim();
-  if (!t) return null;
-  if (isUrlLike(t)) {
-    // Derive a short readable name from the URL path when possible.
-    try {
-      const path = new URL(t).pathname.split('/').filter(Boolean).pop();
-      if (path) return decodeURIComponent(path.split('.')[0]).replace(/[-_]/g, ' ') || null;
-    } catch {
-      // fall through to null
-    }
-    return null;
-  }
-  return t;
-}
-
 export const TimelineRace: React.FC<TimelineRaceProps> = ({
   title,
   items,
@@ -127,11 +103,6 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
               <div key={`${item.label}-${index}`} style={{opacity: rowOpacity, transform: `translateX(${labelX}px) scale(${isLeader ? winnerScale : 1})`, display: 'flex', alignItems: 'center', gap: isPortrait ? 12 : 18}}>
                 <div style={{width: LABEL_W, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12}}>
                   {item.image && <Avatar src={item.image} size={AVATAR} />}
-                  {displayLabel(item.label) != null && (
-                    <div style={{minWidth: 0}}>
-                      <div style={{fontSize: ROW_FONT, fontWeight: 700, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>{displayLabel(item.label)}</div>
-                    </div>
-                  )}
                 </div>
                 <div style={{flex: 1, height: ROW_H * 0.5, backgroundColor: '#1a1a1a', borderRadius: ROW_H * 0.25, overflow: 'hidden', display: 'flex'}}>
                   <div style={{width: Math.max(0, barWidth), height: '100%', backgroundColor: isLeader ? accentColor : '#475569', borderRadius: ROW_H * 0.25, boxShadow: isLeader ? `0 0 ${16 * winnerScale}px ${accentColor}66` : 'none'}} />
@@ -237,11 +208,6 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
           {showYAxis && (
             <>
               {p.image && <Avatar src={p.image} size={AVATAR} />}
-              {displayLabel(p.label) != null && (
-                <div style={{minWidth: 0, flex: 1}}>
-                  <div style={{fontSize: ROW_FONT, fontWeight: 700, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>{displayLabel(p.label)}</div>
-                </div>
-              )}
             </>
           )}
         </div>
