@@ -40,6 +40,8 @@ import type {TemplateId} from '@/remotion/generated/registry';
 import type {AnimationTemplateConfig, TimelineRaceConfig} from '@/lib/animation-config';
 import {emptyAnimationConfig} from '@/lib/animation-config';
 import {useToast} from '@/components/ui/toast';
+import {DEFAULT_EXPORT_PRESET, getExportPreset} from '@/lib/export-presets';
+import type {ExportPresetId} from '@/lib/export-presets';
 
 const QueryCanvas = dynamic(
   () => import('@/components/canvas/query-canvas').then((m) => m.QueryCanvas),
@@ -97,6 +99,11 @@ function BuilderContent() {
 
   const [duration, setDuration] = useState(10);
   const [templateConfig, setTemplateConfig] = useState<AnimationTemplateConfig>(emptyAnimationConfig());
+  const [exportPresetId, setExportPresetId] = useState<ExportPresetId>(DEFAULT_EXPORT_PRESET.id);
+  const [customSize, setCustomSize] = useState<{width: number; height: number}>({width: 1280, height: 720});
+  const exportPreset = getExportPreset(exportPresetId);
+  const exportSize: {width: number; height: number} =
+    exportPresetId === 'custom' ? customSize : {width: exportPreset.width, height: exportPreset.height};
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editIdRef = useRef<string | null>(editId);
@@ -636,6 +643,8 @@ function BuilderContent() {
                 showExportBar={false}
                 templateConfig={templateConfig}
                 onDurationChange={setDuration}
+                width={exportSize.width}
+                height={exportSize.height}
               />
             ) : (
               <div className="h-full flex items-center justify-center text-muted text-sm font-body">
@@ -758,6 +767,10 @@ function BuilderContent() {
             duration={duration}
             onDurationChange={setDuration}
             remotionProps={outputMode === 'animated' ? remotionProps : null}
+            presetId={exportPresetId}
+            onPresetChange={setExportPresetId}
+            customSize={customSize}
+            onCustomSizeChange={setCustomSize}
           />
         </aside>
         )}

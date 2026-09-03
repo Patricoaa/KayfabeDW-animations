@@ -8,6 +8,8 @@ import {downloadChartSvg, downloadChartPng, downloadChartJpg, sanitizeFilename} 
 import {useToast} from '@/components/ui/toast';
 import {TEMPLATES} from '@/remotion/generated/registry';
 import type {TemplateId} from '@/remotion/generated/registry';
+import {EXPORT_PRESETS, getExportPreset} from '@/lib/export-presets';
+import type {ExportPresetId} from '@/lib/export-presets';
 
 type StaticFormat = 'png' | 'jpg' | 'svg';
 type AnimatedFormat = 'mp4' | 'gif';
@@ -29,6 +31,11 @@ type ExportPanelProps = {
   duration: number;
   onDurationChange: (d: number) => void;
   remotionProps?: Record<string, unknown> | null;
+  // Size / preset (controlled from the builder so preview + export stay in sync)
+  presetId: ExportPresetId;
+  onPresetChange: (id: ExportPresetId) => void;
+  customSize: {width: number; height: number};
+  onCustomSizeChange: (s: {width: number; height: number}) => void;
 };
 
 export function ExportPanel({
@@ -41,6 +48,10 @@ export function ExportPanel({
   duration,
   onDurationChange,
   remotionProps,
+  presetId,
+  onPresetChange,
+  customSize,
+  onCustomSizeChange,
 }: ExportPanelProps) {
   const {addToast} = useToast();
 
@@ -60,6 +71,13 @@ export function ExportPanel({
 
   const canvasWidth = chartConfig.width ?? 600;
   const canvasHeight = chartConfig.height ?? 380;
+
+  const preset = getExportPreset(presetId);
+  // Resolve the effective export size for the animated preset.
+  const exportSize: {width: number; height: number} =
+    presetId === 'custom'
+      ? {width: customSize.width, height: customSize.height}
+      : {width: preset.width, height: preset.height};
 
   // Static export
   const handleStaticExport = useCallback(async () => {
@@ -103,6 +121,9 @@ export function ExportPanel({
           inputProps: remotionProps,
           durationInFrames: duration * fps,
           format: animatedFormat,
+          width: exportSize.width,
+          height: exportSize.height,
+          fps,
         }),
         signal: controller.signal,
       });
@@ -138,7 +159,7 @@ export function ExportPanel({
     } finally {
       abortRef.current = null;
     }
-  }, [remotionProps, compositionId, duration, fps, animatedFormat, templateId]);
+  }, [remotionProps, compositionId, duration, fps, animatedFormat, templateId, exportSize]);
 
   const handleCancel = () => {
     abortRef.current?.abort();
@@ -284,6 +305,58 @@ export function ExportPanel({
               ))}
             </div>
           </div>
+
+          {/* Preset selector */}
+          <div>
+            <label className="text-[10px] font-semibold text-muted uppercase tracking-widest mb-2 block font-display">
+              Tamaño / preset
+            </label>
+            <div className="grid grid-cols-2 gap-1">
+              {EXPORT_PRESETS.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => onPresetChange(p.id)}
+                  className={`px-3 py-2 rounded-lg text-xs font-semibold transition-colors flex flex-col items-start gap-0.5 ${
+                    presetId === p.id
+                      ? 'bg-amber-500 text-black'
+                      : 'bg-elevated text-secondary hover:bg-card-hover'
+                  }`}
+                  title={`${p.width} × ${p.height}`}
+                >
+                  <span>{p.label}</span>
+                  <span className={`text-[9px] ${presetId === p.id ? 'opacity-80' : 'opacity-60'}`}>
+                    {p.hint} · {p.width}×{p.height}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {presetId === 'custom' && (
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={128}
+                max={3840}
+                value={customSize.width}
+                onChange={(e) => onCustomSizeChange({...customSize, width: Number(e.target.value)})}
+                className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm text-secondary font-mono"
+                aria-label="Ancho personalizado"
+                placeholder="Ancho"
+              />
+              <span className="text-muted">×</span>
+              <input
+                type="number"
+                min={128}
+                max={3840}
+                value={customSize.height}
+                onChange={(e) => onCustomSizeChange({...customSize, height: Number(e.target.value)})}
+                className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm text-secondary font-mono"
+                aria-label="Alto personalizado"
+                placeholder="Alto"
+              />
+            </div>
+          )}
 
           {/* Render progress */}
           {renderState.status === 'rendering' && (

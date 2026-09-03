@@ -7,6 +7,11 @@ import {useCurrentFrame, useVideoConfig, interpolate, spring, Img, staticFile} f
 // frame, highest on top). Before their date they sit in a placeholder zone.
 // An optional `image` renders an avatar in the row. When `dateMode` is false,
 // it renders a simpler parallel-bar layout (sorted by value, no guide).
+//
+// The layout is fully responsive: it reads the composition width/height via
+// `useVideoConfig()` and re-flows for landscape, portrait (9:16), post (4:5),
+// square, and custom sizes. This lets the same template render at any RRSS
+// preset while keeping elements proportional.
 export type TimelineRaceItem = {
   label: string;              // participant / event name
   image?: string | null;      // optional avatar (url / data: / root-relative)
@@ -52,7 +57,17 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   axisPosition = 'bottom',
 }) => {
   const frame = useCurrentFrame();
-  const {fps, durationInFrames} = useVideoConfig();
+  const {fps, durationInFrames, width: W, height: H} = useVideoConfig();
+
+  // ---- Responsive geometry ----
+  const isPortrait = H > W;
+  const PAD = isPortrait ? Math.round(W * 0.05) : 56;
+  const TITLE_SIZE = isPortrait ? Math.round(W * 0.075) : 42;
+  const ROW_FONT = isPortrait ? Math.round(W * 0.045) : 21;
+  const DATE_FONT = isPortrait ? Math.round(W * 0.09) : 44;
+  const AVATAR = isPortrait ? Math.round(W * 0.09) : 44;
+  const LABEL_W = showYAxis ? (isPortrait ? Math.round(W * 0.3) : 320) : 40;
+  const VALUE_W = isPortrait ? Math.round(W * 0.16) : 110;
 
   const fadeIn = interpolate(frame, [0, 24], [0, 1], {extrapolateRight: 'clamp'});
   const titleY = spring({fps, frame, config: {damping: 15, stiffness: 80}}) * -20;
@@ -65,37 +80,38 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   // ---- compat mode: parallel bars, no timing guide ----
   if (!dateMode) {
     const maxValue = Math.max(...rows.map((it) => it.value), 0);
-    const ROW_H = rows.length <= 6 ? 110 : Math.max(56, 600 / rows.length);
     const visible = (maxRows && maxRows > 0 ? rows.slice(0, maxRows) : rows).slice(0, 9);
     const leading = Math.max(...visible.map((it) => it.value), 0);
+    const barMax = W - LABEL_W - VALUE_W - PAD * 2 - 36;
+    const ROW_H = H * (visible.length <= 6 ? 0.14 : 0.6 / visible.length);
     const winnerScale = interpolate(frame, [durationInFrames - 45, durationInFrames - 10], [1, 1.06], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
     return (
-      <div style={{width: '100%', height: '100%', backgroundColor: '#0a0a0a', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", padding: 60, paddingBottom: 90, boxSizing: 'border-box'}}>
+      <div style={{width: '100%', height: '100%', backgroundColor: '#0a0a0a', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", padding: PAD, paddingBottom: PAD * 1.5, boxSizing: 'border-box'}}>
         <div style={{opacity: fadeIn, transform: `translateY(${titleY}px)`}}>
-          <div style={{fontSize: 44, fontWeight: 800, color: '#ffffff'}}>{title || 'Timeline Race'}</div>
-          <div style={{marginTop: 14, height: 4, width: 160, backgroundColor: accentColor, borderRadius: 2}} />
+          <div style={{fontSize: TITLE_SIZE, fontWeight: 800, color: '#ffffff'}}>{title || 'Timeline Race'}</div>
+          <div style={{marginTop: 14, height: 4, width: Math.max(80, W * 0.09), backgroundColor: accentColor, borderRadius: 2}} />
         </div>
-        <div style={{flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', marginTop: 40}}>
+        <div style={{flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', marginTop: H * 0.04}}>
           {visible.map((item, index) => {
             const delay = 15 + index * 10;
             const isLeader = item.value === leading;
             const rowOpacity = interpolate(frame - delay, [0, 25], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
             const labelX = interpolate(frame - delay, [0, 25], [-24, 0], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
             const barProgress = spring({fps, frame: frame - delay, config: {damping: 18, stiffness: 70}});
-            const barWidth = (item.value / maxValue) * 1280 * barProgress;
+            const barWidth = (item.value / maxValue) * barMax * barProgress;
             return (
-              <div key={`${item.label}-${index}`} style={{opacity: rowOpacity, transform: `translateX(${labelX}px) scale(${isLeader ? winnerScale : 1})`, display: 'flex', alignItems: 'center', gap: 18}}>
-                <div style={{width: 300, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12}}>
-                  {item.image && <Avatar src={item.image} />}
+              <div key={`${item.label}-${index}`} style={{opacity: rowOpacity, transform: `translateX(${labelX}px) scale(${isLeader ? winnerScale : 1})`, display: 'flex', alignItems: 'center', gap: isPortrait ? 12 : 18}}>
+                <div style={{width: LABEL_W, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12}}>
+                  {item.image && <Avatar src={item.image} size={AVATAR} />}
                   <div style={{minWidth: 0}}>
-                    <div style={{fontSize: 22, fontWeight: 700, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>{item.label}</div>
+                    <div style={{fontSize: ROW_FONT, fontWeight: 700, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>{item.label}</div>
                   </div>
                 </div>
                 <div style={{flex: 1, height: ROW_H * 0.5, backgroundColor: '#1a1a1a', borderRadius: ROW_H * 0.25, overflow: 'hidden', display: 'flex'}}>
                   <div style={{width: Math.max(0, barWidth), height: '100%', backgroundColor: isLeader ? accentColor : '#475569', borderRadius: ROW_H * 0.25, boxShadow: isLeader ? `0 0 ${16 * winnerScale}px ${accentColor}66` : 'none'}} />
                 </div>
-                <div style={{width: 120, flexShrink: 0, textAlign: 'right'}}>
-                  <span style={{fontSize: 22, fontWeight: 800, color: isLeader ? accentColor : '#ffffff', fontVariantNumeric: 'tabular-nums'}}>{item.value.toLocaleString()}</span>
+                <div style={{width: VALUE_W, flexShrink: 0, textAlign: 'right'}}>
+                  <span style={{fontSize: ROW_FONT, fontWeight: 800, color: isLeader ? accentColor : '#ffffff', fontVariantNumeric: 'tabular-nums'}}>{item.value.toLocaleString()}</span>
                 </div>
               </div>
             );
@@ -116,11 +132,10 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const withDate = rows.filter((r) => r.date != null);
   const maxValue = Math.max(...withDate.map((it) => it.value), 0) || 1;
 
-  // ---- Date axis track geometry ----
-  const LABEL_W = showYAxis ? 320 : 40;
-  const VALUE_W = showYAxis ? 110 : 110;
-  const TRACK_LEFT = LABEL_W; // after the label/avatar column
-  const TRACK_RIGHT = 1280 - VALUE_W - 24; // before the value column
+  // ---- Date axis track geometry (responsive) ----
+  const innerW = W - PAD * 2;
+  const TRACK_LEFT = LABEL_W;
+  const TRACK_RIGHT = innerW - VALUE_W - (isPortrait ? 8 : 24);
   const BAR_MAX_W = TRACK_RIGHT - TRACK_LEFT;
   const EASE = 26;
   const sweepFrames = Math.max(durationInFrames - EASE * 2, 1);
@@ -129,8 +144,6 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const guideX = TRACK_LEFT + guideT * (TRACK_RIGHT - TRACK_LEFT);
 
   // ---- Group steps by participant (label) ----
-  // A participant may appear across multiple dates (steps); their row shows the
-  // cumulative value at the most recent step the guide has already passed.
   const byLabel = new Map<string, {image?: string | null; steps: {x: number; value: number}[]}>();
   for (const r of withDate) {
     const x = ((r.date as number) - min) / span;
@@ -161,9 +174,15 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const showInactive = !(maxRows && maxRows > 0 && allP.length >= maxRows);
   const visibleActive = allP.filter((p) => p.active);
   const visibleInactive = showInactive ? allP.filter((p) => !p.active) : [];
+  const rowCount = Math.max(visibleActive.length + visibleInactive.length, 1);
 
-  const ROW_H = allP.length <= 6 ? 96 : Math.max(52, 560 / allP.length);
-  const laneY = (index: number) => 40 + index * (ROW_H + 8);
+  // Height budget for the rows area: full height minus title, axis strip and padding.
+  const rowBudget = H - PAD * 2 - TITLE_SIZE * 1.4 - (isPortrait ? H * 0.12 : 100) - (isPortrait ? 12 : 36);
+  const ROW_H = rowCount <= 6 ? Math.min(rowBudget / rowCount * 0.72, isPortrait ? 150 : 96) : Math.max(52, rowBudget / rowCount * 0.62);
+  const ROW_GAP = isPortrait ? 14 : 8;
+
+  // Vertical position of rows within the rows container.
+  const rowsTop = Math.max(0, (rowBudget - rowCount * ROW_H - (rowCount - 1) * ROW_GAP) / 2);
 
   // ---- Winner reveal: scale up + glow the leader as the race finishes ----
   const raceFinished = guideT >= 0.99;
@@ -187,22 +206,22 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     const scale = isLeader ? winnerScale : 1;
     const dim = isLeader ? 1 : dimOthers;
     return (
-      <div key={p.label} style={{position: 'absolute', left: 0, right: 0, height: ROW_H, top: y, display: 'flex', alignItems: 'center', gap: 16, opacity: dim}}>
+      <div key={p.label} style={{position: 'absolute', left: 0, right: 0, height: ROW_H, top: y, display: 'flex', alignItems: 'center', gap: isPortrait ? 10 : 16, opacity: dim}}>
         <div style={{width: LABEL_W, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, justifyContent: showYAxis ? 'flex-start' : 'flex-end'}}>
           {showYAxis && (
             <>
-              {p.image && <Avatar src={p.image} />}
+              {p.image && <Avatar src={p.image} size={AVATAR} />}
               <div style={{minWidth: 0, flex: 1}}>
-                <div style={{fontSize: 21, fontWeight: 700, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>{p.label}</div>
+                <div style={{fontSize: ROW_FONT, fontWeight: 700, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>{p.label}</div>
               </div>
             </>
           )}
         </div>
-        <div style={{flex: 1, height: ROW_H * 0.46, backgroundColor: '#171717', borderRadius: 999, overflow: 'hidden', display: 'flex', position: 'relative'}}>
+        <div style={{flex: 1, height: Math.max(14, ROW_H * 0.46), backgroundColor: '#171717', borderRadius: 999, overflow: 'hidden', display: 'flex', position: 'relative'}}>
           <div style={{width: Math.max(0, barW * pop), height: '100%', backgroundColor: isLeader ? accentColor : '#3f3f46', borderRadius: 999, boxShadow: isLeader ? `0 0 ${18 * scale}px ${accentColor}99` : 'none', transform: `scaleY(${scale})`}} />
         </div>
         <div style={{width: VALUE_W, flexShrink: 0, textAlign: 'right'}}>
-          <span style={{fontSize: 21, fontWeight: 800, color: isLeader ? accentColor : '#ffffff', fontVariantNumeric: 'tabular-nums', opacity: p.active ? 1 : 0.25}}>
+          <span style={{fontSize: ROW_FONT, fontWeight: 800, color: isLeader ? accentColor : '#ffffff', fontVariantNumeric: 'tabular-nums', opacity: p.active ? 1 : 0.25}}>
             {p.active ? p.current.toLocaleString() : '–'}
           </span>
         </div>
@@ -220,11 +239,12 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
 
   // On-screen date text (bottom-right), independent of the reference line.
   const dateLabelText = fmtDate(min + span * guideT, dateFormat);
+  const gridFont = isPortrait ? Math.round(W * 0.028) : 13;
 
   const axisStrip = (
-    <div style={{flexShrink: 0, marginTop: 8, paddingTop: 12, borderTop: '1px solid #1f2937', display: 'grid', gridTemplateColumns: `repeat(${GRID_COUNT}, 1fr)`, gap: 2}}>
+    <div style={{flexShrink: 0, marginTop: 8, paddingTop: 12, borderTop: '1px solid #1f2937', display: 'grid', gridTemplateColumns: `repeat(${GRID_COUNT}, 1fr)`, gap: 2, width: '100%'}}>
       {gridCells.map((cell, i) => (
-        <div key={i} style={{position: 'relative', fontSize: 13, color: cell.passed ? accentColor : '#64748b', fontVariantNumeric: 'tabular-nums', textAlign: 'center', backgroundColor: cell.passed ? `${accentColor}1a` : 'transparent', borderRadius: 4, padding: '2px 0'}}>
+        <div key={i} style={{position: 'relative', fontSize: gridFont, color: cell.passed ? accentColor : '#64748b', fontVariantNumeric: 'tabular-nums', textAlign: 'center', backgroundColor: cell.passed ? `${accentColor}1a` : 'transparent', borderRadius: 4, padding: '2px 0'}}>
           {fmtDate(cell.t, dateFormat)}
         </div>
       ))}
@@ -232,18 +252,18 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   );
 
   return (
-    <div style={{width: '100%', height: '100%', position: 'relative', backgroundColor: '#0a0a0a', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", padding: 56, paddingBottom: 84, boxSizing: 'border-box', overflow: 'hidden'}}>
+    <div style={{width: '100%', height: '100%', position: 'relative', backgroundColor: '#0a0a0a', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", padding: PAD, paddingBottom: isPortrait ? PAD + 60 : 84, boxSizing: 'border-box', overflow: 'hidden'}}>
       <div style={{opacity: fadeIn, transform: `translateY(${titleY}px)`, flexShrink: 0}}>
-        <div style={{fontSize: 42, fontWeight: 800, color: '#ffffff'}}>{title || 'Timeline Race'}</div>
-        <div style={{marginTop: 14, height: 4, width: 160, backgroundColor: accentColor, borderRadius: 2}} />
+        <div style={{fontSize: TITLE_SIZE, fontWeight: 800, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>{title || 'Timeline Race'}</div>
+        <div style={{marginTop: 14, height: 4, width: Math.max(80, W * 0.09), backgroundColor: accentColor, borderRadius: 2}} />
       </div>
 
       {axisPosition === 'top' && axisStrip}
 
       {/* Rows */}
-      <div style={{flex: 1, position: 'relative', marginTop: 36, overflow: 'hidden'}}>
-        {visibleActive.map((p, i) => renderRow(p, laneY(i)))}
-        {visibleInactive.map((p, i) => renderRow(p, laneY(visibleActive.length + i)))}
+      <div style={{flex: 1, position: 'relative', marginTop: isPortrait ? H * 0.03 : 36, overflow: 'hidden'}}>
+        {visibleActive.map((p, i) => renderRow(p, rowsTop + laneY(i)))}
+        {visibleInactive.map((p, i) => renderRow(p, rowsTop + laneY(visibleActive.length + i)))}
 
         {/* Sweeping guide line */}
         {showRefLine && (
@@ -255,18 +275,22 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
 
       {/* On-screen date (bottom-right, large, plain text) */}
       {showDateLabel && (
-        <div style={{position: 'absolute', right: 44, bottom: 30, fontSize: 44, fontWeight: 800, color: accentColor, fontVariantNumeric: 'tabular-nums', textShadow: '0 0 20px rgba(0,0,0,0.6)', lineHeight: 1}}>
+        <div style={{position: 'absolute', right: PAD, bottom: isPortrait ? PAD : 30, fontSize: DATE_FONT, fontWeight: 800, color: accentColor, fontVariantNumeric: 'tabular-nums', textShadow: '0 0 20px rgba(0,0,0,0.6)', lineHeight: 1}}>
           {dateLabelText}
         </div>
       )}
     </div>
   );
+
+  function laneY(index: number) {
+    return index * (ROW_H + ROW_GAP);
+  }
 };
 
-function Avatar({src}: {src: string}) {
+function Avatar({src, size = 44}: {src: string; size?: number}) {
   const imgSrc = src.startsWith('/') && !src.startsWith('//') ? staticFile(src) : src;
   return (
-    <div style={{width: 44, height: 44, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, backgroundColor: '#1f2937', border: '2px solid #334155'}}>
+    <div style={{width: size, height: size, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, backgroundColor: '#1f2937', border: '2px solid #334155'}}>
       <Img src={imgSrc} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
     </div>
   );

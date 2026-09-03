@@ -22,6 +22,8 @@ type AnimationPreviewProps = {
   showExportBar?: boolean;
   templateConfig?: import('@/lib/animation-config').AnimationTemplateConfig;
   onDurationChange?: (d: number) => void;
+  width?: number;
+  height?: number;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -63,6 +65,8 @@ export function AnimationPreview({
   showExportBar = true,
   templateConfig,
   onDurationChange,
+  width,
+  height,
 }: AnimationPreviewProps) {
   const [renderState, setRenderState] = useState<RenderState>({status: 'idle'});
   const [duration, setDuration] = useState(externalDuration ?? 10);
@@ -108,6 +112,9 @@ export function AnimationPreview({
           compositionId,
           inputProps: remotionProps,
           durationInFrames: duration * fps,
+          width: width ?? entry?.meta.width ?? 1920,
+          height: height ?? entry?.meta.height ?? 1080,
+          fps,
         }),
         signal: controller.signal,
       });
@@ -178,8 +185,8 @@ export function AnimationPreview({
                   inputProps={remotionProps}
                   durationInFrames={duration * fps}
                   fps={fps}
-                  compositionWidth={entry?.meta.width ?? 1920}
-                  compositionHeight={entry?.meta.height ?? 1080}
+                  compositionWidth={width ?? entry?.meta.width ?? 1920}
+                  compositionHeight={height ?? entry?.meta.height ?? 1080}
                   style={{width: '100%'}}
                   controls
                   acknowledgeRemotionLicense

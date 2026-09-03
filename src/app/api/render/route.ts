@@ -13,7 +13,18 @@ interface RenderBody {
   inputProps: Record<string, unknown>;
   durationInFrames?: number;
   format?: 'mp4' | 'gif';
+  width?: number;
+  height?: number;
+  fps?: number;
 }
+
+// GIF exports are memory-hungry: Remotion renders the full frame sequence and
+// then runs a palette filter at the target resolution. On serverless the full
+// 1920x1080@30fps pass OOM-kills FFmpeg (SIGKILL). To keep GIFs working we
+// render them at a capped resolution and frame rate, which balances quality
+// against the container's RAM budget.
+const GIF_MAX_W = 1080;
+const GIF_FPS = 12;
 
 const ENTRY = path.join(process.cwd(), 'src', 'remotion', 'index.ts');
 
@@ -123,8 +134,28 @@ export async function POST(req: Request) {
     const codec = body.format === 'gif' ? 'gif' : 'h264';
     const ext = body.format === 'gif' ? 'gif' : 'mp4';
     const contentType = body.format === 'gif' ? 'image/gif' : 'video/mp4';
+    const outputFps = body.fps ?? composition.fps;
+
+    // RRSS preset: override the composition viewport so the template re-flows
+    // to the requested size (the Timeline Race reads width/height dynamically).
+    if (body.width && body.height) {
+      composition.width = Math.round(body.width);
+      composition.height = Math.round(body.height);
+    }
+
+    // GIF: cap resolution and drop fps to avoid OOM in the render container.
+    let everyNthFrame = 1;
+    let scale = 1;
+    if (codec === 'gif') {
+      const desiredFps = Math.min(outputFps, GIF_FPS);
+      everyNthFrame = Math.max(1, Math.round(composition.fps / desiredFps));
+      const maxDim = Math.max(composition.width, composition.height);
+      scale = maxDim > GIF_MAX_W ? GIF_MAX_W / maxDim : 1;
+      console.log(`[render] GIF profile: everyNthFrame=${everyNthFrame} (→${(composition.fps / everyNthFrame).toFixed(1)}fps), scale=${scale.toFixed(3)}, ${Math.round(composition.width * scale)}x${Math.round(composition.height * scale)}`);
+    }
+
     const tmpFile = path.join(os.tmpdir(), `render-${Date.now()}.${ext}`);
-    console.log(`[render] Starting renderMedia to ${tmpFile} (codec: ${codec})...`);
+    console.log(`[render] Starting renderMedia to ${tmpFile} (codec: ${codec}, ${composition.width}x${composition.height})...`);
     await send({type: 'phase', phase: 'Rendering video...', progress: 0.2});
 
     await renderMedia({
@@ -135,6 +166,7 @@ export async function POST(req: Request) {
       inputProps: body.inputProps,
       browserExecutable: chromePath,
       concurrency: 1,
+      ...(codec === 'gif' ? {everyNthFrame, scale} : {}),
       onProgress: ({progress: p}) => {
         send({type: 'phase', phase: 'Rendering video...', progress: 0.2 + p * 0.7});
       },
