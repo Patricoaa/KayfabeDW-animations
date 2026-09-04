@@ -1,4 +1,6 @@
+import React from 'react';
 import {useCurrentFrame, useVideoConfig, interpolate, spring, Img, staticFile, Easing} from 'remotion';
+import {avatarCropRect} from '@/lib/animation-config';
 
 // A date-driven ranked bar race. Each participant has a `date` (timestamp on
 // the shared axis). A vertical guide sweeps left→right across the duration;
@@ -28,14 +30,14 @@ export type TimelineRaceProps = {
   dateFormat?: 'day' | 'month' | 'year';
   maxRows?: number;
   showDateLabel?: boolean;
+  showXAxis?: boolean;
   axisPosition?: 'top' | 'bottom';
+  rowOrder?: ('bar' | 'value' | 'avatar')[];
   avatarSize?: number;
   avatarShape?: 'circle' | 'rounded';
   avatarRadius?: number;
-  avatarZoom?: number;
-  avatarFocusX?: number;
-  avatarFocusY?: number;
   avatarCrops?: Record<string, {zoom?: number; focusX?: number; focusY?: number}>;
+  barColors?: Record<string, string>;
   background?: string;
   marginTop?: number;
   marginRight?: number;
@@ -62,14 +64,14 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   dateFormat = 'day',
   maxRows,
   showDateLabel = true,
+  showXAxis = true,
   axisPosition = 'bottom',
+  rowOrder,
   avatarSize,
   avatarShape = 'circle',
   avatarRadius,
-  avatarZoom = 1,
-  avatarFocusX = 0,
-  avatarFocusY = 0,
   avatarCrops,
+  barColors,
   background = '#0a0a0a',
   marginTop,
   marginRight,
@@ -78,6 +80,15 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
 }) => {
   const frame = useCurrentFrame();
   const {fps, durationInFrames, width: W, height: H} = useVideoConfig();
+
+  // Validate/expand the row segment order (bar/value/avatar), falling back to a
+  // canonical [bar, value, avatar] if the prop is missing or malformed.
+  const order = (() => {
+    if (!rowOrder || rowOrder.length !== 3) return ['bar', 'value', 'avatar'] as const;
+    const uniq = new Set(rowOrder);
+    if (uniq.size !== 3 || (!uniq.has('bar') || !uniq.has('value') || !uniq.has('avatar'))) return ['bar', 'value', 'avatar'] as const;
+    return rowOrder;
+  })();
 
   // ---- Responsive geometry ----
   const isPortrait = H > W;
@@ -122,24 +133,38 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
             const labelX = interpolate(frame - delay, [0, 25], [-24, 0], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
             const barProgress = spring({fps, frame: frame - delay, config: {damping: 18, stiffness: 70}});
             const barWidth = (item.value / maxValue) * barMax * barProgress;
-            return (
-              <div key={`${item.label}-${index}`} style={{opacity: rowOpacity, transform: `translateX(${labelX}px) scale(${isLeader ? winnerScale : 1})`, display: 'flex', alignItems: 'center', gap: isPortrait ? 12 : 18}}>
+            const barFill = barColors?.[item.label] ?? (isLeader ? accentColor : '#475569');
+            const segments: Record<'bar' | 'value' | 'avatar', React.ReactNode> = {
+              bar: (
                 <div style={{flex: 1, height: ROW_H * 0.5, backgroundColor: '#1a1a1a', borderRadius: ROW_H * 0.25, overflow: 'hidden', display: 'flex'}}>
-                  <div style={{width: Math.max(0, barWidth), height: '100%', backgroundColor: isLeader ? accentColor : '#475569', borderRadius: ROW_H * 0.25, boxShadow: isLeader ? `0 0 ${16 * winnerScale}px ${accentColor}66` : 'none'}} />
+                  <div style={{width: Math.max(0, barWidth), height: '100%', backgroundColor: barFill, borderRadius: ROW_H * 0.25, boxShadow: isLeader ? `0 0 ${16 * winnerScale}px ${accentColor}66` : 'none'}} />
                 </div>
+              ),
+              value: (
                 <div style={{width: VALUE_W, flexShrink: 0, textAlign: 'right'}}>
                   <span style={{fontSize: ROW_FONT, fontWeight: 800, color: isLeader ? accentColor : '#ffffff', fontVariantNumeric: 'tabular-nums'}}>{item.value.toLocaleString()}</span>
                 </div>
-                {item.image && <Avatar src={item.image} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(item.label)} />}
+              ),
+              avatar: (
+                <div style={{flexShrink: 0}}>
+                  {item.image && <Avatar src={item.image} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(item.label)} />}
+                </div>
+              ),
+            };
+            return (
+              <div key={`${item.label}-${index}`} style={{opacity: rowOpacity, transform: `translateX(${labelX}px) scale(${isLeader ? winnerScale : 1})`, display: 'flex', alignItems: 'center', gap: isPortrait ? 12 : 18}}>
+                {order.map((seg) => segments[seg])}
               </div>
             );
           })}
         </div>
-        <div style={{marginTop: 16, paddingTop: 14, borderTop: '1px solid #1f2937', display: 'flex', justifyContent: 'space-between', fontSize: 15, color: '#64748b', fontVariantNumeric: 'tabular-nums'}}>
-          {[0, 0.25, 0.5, 0.75, 1].map((p) => (
-            <span key={p}>{Math.round(maxValue * p).toLocaleString()}</span>
-          ))}
-        </div>
+        {showXAxis && (
+          <div style={{marginTop: 16, paddingTop: 14, borderTop: '1px solid #1f2937', display: 'flex', justifyContent: 'space-between', fontSize: 15, color: '#64748b', fontVariantNumeric: 'tabular-nums'}}>
+            {[0, 0.25, 0.5, 0.75, 1].map((p) => (
+              <span key={p}>{Math.round(maxValue * p).toLocaleString()}</span>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -249,13 +274,13 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const winnerScale = 1 + 0.05 * winnerT;
   const dimOthers = 1 - 0.35 * winnerT;
 
-  // Per-participant crop overrides the global avatar zoom/focus.
-  const avatarCropFor = (label: string) => {
+  // Per-participant crop; nothing global (zoom/focus are per-participant only).
+  const avatarCropFor = (label: string): {zoom: number; focusX: number; focusY: number} => {
     const c = avatarCrops?.[label];
     return {
-      zoom: c?.zoom ?? avatarZoom,
-      focusX: c?.focusX ?? avatarFocusX,
-      focusY: c?.focusY ?? avatarFocusY,
+      zoom: c?.zoom ?? 1,
+      focusX: c?.focusX ?? 0,
+      focusY: c?.focusY ?? 0,
     };
   };
 
@@ -283,19 +308,33 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
       top = rowsTop + laneY(change.fromRank) + (yNow - (rowsTop + laneY(change.fromRank))) * Easing.out(Easing.cubic)(Math.max(sw, 0));
     }
 
-    return (
-      <div key={p.label} style={{position: 'absolute', left: 0, right: 0, height: ROW_H, top, display: 'flex', alignItems: 'center', gap: ROW_GAP_PX, opacity: dim}}>
+    // Bar fill: per-participant override wins; otherwise the leader uses the
+    // accent color and the rest a neutral gray.
+    const barFill = barColors?.[p.label] ?? (isLeader ? accentColor : '#3f3f46');
+
+    const segments: Record<'bar' | 'value' | 'avatar', React.ReactNode> = {
+      bar: (
         <div style={{flex: 1, height: Math.max(14, ROW_H * 0.46), backgroundColor: '#171717', borderRadius: 999, overflow: 'hidden', display: 'flex', position: 'relative'}}>
-          <div style={{width: Math.max(0, barW * pop), height: '100%', backgroundColor: isLeader ? accentColor : '#3f3f46', borderRadius: 999, boxShadow: isLeader ? `0 0 ${18 * scale}px ${accentColor}99` : 'none', transform: `scaleY(${scale})`}} />
+          <div style={{width: Math.max(0, barW * pop), height: '100%', backgroundColor: barFill, borderRadius: 999, boxShadow: isLeader ? `0 0 ${18 * scale}px ${accentColor}99` : 'none', transform: `scaleY(${scale})`}} />
         </div>
+      ),
+      value: (
         <div style={{width: VALUE_W, flexShrink: 0, textAlign: 'right'}}>
           <span style={{fontSize: ROW_FONT, fontWeight: 800, color: isLeader ? accentColor : '#ffffff', fontVariantNumeric: 'tabular-nums', opacity: p.active ? 1 : 0.25}}>
             {p.active ? p.current.toLocaleString() : '–'}
           </span>
         </div>
+      ),
+      avatar: (
         <div style={{flexShrink: 0, textAlign: 'right'}}>
           {p.image && <Avatar src={p.image} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(p.label)} />}
         </div>
+      ),
+    };
+
+    return (
+      <div key={p.label} style={{position: 'absolute', left: 0, right: 0, height: ROW_H, top, display: 'flex', alignItems: 'center', gap: ROW_GAP_PX, opacity: dim}}>
+        {order.map((seg) => segments[seg])}
       </div>
     );
   };
@@ -323,7 +362,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
         <div style={{marginTop: 14, height: 4, width: Math.max(80, W * 0.09), backgroundColor: accentColor, borderRadius: 2}} />
       </div>
 
-      {axisPosition === 'top' && numAxis}
+      {showXAxis && axisPosition === 'top' && numAxis}
 
       {/* Rows */}
       <div style={{flex: 1, position: 'relative', marginTop: isPortrait ? H * 0.03 : 36, overflow: 'hidden'}}>
@@ -331,7 +370,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
         {visibleInactive.map((p) => renderRow(p))}
       </div>
 
-      {axisPosition === 'bottom' && numAxis}
+      {showXAxis && axisPosition === 'bottom' && numAxis}
 
       {/* On-screen date (bottom-right, large, plain text) */}
       {showDateLabel && (
@@ -361,13 +400,9 @@ function Avatar({
   crop?: {zoom?: number; focusX?: number; focusY?: number};
 }) {
   const imgSrc = src.startsWith('/') && !src.startsWith('//') ? staticFile(src) : src;
-  const zoom = Math.max(crop?.zoom ?? 1, 0.1);
-  const fx = Math.max(Math.min(crop?.focusX ?? 0, 1), -1);
-  const fy = Math.max(Math.min(crop?.focusY ?? 0, 1), -1);
-  const vw = size * zoom;
-  const vh = size * zoom;
-  const imgX = -vw / 2 + fx * (vw - size) / 2;
-  const imgY = -vh / 2 + fy * (vh - size) / 2;
+  const rect = avatarCropRect(crop?.zoom, crop?.focusX, crop?.focusY, size);
+  const imgX = -rect.w / 2 + rect.dx;
+  const imgY = -rect.h / 2 + rect.dy;
   const borderRadius = shape === 'circle' ? '50%' : `${radius ?? Math.round(size * 0.25)}px`;
   return (
     <div
@@ -388,8 +423,8 @@ function Avatar({
           position: 'absolute',
           left: '50%',
           top: '50%',
-          width: vw,
-          height: vh,
+          width: rect.w,
+          height: rect.h,
           transform: `translate(${imgX}px, ${imgY}px)`,
           objectFit: 'contain',
         }}

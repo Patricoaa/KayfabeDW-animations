@@ -5,6 +5,21 @@ export type DateFormat = 'day' | 'month' | 'year';
 export type AvatarShape = 'circle' | 'rounded';
 export type AvatarCrop = {zoom?: number; focusX?: number; focusY?: number};
 
+export type RowSegment = 'bar' | 'value' | 'avatar';
+
+// Shared crop math: how a zoomed (and focus-shifted) image is placed inside a
+// square frame of `size` px. Used by BOTH the config-panel sidebar preview and
+// the Remotion `<Avatar>` render so they always agree.
+export function avatarCropRect(zoom = 1, focusX = 0, focusY = 0, size: number) {
+  const z = Math.max(zoom, 0.1);
+  const fx = Math.max(Math.min(focusX, 1), -1);
+  const fy = Math.max(Math.min(focusY, 1), -1);
+  const w = size * z;
+  const h = size * z;
+  const extra = w - size;
+  return {w, h, dx: fx * extra / 2, dy: fy * extra / 2};
+}
+
 // Timeline Race: a date-driven ranked bar race. Each row is one participant /
 // event with an optional avatar image, a `dateField` that positions it on the
 // shared date axis (when the playback reaches a participant's date their
@@ -28,17 +43,23 @@ export type TimelineRaceConfig = {
   title?: string;
   maxRows?: number;
   showDateLabel?: boolean;
+  showXAxis?: boolean;
   axisPosition?: 'top' | 'bottom';
 
-  // Avatar controls (mirror the static bar chart): global zoom/focus + shape,
-  // overridable per participant via `avatarCrops` (key = participant label).
+  // Left→right arrangement of the three row segments, e.g. ['bar','value','avatar'].
+  rowOrder?: ('bar' | 'value' | 'avatar')[];
+
+  // Avatar controls (mirror the static bar chart): shape + per-participant
+  // crop overrides via `avatarCrops` (key = participant label). Zoom/focus are
+  // per-participant only (no global fallback).
   avatarSize?: number;
   avatarShape?: AvatarShape;
   avatarRadius?: number;
-  avatarZoom?: number;
-  avatarFocusX?: number;
-  avatarFocusY?: number;
   avatarCrops?: Record<string, AvatarCrop>;
+
+  // Per-participant bar colors (label -> color), mirroring the static chart's
+  // `colorOverrides`. Empty value = default color.
+  barColors?: Record<string, string>;
 
   // Canvas: background color + content margins (RRSS "safe" zones).
   background?: string;

@@ -112,14 +112,14 @@ function convertTimelineRace(
   // Presentation (avatar + canvas) fields shared by every output shape.
   const presentationOf = (t: TimelineRaceConfig | undefined) => ({
     showDateLabel: t?.showDateLabel,
+    showXAxis: t?.showXAxis,
     axisPosition: t?.axisPosition,
+    rowOrder: t?.rowOrder,
     avatarSize: t?.avatarSize,
     avatarShape: t?.avatarShape,
     avatarRadius: t?.avatarRadius,
-    avatarZoom: t?.avatarZoom,
-    avatarFocusX: t?.avatarFocusX,
-    avatarFocusY: t?.avatarFocusY,
     avatarCrops: t?.avatarCrops,
+    barColors: t?.barColors,
     background: t?.background,
     marginTop: t?.marginTop,
     marginRight: t?.marginRight,

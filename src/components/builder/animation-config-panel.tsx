@@ -4,6 +4,7 @@ import React, {useState} from 'react';
 import {ChevronDown} from 'lucide-react';
 import type {ColumnMeta} from '@/components/builder/chart-config-panel';
 import type {TimelineRaceConfig, DateFormat, AvatarShape, AvatarCrop} from '@/lib/animation-config';
+import {avatarCropRect} from '@/lib/animation-config';
 
 type Participant = {label: string; image?: string | null};
 
@@ -50,6 +51,13 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
     else delete next[label];
     update({avatarCrops: next});
   };
+  const setBarColor = (label: string, color?: string) => {
+    const next = {...(value.barColors ?? {})};
+    if (color) next[label] = color;
+    else delete next[label];
+    update({barColors: next});
+  };
+  const setRowOrder = (order: ('bar' | 'value' | 'avatar')[]) => update({rowOrder: order});
 
   return (
     <div className="space-y-3">
@@ -139,6 +147,11 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
           checked={value.showDateLabel ?? true}
           onChange={(v) => update({showDateLabel: v})}
         />
+        <Toggle
+          label="Mostrar eje X"
+          checked={value.showXAxis ?? true}
+          onChange={(v) => update({showXAxis: v})}
+        />
         <div>
           <label className="text-sm font-medium mb-1 block">Posición del eje X</label>
           <div className="grid grid-cols-2 gap-1">
@@ -157,6 +170,10 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
               </button>
             ))}
           </div>
+        </div>
+        <div>
+          <label className="text-sm font-medium mb-2 block">Orden de la fila (izq → der)</label>
+          <RowOrderControl value={value.rowOrder ?? ['bar', 'value', 'avatar']} onChange={setRowOrder} />
         </div>
         <p className="text-[10px] text-muted">
           El eje X muestra el valor acumulado (mínimo 0 y máximo), no las fechas. La fecha en pantalla se muestra abajo a la derecha como texto e indica el momento del recorrido.
@@ -200,14 +217,6 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
         {(value.avatarShape ?? 'circle') === 'rounded' && (
           <NumberInput label="Radio de esquina (vacío = auto)" value={value.avatarRadius} min={0} max={60} step={1} onChange={(v) => update({avatarRadius: v})} />
         )}
-        <div>
-          <label className="text-sm font-medium mb-1 block">Zoom / foco (global)</label>
-          <div className="grid grid-cols-3 gap-2">
-            <NumberInput label="Zoom" value={value.avatarZoom} min={0.1} max={3} step={0.05} onChange={(v) => update({avatarZoom: v})} />
-            <NumberInput label="Foco X" value={value.avatarFocusX !== undefined ? value.avatarFocusX * 100 : undefined} min={-100} max={100} step={5} onChange={(v) => update({avatarFocusX: v === undefined ? undefined : v / 100})} />
-            <NumberInput label="Foco Y" value={value.avatarFocusY !== undefined ? value.avatarFocusY * 100 : undefined} min={-100} max={100} step={5} onChange={(v) => update({avatarFocusY: v === undefined ? undefined : v / 100})} />
-          </div>
-        </div>
         {participants.length > 0 && (
           <div className="pt-2 border-t border-border-subtle">
             <div className="flex items-center justify-between mb-0.5">
@@ -222,25 +231,25 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
             <div className="space-y-2">
               {participants.map((p) => {
                 const cr = value.avatarCrops?.[p.label];
-                const zoom = Math.max(cr?.zoom ?? value.avatarZoom ?? 1, 0.1);
-                const fx = Math.max(Math.min(cr?.focusX ?? value.avatarFocusX ?? 0, 1), -1);
-                const fy = Math.max(Math.min(cr?.focusY ?? value.avatarFocusY ?? 0, 1), -1);
                 const PREVIEW = 40;
-                const posScale = PREVIEW / 2 - (PREVIEW * zoom) / 2;
-                const imgStyle = p.image
-                  ? {
-                      width: PREVIEW * zoom,
-                      height: PREVIEW * zoom,
-                      transform: `translate(${posScale + fx * (PREVIEW * zoom - PREVIEW) / 2}px, ${posScale + fy * (PREVIEW * zoom - PREVIEW) / 2}px)`,
-                    }
-                  : undefined;
+                const crop = avatarCropRect(cr?.zoom, cr?.focusX, cr?.focusY, PREVIEW);
                 const clipStyle = p.image
                   ? {
+                      position: 'relative' as const,
                       width: PREVIEW,
                       height: PREVIEW,
                       borderRadius: (value.avatarShape ?? 'circle') === 'circle' ? '50%' : '8px',
                       overflow: 'hidden' as const,
                       boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.2)',
+                    }
+                  : undefined;
+                const imgStyle = p.image
+                  ? {
+                      width: crop.w,
+                      height: crop.h,
+                      transform: `translate(${-crop.w / 2 + crop.dx}px, ${-crop.h / 2 + crop.dy}px)`,
+                      objectFit: 'contain' as const,
+                      maxWidth: 'none',
                     }
                   : undefined;
                 return (
@@ -255,7 +264,7 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
                       <div className="shrink-0 mt-1">
                         {p.image ? (
                           <div style={clipStyle}>
-                            <img src={p.image} alt="" style={{...imgStyle, objectFit: 'contain', maxWidth: 'none'}} />
+                            <img src={p.image} alt="" style={{...imgStyle, position: 'absolute' as const, left: '50%', top: '50%', objectFit: 'contain' as const, maxWidth: 'none'}} />
                           </div>
                         ) : (
                           <div style={{...clipStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-elevated)'}}>
@@ -276,6 +285,47 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
           </div>
         )}
       </Section>
+
+      {/* ============ BARRAS ============ */}
+      {participants.length > 0 && (
+        <Section title="Barras">
+          <div className="flex items-center justify-between mb-0.5">
+            <label className="text-sm font-medium block">Colores por participante</label>
+            {Object.keys(value.barColors ?? {}).length > 0 && (
+              <button type="button" onClick={() => update({barColors: undefined})} className="text-[10px] text-muted hover:text-red-500">
+                Limpiar todos
+              </button>
+            )}
+          </div>
+          <p className="text-[10px] text-muted mb-1.5">Personaliza el color de la barra de cada participante. Dejar vacío usa el color por defecto.</p>
+          <div className="space-y-1.5">
+            {participants.map((p) => {
+              const color = value.barColors?.[p.label] ?? '#3f3f46';
+              return (
+                <div key={p.label} className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={color}
+                    onChange={(e) => setBarColor(p.label, e.target.value)}
+                    className="w-8 h-8 rounded cursor-pointer border border-border-default bg-transparent"
+                    aria-label={`Color de ${p.label}`}
+                  />
+                  <span className="text-xs text-secondary truncate flex-1">{p.label}</span>
+                  {value.barColors?.[p.label] && (
+                    <button
+                      onClick={() => setBarColor(p.label)}
+                      className="text-muted hover:text-red-500 px-1 text-xs"
+                      aria-label={`Restablecer color de ${p.label}`}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </Section>
+      )}
 
       {/* ============ CANVAS ============ */}
       <Section title="Canvas">
@@ -417,5 +467,46 @@ function ColorInput({label, value, onChange}: {label: string; value?: string; on
       />
       <span className="text-xs text-secondary">{label}</span>
     </label>
+  );
+}
+
+function RowOrderControl({value, onChange}: {value: ('bar' | 'value' | 'avatar')[]; onChange: (order: ('bar' | 'value' | 'avatar')[]) => void}) {
+  const labelOf = (s: 'bar' | 'value' | 'avatar') => (s === 'bar' ? 'Barra' : s === 'value' ? 'Dato' : 'Avatar');
+  const swap = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= value.length) return;
+    const next = [...value];
+    [next[i], next[j]] = [next[j], next[i]];
+    onChange(next);
+  };
+  return (
+    <div>
+      <div className="flex gap-1">
+        {value.map((seg, i) => (
+          <div key={seg} className="flex items-center gap-0.5 flex-1">
+            <button
+              type="button"
+              onClick={() => swap(i, -1)}
+              disabled={i === 0}
+              className="text-xs text-muted hover:text-primary disabled:opacity-30 px-1"
+              aria-label={`Mover ${labelOf(seg)} a la izquierda`}
+            >
+              ◀
+            </button>
+            <span className="flex-1 text-center text-xs font-medium text-secondary bg-elevated rounded px-1.5 py-1 select-none truncate">{labelOf(seg)}</span>
+            <button
+              type="button"
+              onClick={() => swap(i, 1)}
+              disabled={i === value.length - 1}
+              className="text-xs text-muted hover:text-primary disabled:opacity-30 px-1"
+              aria-label={`Mover ${labelOf(seg)} a la derecha`}
+            >
+              ▶
+            </button>
+          </div>
+        ))}
+      </div>
+      <p className="text-[10px] text-muted mt-0.5">Usa ◀ ▶ para reordenar los elementos de cada fila.</p>
+    </div>
   );
 }
