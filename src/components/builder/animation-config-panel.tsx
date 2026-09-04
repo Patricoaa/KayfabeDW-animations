@@ -294,6 +294,17 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
       {/* ============ BARRAS ============ */}
       {participants.length > 0 && (
         <Section title="Barras">
+          <SliderNumberInput
+            label="Ancho de las barras (%)"
+            value={value.barWidth ? Math.round(value.barWidth * 100) : 75}
+            min={40}
+            max={95}
+            step={5}
+            onChange={(v) => update({barWidth: v ? v / 100 : undefined})}
+          />
+          <p className="text-[10px] text-muted mb-1">
+            Reduce el porcentaje para dar más espacio al valor y al avatar (útil cuando el valor se sale de pantalla).
+          </p>
           <div>
             <label className="text-sm font-medium mb-1 block">Máximo de entidades</label>
             <input

@@ -35,6 +35,7 @@ export type TimelineRaceProps = {
   rowOrder?: ('bar' | 'value' | 'avatar')[];
   rowGapH?: number;
   rowGap?: number;
+  barWidth?: number;
   titleX?: number;
   titleY?: number;
   dateX?: number;
@@ -75,6 +76,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   rowOrder,
   rowGapH,
   rowGap,
+  barWidth,
   titleX,
   titleY,
   dateX,
@@ -191,7 +193,8 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   // separations, and the remaining width shared between the value and avatar.
   const innerW = W - PAD_L - PAD_R;
   const ROW_GAP_PX = rowGapH ?? innerW * 0.03;
-  const BAR_MAX_W = Math.max(innerW * 0.75, 1);
+  const BAR_RATIO = Math.min(Math.max(barWidth ?? 0.75, 0.1), 0.95);
+  const BAR_MAX_W = Math.max(innerW * BAR_RATIO, 1);
   const restW = Math.max(innerW - BAR_MAX_W - ROW_GAP_PX * 2, 0);
   const VALUE_W = restW * 0.62;
   const AVATAR = avatarSize ?? restW * 0.38;

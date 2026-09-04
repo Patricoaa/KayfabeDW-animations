@@ -117,6 +117,7 @@ function convertTimelineRace(
     rowOrder: t?.rowOrder,
     rowGapH: t?.rowGapH,
     rowGap: t?.rowGap,
+    barWidth: t?.barWidth,
     titleX: t?.titleX,
     titleY: t?.titleY,
     dateX: t?.dateX,

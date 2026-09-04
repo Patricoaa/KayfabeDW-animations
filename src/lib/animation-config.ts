@@ -54,6 +54,10 @@ export type TimelineRaceConfig = {
   rowGapH?: number;
   rowGap?: number;
 
+  // Bar width as a fraction of the row width (0.4-0.9, default 0.75). Making it
+  // smaller gives the value/avatar columns more room so the value stays visible.
+  barWidth?: number;
+
   // Title position (px offset from the default top-left placement).
   titleX?: number;
   titleY?: number;
