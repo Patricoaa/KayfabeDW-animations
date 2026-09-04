@@ -201,14 +201,30 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const {visActive: visibleActive, visInactive: visibleInactive} = currentRank;
   const rowCount = Math.max(visibleActive.length + visibleInactive.length, 1);
 
-  // Lookback rank (SWAP frames earlier) — used to slide rows between positions.
-  const SWAP = 18;
-  const guideTPrev = frame <= SWAP ? 0 : guideTAt(frame - SWAP);
-  const prevOrder = participantsAt(guideTPrev);
-  const prevIndex = new Map<string, number>();
-  prevOrder.list.forEach((p, i) => prevIndex.set(p.label, i));
+  // Current rank (index in the full ordered list) per participant.
   const curIndex = new Map<string, number>();
   currentRank.list.forEach((p, i) => curIndex.set(p.label, i));
+  const rankNow = (label: string) => curIndex.get(label) ?? 0;
+
+  // Duration (frames) of the slide when a participant changes rank.
+  const SWAP = 24;
+
+  // Detect, for each participant, the most recent rank change within the last
+  // `SWAP` frames. When a reorder happens at frame `c`, the row glides from the
+  // rank it held just before `c` to its current rank over `SWAP` frames. This is
+  // derived purely from `frame` (no React state) so it renders deterministically.
+  const evalChange = (label: string) => {
+    const now = rankNow(label);
+    const from = frame - SWAP > 0 ? frame - SWAP : 0;
+    for (let f = frame; f > from; f--) {
+      const cur = participantsAt(guideTAt(f)).list.findIndex((p) => p.label === label);
+      const prev = participantsAt(guideTAt(f - 1)).list.findIndex((p) => p.label === label);
+      if (cur !== prev && prev !== -1) {
+        return {atFrame: f, fromRank: prev, nowRank: cur};
+      }
+    }
+    return null;
+  };
 
   // Dynamic x-axis max: the highest accumulated value among the participants
   // already active up to the current sweep position, so the axis (and the bar
@@ -256,11 +272,16 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     const scale = isLeader ? winnerScale : 1;
     const dim = isLeader ? 1 : dimOthers;
 
-    // Smooth position: glide between the rank held `SWAP` frames ago and the
-    // current rank so rows rise/fall instead of jumping on reorder.
-    const yNow = rowsTop + laneY(curIndex.get(p.label) ?? 0);
-    const yPrev = rowsTop + laneY(prevIndex.get(p.label) ?? curIndex.get(p.label) ?? 0);
-    const top = interpolate(frame, [1, SWAP], [yPrev, yNow], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic)});
+    // Slide the whole row (bar + value + avatar) between its rank just before the
+    // last reorder and its current rank, easing over `SWAP` frames anchored to
+    // the moment the order actually changed.
+    const yNow = rowsTop + laneY(rankNow(p.label));
+    const change = evalChange(p.label);
+    let top = yNow;
+    if (change) {
+      const sw = Math.min((frame - change.atFrame) / (SWAP - 1), 1);
+      top = rowsTop + laneY(change.fromRank) + (yNow - (rowsTop + laneY(change.fromRank))) * Easing.out(Easing.cubic)(Math.max(sw, 0));
+    }
 
     return (
       <div key={p.label} style={{position: 'absolute', left: 0, right: 0, height: ROW_H, top, display: 'flex', alignItems: 'center', gap: ROW_GAP_PX, opacity: dim}}>
