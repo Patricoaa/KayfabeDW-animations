@@ -45,11 +45,18 @@ export type TimelineRaceProps = {
   avatarRadius?: number;
   avatarCrops?: Record<string, {zoom?: number; focusX?: number; focusY?: number}>;
   barColors?: Record<string, string>;
+  barRadius?: number;
+  backgroundType?: 'color' | 'pattern' | 'gradient' | 'image';
   background?: string;
-  marginTop?: number;
-  marginRight?: number;
-  marginBottom?: number;
-  marginLeft?: number;
+  backgroundSecondary?: string;
+  backgroundImage?: string;
+  backgroundPattern?: 'dots' | 'stripes' | 'grid' | 'checkers';
+  backgroundAngle?: number;
+  backgroundOpacity?: number;
+  backgroundBlur?: number;
+  backgroundFit?: 'cover' | 'contain' | 'fill';
+  showYAxis?: boolean;
+  yAxisColor?: string;
 };
 
 function fmtDate(t: number, fmt: TimelineRaceProps['dateFormat'] = 'day'): string {
@@ -86,11 +93,18 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   avatarRadius,
   avatarCrops,
   barColors,
+  barRadius,
+  backgroundType = 'color',
   background = '#0a0a0a',
-  marginTop,
-  marginRight,
-  marginBottom,
-  marginLeft,
+  backgroundSecondary = '#1f2937',
+  backgroundImage,
+  backgroundPattern = 'dots',
+  backgroundAngle = 135,
+  backgroundOpacity = 1,
+  backgroundBlur = 0,
+  backgroundFit = 'cover',
+  showYAxis = false,
+  yAxisColor = '#334155',
 }) => {
   const frame = useCurrentFrame();
   const {fps, durationInFrames, width: W, height: H} = useVideoConfig();
@@ -122,10 +136,10 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   // ---- Responsive geometry ----
   const isPortrait = H > W;
   const PAD = isPortrait ? Math.round(W * 0.05) : 56;
-  const PAD_T = marginTop ?? PAD;
-  const PAD_R = marginRight ?? PAD;
-  const PAD_B = marginBottom ?? (isPortrait ? PAD + 40 : 84);
-  const PAD_L = marginLeft ?? PAD;
+  const PAD_T = PAD;
+  const PAD_R = PAD;
+  const PAD_B = isPortrait ? PAD + 40 : 84;
+  const PAD_L = PAD;
   const TITLE_SIZE = isPortrait ? Math.round(W * 0.075) : 42;
   const ROW_FONT = isPortrait ? Math.round(W * 0.045) : 21;
   const DATE_FONT = isPortrait ? Math.round(W * 0.09) : 44;
@@ -140,6 +154,73 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     return <div style={{width: '100%', height: '100%', backgroundColor: '#0a0a0a'}} />;
   }
 
+  // ---- Canvas background layer (solid / pattern / gradient / image) ----
+  const bgStyle: React.CSSProperties = (() => {
+    let img: string | undefined;
+    if (backgroundType === 'color') {
+      return {backgroundColor: background};
+    }
+    if (backgroundType === 'image' && backgroundImage) {
+      img = backgroundImage;
+      const size =
+        backgroundFit === 'contain' ? 'contain' : backgroundFit === 'fill' ? '100% 100%' : 'cover';
+      return {
+        backgroundColor: background,
+        backgroundImage: `url(${img})`,
+        backgroundSize: size,
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      };
+    }
+    if (backgroundType === 'gradient') {
+      return {
+        background: `linear-gradient(${backgroundAngle ?? 135}deg, ${background}, ${backgroundSecondary ?? '#1f2937'})`,
+      };
+    }
+    // pattern
+    const fg = background;
+    if (backgroundPattern === 'dots') {
+      return {
+        backgroundColor: '#000',
+        backgroundImage: `radial-gradient(${fg} 22%, transparent 24%)`,
+        backgroundSize: '26px 26px',
+        backgroundPosition: '0 0',
+      };
+    }
+    if (backgroundPattern === 'grid') {
+      return {
+        backgroundColor: '#000',
+        backgroundImage: `linear-gradient(${fg} 1px, transparent 1px), linear-gradient(90deg, ${fg} 1px, transparent 1px)`,
+        backgroundSize: '26px 26px',
+      };
+    }
+    if (backgroundPattern === 'checkers') {
+      return {
+        backgroundColor: '#000',
+        backgroundImage: `linear-gradient(45deg, ${fg} 25%, transparent 25%, transparent 75%, ${fg} 75%), linear-gradient(45deg, ${fg} 25%, transparent 25%, transparent 75%, ${fg} 75%)`,
+        backgroundSize: '26px 26px',
+        backgroundPosition: '0 0, 13px 13px',
+      };
+    }
+    // stripes
+    return {
+      backgroundColor: '#000',
+      backgroundImage: `repeating-linear-gradient(${backgroundAngle ?? 45}deg, ${fg} 0 10px, transparent 10px 22px)`,
+    };
+  })();
+  const bgLayer = (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        zIndex: 0,
+        ...bgStyle,
+        opacity: backgroundOpacity ?? 1,
+        filter: backgroundBlur ? `blur(${backgroundBlur}px)` : undefined,
+      }}
+    />
+  );
+
   // ---- compat mode: parallel bars, no timing guide ----
   if (!dateMode) {
     const maxValue = Math.max(...rows.map((it) => it.value), 0);
@@ -149,12 +230,13 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     const ROW_H = H * (visible.length <= 6 ? 0.14 : 0.6 / visible.length);
     const winnerScale = interpolate(frame, [durationInFrames - 45, durationInFrames - 10], [1, 1.06], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
     return (
-      <div style={{width: '100%', height: '100%', backgroundColor: background, display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", padding: `${PAD_T}px ${PAD_R}px ${PAD_B}px ${PAD_L}px`, boxSizing: 'border-box'}}>
-        <div style={{opacity: fadeIn, transform: `translate(${titleX ?? 0}px, ${(titleY ?? 0) + titleDrop}px)`}}>
+      <div style={{width: '100%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", padding: `${PAD_T}px ${PAD_R}px ${PAD_B}px ${PAD_L}px`, boxSizing: 'border-box'}}>
+        {bgLayer}
+        <div style={{opacity: fadeIn, transform: `translate(${titleX ?? 0}px, ${(titleY ?? 0) + titleDrop}px)`, zIndex: 1}}>
           <div style={{fontSize: TITLE_SIZE, fontWeight: 800, color: '#ffffff'}}>{title || 'Timeline Race'}</div>
           <div style={{marginTop: 14, height: 4, width: Math.max(80, W * 0.09), backgroundColor: accentColor, borderRadius: 2}} />
         </div>
-        <div style={{flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', marginTop: H * 0.04}}>
+        <div style={{flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', marginTop: H * 0.04, zIndex: 1}}>
           {visible.map((item, index) => {
             const delay = 15 + index * 10;
             const isLeader = item.value === leading;
@@ -165,8 +247,8 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
             const barFill = barColors?.[item.label] ?? (isLeader ? accentColor : '#475569');
             const segments: Record<'bar' | 'value' | 'avatar', React.ReactNode> = {
               bar: (
-                <div style={{flex: 1, height: ROW_H * 0.5, backgroundColor: '#1a1a1a', borderRadius: ROW_H * 0.25, overflow: 'hidden', display: 'flex'}}>
-                  <div style={{width: Math.max(0, barWidth), height: '100%', backgroundColor: barFill, borderRadius: ROW_H * 0.25, boxShadow: isLeader ? `0 0 ${16 * winnerScale}px ${accentColor}66` : 'none'}} />
+                <div style={{flex: 1, height: ROW_H * 0.5, backgroundColor: '#1a1a1a', borderRadius: barRadius ?? ROW_H * 0.25, overflow: 'hidden', display: 'flex'}}>
+                  <div style={{width: Math.max(0, barWidth), height: '100%', backgroundColor: barFill, borderRadius: barRadius ?? ROW_H * 0.25, boxShadow: isLeader ? `0 0 ${16 * winnerScale}px ${accentColor}66` : 'none'}} />
                 </div>
               ),
               value: (
@@ -392,10 +474,10 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
 
     const segments: Record<'bar' | 'avatar', React.ReactNode> = {
       bar: (
-        <div style={{flexShrink: 0, width: BAR_MAX_W, height: Math.max(14, ROW_H * 0.46), backgroundColor: '#171717', borderRadius: 999, overflow: 'visible', display: 'flex', position: 'relative', alignItems: 'center'}}>
-          <div style={{width: Math.max(0, barW * pop), height: '100%', backgroundColor: barFill, borderRadius: 999, boxShadow: isLeader ? `0 0 ${18 * scale}px ${accentColor}99` : 'none', transform: `scaleY(${scale})`}} />
+        <div style={{flexShrink: 0, width: BAR_MAX_W, height: Math.max(14, ROW_H * 0.46), backgroundColor: '#171717', borderRadius: barRadius ?? 999, overflow: 'visible', display: 'flex', position: 'relative', alignItems: 'center'}}>
+          <div style={{width: Math.max(0, barW * pop), height: '100%', backgroundColor: barFill, borderRadius: barRadius ?? 999, boxShadow: isLeader ? `0 0 ${18 * scale}px ${accentColor}99` : 'none', transform: `scaleY(${scale})`}} />
           <div style={{position: 'absolute', right: 10, top: 0, bottom: 0, display: 'flex', alignItems: 'center', pointerEvents: 'none'}}>
-            <span style={{fontSize: ROW_FONT, fontWeight: 800, color: isLeader ? accentColor : '#ffffff', fontVariantNumeric: 'tabular-nums', opacity: p.active ? 1 : 0.25, textShadow: '0 1px 2px rgba(0,0,0,0.6)'}}>
+            <span style={{fontSize: ROW_FONT, fontWeight: 800, color: '#ffffff', background: 'rgba(0,0,0,0.55)', padding: '2px 8px', borderRadius: 6, fontVariantNumeric: 'tabular-nums', opacity: p.active ? 1 : 0.25, whiteSpace: 'nowrap'}}>
               {p.active ? p.current.toLocaleString() : '–'}
             </span>
           </div>
@@ -447,20 +529,24 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
       : currentRank.full;
 
   return (
-    <div style={{width: '100%', height: '100%', position: 'relative', backgroundColor: background, display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", padding: `${PAD_T}px ${PAD_R}px ${PAD_B}px ${PAD_L}px`, boxSizing: 'border-box', overflow: 'hidden'}}>
-      <div style={{opacity: fadeIn, transform: `translate(${titleX ?? 0}px, ${(titleY ?? 0) + titleDrop}px)`, flexShrink: 0}}>
+    <div style={{width: '100%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", padding: `${PAD_T}px ${PAD_R}px ${PAD_B}px ${PAD_L}px`, boxSizing: 'border-box', overflow: 'hidden'}}>
+      {bgLayer}
+      <div style={{opacity: fadeIn, transform: `translate(${titleX ?? 0}px, ${(titleY ?? 0) + titleDrop}px)`, flexShrink: 0, position: 'relative', zIndex: 1}}>
         <div style={{fontSize: TITLE_SIZE, fontWeight: 800, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>{title || 'Timeline Race'}</div>
         <div style={{marginTop: 14, height: 4, width: Math.max(80, W * 0.09), backgroundColor: accentColor, borderRadius: 2}} />
       </div>
 
-      {showXAxis && axisPosition === 'top' && numAxis}
+      {showXAxis && axisPosition === 'top' && <div style={{position: 'relative', zIndex: 1}}>{numAxis}</div>}
 
       {/* Rows */}
       <div style={{flex: 1, position: 'relative', marginTop: isPortrait ? H * 0.03 : 36, overflow: 'hidden'}}>
-        {renderPool.map((p) => renderRow(p))}
+        {showYAxis && (
+          <div style={{position: 'absolute', left: -6, top: 0, bottom: 0, width: 2, borderRadius: 1, backgroundColor: yAxisColor ?? '#334155', zIndex: 0}} />
+        )}
+        <div style={{position: 'absolute', inset: 0}}>{renderPool.map((p) => renderRow(p))}</div>
       </div>
 
-      {showXAxis && axisPosition === 'bottom' && numAxis}
+      {showXAxis && axisPosition === 'bottom' && <div style={{position: 'relative', zIndex: 1}}>{numAxis}</div>}
 
       {/* On-screen date (bottom-right, large, plain text) */}
       {showDateLabel && (

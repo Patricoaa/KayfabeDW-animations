@@ -79,12 +79,26 @@ export type TimelineRaceConfig = {
   // `colorOverrides`. Empty value = default color.
   barColors?: Record<string, string>;
 
-  // Canvas: background color + content margins (RRSS "safe" zones).
-  background?: string;
-  marginTop?: number;
-  marginRight?: number;
-  marginBottom?: number;
-  marginLeft?: number;
+  // Bar corner radius (px). Empty = full pill.
+  barRadius?: number;
+
+  // Canvas background. Can be a solid color, a pattern preset, a gradient, or
+  // an uploaded/remote image. `background` is reused as the primary/foreground
+  // color depending on the type.
+  backgroundType?: 'color' | 'pattern' | 'gradient' | 'image';
+  background?: string;            // solid | pattern fg | gradient color 1
+  backgroundSecondary?: string;   // gradient color 2
+  backgroundImage?: string;       // dataURL / remote URL (image type)
+  backgroundPattern?: 'dots' | 'stripes' | 'grid' | 'checkers';
+  backgroundAngle?: number;       // gradient/pattern angle (deg)
+  backgroundOpacity?: number;     // opacity of the background layer (0-1)
+  backgroundBlur?: number;        // blur (px) applied to the background
+  backgroundFit?: 'cover' | 'contain' | 'fill'; // how an image is fit
+
+  // Vertical (Y) plot axis: enable a simple axis line at the bars' origin and
+  // configure its color.
+  showYAxis?: boolean;
+  yAxisColor?: string;
 };
 
 // Keyed by TemplateId. Templates not listed here (or with no entry) inherit

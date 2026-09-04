@@ -127,11 +127,18 @@ function convertTimelineRace(
     avatarRadius: t?.avatarRadius,
     avatarCrops: t?.avatarCrops,
     barColors: t?.barColors,
+    barRadius: t?.barRadius,
+    backgroundType: t?.backgroundType,
     background: t?.background,
-    marginTop: t?.marginTop,
-    marginRight: t?.marginRight,
-    marginBottom: t?.marginBottom,
-    marginLeft: t?.marginLeft,
+    backgroundSecondary: t?.backgroundSecondary,
+    backgroundImage: t?.backgroundImage,
+    backgroundPattern: t?.backgroundPattern,
+    backgroundAngle: t?.backgroundAngle,
+    backgroundOpacity: t?.backgroundOpacity,
+    backgroundBlur: t?.backgroundBlur,
+    backgroundFit: t?.backgroundFit,
+    showYAxis: t?.showYAxis,
+    yAxisColor: t?.yAxisColor,
   });
 
   const rows = data ?? [];

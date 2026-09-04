@@ -305,6 +305,7 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
           <p className="text-[10px] text-muted mb-1">
             Reduce el porcentaje para dar más espacio al valor y al avatar (útil cuando el valor se sale de pantalla).
           </p>
+          <NumberInput label="Radio de esquina de la barra (vacío = píldora)" value={value.barRadius} min={0} max={60} step={1} onChange={(v) => update({barRadius: v})} />
           <div>
             <label className="text-sm font-medium mb-1 block">Máximo de entidades</label>
             <input
@@ -359,17 +360,132 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
 
       {/* ============ CANVAS ============ */}
       <Section title="Canvas">
-        <ColorInput label="Color de fondo" value={value.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
-        <div className="pt-2 mt-1 border-t border-border-subtle">
-          <SliderNumberInput label="Margen superior" value={value.marginTop ?? 0} min={0} max={200} step={4} onChange={(v) => update({marginTop: v || undefined})} />
-          <SliderNumberInput label="Margen derecho" value={value.marginRight ?? 0} min={0} max={200} step={4} onChange={(v) => update({marginRight: v || undefined})} />
-          <SliderNumberInput label="Margen inferior" value={value.marginBottom ?? 0} min={0} max={200} step={4} onChange={(v) => update({marginBottom: v || undefined})} />
-          <SliderNumberInput label="Margen izquierdo" value={value.marginLeft ?? 0} min={0} max={200} step={4} onChange={(v) => update({marginLeft: v || undefined})} />
-          <p className="text-[10px] text-muted pt-1">
-            Márgenes del contenido (zonas "seguras" RRSS), en px. Si se dejan en 0 se usa el automático según el preset.
-          </p>
-        </div>
+        <SelectControl
+          label="Tipo de fondo"
+          value={value.backgroundType ?? 'color'}
+          options={[
+            {value: 'color', label: 'Color único'},
+            {value: 'pattern', label: 'Patrón'},
+            {value: 'gradient', label: 'Degradado'},
+            {value: 'image', label: 'Imagen'},
+          ]}
+          onChange={(v) => update({backgroundType: v as TimelineRaceConfig['backgroundType']})}
+        />
+
+        {(value.backgroundType ?? 'color') === 'color' && (
+          <ColorInput label="Color de fondo" value={value.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
+        )}
+
+        {(value.backgroundType ?? 'color') === 'pattern' && (
+          <>
+            <SelectControl
+              label="Patrón"
+              value={value.backgroundPattern ?? 'dots'}
+              options={[
+                {value: 'dots', label: 'Puntos'},
+                {value: 'stripes', label: 'Rayas'},
+                {value: 'grid', label: 'Cuadrícula'},
+                {value: 'checkers', label: 'Cuadros'},
+              ]}
+              onChange={(v) => update({backgroundPattern: v as TimelineRaceConfig['backgroundPattern']})}
+            />
+            <ColorInput label="Color del patrón" value={value.background ?? '#3b82f6'} onChange={(v) => update({background: v || undefined})} />
+            <SliderNumberInput label="Opacidad (%)" value={Math.round((value.backgroundOpacity ?? 1) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundOpacity: v ? v / 100 : undefined})} />
+          </>
+        )}
+
+        {(value.backgroundType ?? 'color') === 'gradient' && (
+          <>
+            <ColorInput label="Color inicial" value={value.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
+            <ColorInput label="Color final" value={value.backgroundSecondary ?? '#1f2937'} onChange={(v) => update({backgroundSecondary: v || undefined})} />
+            <SliderNumberInput label="Ángulo (grados)" value={value.backgroundAngle ?? 135} min={0} max={360} step={15} onChange={(v) => update({backgroundAngle: v || undefined})} />
+            <SliderNumberInput label="Opacidad (%)" value={Math.round((value.backgroundOpacity ?? 1) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundOpacity: v ? v / 100 : undefined})} />
+          </>
+        )}
+
+        {(value.backgroundType ?? 'color') === 'image' && (
+          <>
+            <FileUploadInput
+              label="Imagen de fondo"
+              value={value.backgroundImage}
+              onLoad={(dataUrl) => update({backgroundImage: dataUrl})}
+              onClear={() => update({backgroundImage: undefined})}
+            />
+            <SelectControl
+              label="Ajuste"
+              value={value.backgroundFit ?? 'cover'}
+              options={[
+                {value: 'cover', label: 'Cubrir'},
+                {value: 'contain', label: 'Contener'},
+                {value: 'fill', label: 'Rellenar'},
+              ]}
+              onChange={(v) => update({backgroundFit: v as TimelineRaceConfig['backgroundFit']})}
+            />
+            <ColorInput label="Color base (debajo)" value={value.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
+            <SliderNumberInput label="Opacidad (%)" value={Math.round((value.backgroundOpacity ?? 1) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundOpacity: v ? v / 100 : undefined})} />
+          </>
+        )}
+
+        <SliderNumberInput label="Desenfoque del fondo (blur px)" value={value.backgroundBlur ?? 0} min={0} max={30} step={1} onChange={(v) => update({backgroundBlur: v || undefined})} />
       </Section>
+
+      {/* ============ EJE ============ */}
+      <Section title="Eje Y">
+        <Toggle label="Eje vertical (Y)" checked={value.showYAxis ?? false} onChange={(v) => update({showYAxis: v || undefined})} />
+        <ColorInput label="Color del eje" value={value.yAxisColor ?? '#334155'} onChange={(v) => update({yAxisColor: v || undefined})} />
+      </Section>
+    </div>
+  );
+}
+
+function SelectControl({label, value, options, onChange}: {label: string; value: string; options: {value: string; label: string}[]; onChange: (v: string) => void}) {
+  return (
+    <div>
+      <label className="text-sm font-medium mb-1 block">{label}</label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function FileUploadInput({label, value, onLoad, onClear}: {label: string; value?: string; onLoad: (dataUrl: string) => void; onClear: () => void}) {
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  return (
+    <div>
+      <label className="text-sm font-medium mb-1 block">{label}</label>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (typeof reader.result === 'string') onLoad(reader.result);
+          };
+          reader.readAsDataURL(file);
+          e.target.value = '';
+        }}
+        className="w-full text-sm text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-elevated file:px-3 file:py-2 file:text-sm file:font-medium"
+      />
+      {value && (
+        <div className="flex items-center gap-2 mt-1">
+          <img src={value} alt="fondo" className="h-10 w-16 object-cover rounded border border-border-default" />
+          <button type="button" onClick={() => {onClear(); if (inputRef.current) inputRef.current.value = '';}} className="text-[10px] text-muted hover:text-red-500">
+            Quitar imagen
+          </button>
+        </div>
+      )}
     </div>
   );
 }
