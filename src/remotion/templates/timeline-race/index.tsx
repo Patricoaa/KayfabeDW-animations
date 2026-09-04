@@ -227,11 +227,12 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     });
     const active = list.filter((p) => p.active).sort((a, b) => b.current - a.current);
     const inactive = list.filter((p) => !p.active).sort((a, b) => b.current - a.current);
-    const all = maxRows && maxRows > 0 ? [...active, ...inactive].slice(0, maxRows) : [...active, ...inactive];
+    const full = [...active, ...inactive];
+    const all = maxRows && maxRows > 0 ? full.slice(0, maxRows) : full;
     const showInactive = !(maxRows && maxRows > 0 && all.length >= maxRows);
     const visActive = all.filter((p) => p.active);
     const visInactive = showInactive ? all.filter((p) => !p.active) : [];
-    return {list: all, visActive, visInactive};
+    return {list: all, full, visActive, visInactive};
   };
 
   const currentRank = participantsAt(guideT);
@@ -262,6 +263,13 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     }
     return null;
   };
+
+  // Whether `label` is inside the visible top-N window at sweep progress `t`.
+  const insideAt = (t: number, label: string) =>
+    participantsAt(t).list.some((q) => q.label === label);
+  // Full (untrimmed) rank of `label` at a given frame.
+  const rankFullAt = (f: number, label: string) =>
+    participantsAt(guideTAt(f)).full.findIndex((q) => q.label === label);
 
   // Dynamic x-axis max: the highest accumulated value among the entities
   // already active up to the current sweep position, so the axis (and the bar
@@ -309,15 +317,55 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     const scale = isLeader ? winnerScale : 1;
     const dim = isLeader ? 1 : dimOthers;
 
-    // Slide the whole row (bar + value + avatar) between its rank just before the
-    // last reorder and its current rank, easing over `SWAP` frames anchored to
-    // the moment the order actually changed.
+    // The frame (if within the last `SWAP`) at which `label` crossed in or out
+    // of the visible top-N window. Mirrors the ranking `evalChange` scan.
+    const evalBoundary = (label: string) => {
+      if (!(maxRows && maxRows > 0)) return null;
+      const from = frame - SWAP > 0 ? frame - SWAP : 0;
+      for (let f = frame; f > from; f--) {
+        const inNow = insideAt(guideTAt(f), label);
+        const inPrev = insideAt(guideTAt(f - 1), label);
+        if (inNow !== inPrev) {
+          return inNow
+            ? {atFrame: f, entering: true as const, fromRank: -1, nowRank: rankFullAt(f, label)}
+            : {atFrame: f, entering: false as const, fromRank: rankFullAt(f - 1, label), nowRank: -1};
+        }
+      }
+      return null;
+    };
+
+    // Lane just past the last visible row; exiting/entering rows glide from/to here.
+    const belowLane = rowCount;
+
+    // Base ranking glide (unchanged): slide between the rank just before the last
+    // reorder and the current rank, easing over `SWAP` frames.
     const yNow = rowsTop + laneY(rankNow(p.label));
     const change = evalChange(p.label);
     let top = yNow;
+    let rowOpacity = dim;
     if (change) {
       const sw = Math.min((frame - change.atFrame) / (SWAP - 1), 1);
       top = rowsTop + laneY(change.fromRank) + (yNow - (rowsTop + laneY(change.fromRank))) * Easing.out(Easing.cubic)(Math.max(sw, 0));
+    }
+
+    // Smooth entry/exit when the top-N limit makes an entity cross the window
+    // boundary: fade (0->1 enter, 1->0 exit) while gliding vertically from/to
+    // the lane just below the last visible row.
+    const bnd = evalBoundary(p.label);
+    if (bnd) {
+      const sw = Math.min((frame - bnd.atFrame) / (SWAP - 1), 1);
+      const ease = Easing.out(Easing.cubic)(Math.max(sw, 0));
+      if (bnd.entering) {
+        const fromY = rowsTop + laneY(belowLane);
+        const toY = rowsTop + laneY(bnd.nowRank);
+        top = fromY + (toY - fromY) * ease;
+        rowOpacity = dim * ease;
+      } else {
+        const fromY = rowsTop + laneY(bnd.fromRank);
+        const toY = rowsTop + laneY(belowLane);
+        top = fromY + (toY - fromY) * ease;
+        rowOpacity = dim * (1 - ease);
+      }
     }
 
     // Bar fill: per-entity override wins; otherwise the leader uses the
@@ -345,7 +393,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     };
 
     return (
-      <div key={p.label} style={{position: 'absolute', left: 0, right: 0, height: ROW_H, top, display: 'flex', alignItems: 'center', gap: ROW_GAP_PX, opacity: dim}}>
+      <div key={p.label} style={{position: 'absolute', left: 0, right: 0, height: ROW_H, top, display: 'flex', alignItems: 'center', gap: ROW_GAP_PX, opacity: rowOpacity}}>
         {order.map((seg) => segments[seg])}
       </div>
     );
@@ -367,6 +415,21 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     </div>
   );
 
+  // Rows to render = the current top-N window plus any entity still mid-way out
+  // of the window (exited within the last SWAP frames and still fading/gliding).
+  const windowLabels = new Set(currentRank.list.map((q) => q.label));
+  const renderPool =
+    maxRows && maxRows > 0
+      ? currentRank.full.filter((q) => {
+          if (windowLabels.has(q.label)) return true;
+          const from = frame - SWAP > 0 ? frame - SWAP : 0;
+          for (let f = frame; f > from; f--) {
+            if (insideAt(guideTAt(f), q.label)) return true;
+          }
+          return false;
+        })
+      : currentRank.full;
+
   return (
     <div style={{width: '100%', height: '100%', position: 'relative', backgroundColor: background, display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", padding: `${PAD_T}px ${PAD_R}px ${PAD_B}px ${PAD_L}px`, boxSizing: 'border-box', overflow: 'hidden'}}>
       <div style={{opacity: fadeIn, transform: `translate(${titleX ?? 0}px, ${(titleY ?? 0) + titleDrop}px)`, flexShrink: 0}}>
@@ -378,8 +441,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
 
       {/* Rows */}
       <div style={{flex: 1, position: 'relative', marginTop: isPortrait ? H * 0.03 : 36, overflow: 'hidden'}}>
-        {visibleActive.map((p) => renderRow(p))}
-        {visibleInactive.map((p) => renderRow(p))}
+        {renderPool.map((p) => renderRow(p))}
       </div>
 
       {showXAxis && axisPosition === 'bottom' && numAxis}
