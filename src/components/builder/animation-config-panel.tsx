@@ -75,18 +75,25 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
             Si se deja vacío se usa el título de la visualización.
           </p>
         </div>
+        <div className="pt-2 mt-1 border-t border-border-subtle">
+          <p className="text-[10px] text-muted mb-1.5">Posición del título (offset en px desde su lugar por defecto).</p>
+          <div className="grid grid-cols-2 gap-2">
+            <NumberInput label="X (px)" value={value.titleX} min={-400} max={400} step={4} onChange={(v) => update({titleX: v})} />
+            <NumberInput label="Y (px)" value={value.titleY} min={-400} max={400} step={4} onChange={(v) => update({titleY: v})} />
+          </div>
+        </div>
       </Section>
 
       <Section title="Datos" defaultOpen>
         <FieldSelect
-          label="Participante / etiqueta"
+          label="Entidad / etiqueta"
           value={value.labelField ?? ''}
           options={fieldMeta}
           fallback={columns}
           onChange={(v) => update({labelField: v || undefined})}
         />
         <FieldSelect
-          label="Imagen del participante (opcional)"
+          label="Imagen de la entidad (opcional)"
           value={value.imageField ?? ''}
           options={fieldMeta}
           fallback={columns}
@@ -110,20 +117,6 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
           role="numeric"
           onChange={(v) => update({valueField: v || undefined})}
         />
-        <div>
-          <label className="text-sm font-medium mb-1 block">Máximo de participantes</label>
-          <input
-            type="number"
-            min={0}
-            max={50}
-            value={value.maxRows ?? 0}
-            onChange={(e) => update({maxRows: Number(e.target.value) || undefined})}
-            className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-          />
-          <p className="text-[10px] text-muted mt-0.5">
-            0 = sin límite. Limita la cantidad de participantes visibles en la carrera.
-          </p>
-        </div>
       </Section>
 
       <Section title="Eje X" defaultOpen>
@@ -142,11 +135,6 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
             Agrupa los datos por día, mes o año y re-agrega el valor acumulado en cada rango.
           </p>
         </div>
-        <Toggle
-          label="Mostrar fecha en pantalla"
-          checked={value.showDateLabel ?? true}
-          onChange={(v) => update({showDateLabel: v})}
-        />
         <Toggle
           label="Mostrar eje X"
           checked={value.showXAxis ?? true}
@@ -175,9 +163,26 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
           <label className="text-sm font-medium mb-2 block">Orden de la fila (izq → der)</label>
           <RowOrderControl value={value.rowOrder ?? ['bar', 'value', 'avatar']} onChange={setRowOrder} />
         </div>
+        <SliderNumberInput label="Separación vertical entre filas (px)" value={value.rowGap ?? 0} min={0} max={120} step={2} onChange={(v) => update({rowGap: v || undefined})} />
+        <SliderNumberInput label="Separación horizontal (px)" value={value.rowGapH ?? 0} min={0} max={80} step={2} onChange={(v) => update({rowGapH: v || undefined})} />
         <p className="text-[10px] text-muted">
           El eje X muestra el valor acumulado (mínimo 0 y máximo), no las fechas. La fecha en pantalla se muestra abajo a la derecha como texto e indica el momento del recorrido.
         </p>
+      </Section>
+
+      <Section title="Fecha">
+        <Toggle
+          label="Mostrar fecha en pantalla"
+          checked={value.showDateLabel ?? true}
+          onChange={(v) => update({showDateLabel: v})}
+        />
+        <div className="pt-2 mt-1 border-t border-border-subtle">
+          <p className="text-[10px] text-muted mb-1.5">Posición de la fecha (offset en px desde la esquina inferior derecha).</p>
+          <div className="grid grid-cols-2 gap-2">
+            <NumberInput label="X (px)" value={value.dateX} min={-400} max={400} step={4} onChange={(v) => update({dateX: v})} />
+            <NumberInput label="Y (px)" value={value.dateY} min={-400} max={400} step={4} onChange={(v) => update({dateY: v})} />
+          </div>
+        </div>
       </Section>
 
       {/* ============ AVATAR ============ */}
@@ -220,7 +225,7 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
         {participants.length > 0 && (
           <div className="pt-2 border-t border-border-subtle">
             <div className="flex items-center justify-between mb-0.5">
-              <label className="text-sm font-medium block">Ajustar por participante</label>
+              <label className="text-sm font-medium block">Ajustar por entidad</label>
               {Object.keys(value.avatarCrops ?? {}).length > 0 && (
                 <button type="button" onClick={() => update({avatarCrops: undefined})} className="text-[10px] text-muted hover:text-red-500">
                   Limpiar todas
@@ -289,15 +294,29 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
       {/* ============ BARRAS ============ */}
       {participants.length > 0 && (
         <Section title="Barras">
+          <div>
+            <label className="text-sm font-medium mb-1 block">Máximo de entidades</label>
+            <input
+              type="number"
+              min={0}
+              max={50}
+              value={value.maxRows ?? 0}
+              onChange={(e) => update({maxRows: Number(e.target.value) || undefined})}
+              className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+            />
+            <p className="text-[10px] text-muted mt-0.5">
+              0 = sin límite. Limita la cantidad de entidades visibles en la carrera.
+            </p>
+          </div>
           <div className="flex items-center justify-between mb-0.5">
-            <label className="text-sm font-medium block">Colores por participante</label>
+            <label className="text-sm font-medium block">Colores por entidad</label>
             {Object.keys(value.barColors ?? {}).length > 0 && (
               <button type="button" onClick={() => update({barColors: undefined})} className="text-[10px] text-muted hover:text-red-500">
                 Limpiar todos
               </button>
             )}
           </div>
-          <p className="text-[10px] text-muted mb-1.5">Personaliza el color de la barra de cada participante. Dejar vacío usa el color por defecto.</p>
+          <p className="text-[10px] text-muted mb-1.5">Personaliza el color de la barra de cada entidad. Dejar vacío usa el color por defecto.</p>
           <div className="space-y-1.5">
             {participants.map((p) => {
               const color = value.barColors?.[p.label] ?? '#3f3f46';

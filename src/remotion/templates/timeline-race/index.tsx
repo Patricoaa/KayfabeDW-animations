@@ -2,10 +2,10 @@ import React from 'react';
 import {useCurrentFrame, useVideoConfig, interpolate, spring, Img, staticFile, Easing} from 'remotion';
 import {avatarCropRect} from '@/lib/animation-config';
 
-// A date-driven ranked bar race. Each participant has a `date` (timestamp on
+// A date-driven ranked bar race. Each entity has a `date` (timestamp on
 // the shared axis). A vertical guide sweeps left→right across the duration;
-// when the guide passes a participant's date, their accumulated `value` jumps
-// up (spring) and they enter the live ranking (rows re-sort by value each
+// when the guide passes an entity's date, its accumulated `value` jumps
+// up (spring) and it enters the live ranking (rows re-sort by value each
 // frame, highest on top). Before their date they sit in a placeholder zone.
 // An optional `image` renders an avatar in the row. When `dateMode` is false,
 // it renders a simpler parallel-bar layout (sorted by value, no guide).
@@ -15,7 +15,7 @@ import {avatarCropRect} from '@/lib/animation-config';
 // square, and custom sizes. This lets the same template render at any RRSS
 // preset while keeping elements proportional.
 export type TimelineRaceItem = {
-  label: string;              // participant / event name
+  label: string;              // entity / event name
   image?: string | null;      // optional avatar (url / data: / root-relative)
   date: number | null;        // timestamp ms on the shared axis (null in compat)
   value: number;              // accumulated numeric shown once activated
@@ -33,6 +33,12 @@ export type TimelineRaceProps = {
   showXAxis?: boolean;
   axisPosition?: 'top' | 'bottom';
   rowOrder?: ('bar' | 'value' | 'avatar')[];
+  rowGapH?: number;
+  rowGap?: number;
+  titleX?: number;
+  titleY?: number;
+  dateX?: number;
+  dateY?: number;
   avatarSize?: number;
   avatarShape?: 'circle' | 'rounded';
   avatarRadius?: number;
@@ -67,6 +73,12 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   showXAxis = true,
   axisPosition = 'bottom',
   rowOrder,
+  rowGapH,
+  rowGap,
+  titleX,
+  titleY,
+  dateX,
+  dateY,
   avatarSize,
   avatarShape = 'circle',
   avatarRadius,
@@ -104,7 +116,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const VALUE_W = isPortrait ? Math.round(W * 0.16) : 110;
 
   const fadeIn = interpolate(frame, [0, 24], [0, 1], {extrapolateRight: 'clamp'});
-  const titleY = spring({fps, frame, config: {damping: 15, stiffness: 80}}) * -20;
+  const titleDrop = spring({fps, frame, config: {damping: 15, stiffness: 80}}) * -20;
 
   const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
   if (rows.length === 0) {
@@ -121,7 +133,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     const winnerScale = interpolate(frame, [durationInFrames - 45, durationInFrames - 10], [1, 1.06], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
     return (
       <div style={{width: '100%', height: '100%', backgroundColor: background, display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", padding: `${PAD_T}px ${PAD_R}px ${PAD_B}px ${PAD_L}px`, boxSizing: 'border-box'}}>
-        <div style={{opacity: fadeIn, transform: `translateY(${titleY}px)`}}>
+        <div style={{opacity: fadeIn, transform: `translate(${titleX ?? 0}px, ${(titleY ?? 0) + titleDrop}px)`}}>
           <div style={{fontSize: TITLE_SIZE, fontWeight: 800, color: '#ffffff'}}>{title || 'Timeline Race'}</div>
           <div style={{marginTop: 14, height: 4, width: Math.max(80, W * 0.09), backgroundColor: accentColor, borderRadius: 2}} />
         </div>
@@ -178,7 +190,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   // The plot takes the maximum width: bars grow from the left edge, and the
   // numeric value + avatar sit at the right end of each row.
   const innerW = W - PAD_L - PAD_R;
-  const ROW_GAP_PX = isPortrait ? 12 : 16;
+  const ROW_GAP_PX = rowGapH ?? (isPortrait ? 12 : 16);
   const TRACK_LEFT = 0;
   const TRACK_RIGHT = innerW - VALUE_W - AVATAR - ROW_GAP_PX * 2;
   const BAR_MAX_W = Math.max(TRACK_RIGHT - TRACK_LEFT, 1);
@@ -191,7 +203,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const raw = interpolate(frame, [EASE, EASE + sweepFrames], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
   const guideT = raw * raw * (3 - 2 * raw); // smoothstep time drive
 
-  // ---- Group steps by participant (label) ----
+  // ---- Group steps by entity (label) ----
   const byLabel = new Map<string, {image?: string | null; steps: {x: number; value: number}[]}>();
   for (const r of withDate) {
     const x = ((r.date as number) - min) / span;
@@ -204,7 +216,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   }
   for (const e of byLabel.values()) e.steps.sort((a, b) => a.x - b.x);
 
-  // Ranked participant list at a given sweep progress `t` (0..1). Reused both
+  // Ranked entity list at a given sweep progress `t` (0..1). Reused both
   // for the current frame and for a `SWAP`-frame lookback so the row position
   // can glide between the previous and current rank instead of jumping.
   const participantsAt = (t: number) => {
@@ -226,15 +238,15 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const {visActive: visibleActive, visInactive: visibleInactive} = currentRank;
   const rowCount = Math.max(visibleActive.length + visibleInactive.length, 1);
 
-  // Current rank (index in the full ordered list) per participant.
+  // Current rank (index in the full ordered list) per entity.
   const curIndex = new Map<string, number>();
   currentRank.list.forEach((p, i) => curIndex.set(p.label, i));
   const rankNow = (label: string) => curIndex.get(label) ?? 0;
 
-  // Duration (frames) of the slide when a participant changes rank.
+  // Duration (frames) of the slide when an entity changes rank.
   const SWAP = 24;
 
-  // Detect, for each participant, the most recent rank change within the last
+  // Detect, for each entity, the most recent rank change within the last
   // `SWAP` frames. When a reorder happens at frame `c`, the row glides from the
   // rank it held just before `c` to its current rank over `SWAP` frames. This is
   // derived purely from `frame` (no React state) so it renders deterministically.
@@ -251,7 +263,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     return null;
   };
 
-  // Dynamic x-axis max: the highest accumulated value among the participants
+  // Dynamic x-axis max: the highest accumulated value among the entities
   // already active up to the current sweep position, so the axis (and the bar
   // scale) recalibrate as the race advances instead of staying fixed at the
   // final maximum.
@@ -260,7 +272,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   // Height budget for the rows area: full height minus title, axis strip and padding.
   const rowBudget = H - PAD_T - PAD_B - TITLE_SIZE * 1.4 - (isPortrait ? H * 0.12 : 100) - (isPortrait ? 12 : 36);
   const ROW_H = rowCount <= 6 ? Math.min(rowBudget / rowCount * 0.72, isPortrait ? 150 : 96) : Math.max(52, rowBudget / rowCount * 0.62);
-  const ROW_GAP = isPortrait ? 14 : 8;
+  const ROW_GAP = rowGap ?? (isPortrait ? 14 : 8);
 
   // Vertical position of rows within the rows container.
   const rowsTop = Math.max(0, (rowBudget - rowCount * ROW_H - (rowCount - 1) * ROW_GAP) / 2);
@@ -274,7 +286,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const winnerScale = 1 + 0.05 * winnerT;
   const dimOthers = 1 - 0.35 * winnerT;
 
-  // Per-participant crop; nothing global (zoom/focus are per-participant only).
+  // Per-entity crop; nothing global (zoom/focus are per-entity only).
   const avatarCropFor = (label: string): {zoom: number; focusX: number; focusY: number} => {
     const c = avatarCrops?.[label];
     return {
@@ -308,7 +320,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
       top = rowsTop + laneY(change.fromRank) + (yNow - (rowsTop + laneY(change.fromRank))) * Easing.out(Easing.cubic)(Math.max(sw, 0));
     }
 
-    // Bar fill: per-participant override wins; otherwise the leader uses the
+    // Bar fill: per-entity override wins; otherwise the leader uses the
     // accent color and the rest a neutral gray.
     const barFill = barColors?.[p.label] ?? (isLeader ? accentColor : '#3f3f46');
 
@@ -357,7 +369,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
 
   return (
     <div style={{width: '100%', height: '100%', position: 'relative', backgroundColor: background, display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", padding: `${PAD_T}px ${PAD_R}px ${PAD_B}px ${PAD_L}px`, boxSizing: 'border-box', overflow: 'hidden'}}>
-      <div style={{opacity: fadeIn, transform: `translateY(${titleY}px)`, flexShrink: 0}}>
+      <div style={{opacity: fadeIn, transform: `translate(${titleX ?? 0}px, ${(titleY ?? 0) + titleDrop}px)`, flexShrink: 0}}>
         <div style={{fontSize: TITLE_SIZE, fontWeight: 800, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>{title || 'Timeline Race'}</div>
         <div style={{marginTop: 14, height: 4, width: Math.max(80, W * 0.09), backgroundColor: accentColor, borderRadius: 2}} />
       </div>
@@ -374,7 +386,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
 
       {/* On-screen date (bottom-right, large, plain text) */}
       {showDateLabel && (
-        <div style={{position: 'absolute', right: PAD_R, bottom: PAD_B > 30 ? PAD_B : 30, fontSize: DATE_FONT, fontWeight: 800, color: accentColor, fontVariantNumeric: 'tabular-nums', textShadow: '0 0 20px rgba(0,0,0,0.6)', lineHeight: 1}}>
+        <div style={{position: 'absolute', right: PAD_R, bottom: PAD_B > 30 ? PAD_B : 30, transform: `translate(${dateX ?? 0}px, ${dateY ?? 0}px)`, fontSize: DATE_FONT, fontWeight: 800, color: accentColor, fontVariantNumeric: 'tabular-nums', textShadow: '0 0 20px rgba(0,0,0,0.6)', lineHeight: 1}}>
           {dateLabelText}
         </div>
       )}

@@ -115,6 +115,12 @@ function convertTimelineRace(
     showXAxis: t?.showXAxis,
     axisPosition: t?.axisPosition,
     rowOrder: t?.rowOrder,
+    rowGapH: t?.rowGapH,
+    rowGap: t?.rowGap,
+    titleX: t?.titleX,
+    titleY: t?.titleY,
+    dateX: t?.dateX,
+    dateY: t?.dateY,
     avatarSize: t?.avatarSize,
     avatarShape: t?.avatarShape,
     avatarRadius: t?.avatarRadius,
@@ -172,10 +178,10 @@ function convertTimelineRace(
   const min = Math.min(...dates);
   const max = Math.max(...dates);
 
-  // ---- Accumulate per participant ----
-  // Group each participant's events by time period (day/month/year per
+  // ---- Accumulate per entity ----
+  // Group each entity's events by time period (day/month/year per
   // dateFormat), then compute a running cumulative value so that when the
-  // sweeping guide crosses a participant's date, its bar jumps to the total
+  // sweeping guide crosses an entity's date, its bar jumps to the total
   // up to that moment. Items are emitted as steps (label repeats); the
   // template renders one row per distinct label.
   const fmt = tc?.dateFormat ?? 'day';
@@ -244,8 +250,8 @@ function convertTimelineRace(
   };
 }
 
-// Resolve the distinct participants (label + avatar image) of a Timeline Race
-// so the config panel can offer per-participant avatar crop controls. Uses the
+// Resolve the distinct entities (label + avatar image) of a Timeline Race
+// so the config panel can offer per-entity avatar crop controls. Uses the
 // same column resolution as convertTimelineRace.
 export function getTimelineRaceParticipants(
   data: Record<string, unknown>[],
