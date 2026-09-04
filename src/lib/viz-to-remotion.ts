@@ -109,9 +109,27 @@ function convertTimelineRace(
   config: ChartConfig,
   tc?: TimelineRaceConfig,
 ): Record<string, unknown> {
+  // Presentation (avatar + canvas) fields shared by every output shape.
+  const presentationOf = (t: TimelineRaceConfig | undefined) => ({
+    showDateLabel: t?.showDateLabel,
+    axisPosition: t?.axisPosition,
+    avatarSize: t?.avatarSize,
+    avatarShape: t?.avatarShape,
+    avatarRadius: t?.avatarRadius,
+    avatarZoom: t?.avatarZoom,
+    avatarFocusX: t?.avatarFocusX,
+    avatarFocusY: t?.avatarFocusY,
+    avatarCrops: t?.avatarCrops,
+    background: t?.background,
+    marginTop: t?.marginTop,
+    marginRight: t?.marginRight,
+    marginBottom: t?.marginBottom,
+    marginLeft: t?.marginLeft,
+  });
+
   const rows = data ?? [];
   if (rows.length === 0) {
-    return {title: (tc?.title || config.title) ?? '', items: [], accentColor: config.colors?.[0] ?? '#FFD700', dateMode: false};
+    return {title: (tc?.title || config.title) ?? '', items: [], accentColor: config.colors?.[0] ?? '#FFD700', dateMode: false, ...presentationOf(tc)};
   }
 
   // Explicit per-template column mapping wins; otherwise fall back to the
@@ -147,10 +165,7 @@ function convertTimelineRace(
       accentColor: config.colors?.[0] ?? '#FFD700',
       dateMode: false,
       maxRows: tc?.maxRows,
-      showYAxis: tc?.showYAxis,
-      showRefLine: tc?.showRefLine,
-      showDateLabel: tc?.showDateLabel,
-      axisPosition: tc?.axisPosition,
+      ...presentationOf(tc),
     };
   }
 
@@ -205,10 +220,7 @@ function convertTimelineRace(
       dateMode: true,
       domain: [min, max] as [number, number],
       maxRows: tc?.maxRows,
-      showYAxis: tc?.showYAxis,
-      showRefLine: tc?.showRefLine,
-      showDateLabel: tc?.showDateLabel,
-      axisPosition: tc?.axisPosition,
+      ...presentationOf(tc),
     };
   }
 
@@ -228,11 +240,31 @@ function convertTimelineRace(
     dateFormat: fmt,
     domain: [sMin, sMax] as [number, number],
     maxRows: tc?.maxRows,
-    showYAxis: tc?.showYAxis,
-    showRefLine: tc?.showRefLine,
-    showDateLabel: tc?.showDateLabel,
-      axisPosition: tc?.axisPosition,
+    ...presentationOf(tc),
   };
+}
+
+// Resolve the distinct participants (label + avatar image) of a Timeline Race
+// so the config panel can offer per-participant avatar crop controls. Uses the
+// same column resolution as convertTimelineRace.
+export function getTimelineRaceParticipants(
+  data: Record<string, unknown>[],
+  config: ChartConfig,
+  tc?: TimelineRaceConfig,
+): {label: string; image?: string | null}[] {
+  const rows = data ?? [];
+  if (rows.length === 0) return [];
+  const labelField = tc?.labelField ?? config.xField ?? Object.keys(rows[0])[0];
+  const imageField = tc?.imageField;
+  const seen = new Map<string, true>();
+  const out: {label: string; image?: string | null}[] = [];
+  for (const row of rows) {
+    const label = String(row[labelField] ?? '');
+    if (!label || seen.has(label)) continue;
+    seen.set(label, true);
+    out.push({label, image: imageField ? avatarUrlOf(row[imageField]) : null});
+  }
+  return out;
 }
 
 function convertHeatmapLuchas(data: Record<string, unknown>[], config: ChartConfig): Record<string, unknown> {

@@ -22,7 +22,7 @@ import type {ChartConfig} from '@/lib/chart-config';
 import {DEFAULT_CHART_CONFIG, applyChartDefaults} from '@/lib/chart-config';
 import type {SchemaMetadata} from '@/lib/schema-metadata';
 import {getSchemaMetadata, getTableDepth, isNumericType} from '@/lib/schema-metadata';
-import {suggestBestTemplate, convertToRemotionProps} from '@/lib/viz-to-remotion';
+import {suggestBestTemplate, convertToRemotionProps, getTimelineRaceParticipants} from '@/lib/viz-to-remotion';
 import {applyChartFilters} from '@/lib/chart-data';
 import {chartToDataUrl} from '@/lib/export-static';
 import dynamic from 'next/dynamic';
@@ -442,6 +442,15 @@ function BuilderContent() {
     [chartConfig, filteredData, activeTemplate, templateConfig],
   );
 
+  // Distinct participants (label + avatar) for the per-participant avatar crop
+  // controls in the Timeline Race config panel.
+  const timelineParticipants = useMemo(
+    () => (activeTemplate === 'timeline-race'
+      ? getTimelineRaceParticipants(filteredData, chartConfig, templateConfig['timeline-race'])
+      : []),
+    [activeTemplate, filteredData, chartConfig, templateConfig],
+  );
+
   // Fan-out metadata for the step-2 chart panel. `aliasToTable` maps each
   // selected column (by alias or bare name) back to its source table, so the
   // config panel can warn when an aggregate is applied to a shallower table in
@@ -732,6 +741,7 @@ function BuilderContent() {
                     fieldMeta={fieldMeta}
                     value={templateConfig['timeline-race'] ?? {}}
                     onChange={(tc) => setTemplateConfig((prev) => ({...prev, 'timeline-race': tc as TimelineRaceConfig}))}
+                    participants={timelineParticipants}
                   />
                 )}
               </>
