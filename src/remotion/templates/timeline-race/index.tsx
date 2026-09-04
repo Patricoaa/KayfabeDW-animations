@@ -112,8 +112,8 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const TITLE_SIZE = isPortrait ? Math.round(W * 0.075) : 42;
   const ROW_FONT = isPortrait ? Math.round(W * 0.045) : 21;
   const DATE_FONT = isPortrait ? Math.round(W * 0.09) : 44;
-  const AVATAR = avatarSize ?? (isPortrait ? Math.round(W * 0.09) : 44);
-  const VALUE_W = isPortrait ? Math.round(W * 0.16) : 110;
+  const COMPAT_AVATAR = avatarSize ?? (isPortrait ? Math.round(W * 0.09) : 44);
+  const COMPAT_VALUE_W = isPortrait ? Math.round(W * 0.16) : 110;
 
   const fadeIn = interpolate(frame, [0, 24], [0, 1], {extrapolateRight: 'clamp'});
   const titleDrop = spring({fps, frame, config: {damping: 15, stiffness: 80}}) * -20;
@@ -128,7 +128,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     const maxValue = Math.max(...rows.map((it) => it.value), 0);
     const visible = (maxRows && maxRows > 0 ? rows.slice(0, maxRows) : rows).slice(0, 9);
     const leading = Math.max(...visible.map((it) => it.value), 0);
-    const barMax = W - VALUE_W - AVATAR - PAD_L - PAD_R - (isPortrait ? 12 : 18) - 24;
+    const barMax = W - COMPAT_VALUE_W - COMPAT_AVATAR - PAD_L - PAD_R - (isPortrait ? 12 : 18) - 24;
     const ROW_H = H * (visible.length <= 6 ? 0.14 : 0.6 / visible.length);
     const winnerScale = interpolate(frame, [durationInFrames - 45, durationInFrames - 10], [1, 1.06], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
     return (
@@ -153,13 +153,13 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
                 </div>
               ),
               value: (
-                <div style={{width: VALUE_W, flexShrink: 0, textAlign: 'right'}}>
+                <div style={{width: COMPAT_VALUE_W, flexShrink: 0, textAlign: 'right'}}>
                   <span style={{fontSize: ROW_FONT, fontWeight: 800, color: isLeader ? accentColor : '#ffffff', fontVariantNumeric: 'tabular-nums'}}>{item.value.toLocaleString()}</span>
                 </div>
               ),
               avatar: (
                 <div style={{flexShrink: 0}}>
-                  {item.image && <Avatar src={item.image} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(item.label)} />}
+                  {item.image && <Avatar src={item.image} size={COMPAT_AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(item.label)} />}
                 </div>
               ),
             };
@@ -187,13 +187,14 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const withDate = rows.filter((r) => r.date != null);
 
   // ---- Date axis track geometry (responsive) ----
-  // The plot takes the maximum width: bars grow from the left edge, and the
-  // numeric value + avatar sit at the right end of each row.
+  // Row width is split proportionally: bar track ~75%, ~3% between-segment
+  // separations, and the remaining width shared between the value and avatar.
   const innerW = W - PAD_L - PAD_R;
-  const ROW_GAP_PX = rowGapH ?? (isPortrait ? 12 : 16);
-  const TRACK_LEFT = 0;
-  const TRACK_RIGHT = innerW - VALUE_W - AVATAR - ROW_GAP_PX * 2;
-  const BAR_MAX_W = Math.max(TRACK_RIGHT - TRACK_LEFT, 1);
+  const ROW_GAP_PX = rowGapH ?? innerW * 0.03;
+  const BAR_MAX_W = Math.max(innerW * 0.75, 1);
+  const restW = Math.max(innerW - BAR_MAX_W - ROW_GAP_PX * 2, 0);
+  const VALUE_W = restW * 0.62;
+  const AVATAR = avatarSize ?? restW * 0.38;
   const EASE = 26;
   const sweepFrames = Math.max(durationInFrames - EASE * 2, 1);
   const guideTAt = (f: number) => {
@@ -374,7 +375,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
 
     const segments: Record<'bar' | 'value' | 'avatar', React.ReactNode> = {
       bar: (
-        <div style={{flex: 1, height: Math.max(14, ROW_H * 0.46), backgroundColor: '#171717', borderRadius: 999, overflow: 'hidden', display: 'flex', position: 'relative'}}>
+        <div style={{flexShrink: 0, width: BAR_MAX_W, height: Math.max(14, ROW_H * 0.46), backgroundColor: '#171717', borderRadius: 999, overflow: 'hidden', display: 'flex', position: 'relative'}}>
           <div style={{width: Math.max(0, barW * pop), height: '100%', backgroundColor: barFill, borderRadius: 999, boxShadow: isLeader ? `0 0 ${18 * scale}px ${accentColor}99` : 'none', transform: `scaleY(${scale})`}} />
         </div>
       ),
@@ -386,7 +387,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
         </div>
       ),
       avatar: (
-        <div style={{flexShrink: 0, textAlign: 'right'}}>
+        <div style={{width: AVATAR, flexShrink: 0, textAlign: 'right'}}>
           {p.image && <Avatar src={p.image} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(p.label)} />}
         </div>
       ),
@@ -406,10 +407,10 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
 
   const numAxis = (
     <div style={{position: 'relative', flexShrink: 0, marginTop: 8, paddingTop: 12, borderTop: '1px solid #1f2937', width: '100%', height: 22}}>
-      <div style={{position: 'absolute', left: TRACK_LEFT - 6, top: 0, fontSize: axisFont, color: '#64748b', fontVariantNumeric: 'tabular-nums'}}>
+      <div style={{position: 'absolute', left: -6, top: 0, fontSize: axisFont, color: '#64748b', fontVariantNumeric: 'tabular-nums'}}>
         {0}
       </div>
-      <div style={{position: 'absolute', right: innerW - TRACK_RIGHT - 6, top: 0, fontSize: axisFont, color: '#64748b', fontVariantNumeric: 'tabular-nums', textAlign: 'right'}}>
+      <div style={{position: 'absolute', left: BAR_MAX_W - 6, top: 0, fontSize: axisFont, color: '#64748b', fontVariantNumeric: 'tabular-nums', textAlign: 'right'}}>
         {currentMax.toLocaleString()}
       </div>
     </div>
