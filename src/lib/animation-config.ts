@@ -7,6 +7,20 @@ export type AvatarCrop = {zoom?: number; focusX?: number; focusY?: number};
 
 export type RowSegment = 'bar' | 'avatar';
 
+// Typography overrides for the title and the on-screen date. Empty = the
+// template's default (font family/color/size/weight). `multiline` is only
+// used for the title (wrapping of line breaks).
+export type RaceTextStyle = {
+  fontFamily?: string;
+  color?: string;
+  size?: number;
+  weight?: number;
+  textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
+  letterSpacing?: number;
+  lineHeight?: number;
+  align?: 'left' | 'center' | 'right';
+};
+
 // Shared crop math: how a zoomed (and focus-shifted) image is placed inside a
 // square frame of `size` px. Used by BOTH the config-panel sidebar preview and
 // the Remotion `<Avatar>` render so they always agree.
@@ -96,9 +110,14 @@ export type TimelineRaceConfig = {
   backgroundFit?: 'cover' | 'contain' | 'fill'; // how an image is fit
 
   // Vertical (Y) plot axis: enable a simple axis line at the bars' origin and
-  // configure its color.
+  // configure its color and thickness (px).
   showYAxis?: boolean;
   yAxisColor?: string;
+  yAxisWidth?: number;
+
+  // Typography overrides for the title and the on-screen date.
+  titleText?: RaceTextStyle;
+  dateText?: RaceTextStyle;
 };
 
 // Keyed by TemplateId. Templates not listed here (or with no entry) inherit

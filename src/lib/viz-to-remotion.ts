@@ -139,6 +139,9 @@ function convertTimelineRace(
     backgroundFit: t?.backgroundFit,
     showYAxis: t?.showYAxis,
     yAxisColor: t?.yAxisColor,
+    yAxisWidth: t?.yAxisWidth,
+    titleText: t?.titleText,
+    dateText: t?.dateText,
   });
 
   const rows = data ?? [];

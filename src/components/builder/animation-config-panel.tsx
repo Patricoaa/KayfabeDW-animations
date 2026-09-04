@@ -3,8 +3,9 @@
 import React, {useState} from 'react';
 import {ChevronDown} from 'lucide-react';
 import type {ColumnMeta} from '@/components/builder/chart-config-panel';
-import type {TimelineRaceConfig, DateFormat, AvatarShape, AvatarCrop} from '@/lib/animation-config';
+import type {TimelineRaceConfig, DateFormat, AvatarShape, AvatarCrop, RaceTextStyle} from '@/lib/animation-config';
 import {avatarCropRect} from '@/lib/animation-config';
+import {FONT_PRESETS} from '@/lib/chart-config';
 
 type Participant = {label: string; image?: string | null};
 
@@ -63,16 +64,16 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
     <div className="space-y-3">
       <Section title="Header" defaultOpen>
         <div>
-          <label className="text-sm font-medium mb-1 block">Título</label>
-          <input
-            type="text"
+          <label className="text-sm font-medium mb-1 block">Título (multilínea)</label>
+          <textarea
             value={value.title ?? ''}
             onChange={(e) => update({title: e.target.value || undefined})}
             placeholder="Título de la animación"
-            className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+            rows={2}
+            className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500 resize-y"
           />
           <p className="text-[10px] text-muted mt-0.5">
-            Si se deja vacío se usa el título de la visualización.
+            Si se deja vacío se usa el título de la visualización. Usa Enter para saltar de línea.
           </p>
         </div>
         <div className="pt-2 mt-1 border-t border-border-subtle">
@@ -81,6 +82,9 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
             <NumberInput label="X (px)" value={value.titleX} min={-400} max={400} step={4} onChange={(v) => update({titleX: v})} />
             <NumberInput label="Y (px)" value={value.titleY} min={-400} max={400} step={4} onChange={(v) => update({titleY: v})} />
           </div>
+        </div>
+        <div className="pt-2 mt-1 border-t border-border-subtle">
+          <RaceTextControls label="Texto del título" value={value.titleText} onChange={(patch) => update({titleText: {...(value.titleText ?? {}), ...patch}})} />
         </div>
       </Section>
 
@@ -170,6 +174,19 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
         </p>
       </Section>
 
+      <Section title="Eje Y">
+        <Toggle
+          label="Eje vertical (Y)"
+          checked={value.showYAxis ?? false}
+          onChange={(v) => update({showYAxis: v || undefined})}
+        />
+        <ColorInput label="Color del eje" value={value.yAxisColor ?? '#334155'} onChange={(v) => update({yAxisColor: v || undefined})} />
+        <SliderNumberInput label="Grosor del eje (px)" value={value.yAxisWidth ?? 2} min={1} max={12} step={1} onChange={(v) => update({yAxisWidth: v || undefined})} />
+        <p className="text-[10px] text-muted">
+          Línea vertical en el origen (borde izquierdo) de las barras.
+        </p>
+      </Section>
+
       <Section title="Fecha">
         <Toggle
           label="Mostrar fecha en pantalla"
@@ -182,6 +199,9 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
             <NumberInput label="X (px)" value={value.dateX} min={-400} max={400} step={4} onChange={(v) => update({dateX: v})} />
             <NumberInput label="Y (px)" value={value.dateY} min={-400} max={400} step={4} onChange={(v) => update({dateY: v})} />
           </div>
+        </div>
+        <div className="pt-2 mt-1 border-t border-border-subtle">
+          <RaceTextControls label="Texto de la fecha" value={value.dateText} onChange={(patch) => update({dateText: {...(value.dateText ?? {}), ...patch}})} />
         </div>
       </Section>
 
@@ -428,12 +448,6 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
 
         <SliderNumberInput label="Desenfoque del fondo (blur px)" value={value.backgroundBlur ?? 0} min={0} max={30} step={1} onChange={(v) => update({backgroundBlur: v || undefined})} />
       </Section>
-
-      {/* ============ EJE ============ */}
-      <Section title="Eje Y">
-        <Toggle label="Eje vertical (Y)" checked={value.showYAxis ?? false} onChange={(v) => update({showYAxis: v || undefined})} />
-        <ColorInput label="Color del eje" value={value.yAxisColor ?? '#334155'} onChange={(v) => update({yAxisColor: v || undefined})} />
-      </Section>
     </div>
   );
 }
@@ -655,6 +669,76 @@ function RowOrderControl({value, onChange}: {value: ('bar' | 'avatar')[]; onChan
         ))}
       </div>
       <p className="text-[10px] text-muted mt-0.5">Usa ◀ ▶ para reordenar los elementos de cada fila. El dato siempre va al extremo derecho de la barra.</p>
+    </div>
+  );
+}
+
+function RaceTextControls({label, value, onChange}: {label: string; value?: RaceTextStyle; onChange: (patch: Partial<RaceTextStyle>) => void}) {
+  const v = value ?? {};
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium">{label}</p>
+      <div>
+        <label className="text-sm font-medium mb-1 block">Tipografía</label>
+        <select
+          value={v.fontFamily ?? ''}
+          onChange={(e) => onChange({fontFamily: e.target.value || undefined})}
+          className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+        >
+          <option value="">Por defecto</option>
+          {FONT_PRESETS.map((f) => (
+            <option key={f.name} value={f.family}>{f.name}</option>
+          ))}
+        </select>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <NumberInput label="Tamaño (px)" value={v.size} min={6} max={160} step={1} onChange={(n) => onChange({size: n})} />
+        <NumberInput label="Grosor" value={v.weight} min={400} max={800} step={100} onChange={(n) => onChange({weight: n})} />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <NumberInput label="Interletrado (px)" value={v.letterSpacing} min={-2} max={20} step={1} onChange={(n) => onChange({letterSpacing: n})} />
+        <NumberInput label="Alto de línea" value={v.lineHeight} min={0.8} max={2} step={0.1} onChange={(n) => onChange({lineHeight: n})} />
+      </div>
+      <ColorInput label="Color del texto" value={v.color} onChange={(c) => onChange({color: c || undefined})} />
+      <div>
+        <label className="text-sm font-medium mb-1 block">Mayúsculas / minúsculas</label>
+        <div className="grid grid-cols-4 gap-1">
+          {([
+            ['none', 'Normal'],
+            ['uppercase', 'MAY'],
+            ['lowercase', 'min'],
+            ['capitalize', 'Cap'],
+          ] as const).map(([val, lab]) => (
+            <button
+              key={val}
+              type="button"
+              onClick={() => onChange({textTransform: val === 'none' ? undefined : val})}
+              className={`px-2 py-1.5 rounded-md text-sm font-medium transition-colors ${(v.textTransform ?? 'none') === val ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'}`}
+            >
+              {lab}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <label className="text-sm font-medium mb-1 block">Alineación</label>
+        <div className="grid grid-cols-3 gap-1">
+          {([
+            ['left', 'Izq'],
+            ['center', 'Centro'],
+            ['right', 'Der'],
+          ] as const).map(([val, lab]) => (
+            <button
+              key={val}
+              type="button"
+              onClick={() => onChange({align: (v.align ?? 'left') === val ? undefined : val})}
+              className={`px-2 py-1.5 rounded-md text-sm font-medium transition-colors ${(v.align ?? 'left') === val ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'}`}
+            >
+              {lab}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

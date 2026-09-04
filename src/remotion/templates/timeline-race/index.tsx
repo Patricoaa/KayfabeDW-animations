@@ -1,6 +1,6 @@
 import React from 'react';
 import {useCurrentFrame, useVideoConfig, interpolate, spring, Img, staticFile, Easing} from 'remotion';
-import {avatarCropRect} from '@/lib/animation-config';
+import {avatarCropRect, type RaceTextStyle} from '@/lib/animation-config';
 
 // A date-driven ranked bar race. Each entity has a `date` (timestamp on
 // the shared axis). A vertical guide sweeps left→right across the duration;
@@ -57,6 +57,9 @@ export type TimelineRaceProps = {
   backgroundFit?: 'cover' | 'contain' | 'fill';
   showYAxis?: boolean;
   yAxisColor?: string;
+  yAxisWidth?: number;
+  titleText?: RaceTextStyle;
+  dateText?: RaceTextStyle;
 };
 
 function fmtDate(t: number, fmt: TimelineRaceProps['dateFormat'] = 'day'): string {
@@ -67,6 +70,22 @@ function fmtDate(t: number, fmt: TimelineRaceProps['dateFormat'] = 'day'): strin
   if (fmt === 'month') return `${mm}/${y}`;
   const dd = String(d.getDate()).padStart(2, '0');
   return `${dd}/${mm}/${y}`;
+}
+
+// Merge a RaceTextStyle override onto concrete defaults into a CSSProperties
+// subset, dropping undefined so the default wins when not configured.
+function textStyle(over: RaceTextStyle | undefined, defaults: {color: string; size: number; weight: number}) {
+  const s: React.CSSProperties = {
+    color: over?.color ?? defaults.color,
+    fontSize: over?.size ?? defaults.size,
+    fontWeight: over?.weight ?? defaults.weight,
+  };
+  if (over?.fontFamily) s.fontFamily = over.fontFamily;
+  if (over?.textTransform && over.textTransform !== 'none') s.textTransform = over.textTransform;
+  if (over?.letterSpacing !== undefined) s.letterSpacing = over.letterSpacing;
+  if (over?.lineHeight) s.lineHeight = over.lineHeight;
+  if (over?.align) s.textAlign = over.align;
+  return s;
 }
 
 export const TimelineRace: React.FC<TimelineRaceProps> = ({
@@ -105,6 +124,9 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   backgroundFit = 'cover',
   showYAxis = false,
   yAxisColor = '#334155',
+  yAxisWidth = 2,
+  titleText,
+  dateText,
 }) => {
   const frame = useCurrentFrame();
   const {fps, durationInFrames, width: W, height: H} = useVideoConfig();
@@ -233,7 +255,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
       <div style={{width: '100%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", padding: `${PAD_T}px ${PAD_R}px ${PAD_B}px ${PAD_L}px`, boxSizing: 'border-box'}}>
         {bgLayer}
         <div style={{opacity: fadeIn, transform: `translate(${titleX ?? 0}px, ${(titleY ?? 0) + titleDrop}px)`, zIndex: 1}}>
-          <div style={{fontSize: TITLE_SIZE, fontWeight: 800, color: '#ffffff'}}>{title || 'Timeline Race'}</div>
+          <div style={{...textStyle(titleText, {color: '#ffffff', size: TITLE_SIZE, weight: 800}), whiteSpace: 'pre-line'}}>{title || 'Timeline Race'}</div>
           <div style={{marginTop: 14, height: 4, width: Math.max(80, W * 0.09), backgroundColor: accentColor, borderRadius: 2}} />
         </div>
         <div style={{flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', marginTop: H * 0.04, zIndex: 1}}>
@@ -532,7 +554,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     <div style={{width: '100%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", padding: `${PAD_T}px ${PAD_R}px ${PAD_B}px ${PAD_L}px`, boxSizing: 'border-box', overflow: 'hidden'}}>
       {bgLayer}
       <div style={{opacity: fadeIn, transform: `translate(${titleX ?? 0}px, ${(titleY ?? 0) + titleDrop}px)`, flexShrink: 0, position: 'relative', zIndex: 1}}>
-        <div style={{fontSize: TITLE_SIZE, fontWeight: 800, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>{title || 'Timeline Race'}</div>
+        <div style={{...textStyle(titleText, {color: '#ffffff', size: TITLE_SIZE, weight: 800}), whiteSpace: 'pre-line'}}>{title || 'Timeline Race'}</div>
         <div style={{marginTop: 14, height: 4, width: Math.max(80, W * 0.09), backgroundColor: accentColor, borderRadius: 2}} />
       </div>
 
@@ -541,7 +563,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
       {/* Rows */}
       <div style={{flex: 1, position: 'relative', marginTop: isPortrait ? H * 0.03 : 36, overflow: 'hidden'}}>
         {showYAxis && (
-          <div style={{position: 'absolute', left: -6, top: 0, bottom: 0, width: 2, borderRadius: 1, backgroundColor: yAxisColor ?? '#334155', zIndex: 0}} />
+          <div style={{position: 'absolute', left: 0, top: 0, bottom: 0, width: yAxisWidth ?? 2, borderRadius: 1, backgroundColor: yAxisColor ?? '#334155', zIndex: 0}} />
         )}
         <div style={{position: 'absolute', inset: 0}}>{renderPool.map((p) => renderRow(p))}</div>
       </div>
@@ -550,7 +572,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
 
       {/* On-screen date (bottom-right, large, plain text) */}
       {showDateLabel && (
-        <div style={{position: 'absolute', right: PAD_R, bottom: PAD_B > 30 ? PAD_B : 30, transform: `translate(${dateX ?? 0}px, ${dateY ?? 0}px)`, fontSize: DATE_FONT, fontWeight: 800, color: accentColor, fontVariantNumeric: 'tabular-nums', textShadow: '0 0 20px rgba(0,0,0,0.6)', lineHeight: 1}}>
+        <div style={{position: 'absolute', right: PAD_R, bottom: PAD_B > 30 ? PAD_B : 30, transform: `translate(${dateX ?? 0}px, ${dateY ?? 0}px)`, ...textStyle(dateText, {color: accentColor, size: DATE_FONT, weight: 800}), fontVariantNumeric: 'tabular-nums', textShadow: '0 0 20px rgba(0,0,0,0.6)', lineHeight: dateText?.lineHeight ?? 1}}>
           {dateLabelText}
         </div>
       )}
