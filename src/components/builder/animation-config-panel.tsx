@@ -57,7 +57,7 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
     else delete next[label];
     update({barColors: next});
   };
-  const setRowOrder = (order: ('bar' | 'value' | 'avatar')[]) => update({rowOrder: order});
+  const setRowOrder = (order: ('bar' | 'avatar')[]) => update({rowOrder: order});
 
   return (
     <div className="space-y-3">
@@ -161,7 +161,7 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
         </div>
         <div>
           <label className="text-sm font-medium mb-2 block">Orden de la fila (izq → der)</label>
-          <RowOrderControl value={value.rowOrder ?? ['bar', 'value', 'avatar']} onChange={setRowOrder} />
+          <RowOrderControl value={value.rowOrder ?? ['bar', 'avatar']} onChange={setRowOrder} />
         </div>
         <SliderNumberInput label="Separación vertical entre filas (px)" value={value.rowGap ?? 0} min={0} max={120} step={2} onChange={(v) => update({rowGap: v || undefined})} />
         <SliderNumberInput label="Separación horizontal (px)" value={value.rowGapH ?? 0} min={0} max={80} step={2} onChange={(v) => update({rowGapH: v || undefined})} />
@@ -500,19 +500,21 @@ function ColorInput({label, value, onChange}: {label: string; value?: string; on
   );
 }
 
-function RowOrderControl({value, onChange}: {value: ('bar' | 'value' | 'avatar')[]; onChange: (order: ('bar' | 'value' | 'avatar')[]) => void}) {
-  const labelOf = (s: 'bar' | 'value' | 'avatar') => (s === 'bar' ? 'Barra' : s === 'value' ? 'Dato' : 'Avatar');
+function RowOrderControl({value, onChange}: {value: ('bar' | 'avatar')[]; onChange: (order: ('bar' | 'avatar')[]) => void}) {
+  const rows = Array.from(new Set(value.filter((s) => s === 'bar' || s === 'avatar'))) as ('bar' | 'avatar')[];
+  const normal: ('bar' | 'avatar')[] = rows.length === 2 ? rows : ['bar', 'avatar'];
+  const labelOf = (s: 'bar' | 'avatar') => (s === 'bar' ? 'Barra' : 'Avatar');
   const swap = (i: number, dir: -1 | 1) => {
     const j = i + dir;
-    if (j < 0 || j >= value.length) return;
-    const next = [...value];
+    if (j < 0 || j >= normal.length) return;
+    const next = [...normal];
     [next[i], next[j]] = [next[j], next[i]];
     onChange(next);
   };
   return (
     <div>
       <div className="flex gap-1">
-        {value.map((seg, i) => (
+        {normal.map((seg, i) => (
           <div key={seg} className="flex items-center gap-0.5 flex-1">
             <button
               type="button"
@@ -527,7 +529,7 @@ function RowOrderControl({value, onChange}: {value: ('bar' | 'value' | 'avatar')
             <button
               type="button"
               onClick={() => swap(i, 1)}
-              disabled={i === value.length - 1}
+              disabled={i === normal.length - 1}
               className="text-xs text-muted hover:text-primary disabled:opacity-30 px-1"
               aria-label={`Mover ${labelOf(seg)} a la derecha`}
             >
@@ -536,7 +538,7 @@ function RowOrderControl({value, onChange}: {value: ('bar' | 'value' | 'avatar')
           </div>
         ))}
       </div>
-      <p className="text-[10px] text-muted mt-0.5">Usa ◀ ▶ para reordenar los elementos de cada fila.</p>
+      <p className="text-[10px] text-muted mt-0.5">Usa ◀ ▶ para reordenar los elementos de cada fila. El dato siempre va al extremo derecho de la barra.</p>
     </div>
   );
 }

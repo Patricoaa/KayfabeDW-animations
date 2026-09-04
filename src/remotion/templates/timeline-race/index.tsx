@@ -32,7 +32,7 @@ export type TimelineRaceProps = {
   showDateLabel?: boolean;
   showXAxis?: boolean;
   axisPosition?: 'top' | 'bottom';
-  rowOrder?: ('bar' | 'value' | 'avatar')[];
+  rowOrder?: ('bar' | 'avatar')[];
   rowGapH?: number;
   rowGap?: number;
   barWidth?: number;
@@ -95,13 +95,28 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const frame = useCurrentFrame();
   const {fps, durationInFrames, width: W, height: H} = useVideoConfig();
 
-  // Validate/expand the row segment order (bar/value/avatar), falling back to a
-  // canonical [bar, value, avatar] if the prop is missing or malformed.
+  // Date mode drops the value, which is pinned to the bar's right end. Date mode
+  // order only covers the bar and avatar segments.
   const order = (() => {
-    if (!rowOrder || rowOrder.length !== 3) return ['bar', 'value', 'avatar'] as const;
-    const uniq = new Set(rowOrder);
-    if (uniq.size !== 3 || (!uniq.has('bar') || !uniq.has('value') || !uniq.has('avatar'))) return ['bar', 'value', 'avatar'] as const;
-    return rowOrder;
+    const segs: ('bar' | 'avatar')[] = ['bar', 'avatar'];
+    if (!rowOrder) return segs;
+    const clean = Array.from(new Set(rowOrder.filter((s) => s === 'bar' || s === 'avatar'))) as ('bar' | 'avatar')[];
+    return clean.length === 2 ? clean : segs;
+  })();
+  // Compat mode keeps the original three-segment order (bar/value/avatar) so its
+  // behavior is unchanged: the value is auto-inserted right after the bar.
+  const orderCompat = (() => {
+    const segs: ('bar' | 'value' | 'avatar')[] = [];
+    for (const s of order) {
+      if (s === 'bar') {
+        if (!segs.includes('bar')) segs.push('bar', 'value');
+      } else if (s === 'avatar') {
+        if (!segs.includes('avatar')) segs.push('avatar');
+      }
+    }
+    if (!segs.includes('bar')) segs.unshift('bar', 'value');
+    if (!segs.includes('avatar')) segs.push('avatar');
+    return segs;
   })();
 
   // ---- Responsive geometry ----
@@ -167,7 +182,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
             };
             return (
               <div key={`${item.label}-${index}`} style={{opacity: rowOpacity, transform: `translateX(${labelX}px) scale(${isLeader ? winnerScale : 1})`, display: 'flex', alignItems: 'center', gap: isPortrait ? 12 : 18}}>
-                {order.map((seg) => segments[seg])}
+                {orderCompat.map((seg) => segments[seg])}
               </div>
             );
           })}
@@ -189,15 +204,14 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const withDate = rows.filter((r) => r.date != null);
 
   // ---- Date axis track geometry (responsive) ----
-  // Row width is split proportionally: bar track ~75%, ~3% between-segment
-  // separations, and the remaining width shared between the value and avatar.
+  // The value (dato) is pinned to the bar's right end, so the row splits into
+  // just two flex segments: the bar track (~barWidth fraction) and the avatar.
+  // A single ~3% separation sits between them; the rest of the width is the avatar.
   const innerW = W - PAD_L - PAD_R;
   const ROW_GAP_PX = rowGapH ?? innerW * 0.03;
   const BAR_RATIO = Math.min(Math.max(barWidth ?? 0.75, 0.1), 0.95);
   const BAR_MAX_W = Math.max(innerW * BAR_RATIO, 1);
-  const restW = Math.max(innerW - BAR_MAX_W - ROW_GAP_PX * 2, 0);
-  const VALUE_W = restW * 0.62;
-  const AVATAR = avatarSize ?? restW * 0.38;
+  const AVATAR = avatarSize ?? Math.max(innerW - BAR_MAX_W - ROW_GAP_PX, 0);
   const EASE = 26;
   const sweepFrames = Math.max(durationInFrames - EASE * 2, 1);
   const guideTAt = (f: number) => {
@@ -376,17 +390,15 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     // accent color and the rest a neutral gray.
     const barFill = barColors?.[p.label] ?? (isLeader ? accentColor : '#3f3f46');
 
-    const segments: Record<'bar' | 'value' | 'avatar', React.ReactNode> = {
+    const segments: Record<'bar' | 'avatar', React.ReactNode> = {
       bar: (
-        <div style={{flexShrink: 0, width: BAR_MAX_W, height: Math.max(14, ROW_H * 0.46), backgroundColor: '#171717', borderRadius: 999, overflow: 'hidden', display: 'flex', position: 'relative'}}>
+        <div style={{flexShrink: 0, width: BAR_MAX_W, height: Math.max(14, ROW_H * 0.46), backgroundColor: '#171717', borderRadius: 999, overflow: 'visible', display: 'flex', position: 'relative', alignItems: 'center'}}>
           <div style={{width: Math.max(0, barW * pop), height: '100%', backgroundColor: barFill, borderRadius: 999, boxShadow: isLeader ? `0 0 ${18 * scale}px ${accentColor}99` : 'none', transform: `scaleY(${scale})`}} />
-        </div>
-      ),
-      value: (
-        <div style={{width: VALUE_W, flexShrink: 0, textAlign: 'right'}}>
-          <span style={{fontSize: ROW_FONT, fontWeight: 800, color: isLeader ? accentColor : '#ffffff', fontVariantNumeric: 'tabular-nums', opacity: p.active ? 1 : 0.25}}>
-            {p.active ? p.current.toLocaleString() : '–'}
-          </span>
+          <div style={{position: 'absolute', right: 10, top: 0, bottom: 0, display: 'flex', alignItems: 'center', pointerEvents: 'none'}}>
+            <span style={{fontSize: ROW_FONT, fontWeight: 800, color: isLeader ? accentColor : '#ffffff', fontVariantNumeric: 'tabular-nums', opacity: p.active ? 1 : 0.25, textShadow: '0 1px 2px rgba(0,0,0,0.6)'}}>
+              {p.active ? p.current.toLocaleString() : '–'}
+            </span>
+          </div>
         </div>
       ),
       avatar: (

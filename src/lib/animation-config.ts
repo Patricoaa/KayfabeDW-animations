@@ -5,7 +5,7 @@ export type DateFormat = 'day' | 'month' | 'year';
 export type AvatarShape = 'circle' | 'rounded';
 export type AvatarCrop = {zoom?: number; focusX?: number; focusY?: number};
 
-export type RowSegment = 'bar' | 'value' | 'avatar';
+export type RowSegment = 'bar' | 'avatar';
 
 // Shared crop math: how a zoomed (and focus-shifted) image is placed inside a
 // square frame of `size` px. Used by BOTH the config-panel sidebar preview and
@@ -46,8 +46,9 @@ export type TimelineRaceConfig = {
   showXAxis?: boolean;
   axisPosition?: 'top' | 'bottom';
 
-  // Left→right arrangement of the three row segments, e.g. ['bar','value','avatar'].
-  rowOrder?: ('bar' | 'value' | 'avatar')[];
+  // Left→right arrangement of the row segments, e.g. ['avatar','bar']. The
+  // value (dato) is no longer here: it is pinned to the bar's right end.
+  rowOrder?: ('bar' | 'avatar')[];
 
   // Row spacing (px). `rowGapH` = horizontal separation between the three row
   // segments; `rowGap` = vertical separation between rows. Empty = auto.
