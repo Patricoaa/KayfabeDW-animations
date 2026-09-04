@@ -1,4 +1,4 @@
-import {useCurrentFrame, useVideoConfig, interpolate, spring, Img, staticFile} from 'remotion';
+import {useCurrentFrame, useVideoConfig, interpolate, spring, Img, staticFile, Easing} from 'remotion';
 
 // A date-driven ranked bar race. Each participant has a `date` (timestamp on
 // the shared axis). A vertical guide sweeps left→right across the duration;
@@ -90,7 +90,6 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const ROW_FONT = isPortrait ? Math.round(W * 0.045) : 21;
   const DATE_FONT = isPortrait ? Math.round(W * 0.09) : 44;
   const AVATAR = avatarSize ?? (isPortrait ? Math.round(W * 0.09) : 44);
-  const LABEL_W = isPortrait ? Math.round(W * 0.3) : 320;
   const VALUE_W = isPortrait ? Math.round(W * 0.16) : 110;
 
   const fadeIn = interpolate(frame, [0, 24], [0, 1], {extrapolateRight: 'clamp'});
@@ -106,7 +105,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     const maxValue = Math.max(...rows.map((it) => it.value), 0);
     const visible = (maxRows && maxRows > 0 ? rows.slice(0, maxRows) : rows).slice(0, 9);
     const leading = Math.max(...visible.map((it) => it.value), 0);
-    const barMax = W - LABEL_W - VALUE_W - PAD_L - PAD_R - 36;
+    const barMax = W - VALUE_W - AVATAR - PAD_L - PAD_R - (isPortrait ? 12 : 18) - 24;
     const ROW_H = H * (visible.length <= 6 ? 0.14 : 0.6 / visible.length);
     const winnerScale = interpolate(frame, [durationInFrames - 45, durationInFrames - 10], [1, 1.06], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
     return (
@@ -125,15 +124,13 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
             const barWidth = (item.value / maxValue) * barMax * barProgress;
             return (
               <div key={`${item.label}-${index}`} style={{opacity: rowOpacity, transform: `translateX(${labelX}px) scale(${isLeader ? winnerScale : 1})`, display: 'flex', alignItems: 'center', gap: isPortrait ? 12 : 18}}>
-                <div style={{width: LABEL_W, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12}}>
-                  {item.image && <Avatar src={item.image} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(item.label)} />}
-                </div>
                 <div style={{flex: 1, height: ROW_H * 0.5, backgroundColor: '#1a1a1a', borderRadius: ROW_H * 0.25, overflow: 'hidden', display: 'flex'}}>
                   <div style={{width: Math.max(0, barWidth), height: '100%', backgroundColor: isLeader ? accentColor : '#475569', borderRadius: ROW_H * 0.25, boxShadow: isLeader ? `0 0 ${16 * winnerScale}px ${accentColor}66` : 'none'}} />
                 </div>
                 <div style={{width: VALUE_W, flexShrink: 0, textAlign: 'right'}}>
                   <span style={{fontSize: ROW_FONT, fontWeight: 800, color: isLeader ? accentColor : '#ffffff', fontVariantNumeric: 'tabular-nums'}}>{item.value.toLocaleString()}</span>
                 </div>
+                {item.image && <Avatar src={item.image} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(item.label)} />}
               </div>
             );
           })}
@@ -151,15 +148,21 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const [min, max] = domain ?? [0, 1];
   const span = Math.max(max - min, 1);
   const withDate = rows.filter((r) => r.date != null);
-  const maxValue = Math.max(...withDate.map((it) => it.value), 0) || 1;
 
   // ---- Date axis track geometry (responsive) ----
+  // The plot takes the maximum width: bars grow from the left edge, and the
+  // numeric value + avatar sit at the right end of each row.
   const innerW = W - PAD_L - PAD_R;
-  const TRACK_LEFT = LABEL_W;
-  const TRACK_RIGHT = innerW - VALUE_W - (isPortrait ? 8 : 24);
-  const BAR_MAX_W = TRACK_RIGHT - TRACK_LEFT;
+  const ROW_GAP_PX = isPortrait ? 12 : 16;
+  const TRACK_LEFT = 0;
+  const TRACK_RIGHT = innerW - VALUE_W - AVATAR - ROW_GAP_PX * 2;
+  const BAR_MAX_W = Math.max(TRACK_RIGHT - TRACK_LEFT, 1);
   const EASE = 26;
   const sweepFrames = Math.max(durationInFrames - EASE * 2, 1);
+  const guideTAt = (f: number) => {
+    const r = interpolate(f, [EASE, EASE + sweepFrames], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
+    return r * r * (3 - 2 * r); // smoothstep easing
+  };
   const raw = interpolate(frame, [EASE, EASE + sweepFrames], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
   const guideT = raw * raw * (3 - 2 * raw); // smoothstep time drive
 
@@ -174,27 +177,44 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     }
     entry.steps.push({x, value: r.value});
   }
-  const participants = Array.from(byLabel.entries()).map(([label, e]) => {
-    const sorted = [...e.steps].sort((a, b) => a.x - b.x);
-    const passed = sorted.filter((s) => guideT >= s.x);
-    const current = passed.length > 0 ? passed[passed.length - 1].value : 0;
-    const firstX = sorted[0]?.x ?? 1;
-    return {
-      label,
-      image: e.image,
-      current,
-      active: passed.length > 0,
-      firstX,
-    };
-  });
+  for (const e of byLabel.values()) e.steps.sort((a, b) => a.x - b.x);
 
-  const activeP = participants.filter((p) => p.active).sort((a, b) => b.current - a.current);
-  const inactiveP = participants.filter((p) => !p.active).sort((a, b) => b.current - a.current);
-  const allP = (maxRows && maxRows > 0 ? [...activeP, ...inactiveP].slice(0, maxRows) : [...activeP, ...inactiveP]);
-  const showInactive = !(maxRows && maxRows > 0 && allP.length >= maxRows);
-  const visibleActive = allP.filter((p) => p.active);
-  const visibleInactive = showInactive ? allP.filter((p) => !p.active) : [];
+  // Ranked participant list at a given sweep progress `t` (0..1). Reused both
+  // for the current frame and for a `SWAP`-frame lookback so the row position
+  // can glide between the previous and current rank instead of jumping.
+  const participantsAt = (t: number) => {
+    const list = Array.from(byLabel.entries()).map(([label, e]) => {
+      const passed = e.steps.filter((s) => t >= s.x);
+      const current = passed.length > 0 ? passed[passed.length - 1].value : 0;
+      return {label, image: e.image, current, active: passed.length > 0, firstX: e.steps[0]?.x ?? 1};
+    });
+    const active = list.filter((p) => p.active).sort((a, b) => b.current - a.current);
+    const inactive = list.filter((p) => !p.active).sort((a, b) => b.current - a.current);
+    const all = maxRows && maxRows > 0 ? [...active, ...inactive].slice(0, maxRows) : [...active, ...inactive];
+    const showInactive = !(maxRows && maxRows > 0 && all.length >= maxRows);
+    const visActive = all.filter((p) => p.active);
+    const visInactive = showInactive ? all.filter((p) => !p.active) : [];
+    return {list: all, visActive, visInactive};
+  };
+
+  const currentRank = participantsAt(guideT);
+  const {visActive: visibleActive, visInactive: visibleInactive} = currentRank;
   const rowCount = Math.max(visibleActive.length + visibleInactive.length, 1);
+
+  // Lookback rank (SWAP frames earlier) — used to slide rows between positions.
+  const SWAP = 18;
+  const guideTPrev = frame <= SWAP ? 0 : guideTAt(frame - SWAP);
+  const prevOrder = participantsAt(guideTPrev);
+  const prevIndex = new Map<string, number>();
+  prevOrder.list.forEach((p, i) => prevIndex.set(p.label, i));
+  const curIndex = new Map<string, number>();
+  currentRank.list.forEach((p, i) => curIndex.set(p.label, i));
+
+  // Dynamic x-axis max: the highest accumulated value among the participants
+  // already active up to the current sweep position, so the axis (and the bar
+  // scale) recalibrate as the race advances instead of staying fixed at the
+  // final maximum.
+  const currentMax = Math.max(...visibleActive.map((p) => p.current), 0) || 1;
 
   // Height budget for the rows area: full height minus title, axis strip and padding.
   const rowBudget = H - PAD_T - PAD_B - TITLE_SIZE * 1.4 - (isPortrait ? H * 0.12 : 100) - (isPortrait ? 12 : 36);
@@ -223,10 +243,10 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     };
   };
 
-  const renderRow = (p: {label: string; image?: string | null; current: number; active: boolean; firstX: number}, y: number) => {
+  const renderRow = (p: {label: string; image?: string | null; current: number; active: boolean; firstX: number}) => {
     const display = p.active ? p.current : 0;
     const isLeader = p.active && visibleActive[0] && p.current === visibleActive[0].current && visibleActive[0].current > 0;
-    const barW = (display / maxValue) * BAR_MAX_W * (p.active ? 1 : 0);
+    const barW = (display / currentMax) * BAR_MAX_W * (p.active ? 1 : 0);
     const pop = spring({
       fps,
       frame: p.active ? frame - Math.max(0, Math.floor((p.firstX / 1.001) * sweepFrames)) : frame,
@@ -235,11 +255,15 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     });
     const scale = isLeader ? winnerScale : 1;
     const dim = isLeader ? 1 : dimOthers;
+
+    // Smooth position: glide between the rank held `SWAP` frames ago and the
+    // current rank so rows rise/fall instead of jumping on reorder.
+    const yNow = rowsTop + laneY(curIndex.get(p.label) ?? 0);
+    const yPrev = rowsTop + laneY(prevIndex.get(p.label) ?? curIndex.get(p.label) ?? 0);
+    const top = interpolate(frame, [1, SWAP], [yPrev, yNow], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic)});
+
     return (
-      <div key={p.label} style={{position: 'absolute', left: 0, right: 0, height: ROW_H, top: y, display: 'flex', alignItems: 'center', gap: isPortrait ? 10 : 16, opacity: dim}}>
-        <div style={{width: LABEL_W, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, justifyContent: 'flex-end'}}>
-          {p.image && <Avatar src={p.image} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(p.label)} />}
-        </div>
+      <div key={p.label} style={{position: 'absolute', left: 0, right: 0, height: ROW_H, top, display: 'flex', alignItems: 'center', gap: ROW_GAP_PX, opacity: dim}}>
         <div style={{flex: 1, height: Math.max(14, ROW_H * 0.46), backgroundColor: '#171717', borderRadius: 999, overflow: 'hidden', display: 'flex', position: 'relative'}}>
           <div style={{width: Math.max(0, barW * pop), height: '100%', backgroundColor: isLeader ? accentColor : '#3f3f46', borderRadius: 999, boxShadow: isLeader ? `0 0 ${18 * scale}px ${accentColor}99` : 'none', transform: `scaleY(${scale})`}} />
         </div>
@@ -247,6 +271,9 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
           <span style={{fontSize: ROW_FONT, fontWeight: 800, color: isLeader ? accentColor : '#ffffff', fontVariantNumeric: 'tabular-nums', opacity: p.active ? 1 : 0.25}}>
             {p.active ? p.current.toLocaleString() : '–'}
           </span>
+        </div>
+        <div style={{flexShrink: 0, textAlign: 'right'}}>
+          {p.image && <Avatar src={p.image} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(p.label)} />}
         </div>
       </div>
     );
@@ -263,7 +290,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
         {0}
       </div>
       <div style={{position: 'absolute', right: innerW - TRACK_RIGHT - 6, top: 0, fontSize: axisFont, color: '#64748b', fontVariantNumeric: 'tabular-nums', textAlign: 'right'}}>
-        {maxValue.toLocaleString()}
+        {currentMax.toLocaleString()}
       </div>
     </div>
   );
@@ -279,8 +306,8 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
 
       {/* Rows */}
       <div style={{flex: 1, position: 'relative', marginTop: isPortrait ? H * 0.03 : 36, overflow: 'hidden'}}>
-        {visibleActive.map((p, i) => renderRow(p, rowsTop + laneY(i)))}
-        {visibleInactive.map((p, i) => renderRow(p, rowsTop + laneY(visibleActive.length + i)))}
+        {visibleActive.map((p) => renderRow(p))}
+        {visibleInactive.map((p) => renderRow(p))}
       </div>
 
       {axisPosition === 'bottom' && numAxis}
@@ -343,7 +370,7 @@ function Avatar({
           width: vw,
           height: vh,
           transform: `translate(${imgX}px, ${imgY}px)`,
-          objectFit: 'cover',
+          objectFit: 'contain',
         }}
       />
     </div>
