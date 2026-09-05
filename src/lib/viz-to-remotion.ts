@@ -80,10 +80,14 @@ function isImageUrl(value: unknown): boolean {
 }
 
 // Pick the "Entidad / etiqueta" column (the participant label) for a timeline
-// race. An explicit per-template mapping wins; otherwise the inherited
-// xField — but never an image/URL column (common when the static chart itself
-// plots image URLs as labels) nor a purely numeric column. Falls back to the
-// first text column.
+// race. An explicit per-template mapping wins; otherwise we inherit the
+// static xField — but we never pick an image/URL column (common when the
+// static chart plots image URLs as labels), a purely numeric column, or a
+// date/time column (JSONB normalizes object keys by length/alphabetically, so
+// a layout like [wins, imagen_url, match_date, wrestler_name] must not land on
+// match_date — that would turn every row into its own bar). Among the
+// remaining text columns we prefer the entity-like one, i.e. the column whose
+// sample values repeat the most.
 function resolveLabelField(
   rows: Record<string, unknown>[],
   config: ChartConfig,
@@ -96,16 +100,33 @@ function resolveLabelField(
   const candidates = [push(config.xField), ...Object.keys(rows[0] ?? {})].filter(
     (c): c is string => !!c,
   );
-  const sample = (f: string) => rows.slice(0, 12).map((r) => r[f]);
-  const isUsable = (v: unknown) => {
-    const s = String(v ?? '').trim();
-    return s !== '' && !isImageUrl(v) && isNaN(Number(s));
+  const sample = (f: string) => rows.slice(0, 24).map((r) => r[f]);
+  const isDateName = (f: string) =>
+    /date|fecha|inicio|start|time|tiempo|a[ñn]o|dia|d[ií]a/i.test(f);
+  const isDateValue = (vals: unknown[]) =>
+    vals.some((v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v.trim()));
+  const isUsable = (f: string, vals: unknown[]) => {
+    const nonEmpty = vals.filter((v) => String(v ?? '').trim() !== '');
+    if (nonEmpty.length === 0) return false;
+    if (nonEmpty.some((v) => isImageUrl(v))) return false;
+    if (nonEmpty.some((v) => !isNaN(Number(v)))) return false;
+    if (isDateName(f) || isDateValue(nonEmpty)) return false;
+    return true;
   };
 
+  let best: string | null = null;
+  let bestRatio = Infinity;
   for (const f of candidates) {
-    if (sample(f).some(isUsable)) return f;
+    const vals = sample(f);
+    if (!isUsable(f, vals)) continue;
+    const uniq = new Set(vals.map((v) => String(v ?? '').trim())).size;
+    const ratio = vals.length > 0 ? uniq / vals.length : Infinity;
+    if (ratio < bestRatio) {
+      bestRatio = ratio;
+      best = f;
+    }
   }
-  return candidates[0] ?? '';
+  return best ?? '';
 }
 
 function parseDateValue(value: unknown): number | null {
