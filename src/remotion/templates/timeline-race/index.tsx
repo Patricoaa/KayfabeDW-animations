@@ -554,9 +554,9 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
       bar: (
         <div style={{flexShrink: 0, width: BAR_MAX_W, height: BAR_H, position: 'relative', display: 'flex', alignItems: 'center'}}>
           <div style={{position: 'absolute', left: 0, right: 0, top: '50%', height: GROOVE_H, transform: 'translateY(-50%)', backgroundColor: '#171717', borderRadius: barRadius ?? 999}} />
-          <div style={{position: 'absolute', left: 0, top: 0, bottom: 0, width: '100%', display: 'flex', alignItems: 'center', opacity: outro}}>
-            <span style={{fontSize: Math.round(ROW_FONT * 0.92), fontWeight: 700, color: '#d4d4d8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', paddingRight: 8}}>{p.label}</span>
-          </div>
+<div style={{position: 'absolute', left: 0, top: 0, bottom: 0, width: '100%', display: 'flex', alignItems: 'center', opacity: outro, transform: `translateX(${(1 - outro) * -18}px)`}}>
+  <span style={{fontSize: Math.round(ROW_FONT * 0.92), fontWeight: 700, color: '#d4d4d8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', paddingLeft: 12, paddingRight: 8}}>{p.label}</span>
+</div>
           <div style={{position: 'absolute', left: leftOff, top: '50%', width: Math.max(0, w), height: BAR_H, transform: `translateY(-50%) scaleY(${scale})`, backgroundColor: barFill, borderRadius: barRadius ?? 999, boxShadow: isLeader ? `0 0 ${18 * scale}px ${accentColor}99` : 'none'}} />
           <div style={{position: 'absolute', right: 10, top: 0, bottom: 0, display: 'flex', alignItems: 'center', pointerEvents: 'none'}}>
             <span style={{fontSize: ROW_FONT, fontWeight: 800, color: '#ffffff', fontVariantNumeric: 'tabular-nums', opacity: p.active ? 1 : 0.25, whiteSpace: 'nowrap'}}>
