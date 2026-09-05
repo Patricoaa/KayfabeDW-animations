@@ -1,6 +1,6 @@
 import React from 'react';
 import {useCurrentFrame, useVideoConfig, interpolate, spring, Img, staticFile, Easing} from 'remotion';
-import {avatarCropRect, type RaceTextStyle} from '@/lib/animation-config';
+import {avatarCropRect, type RaceTextStyle} from '../../../lib/animation-config';
 
 // A date-driven ranked bar race. Each entity has a `date` (timestamp on
 // the shared axis). A vertical guide sweeps left→right across the duration;
@@ -29,6 +29,7 @@ export type TimelineRaceProps = {
   domain?: [number, number];
   dateFormat?: 'day' | 'month' | 'year';
   maxRows?: number;
+  holdFinalSeconds?: number;
   showDateLabel?: boolean;
   showXAxis?: boolean;
   axisPosition?: 'top' | 'bottom';
@@ -100,6 +101,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   domain,
   dateFormat = 'day',
   maxRows,
+  holdFinalSeconds = 2,
   showDateLabel = true,
   showXAxis = true,
   axisPosition = 'bottom',
@@ -331,7 +333,11 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   // finishes `OUTRO` frames before the last frame so the bars can collapse and
   // the entity labels fade in on top of the shrunken bars.
   const OUTRO = Math.min(45, Math.max(0, Math.floor(durationInFrames * 0.12)));
-  const sweepFrames = Math.max(durationInFrames - EASE * 2 - OUTRO, 1);
+  // Hold the final result before the outro: a configurable pause (seconds)
+  // where the winner stays on screen once the sweep has finished. The frames
+  // come out of the sweep so the total duration is preserved.
+  const holdFrames = Math.max(0, Math.min(Math.round(holdFinalSeconds * fps), Math.max(0, durationInFrames - EASE * 2 - OUTRO - 1)));
+  const sweepFrames = Math.max(durationInFrames - EASE * 2 - OUTRO - holdFrames, 1);
   const raceEndFrame = EASE + sweepFrames;
   const guideTAt = (f: number) => {
     const r = interpolate(f, [EASE, EASE + sweepFrames], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
@@ -353,11 +359,26 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   }
   for (const e of byLabel.values()) e.steps.sort((a, b) => a.x - b.x);
 
-  // Ranked entity list at a given sweep progress `t` (0..1). Reused both
-  // for the current frame and for a `SWAP`-frame lookback so the row position
-  // can glide between the previous and current rank instead of jumping.
-  const participantsAt = (t: number) => {
-    const list = Array.from(byLabel.entries()).map(([label, e]) => {
+  // Ranked entity list at a given sweep progress `t` (0..1). The sort used to
+  // run once per call and was re-executed dozens of times per frame (per row,
+  // per SWAP-frame history scan). With large datasets that was O(calls × N log
+  // N) per frame. Snapshots are now built once per unique sweep position and
+  // shared by every consumer within a frame's render — the per-frame cost is
+  // bounded by the ~SWAP snapshot builds instead of multiplying by entity count.
+  type Participant = {label: string; image?: string | null; current: number; active: boolean; firstX: number};
+  type RankSnap = {
+    list: Participant[];            // visible top-N window (all when no maxRows)
+    full: Participant[];            // every entity, active first, then inactive
+    visActive: Participant[];
+    visInactive: Participant[];
+    window: Set<string>;            // labels inside the visible list (O(1) lookup)
+    listIndex: Map<string, number>; // rank position within `list`
+    fullIndex: Map<string, number>; // rank position within `full`
+  };
+
+  const buildSnap = (t: number): RankSnap => {
+    const list: Participant[] = [];
+    for (const [label, e] of byLabel.entries()) {
       const steps = e.steps;
       let i = -1;
       for (let k = 0; k < steps.length; k++) {
@@ -378,26 +399,45 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
           current = cur.value + (nxt.value - cur.value) * frac;
         }
       }
-      return {label, image: e.image, current, active, firstX: steps[0]?.x ?? 1};
-    });
-    const active = list.filter((p) => p.active).sort((a, b) => b.current - a.current);
-    const inactive = list.filter((p) => !p.active).sort((a, b) => b.current - a.current);
-    const full = [...active, ...inactive];
+      list.push({label, image: e.image, current, active, firstX: steps[0]?.x ?? 1});
+    }
+    const activeList = list.filter((p) => p.active).sort((a, b) => b.current - a.current);
+    const inactiveList = list.filter((p) => !p.active).sort((a, b) => b.current - a.current);
+    const full = [...activeList, ...inactiveList];
     const all = maxRows && maxRows > 0 ? full.slice(0, maxRows) : full;
     const showInactive = !(maxRows && maxRows > 0 && all.length >= maxRows);
     const visActive = all.filter((p) => p.active);
     const visInactive = showInactive ? all.filter((p) => !p.active) : [];
-    return {list: all, full, visActive, visInactive};
+    const window = new Set<string>();
+    const listIndex = new Map<string, number>();
+    const fullIndex = new Map<string, number>();
+    all.forEach((p, i) => {
+      window.add(p.label);
+      listIndex.set(p.label, i);
+    });
+    full.forEach((p, i) => fullIndex.set(p.label, i));
+    return {list: all, full, visActive, visInactive, window, listIndex, fullIndex};
   };
 
-  const currentRank = participantsAt(guideT);
+  // Snapshot cache keyed by sweep position `t` (= frame via `guideTAt`); built
+  // lazily so the SWAP-window history, boundary scans and render pool all share
+  // the exact same snapshots for a given frame instead of re-sorting each call.
+  const snapCache = new Map<number, RankSnap>();
+  const rankAtFrame = (f: number): RankSnap => {
+    const t = guideTAt(f);
+    const cached = snapCache.get(t);
+    if (cached) return cached;
+    const snap = buildSnap(t);
+    snapCache.set(t, snap);
+    return snap;
+  };
+
+  const currentRank = rankAtFrame(frame);
   const {visActive: visibleActive, visInactive: visibleInactive} = currentRank;
   const rowCount = Math.max(visibleActive.length + visibleInactive.length, 1);
 
-  // Current rank (index in the full ordered list) per entity.
-  const curIndex = new Map<string, number>();
-  currentRank.list.forEach((p, i) => curIndex.set(p.label, i));
-  const rankNow = (label: string) => curIndex.get(label) ?? 0;
+  // Current rank (index in the visible / full order) per entity.
+  const rankNow = (label: string) => currentRank.listIndex.get(label) ?? 0;
 
   // Duration (frames) of the slide when an entity changes rank.
   const SWAP = 24;
@@ -407,11 +447,10 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   // rank it held just before `c` to its current rank over `SWAP` frames. This is
   // derived purely from `frame` (no React state) so it renders deterministically.
   const evalChange = (label: string) => {
-    const now = rankNow(label);
     const from = frame - SWAP > 0 ? frame - SWAP : 0;
     for (let f = frame; f > from; f--) {
-      const cur = participantsAt(guideTAt(f)).list.findIndex((p) => p.label === label);
-      const prev = participantsAt(guideTAt(f - 1)).list.findIndex((p) => p.label === label);
+      const cur = rankAtFrame(f).listIndex.get(label) ?? -1;
+      const prev = rankAtFrame(f - 1).listIndex.get(label) ?? -1;
       if (cur !== prev && prev !== -1) {
         return {atFrame: f, fromRank: prev, nowRank: cur};
       }
@@ -419,12 +458,10 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     return null;
   };
 
-  // Whether `label` is inside the visible top-N window at sweep progress `t`.
-  const insideAt = (t: number, label: string) =>
-    participantsAt(t).list.some((q) => q.label === label);
+  // Whether `label` is inside the visible top-N window at frame `f`.
+  const insideAt = (f: number, label: string) => rankAtFrame(f).window.has(label);
   // Full (untrimmed) rank of `label` at a given frame.
-  const rankFullAt = (f: number, label: string) =>
-    participantsAt(guideTAt(f)).full.findIndex((q) => q.label === label);
+  const rankFullAt = (f: number, label: string) => rankAtFrame(f).fullIndex.get(label) ?? -1;
 
   // Dynamic x-axis max: the highest accumulated value among the entities
   // already active up to the current sweep position, so the axis (and the bar
@@ -454,10 +491,12 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const winnerScale = 1 + 0.05 * winnerT;
   const dimOthers = 1 - 0.35 * winnerT;
 
-  // ---- Outro: after the race finishes, every bar slides to the right end of
-  // the track and contracts into a uniform block sized to fit the largest
-  // datum shown; each entity label fades in behind its bar. ----
-  const outroEase = interpolate(frame, [raceEndFrame, raceEndFrame + Math.max(1, Math.min(30, OUTRO))], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
+  // ---- Outro: after the race finishes (and the optional final hold expires),
+  // every bar slides to the right end of the track and contracts into a
+  // uniform block sized to fit the largest datum shown; each entity label
+  // fades in behind its bar. ----
+  const outroStart = raceEndFrame + holdFrames;
+  const outroEase = interpolate(frame, [outroStart, outroStart + Math.max(1, Math.min(30, OUTRO))], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
   const outro = Easing.out(Easing.cubic)(Math.max(Math.min(outroEase, 1), 0));
   // Uniform contracted width for ALL bars, larger than the biggest datum value
   // (computed from the widest formatted number across every entity).
@@ -597,14 +636,13 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
 
   // Rows to render = the current top-N window plus any entity still mid-way out
   // of the window (exited within the last SWAP frames and still fading/gliding).
-  const windowLabels = new Set(currentRank.list.map((q) => q.label));
   const renderPool =
     maxRows && maxRows > 0
       ? currentRank.full.filter((q) => {
-          if (windowLabels.has(q.label)) return true;
+          if (currentRank.window.has(q.label)) return true;
           const from = frame - SWAP > 0 ? frame - SWAP : 0;
           for (let f = frame; f > from; f--) {
-            if (insideAt(guideTAt(f), q.label)) return true;
+            if (insideAt(f, q.label)) return true;
           }
           return false;
         })

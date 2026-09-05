@@ -56,6 +56,10 @@ export type TimelineRaceConfig = {
   dateFormat?: DateFormat;
   title?: string;
   maxRows?: number;
+
+  // Pause (seconds) that freezes the final result on-screen after the sweep
+  // finishes and before the outro contracts the bars. 0 = no extra hold.
+  holdFinalSeconds?: number;
   showDateLabel?: boolean;
   showXAxis?: boolean;
   axisPosition?: 'top' | 'bottom';

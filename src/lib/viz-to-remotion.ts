@@ -258,6 +258,8 @@ function convertTimelineRace(
     showDateLabel: t?.showDateLabel,
     showXAxis: t?.showXAxis,
     axisPosition: t?.axisPosition,
+    maxRows: t?.maxRows,
+    holdFinalSeconds: t?.holdFinalSeconds,
     rowOrder: t?.rowOrder,
     rowGapH: t?.rowGapH,
     rowGap: t?.rowGap,
@@ -329,7 +331,6 @@ function convertTimelineRace(
       items: sorted,
       accentColor: config.colors?.[0] ?? '#FFD700',
       dateMode: false,
-      maxRows: tc?.maxRows,
       ...presentationOf(tc),
     };
   }
@@ -384,7 +385,6 @@ function convertTimelineRace(
       accentColor: config.colors?.[0] ?? '#FFD700',
       dateMode: true,
       domain: [min, max] as [number, number],
-      maxRows: tc?.maxRows,
       ...presentationOf(tc),
     };
   }
@@ -404,7 +404,6 @@ function convertTimelineRace(
     dateMode: true,
     dateFormat: fmt,
     domain: [sMin, sMax] as [number, number],
-    maxRows: tc?.maxRows,
     ...presentationOf(tc),
   };
 }

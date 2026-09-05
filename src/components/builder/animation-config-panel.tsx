@@ -360,6 +360,17 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
               0 = sin límite. Limita la cantidad de entidades visibles en la carrera.
             </p>
           </div>
+          <SliderNumberInput
+            label="Congelar resultado final (s)"
+            value={value.holdFinalSeconds ?? 2}
+            min={0}
+            max={10}
+            step={1}
+            onChange={(v) => update({holdFinalSeconds: v})}
+          />
+          <p className="text-[10px] text-muted mt-0.5">
+            Mantiene el resultado final en pantalla unos segundos antes del outro de salida. 0 = sin congelado.
+          </p>
           <div className="flex items-center justify-between mb-0.5">
             <label className="text-sm font-medium block">Colores por entidad</label>
             {Object.keys(value.barColors ?? {}).length > 0 && (
