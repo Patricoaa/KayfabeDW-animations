@@ -225,6 +225,42 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
         </div>
       </Section>
 
+      <Section title="Ranking">
+        <div>
+          <label className="text-sm font-medium mb-1 block">Máximo de entidades</label>
+          <input
+            type="number"
+            min={0}
+            max={50}
+            value={value.maxRows ?? 0}
+            onChange={(e) => update({maxRows: Number(e.target.value) || undefined})}
+            className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+          />
+          <p className="text-[10px] text-muted mt-0.5">
+            0 = sin límite. Limita la cantidad de entidades visibles en la carrera.
+          </p>
+        </div>
+        <SliderNumberInput
+          label="Congelar resultado final (s)"
+          value={value.holdFinalSeconds ?? 2}
+          min={0}
+          max={10}
+          step={1}
+          onChange={(v) => update({holdFinalSeconds: v})}
+        />
+        <p className="text-[10px] text-muted mt-0.5">
+          Mantiene el resultado final en pantalla unos segundos antes del outro de salida. 0 = sin congelado.
+        </p>
+        <Toggle
+          label="Efecto podio al final"
+          checked={value.podiumEffect ?? true}
+          onChange={(v) => update({podiumEffect: v})}
+        />
+        <p className="text-[10px] text-muted">
+          Cuando se revela el ganador, lo agranda con brillo y atenúa a los que no quedaron primeros. Apagado = sin atenuación ni brillo.
+        </p>
+      </Section>
+
       {/* ============ AVATAR ============ */}
       <Section title="Avatar">
         <div>
@@ -346,31 +382,13 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
             Reduce el porcentaje para dar más espacio al valor y al avatar (útil cuando el valor se sale de pantalla).
           </p>
           <NumberInput label="Radio de esquina de la barra (vacío = píldora)" value={value.barRadius} min={0} max={60} step={1} onChange={(v) => update({barRadius: v})} />
-          <div>
-            <label className="text-sm font-medium mb-1 block">Máximo de entidades</label>
-            <input
-              type="number"
-              min={0}
-              max={50}
-              value={value.maxRows ?? 0}
-              onChange={(e) => update({maxRows: Number(e.target.value) || undefined})}
-              className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-            />
-            <p className="text-[10px] text-muted mt-0.5">
-              0 = sin límite. Limita la cantidad de entidades visibles en la carrera.
-            </p>
+          <div className="pt-2 mt-1 border-t border-border-subtle">
+            <p className="text-[10px] text-muted mb-1.5">Posición del grupo de filas y eje X (offset en px desde su lugar por defecto).</p>
+            <div className="grid grid-cols-2 gap-2">
+              <NumberInput label="X (px)" value={value.barsX} min={-400} max={400} step={4} onChange={(v) => update({barsX: v})} />
+              <NumberInput label="Y (px)" value={value.barsY} min={-400} max={400} step={4} onChange={(v) => update({barsY: v})} />
+            </div>
           </div>
-          <SliderNumberInput
-            label="Congelar resultado final (s)"
-            value={value.holdFinalSeconds ?? 2}
-            min={0}
-            max={10}
-            step={1}
-            onChange={(v) => update({holdFinalSeconds: v})}
-          />
-          <p className="text-[10px] text-muted mt-0.5">
-            Mantiene el resultado final en pantalla unos segundos antes del outro de salida. 0 = sin congelado.
-          </p>
           <div className="flex items-center justify-between mb-0.5">
             <label className="text-sm font-medium block">Colores por entidad</label>
             {Object.keys(value.barColors ?? {}).length > 0 && (

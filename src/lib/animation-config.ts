@@ -60,6 +60,17 @@ export type TimelineRaceConfig = {
   // Pause (seconds) that freezes the final result on-screen after the sweep
   // finishes and before the outro contracts the bars. 0 = no extra hold.
   holdFinalSeconds?: number;
+
+  // Podium effect at the race end: when the winner is revealed, the leader
+  // grows + glows and the rest are dimmed. false disables the whole effect
+  // (no dimming, no scale/glow). Defaults to ON.
+  podiumEffect?: boolean;
+
+  // Bar-group position (px offset from the default center placement). Moves
+  // the whole row block (avatars + bars + track + accumulated value), the
+  // numeric X axis and the Y axis together.
+  barsX?: number;
+  barsY?: number;
   showDateLabel?: boolean;
   showXAxis?: boolean;
   axisPosition?: 'top' | 'bottom';

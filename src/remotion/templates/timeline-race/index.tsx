@@ -30,6 +30,9 @@ export type TimelineRaceProps = {
   dateFormat?: 'day' | 'month' | 'year';
   maxRows?: number;
   holdFinalSeconds?: number;
+  podiumEffect?: boolean;
+  barsX?: number;
+  barsY?: number;
   showDateLabel?: boolean;
   showXAxis?: boolean;
   axisPosition?: 'top' | 'bottom';
@@ -102,6 +105,9 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   dateFormat = 'day',
   maxRows,
   holdFinalSeconds = 2,
+  podiumEffect = true,
+  barsX,
+  barsY,
   showDateLabel = true,
   showXAxis = true,
   axisPosition = 'bottom',
@@ -488,8 +494,10 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const winnerT = raceFinished
     ? interpolate(frame, [finishStart, finishStart + 45], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'})
     : 0;
-  const winnerScale = 1 + 0.05 * winnerT;
-  const dimOthers = 1 - 0.35 * winnerT;
+  // Podium effect at the finish: the leader grows + glows and the rest dim.
+  // Disabled entirely when `podiumEffect` is false (no dim / no scale / no glow).
+  const winnerScale = podiumEffect ? 1 + 0.05 * winnerT : 1;
+  const dimOthers = podiumEffect ? 1 - 0.35 * winnerT : 1;
 
   // ---- Outro: after the race finishes (and the optional final hold expires),
   // every bar slides to the right end of the track and contracts into a
@@ -596,7 +604,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
 <div style={{position: 'absolute', left: 0, top: 0, bottom: 0, width: '100%', display: 'flex', alignItems: 'center', opacity: outro, transform: `translateX(${(1 - outro) * -18}px)`}}>
   <span style={{fontSize: Math.round(ROW_FONT * 0.92), fontWeight: 700, color: '#d4d4d8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', paddingLeft: 12, paddingRight: 8}}>{p.label}</span>
 </div>
-          <div style={{position: 'absolute', left: leftOff, top: '50%', width: Math.max(0, w), height: BAR_H, transform: `translateY(-50%) scaleY(${scale})`, backgroundColor: barFill, borderRadius: barRadius ?? 999, boxShadow: isLeader ? `0 0 ${18 * scale}px ${accentColor}99` : 'none'}} />
+          <div style={{position: 'absolute', left: leftOff, top: '50%', width: Math.max(0, w), height: BAR_H, transform: `translateY(-50%) scaleY(${scale})`, backgroundColor: barFill, borderRadius: barRadius ?? 999, boxShadow: isLeader && podiumEffect ? `0 0 ${18 * scale}px ${accentColor}99` : 'none'}} />
           <div style={{position: 'absolute', right: 10, top: 0, bottom: 0, display: 'flex', alignItems: 'center', pointerEvents: 'none'}}>
             <span style={{fontSize: ROW_FONT, fontWeight: 800, color: '#ffffff', fontVariantNumeric: 'tabular-nums', opacity: p.active ? 1 : 0.25, whiteSpace: 'nowrap'}}>
               {p.active ? Math.round(p.current).toLocaleString() : '–'}
@@ -624,7 +632,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const axisFont = isPortrait ? Math.round(W * 0.026) : 13;
 
   const numAxis = (
-    <div style={{position: 'relative', flexShrink: 0, marginTop: 8, paddingTop: 12, borderTop: '1px solid #1f2937', width: '100%', height: 22}}>
+    <div style={{position: 'relative', flexShrink: 0, marginTop: 8, paddingTop: 12, borderTop: '1px solid #1f2937', width: '100%', height: 22, transform: `translate(${barsX ?? 0}px, ${barsY ?? 0}px)`}}>
       <div style={{position: 'absolute', left: -6, top: 0, fontSize: axisFont, color: '#64748b', fontVariantNumeric: 'tabular-nums'}}>
         {0}
       </div>
@@ -661,7 +669,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
       {showXAxis && axisPosition === 'top' && <div style={{position: 'relative', zIndex: 1}}>{numAxis}</div>}
 
       {/* Rows */}
-      <div style={{flex: 1, position: 'relative', marginTop: isPortrait ? H * 0.03 : 36, overflow: 'hidden'}}>
+      <div style={{flex: 1, position: 'relative', marginTop: isPortrait ? H * 0.03 : 36, overflow: 'hidden', transform: `translate(${barsX ?? 0}px, ${barsY ?? 0}px)`}}>
         {showYAxis && (
           <div style={{position: 'absolute', left: order[0] === 'bar' ? 0 : AVATAR + ROW_GAP_PX, top: rowsTop, height: rowCount * ROW_H + (rowCount - 1) * ROW_GAP, width: yAxisWidth ?? 2, borderRadius: 1, backgroundColor: yAxisColor ?? '#334155', zIndex: 0}} />
         )}
