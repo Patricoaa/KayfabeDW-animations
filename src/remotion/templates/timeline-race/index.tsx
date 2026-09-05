@@ -499,7 +499,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
         <div style={{flexShrink: 0, width: BAR_MAX_W, height: Math.max(14, ROW_H * 0.46), backgroundColor: '#171717', borderRadius: barRadius ?? 999, overflow: 'visible', display: 'flex', position: 'relative', alignItems: 'center'}}>
           <div style={{width: Math.max(0, barW * pop), height: '100%', backgroundColor: barFill, borderRadius: barRadius ?? 999, boxShadow: isLeader ? `0 0 ${18 * scale}px ${accentColor}99` : 'none', transform: `scaleY(${scale})`}} />
           <div style={{position: 'absolute', right: 10, top: 0, bottom: 0, display: 'flex', alignItems: 'center', pointerEvents: 'none'}}>
-            <span style={{fontSize: ROW_FONT, fontWeight: 800, color: '#ffffff', background: 'rgba(0,0,0,0.55)', padding: '2px 8px', borderRadius: 6, fontVariantNumeric: 'tabular-nums', opacity: p.active ? 1 : 0.25, whiteSpace: 'nowrap'}}>
+            <span style={{fontSize: ROW_FONT, fontWeight: 800, color: '#ffffff', fontVariantNumeric: 'tabular-nums', opacity: p.active ? 1 : 0.25, whiteSpace: 'nowrap'}}>
               {p.active ? p.current.toLocaleString() : '–'}
             </span>
           </div>
@@ -563,7 +563,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
       {/* Rows */}
       <div style={{flex: 1, position: 'relative', marginTop: isPortrait ? H * 0.03 : 36, overflow: 'hidden'}}>
         {showYAxis && (
-          <div style={{position: 'absolute', left: 0, top: 0, bottom: 0, width: yAxisWidth ?? 2, borderRadius: 1, backgroundColor: yAxisColor ?? '#334155', zIndex: 0}} />
+          <div style={{position: 'absolute', left: order[0] === 'bar' ? 0 : AVATAR + ROW_GAP_PX, top: rowsTop, height: rowCount * ROW_H + (rowCount - 1) * ROW_GAP, width: yAxisWidth ?? 2, borderRadius: 1, backgroundColor: yAxisColor ?? '#334155', zIndex: 0}} />
         )}
         <div style={{position: 'absolute', inset: 0}}>{renderPool.map((p) => renderRow(p))}</div>
       </div>
