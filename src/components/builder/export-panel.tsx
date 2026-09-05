@@ -272,12 +272,12 @@ export function ExportPanel({
                 id="export-duration"
                 type="range"
                 min={1}
-                max={20}
+                max={60}
                 value={duration}
                 onChange={(e) => onDurationChange(Number(e.target.value))}
                 className="flex-1 accent-amber-500"
               />
-              <span className="text-sm text-secondary w-20 text-right font-mono">
+              <span className="text-sm text-secondary w-32 text-right font-mono">
                 {duration}s ({duration * fps} frames)
               </span>
             </div>

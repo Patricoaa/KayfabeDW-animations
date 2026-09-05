@@ -290,7 +290,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
               ),
               avatar: (
                 <div style={{flexShrink: 0}}>
-                  {item.image && <Avatar src={item.image} size={COMPAT_AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(item.label)} />}
+                  {item.image && <Avatar src={item.image} size={COMPAT_AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(item.label, item.image)} />}
                 </div>
               ),
             };
@@ -358,9 +358,27 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   // can glide between the previous and current rank instead of jumping.
   const participantsAt = (t: number) => {
     const list = Array.from(byLabel.entries()).map(([label, e]) => {
-      const passed = e.steps.filter((s) => t >= s.x);
-      const current = passed.length > 0 ? passed[passed.length - 1].value : 0;
-      return {label, image: e.image, current, active: passed.length > 0, firstX: e.steps[0]?.x ?? 1};
+      const steps = e.steps;
+      let i = -1;
+      for (let k = 0; k < steps.length; k++) {
+        if (t >= steps[k].x) i = k;
+        else break;
+      }
+      const active = i >= 0;
+      let current = 0;
+      if (active) {
+        const cur = steps[i];
+        const nxt = steps[i + 1];
+        current = cur.value;
+        if (nxt) {
+          // Lerp between the crossed period and the next so longer durations
+          // stay fluid instead of jumping discretely between aggregated months.
+          const segSpan = Math.max(nxt.x - cur.x, 1e-4);
+          const frac = Math.min(1, Math.max(0, (t - cur.x) / segSpan));
+          current = cur.value + (nxt.value - cur.value) * frac;
+        }
+      }
+      return {label, image: e.image, current, active, firstX: steps[0]?.x ?? 1};
     });
     const active = list.filter((p) => p.active).sort((a, b) => b.current - a.current);
     const inactive = list.filter((p) => !p.active).sort((a, b) => b.current - a.current);
@@ -422,6 +440,11 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   // Vertical position of rows within the rows container.
   const rowsTop = Math.max(0, (rowBudget - rowCount * ROW_H - (rowCount - 1) * ROW_GAP) / 2);
 
+  // Bar geometry: the fill is slightly thicker than the track ("camino") it
+  // slides along, so the groove reads as a rail the bar is drawn over.
+  const GROOVE_H = Math.max(12, ROW_H * 0.42);
+  const BAR_H = GROOVE_H + Math.max(2, Math.round(ROW_H * 0.06));
+
   // ---- Winner reveal: scale up + glow the leader as the race finishes ----
   const raceFinished = guideT >= 0.99;
   const finishStart = Math.max(0, raceEndFrame - 12);
@@ -431,17 +454,21 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const winnerScale = 1 + 0.05 * winnerT;
   const dimOthers = 1 - 0.35 * winnerT;
 
-  // ---- Outro: after the race finishes, bars collapse to a thin sliver and
-  // each entity label fades in behind its bar. ----
+  // ---- Outro: after the race finishes, every bar slides to the right end of
+  // the track and contracts into a uniform block sized to fit the largest
+  // datum shown; each entity label fades in behind its bar. ----
   const outroEase = interpolate(frame, [raceEndFrame, raceEndFrame + Math.max(1, Math.min(30, OUTRO))], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
   const outro = Easing.out(Easing.cubic)(Math.max(Math.min(outroEase, 1), 0));
-  // Bars shrink down to ~5% of their width (the value keeps standing at the
-  // right end of the track).
-  const collapse = 1 - 0.95 * outro;
+  // Uniform contracted width for ALL bars, larger than the biggest datum value
+  // (computed from the widest formatted number across every entity).
+  const FINAL_W = Math.min(
+    BAR_MAX_W * 0.9,
+    Math.max(48, Math.max(...withDate.map((r) => r.value), 0).toLocaleString().length * ROW_FONT * 0.58 + 28),
+  );
 
   // Per-entity crop; nothing global (zoom/focus are per-entity only).
-  const avatarCropFor = (label: string): {zoom: number; focusX: number; focusY: number} => {
-    const c = avatarCrops?.[label];
+  const avatarCropFor = (label: string, image?: string | null): {zoom: number; focusX: number; focusY: number} => {
+    const c = avatarCrops?.[label] ?? (image ? avatarCrops?.[image] : undefined);
     return {
       zoom: c?.zoom ?? 1,
       focusX: c?.focusX ?? 0,
@@ -452,13 +479,18 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const renderRow = (p: {label: string; image?: string | null; current: number; active: boolean; firstX: number}) => {
     const display = p.active ? p.current : 0;
     const isLeader = p.active && visibleActive[0] && p.current === visibleActive[0].current && visibleActive[0].current > 0;
-    const barW = (display / currentMax) * BAR_MAX_W * (p.active ? 1 : 0) * collapse;
+    const rawW = Math.max(0, (display / currentMax) * BAR_MAX_W * (p.active ? 1 : 0));
     const pop = spring({
       fps,
       frame: p.active ? frame - Math.max(0, Math.floor((p.firstX / 1.001) * sweepFrames)) : frame,
       config: {damping: 22, stiffness: 110},
       durationInFrames: 28,
     });
+    const fulW = rawW * pop;
+    // Outro: slide + contract toward the right end, ending on the uniform
+    // FINAL_W block (the leader's right edge stays pinned to the track end).
+    const w = fulW + (FINAL_W - fulW) * outro;
+    const leftOff = (BAR_MAX_W - FINAL_W) * outro;
     const scale = isLeader ? winnerScale : 1;
     const dim = isLeader ? 1 : dimOthers;
 
@@ -513,27 +545,29 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
       }
     }
 
-    // Bar fill: per-entity override wins; otherwise the leader uses the
-    // accent color and the rest a neutral gray.
-    const barFill = barColors?.[p.label] ?? (isLeader ? accentColor : '#3f3f46');
+    // Bar fill: per-entity override wins (label, or its avatar URL as fallback
+    // for configs saved before labels switched to names); otherwise the leader
+    // uses the accent color and the rest a neutral gray.
+    const barFill = barColors?.[p.label] ?? (p.image ? barColors?.[p.image] : undefined) ?? (isLeader ? accentColor : '#3f3f46');
 
     const segments: Record<'bar' | 'avatar', React.ReactNode> = {
       bar: (
-        <div style={{flexShrink: 0, width: BAR_MAX_W, height: Math.max(14, ROW_H * 0.46), backgroundColor: '#171717', borderRadius: barRadius ?? 999, overflow: 'visible', display: 'flex', position: 'relative', alignItems: 'center'}}>
+        <div style={{flexShrink: 0, width: BAR_MAX_W, height: BAR_H, position: 'relative', display: 'flex', alignItems: 'center'}}>
+          <div style={{position: 'absolute', left: 0, right: 0, top: '50%', height: GROOVE_H, transform: 'translateY(-50%)', backgroundColor: '#171717', borderRadius: barRadius ?? 999}} />
           <div style={{position: 'absolute', left: 0, top: 0, bottom: 0, width: '100%', display: 'flex', alignItems: 'center', opacity: outro}}>
             <span style={{fontSize: Math.round(ROW_FONT * 0.92), fontWeight: 700, color: '#d4d4d8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', paddingRight: 8}}>{p.label}</span>
           </div>
-          <div style={{width: Math.max(0, barW * pop), height: '100%', backgroundColor: barFill, borderRadius: barRadius ?? 999, boxShadow: isLeader ? `0 0 ${18 * scale}px ${accentColor}99` : 'none', transform: `scaleY(${scale})`}} />
+          <div style={{position: 'absolute', left: leftOff, top: '50%', width: Math.max(0, w), height: BAR_H, transform: `translateY(-50%) scaleY(${scale})`, backgroundColor: barFill, borderRadius: barRadius ?? 999, boxShadow: isLeader ? `0 0 ${18 * scale}px ${accentColor}99` : 'none'}} />
           <div style={{position: 'absolute', right: 10, top: 0, bottom: 0, display: 'flex', alignItems: 'center', pointerEvents: 'none'}}>
             <span style={{fontSize: ROW_FONT, fontWeight: 800, color: '#ffffff', fontVariantNumeric: 'tabular-nums', opacity: p.active ? 1 : 0.25, whiteSpace: 'nowrap'}}>
-              {p.active ? p.current.toLocaleString() : '–'}
+              {p.active ? Math.round(p.current).toLocaleString() : '–'}
             </span>
           </div>
         </div>
       ),
       avatar: (
         <div style={{width: AVATAR, flexShrink: 0, textAlign: 'right'}}>
-          {p.image && <Avatar src={p.image} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(p.label)} />}
+          {p.image && <Avatar src={p.image} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(p.label, p.image)} />}
         </div>
       ),
     };

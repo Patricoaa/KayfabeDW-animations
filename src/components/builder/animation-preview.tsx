@@ -222,7 +222,7 @@ export function AnimationPreview({
           id="duration-main-slider"
           type="range"
           min={1}
-          max={20}
+          max={60}
           value={duration}
           onChange={(e) => changeDuration(Number(e.target.value))}
           className="flex-1 accent-amber-500"
