@@ -85,9 +85,17 @@ function isImageUrl(value: unknown): boolean {
 // static chart plots image URLs as labels), a purely numeric column, or a
 // date/time column (JSONB normalizes object keys by length/alphabetically, so
 // a layout like [wins, imagen_url, match_date, wrestler_name] must not land on
-// match_date — that would turn every row into its own bar). Among the
-// remaining text columns we prefer the entity-like one, i.e. the column whose
-// sample values repeat the most.
+// match_date — that would turn every row into its own bar).
+//
+// Enriched views (e.g. v_wrestler_wins) also carry catalog columns — gender,
+// result, participant_type... — whose distinct-count heuristic would beat the
+// entity column on small filtered sets (your 3-wrestler race has only 3 names,
+// so a "<6 distinct" cutoff would wrongly reject the entity). The reliable
+// signal is avatar identity: a participant maps 1:1 to its image URL, so the
+// label must be constant within every group of rows sharing the same avatar,
+// while catalog columns vary across the wins/losses of the same wrestler and
+// can never satisfy that. Among the survivors we prefer the one with the most
+// distinct values (that is the entity), breaking ties by repetition.
 function resolveLabelField(
   rows: Record<string, unknown>[],
   config: ChartConfig,
@@ -100,31 +108,113 @@ function resolveLabelField(
   const candidates = [push(config.xField), ...Object.keys(rows[0] ?? {})].filter(
     (c): c is string => !!c,
   );
-  const sample = (f: string) => rows.slice(0, 24).map((r) => r[f]);
   const isDateName = (f: string) =>
     /date|fecha|inicio|start|time|tiempo|a[ñn]o|dia|d[ií]a/i.test(f);
   const isDateValue = (vals: unknown[]) =>
     vals.some((v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v.trim()));
-  const isUsable = (f: string, vals: unknown[]) => {
-    const nonEmpty = vals.filter((v) => String(v ?? '').trim() !== '');
-    if (nonEmpty.length === 0) return false;
-    if (nonEmpty.some((v) => isImageUrl(v))) return false;
-    if (nonEmpty.some((v) => !isNaN(Number(v)))) return false;
-    if (isDateName(f) || isDateValue(nonEmpty)) return false;
+  const isUsable = (f: string) => {
+    const vals = rows.map((r) => String(r[f] ?? '').trim()).filter((v) => v !== '');
+    if (vals.length === 0) return false;
+    if (vals.some((v) => isImageUrl(v))) return false;
+    if (vals.some((v) => !isNaN(Number(v)))) return false;
+    if (isDateName(f) || isDateValue(vals)) return false;
     return true;
   };
 
-  let best: string | null = null;
-  let bestRatio = Infinity;
-  for (const f of candidates) {
-    const vals = sample(f);
-    if (!isUsable(f, vals)) continue;
-    const uniq = new Set(vals.map((v) => String(v ?? '').trim())).size;
-    const ratio = vals.length > 0 ? uniq / vals.length : Infinity;
-    if (ratio < bestRatio) {
-      bestRatio = ratio;
-      best = f;
+  const detectedImg = candidates.find((f) => rows.some((r) => isImageUrl(r[f])));
+  const imageField =
+    (tc?.imageField && rows.some((r) => isImageUrl(r[tc.imageField!])))
+      ? tc.imageField
+      : detectedImg;
+
+  const byImage = new Map<string, Map<string, Set<string>>>();
+  if (imageField) {
+    for (const row of rows) {
+      const img = String(row[imageField] ?? '').trim();
+      if (img === '') continue;
+      let per = byImage.get(img);
+      if (!per) {
+        per = new Map();
+        byImage.set(img, per);
+      }
+      for (const f of candidates) {
+        let set = per.get(f);
+        if (!set) {
+          set = new Set();
+          per.set(f, set);
+        }
+        set.add(String(row[f] ?? '').trim());
+      }
     }
+  }
+
+  const distinctOf = (f: string) =>
+    new Set(rows.map((r) => String(r[f] ?? '').trim()).filter((v) => v !== '')).size;
+  // Identity-ish column names, used to break ties between equally-distinct
+  // candidates (e.g. wrestler_name vs result when no avatar column exists).
+  const isIdentityName = (f: string) =>
+    /name|nombre|luchador|wrestler|participant|entidad|compet|fighter|player|team|equipo|club/i.test(f);
+
+  const labelLike = new Map<string, number>();
+  for (const f of candidates) {
+    if (!isUsable(f)) continue;
+    const uniq = distinctOf(f);
+    if (uniq < 2) continue; // constant column: an attribute, not an identity
+    if (imageField) {
+      let constantPerAvatar = true;
+      for (const per of byImage.values()) {
+        const set = per.get(f);
+        if (set && set.size > 1) {
+          constantPerAvatar = false;
+          break;
+        }
+      }
+      if (!constantPerAvatar) continue;
+    }
+    labelLike.set(f, uniq);
+  }
+
+  let best: string | null = null;
+  let bestUniq = -1;
+  let bestRatio = Infinity;
+  let bestIdent = false;
+
+  const consider = (f: string, uniq: number, ratio: number) => {
+    const ident = isIdentityName(f);
+    let better: boolean;
+    if (labelLike.size > 0) {
+      // Normal path: most distinct values first; identity-named column breaks
+      // ties (e.g. wrestler_name over result when no avatar column exists).
+      better =
+        uniq > bestUniq ||
+        (uniq === bestUniq &&
+          ((ident && !bestIdent) || (ident === bestIdent && ratio < bestRatio)));
+    } else {
+      // Tiny set (single entity filtered): every column is constant, so prefer
+      // the first identity-looking usable column, otherwise max distinctness.
+      if (ident) better = !bestIdent;
+      else if (bestIdent) better = false;
+      else better = best === null || uniq > bestUniq || (uniq === bestUniq && ratio < bestRatio);
+    }
+    if (better) {
+      best = f;
+      bestUniq = uniq;
+      bestRatio = ratio;
+      bestIdent = ident;
+    }
+  };
+
+  if (labelLike.size === 0) {
+    for (const f of candidates) {
+      if (!isUsable(f)) continue;
+      const uniq = distinctOf(f);
+      consider(f, uniq, uniq / rows.length);
+    }
+    return best ?? '';
+  }
+
+  for (const [f, uniq] of labelLike) {
+    consider(f, uniq, uniq / rows.length);
   }
   return best ?? '';
 }
