@@ -86,6 +86,26 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
         <div className="pt-2 mt-1 border-t border-border-subtle">
           <RaceTextControls label="Texto del título" value={value.titleText} onChange={(patch) => update({titleText: {...(value.titleText ?? {}), ...patch}})} />
         </div>
+        <div className="pt-2 mt-1 border-t border-border-subtle">
+          <label className="text-sm font-medium mb-1 block">Subtítulo</label>
+          <input
+            type="text"
+            value={value.subtitle ?? ''}
+            onChange={(e) => update({subtitle: e.target.value || undefined})}
+            placeholder="Subtítulo (opcional)"
+            className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+          />
+        </div>
+        <div className="pt-2 mt-1 border-t border-border-subtle">
+          <p className="text-[10px] text-muted mb-1.5">Posición del subtítulo (offset en px desde su lugar por defecto).</p>
+          <div className="grid grid-cols-2 gap-2">
+            <NumberInput label="X (px)" value={value.subtitleX} min={-400} max={400} step={4} onChange={(v) => update({subtitleX: v})} />
+            <NumberInput label="Y (px)" value={value.subtitleY} min={-400} max={400} step={4} onChange={(v) => update({subtitleY: v})} />
+          </div>
+        </div>
+        <div className="pt-2 mt-1 border-t border-border-subtle">
+          <RaceTextControls label="Texto del subtítulo" value={value.subtitleText} onChange={(patch) => update({subtitleText: {...(value.subtitleText ?? {}), ...patch}})} />
+        </div>
       </Section>
 
       <Section title="Datos" defaultOpen>

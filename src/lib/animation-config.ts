@@ -77,6 +77,13 @@ export type TimelineRaceConfig = {
   titleX?: number;
   titleY?: number;
 
+  // Subtitle (optional), rendered under the title. Own text style + position
+  // offsets like the title.
+  subtitle?: string;
+  subtitleText?: RaceTextStyle;
+  subtitleX?: number;
+  subtitleY?: number;
+
   // On-screen date position (px offset from the default bottom-right placement).
   dateX?: number;
   dateY?: number;

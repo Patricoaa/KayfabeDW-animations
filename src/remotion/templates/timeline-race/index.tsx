@@ -38,6 +38,10 @@ export type TimelineRaceProps = {
   barWidth?: number;
   titleX?: number;
   titleY?: number;
+  subtitle?: string;
+  subtitleText?: RaceTextStyle;
+  subtitleX?: number;
+  subtitleY?: number;
   dateX?: number;
   dateY?: number;
   avatarSize?: number;
@@ -105,6 +109,10 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   barWidth,
   titleX,
   titleY,
+  subtitle,
+  subtitleText,
+  subtitleX,
+  subtitleY,
   dateX,
   dateY,
   avatarSize,
@@ -254,9 +262,11 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     return (
       <div style={{width: '100%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", padding: `${PAD_T}px ${PAD_R}px ${PAD_B}px ${PAD_L}px`, boxSizing: 'border-box'}}>
         {bgLayer}
-        <div style={{opacity: fadeIn, transform: `translate(${titleX ?? 0}px, ${(titleY ?? 0) + titleDrop}px)`, zIndex: 1}}>
+        <div style={{position: 'absolute', top: PAD_T, left: PAD_L, zIndex: 1, opacity: fadeIn, transform: `translate(${titleX ?? 0}px, ${(titleY ?? 0) + titleDrop}px)`}}>
           <div style={{...textStyle(titleText, {color: '#ffffff', size: TITLE_SIZE, weight: 800}), whiteSpace: 'pre-line'}}>{title || 'Timeline Race'}</div>
-          <div style={{marginTop: 14, height: 4, width: Math.max(80, W * 0.09), backgroundColor: accentColor, borderRadius: 2}} />
+          {subtitle && (
+            <div style={{marginTop: 10, transform: `translate(${subtitleX ?? 0}px, ${subtitleY ?? 0}px)`, ...textStyle(subtitleText, {color: accentColor, size: Math.max(ROW_FONT, Math.round(TITLE_SIZE / 2)), weight: 600}), whiteSpace: 'pre-line'}}>{subtitle}</div>
+          )}
         </div>
         <div style={{flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', marginTop: H * 0.04, zIndex: 1}}>
           {visible.map((item, index) => {
@@ -317,7 +327,12 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const BAR_MAX_W = Math.max(innerW * BAR_RATIO, 1);
   const AVATAR = avatarSize ?? Math.max(innerW - BAR_MAX_W - ROW_GAP_PX, 0);
   const EASE = 26;
-  const sweepFrames = Math.max(durationInFrames - EASE * 2, 1);
+  // Reserve a breathing tail at the end of the video for the outro: the race
+  // finishes `OUTRO` frames before the last frame so the bars can collapse and
+  // the entity labels fade in on top of the shrunken bars.
+  const OUTRO = Math.min(45, Math.max(0, Math.floor(durationInFrames * 0.12)));
+  const sweepFrames = Math.max(durationInFrames - EASE * 2 - OUTRO, 1);
+  const raceEndFrame = EASE + sweepFrames;
   const guideTAt = (f: number) => {
     const r = interpolate(f, [EASE, EASE + sweepFrames], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
     return r * r * (3 - 2 * r); // smoothstep easing
@@ -409,12 +424,20 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
 
   // ---- Winner reveal: scale up + glow the leader as the race finishes ----
   const raceFinished = guideT >= 0.99;
-  const finishStart = Math.max(0, durationInFrames - 60);
+  const finishStart = Math.max(0, raceEndFrame - 12);
   const winnerT = raceFinished
     ? interpolate(frame, [finishStart, finishStart + 45], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'})
     : 0;
   const winnerScale = 1 + 0.05 * winnerT;
   const dimOthers = 1 - 0.35 * winnerT;
+
+  // ---- Outro: after the race finishes, bars collapse to a thin sliver and
+  // each entity label fades in behind its bar. ----
+  const outroEase = interpolate(frame, [raceEndFrame, raceEndFrame + Math.max(1, Math.min(30, OUTRO))], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
+  const outro = Easing.out(Easing.cubic)(Math.max(Math.min(outroEase, 1), 0));
+  // Bars shrink down to ~5% of their width (the value keeps standing at the
+  // right end of the track).
+  const collapse = 1 - 0.95 * outro;
 
   // Per-entity crop; nothing global (zoom/focus are per-entity only).
   const avatarCropFor = (label: string): {zoom: number; focusX: number; focusY: number} => {
@@ -429,7 +452,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const renderRow = (p: {label: string; image?: string | null; current: number; active: boolean; firstX: number}) => {
     const display = p.active ? p.current : 0;
     const isLeader = p.active && visibleActive[0] && p.current === visibleActive[0].current && visibleActive[0].current > 0;
-    const barW = (display / currentMax) * BAR_MAX_W * (p.active ? 1 : 0);
+    const barW = (display / currentMax) * BAR_MAX_W * (p.active ? 1 : 0) * collapse;
     const pop = spring({
       fps,
       frame: p.active ? frame - Math.max(0, Math.floor((p.firstX / 1.001) * sweepFrames)) : frame,
@@ -497,6 +520,9 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     const segments: Record<'bar' | 'avatar', React.ReactNode> = {
       bar: (
         <div style={{flexShrink: 0, width: BAR_MAX_W, height: Math.max(14, ROW_H * 0.46), backgroundColor: '#171717', borderRadius: barRadius ?? 999, overflow: 'visible', display: 'flex', position: 'relative', alignItems: 'center'}}>
+          <div style={{position: 'absolute', left: 0, top: 0, bottom: 0, width: '100%', display: 'flex', alignItems: 'center', opacity: outro}}>
+            <span style={{fontSize: Math.round(ROW_FONT * 0.92), fontWeight: 700, color: '#d4d4d8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', paddingRight: 8}}>{p.label}</span>
+          </div>
           <div style={{width: Math.max(0, barW * pop), height: '100%', backgroundColor: barFill, borderRadius: barRadius ?? 999, boxShadow: isLeader ? `0 0 ${18 * scale}px ${accentColor}99` : 'none', transform: `scaleY(${scale})`}} />
           <div style={{position: 'absolute', right: 10, top: 0, bottom: 0, display: 'flex', alignItems: 'center', pointerEvents: 'none'}}>
             <span style={{fontSize: ROW_FONT, fontWeight: 800, color: '#ffffff', fontVariantNumeric: 'tabular-nums', opacity: p.active ? 1 : 0.25, whiteSpace: 'nowrap'}}>
@@ -553,9 +579,11 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   return (
     <div style={{width: '100%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", padding: `${PAD_T}px ${PAD_R}px ${PAD_B}px ${PAD_L}px`, boxSizing: 'border-box', overflow: 'hidden'}}>
       {bgLayer}
-      <div style={{opacity: fadeIn, transform: `translate(${titleX ?? 0}px, ${(titleY ?? 0) + titleDrop}px)`, flexShrink: 0, position: 'relative', zIndex: 1}}>
+      <div style={{position: 'absolute', top: PAD_T, left: PAD_L, zIndex: 1, opacity: fadeIn, transform: `translate(${titleX ?? 0}px, ${(titleY ?? 0) + titleDrop}px)`}}>
         <div style={{...textStyle(titleText, {color: '#ffffff', size: TITLE_SIZE, weight: 800}), whiteSpace: 'pre-line'}}>{title || 'Timeline Race'}</div>
-        <div style={{marginTop: 14, height: 4, width: Math.max(80, W * 0.09), backgroundColor: accentColor, borderRadius: 2}} />
+        {subtitle && (
+          <div style={{marginTop: 10, transform: `translate(${subtitleX ?? 0}px, ${subtitleY ?? 0}px)`, ...textStyle(subtitleText, {color: accentColor, size: Math.max(ROW_FONT, Math.round(TITLE_SIZE / 2)), weight: 600}), whiteSpace: 'pre-line'}}>{subtitle}</div>
+        )}
       </div>
 
       {showXAxis && axisPosition === 'top' && <div style={{position: 'relative', zIndex: 1}}>{numAxis}</div>}
@@ -572,7 +600,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
 
       {/* On-screen date (bottom-right, large, plain text) */}
       {showDateLabel && (
-        <div style={{position: 'absolute', right: PAD_R, bottom: PAD_B > 30 ? PAD_B : 30, transform: `translate(${dateX ?? 0}px, ${dateY ?? 0}px)`, ...textStyle(dateText, {color: accentColor, size: DATE_FONT, weight: 800}), fontVariantNumeric: 'tabular-nums', textShadow: '0 0 20px rgba(0,0,0,0.6)', lineHeight: dateText?.lineHeight ?? 1}}>
+        <div style={{position: 'absolute', right: PAD_R, bottom: PAD_B > 30 ? PAD_B : 30, transform: `translate(${dateX ?? 0}px, ${dateY ?? 0}px)`, ...textStyle(dateText, {color: accentColor, size: DATE_FONT, weight: 800}), fontVariantNumeric: 'tabular-nums', lineHeight: dateText?.lineHeight ?? 1}}>
           {dateLabelText}
         </div>
       )}
