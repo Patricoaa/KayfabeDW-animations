@@ -75,38 +75,6 @@ function avatarUrlOf(value: unknown): string | null {
   return null;
 }
 
-function isImageUrl(value: unknown): boolean {
-  return avatarUrlOf(value) != null;
-}
-
-// Pick the "Entidad / etiqueta" column for a timeline race. An explicit
-// per-template mapping wins; otherwise the inherited xField — but never an
-// image/URL column (common when the static chart itself plots image URLs as
-// labels) nor a purely numeric column. Falls back to the first text column.
-function resolveLabelField(
-  rows: Record<string, unknown>[],
-  config: ChartConfig,
-  tc?: TimelineRaceConfig,
-): string {
-  const push = (f: string | undefined | null) => (f && f.trim() !== '' ? f : undefined);
-  const explicit = push(tc?.labelField);
-  if (explicit) return explicit;
-
-  const candidates = [push(config.xField), ...Object.keys(rows[0] ?? {})].filter(
-    (c): c is string => !!c,
-  );
-  const sample = (f: string) => rows.slice(0, 12).map((r) => r[f]);
-  const isUsable = (v: unknown) => {
-    const s = String(v ?? '').trim();
-    return s !== '' && !isImageUrl(v) && isNaN(Number(s));
-  };
-
-  for (const f of candidates) {
-    if (sample(f).some(isUsable)) return f;
-  }
-  return candidates[0] ?? '';
-}
-
 function parseDateValue(value: unknown): number | null {
   if (value == null || value === '') return null;
   if (typeof value === 'number') {
@@ -186,8 +154,8 @@ function convertTimelineRace(
   }
 
   // Explicit per-template column mapping wins; otherwise fall back to the
-  // inherited static xField plus heuristic detection (never an image-URL column).
-  const labelField = resolveLabelField(rows, config, tc);
+  // inherited static xField/yField plus heuristic detection.
+  const labelField = tc?.labelField ?? config.xField ?? Object.keys(rows[0])[0];
   const valueField = tc?.valueField ?? config.yField;
   const imageField = tc?.imageField;
   const startField =
@@ -307,7 +275,7 @@ export function getTimelineRaceParticipants(
 ): {label: string; image?: string | null}[] {
   const rows = data ?? [];
   if (rows.length === 0) return [];
-  const labelField = resolveLabelField(rows, config, tc);
+  const labelField = tc?.labelField ?? config.xField ?? Object.keys(rows[0])[0];
   const imageField = tc?.imageField;
   const seen = new Map<string, true>();
   const out: {label: string; image?: string | null}[] = [];

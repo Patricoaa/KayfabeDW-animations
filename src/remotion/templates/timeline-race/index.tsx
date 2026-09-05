@@ -290,7 +290,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
               ),
               avatar: (
                 <div style={{flexShrink: 0}}>
-                  {item.image && <Avatar src={item.image} size={COMPAT_AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(item.label, item.image)} />}
+                  {item.image && <Avatar src={item.image} size={COMPAT_AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(item.label)} />}
                 </div>
               ),
             };
@@ -440,8 +440,8 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const collapse = 1 - 0.95 * outro;
 
   // Per-entity crop; nothing global (zoom/focus are per-entity only).
-  const avatarCropFor = (label: string, image?: string | null): {zoom: number; focusX: number; focusY: number} => {
-    const c = avatarCrops?.[label] ?? (image ? avatarCrops?.[image] : undefined);
+  const avatarCropFor = (label: string): {zoom: number; focusX: number; focusY: number} => {
+    const c = avatarCrops?.[label];
     return {
       zoom: c?.zoom ?? 1,
       focusX: c?.focusX ?? 0,
@@ -452,16 +452,13 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const renderRow = (p: {label: string; image?: string | null; current: number; active: boolean; firstX: number}) => {
     const display = p.active ? p.current : 0;
     const isLeader = p.active && visibleActive[0] && p.current === visibleActive[0].current && visibleActive[0].current > 0;
-    const rawW = Math.max(0, (display / currentMax) * BAR_MAX_W * (p.active ? 1 : 0));
+    const barW = (display / currentMax) * BAR_MAX_W * (p.active ? 1 : 0) * collapse;
     const pop = spring({
       fps,
       frame: p.active ? frame - Math.max(0, Math.floor((p.firstX / 1.001) * sweepFrames)) : frame,
       config: {damping: 22, stiffness: 110},
       durationInFrames: 28,
     });
-    const fulW = rawW * pop;
-    const retract = fulW * (1 - collapse);
-    const barW = fulW * collapse;
     const scale = isLeader ? winnerScale : 1;
     const dim = isLeader ? 1 : dimOthers;
 
@@ -518,7 +515,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
 
     // Bar fill: per-entity override wins; otherwise the leader uses the
     // accent color and the rest a neutral gray.
-    const barFill = barColors?.[p.label] ?? (p.image ? barColors?.[p.image] : undefined) ?? (isLeader ? accentColor : '#3f3f46');
+    const barFill = barColors?.[p.label] ?? (isLeader ? accentColor : '#3f3f46');
 
     const segments: Record<'bar' | 'avatar', React.ReactNode> = {
       bar: (
@@ -526,7 +523,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
           <div style={{position: 'absolute', left: 0, top: 0, bottom: 0, width: '100%', display: 'flex', alignItems: 'center', opacity: outro}}>
             <span style={{fontSize: Math.round(ROW_FONT * 0.92), fontWeight: 700, color: '#d4d4d8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', paddingRight: 8}}>{p.label}</span>
           </div>
-          <div style={{width: Math.max(0, barW), marginLeft: retract, height: '100%', backgroundColor: barFill, borderRadius: barRadius ?? 999, boxShadow: isLeader ? `0 0 ${18 * scale}px ${accentColor}99` : 'none', transform: `scaleY(${scale})`}} />
+          <div style={{width: Math.max(0, barW * pop), height: '100%', backgroundColor: barFill, borderRadius: barRadius ?? 999, boxShadow: isLeader ? `0 0 ${18 * scale}px ${accentColor}99` : 'none', transform: `scaleY(${scale})`}} />
           <div style={{position: 'absolute', right: 10, top: 0, bottom: 0, display: 'flex', alignItems: 'center', pointerEvents: 'none'}}>
             <span style={{fontSize: ROW_FONT, fontWeight: 800, color: '#ffffff', fontVariantNumeric: 'tabular-nums', opacity: p.active ? 1 : 0.25, whiteSpace: 'nowrap'}}>
               {p.active ? p.current.toLocaleString() : '–'}
@@ -536,7 +533,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
       ),
       avatar: (
         <div style={{width: AVATAR, flexShrink: 0, textAlign: 'right'}}>
-          {p.image && <Avatar src={p.image} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(p.label, p.image)} />}
+          {p.image && <Avatar src={p.image} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(p.label)} />}
         </div>
       ),
     };
