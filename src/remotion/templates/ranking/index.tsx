@@ -292,9 +292,10 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
   const frameFade = Easing.out(Easing.cubic)(activeProg);
   const framePan = rowImagePan !== false ? Easing.out(Easing.cubic)(activeProg) : 0;
 
-  // Cover-crop geometry for the frame: the image scales by each entity's zoom
-  // beyond the frame size and the focus shifts it; the horizontal overflow
-  // (`extraX`) is what the one-way pan travels.
+  // Cover-crop geometry for the frame. The image always fills the frame box
+  // (`objectFit: 'cover'`, so the browser auto-rescales to match width and
+  // height); zoom/focus/pan run through a top-left-origin transform. `extraX`
+  // is the horizontal overflow the one-way pan travels.
   const frameImgGeom = (label: string, pan: number) => {
     const ric = rowImageCrops?.[label];
     const z = Math.max(ric?.zoom ?? 1, 0.1);
@@ -302,12 +303,9 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
     const fy = Math.max(Math.min(ric?.focusY ?? 0, 1), -1);
     const extraX = FRAME_W * (z - 1);
     const extraY = frameHeight * (z - 1);
-    return {
-      w: FRAME_W * z,
-      h: frameHeight * z,
-      x: (fx * extraX) / 2 - extraX / 2 + extraX * pan,
-      y: (fy * extraY) / 2 - extraY / 2,
-    };
+    const clampX = z >= 1 ? Math.max(-extraX, Math.min(0, -extraX / 2 - (fx * extraX) / 2 + extraX * pan)) : -extraX / 2 - (fx * extraX) / 2 + extraX * pan;
+    const clampY = z >= 1 ? Math.max(-extraY, Math.min(0, -extraY / 2 - (fy * extraY) / 2)) : -extraY / 2 - (fy * extraY) / 2;
+    return {z: Math.max(z, 0.1), tx: clampX, ty: clampY};
   };
 
   const frameLayer = (label: string, pan: number, opacity: number) => {
@@ -319,11 +317,12 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
         src={src}
         style={{
           position: 'absolute',
-          left: '50%',
-          top: '50%',
-          width: g.w,
-          height: g.h,
-          transform: `translate(${g.x}px, ${g.y}px)`,
+          left: 0,
+          top: 0,
+          width: '100%',
+          height: '100%',
+          transform: `translate(${g.tx}px, ${g.ty}px) scale(${g.z})`,
+          transformOrigin: '0 0',
           objectFit: 'cover',
           maxWidth: 'none',
           opacity,

@@ -755,10 +755,10 @@ function RowImageSection({value, onChange, participants = []}: {
               const z = Math.max(cr?.zoom ?? 1, 0.1);
               const fx = Math.max(Math.min(cr?.focusX ?? 0, 1), -1);
               const fy = Math.max(Math.min(cr?.focusY ?? 0, 1), -1);
-              const cw = PW * z;
-              const ch = PH * z;
-              const dx = (fx * (cw - PW)) / 2;
-              const dy = (fy * (ch - PH)) / 2;
+              const ex = PW * (z - 1);
+              const ey = PH * (z - 1);
+              const ptx = z >= 1 ? Math.max(-ex, Math.min(0, -ex / 2 - (fx * ex) / 2)) : -ex / 2 - (fx * ex) / 2;
+              const pty = z >= 1 ? Math.max(-ey, Math.min(0, -ey / 2 - (fy * ey) / 2)) : -ey / 2 - (fy * ey) / 2;
               const previewStyle = {
                 position: 'relative' as const,
                 width: PW,
@@ -778,7 +778,7 @@ function RowImageSection({value, onChange, participants = []}: {
                     <div className="shrink-0 mt-1">
                       {src ? (
                         <div style={previewStyle}>
-                          <img src={src} alt="" style={{position: 'absolute' as const, left: '50%', top: '50%', width: cw, height: ch, transform: `translate(${-cw/2 + dx}px, ${-ch/2 + dy}px)`, objectFit: 'cover' as const, maxWidth: 'none'}} />
+                          <img src={src} alt="" style={{position: 'absolute' as const, left: 0, top: 0, width: '100%', height: '100%', transform: `translate(${ptx}px, ${pty}px) scale(${z})`, transformOrigin: '0 0', objectFit: 'cover' as const, maxWidth: 'none'}} />
                         </div>
                       ) : (
                         <div style={{...previewStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-elevated)'}}>

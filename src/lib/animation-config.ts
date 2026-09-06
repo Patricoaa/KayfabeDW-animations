@@ -256,7 +256,8 @@ export type RankingConfig = CommonAnimationConfig & {
   // in px (empty = auto, right side; no upper cap, can reach the full canvas
   // width — rows squeeze left); `rowImageHeight` empty = full height of the
   // rows area. `rowImageX`/`rowImageY` offset the frame on the canvas.
-  // Per-entity `rowImageCrops` zoom/focus adjust each image inside the frame.
+  // Each image auto-fills the frame (`object-fit: cover`), and per-entity
+  // `rowImageCrops` zoom/focus adjust the crop inside it.
   rowImageWidth?: number;
   rowImageHeight?: number;
   rowImageX?: number;
