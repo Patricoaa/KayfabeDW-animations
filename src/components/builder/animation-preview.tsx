@@ -2,6 +2,7 @@
 
 import {useState, useMemo, useEffect, useRef} from 'react';
 import React from 'react';
+import {Minus, Plus, Maximize} from 'lucide-react';
 import {Player} from '@remotion/player';
 import type {ChartConfig} from '@/lib/chart-config';
 import {convertToRemotionProps} from '@/lib/viz-to-remotion';
@@ -80,6 +81,23 @@ export function AnimationPreview({
   // the box, the Player letterboxes, and the safe-zone overlay misaligns).
   const [fitBox, setFitBox] = useState<{w: number; h: number} | null>(null);
   const areaRef = useRef<HTMLDivElement | null>(null);
+
+  // Zoom state: "fit" (Ajustar, default) or an explicit percentage of the
+  // composition size. At 100% the preview shows the real export size in CSS px.
+  const MIN_PCT = 25;
+  const MAX_PCT = 300;
+  const [pctMode, setPctMode] = useState(false);
+  const [pctScale, setPctScale] = useState(100);
+  const clampPct = (v: number) => Math.max(MIN_PCT, Math.min(MAX_PCT, Math.round(v)));
+  const zoomScaled = (factor: number) => {
+    setPctMode(true);
+    setPctScale((p) => clampPct(p * factor));
+  };
+  const zoomAbsolute = (v: number) => {
+    setPctMode(true);
+    setPctScale(clampPct(v));
+  };
+  const fitView = () => setPctMode(false);
 
   useEffect(() => {
     const el = areaRef.current;
@@ -192,6 +210,15 @@ export function AnimationPreview({
 
   const Comp = LAZY_COMPONENTS[templateId];
 
+  // Current on-screen frame box and its scale relative to the composition.
+  const boxPx = pctMode
+    ? {w: Math.max(1, Math.round((compW * pctScale) / 100)), h: Math.max(1, Math.round((compH * pctScale) / 100))}
+    : fitBox;
+  const displayW = boxPx?.w ?? compW;
+  const displayH = boxPx?.h ?? compH;
+  const fitPct = fitBox ? Math.round((fitBox.w / compW) * 100) : 100;
+  const displayPct = pctMode ? clampPct(pctScale) : fitPct;
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Preview player — fits fully inside the area (no scroll/zoom needed) by
@@ -203,28 +230,81 @@ export function AnimationPreview({
         {mounted && Comp && (
           <React.Suspense fallback={<div className="p-8 text-muted text-sm text-center">Cargando template...</div>}>
             <div
-              className="border border-border-default rounded-lg overflow-hidden relative"
-              style={
-                fitBox
-                  ? {width: fitBox.w, height: fitBox.h}
-                  : {width: '100%', maxHeight: '100%', aspectRatio: `${compW} / ${compH}`}
-              }
+              className={pctMode ? 'overflow-auto' : ''}
+              style={pctMode ? {width: 'max-content', maxWidth: '100%', height: 'max-content', maxHeight: '100%', margin: 'auto'} : undefined}
             >
-              <Player
-                component={Comp}
-                inputProps={remotionProps}
-                durationInFrames={duration * fps}
-                fps={fps}
-                compositionWidth={compW}
-                compositionHeight={compH}
-                style={{width: '100%', height: '100%'}}
-                controls
-                acknowledgeRemotionLicense
-              />
-              {showSafeZones && <SafeZoneOverlay width={compW} height={compH} settings={safeZones} />}
+              <div
+                className="border border-border-default rounded-lg overflow-hidden relative"
+                style={
+                  boxPx
+                    ? {width: boxPx.w, height: boxPx.h}
+                    : {width: '100%', maxHeight: '100%', aspectRatio: `${compW} / ${compH}`}
+                }
+              >
+                <Player
+                  component={Comp}
+                  inputProps={remotionProps}
+                  durationInFrames={duration * fps}
+                  fps={fps}
+                  compositionWidth={compW}
+                  compositionHeight={compH}
+                  style={{width: '100%', height: '100%'}}
+                  controls
+                  acknowledgeRemotionLicense
+                />
+                {showSafeZones && <SafeZoneOverlay width={compW} height={compH} settings={safeZones} />}
+              </div>
             </div>
           </React.Suspense>
         )}
+
+        {/* Zoom — porque el preview escala para caber; "100%" muestra el canvas
+            a su tamaño de export real (px CSS), con scroll si no entra. */}
+        <div className="absolute left-2 top-2 z-30 flex items-center gap-0.5 rounded-lg border border-border-default bg-card px-1.5 py-1 shadow-md">
+          <button
+            type="button"
+            onClick={() => zoomScaled(1 / 1.25)}
+            aria-label="Reducir"
+            className="p-1 rounded-md text-secondary hover:bg-card-hover transition-colors"
+          >
+            <Minus size={13} />
+          </button>
+          <input
+            type="range"
+            min={MIN_PCT}
+            max={MAX_PCT}
+            value={displayPct}
+            onChange={(e) => zoomAbsolute(Number(e.target.value))}
+            className="w-20 accent-amber-500"
+            aria-label="Zoom"
+          />
+          <button
+            type="button"
+            onClick={() => zoomAbsolute(100)}
+            className="px-1.5 py-0.5 rounded text-[10px] font-medium text-secondary hover:bg-card-hover transition-colors"
+          >
+            100%
+          </button>
+          <button
+            type="button"
+            onClick={fitView}
+            className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${
+              pctMode ? 'text-secondary hover:bg-card-hover' : 'bg-amber-500 text-black'
+            }`}
+          >
+            <Maximize size={10} className="inline mr-0.5 -mt-px" /> Ajustar
+          </button>
+          <button
+            type="button"
+            onClick={() => zoomScaled(1.25)}
+            aria-label="Ampliar"
+            className="p-1 rounded-md text-secondary hover:bg-card-hover transition-colors"
+          >
+            <Plus size={13} />
+          </button>
+          <span className="w-8 text-right text-[10px] text-muted tabular-nums">{displayPct}%</span>
+        </div>
+
         {showSafeZones && (
           <SafeZoneControls settings={safeZones} onChange={setSafeZones} width={compW} height={compH} />
         )}
@@ -273,8 +353,8 @@ export function AnimationPreview({
             </button>
           ))}
         </div>
-        <span className="text-[11px] text-muted font-mono ml-auto shrink-0">
-          {width}×{height}
+        <span className="text-[11px] text-muted font-mono ml-auto shrink-0" title={`Export: ${width}×${height}`}>
+          {displayW}×{displayH} · {displayPct}%
         </span>
       </div>
       )}
