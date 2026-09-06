@@ -290,25 +290,41 @@ function buildSql(spec: QuerySpec): string[] {
         default: return `${col} ${f.op} ${quote(f.value ?? '')}`;
       }
     };
-    const groups: {cond: string; incoming: string}[] = [];
-    let prevKey: string | null = null;
-    let prevLogic = 'AND';
-    let cur: {cond: string; incoming: string} | null = null;
-    spec.filters.forEach((f, i) => {
+    // Mismo algoritmo que la RPC query_builder (migración 0126):
+    //   * filtros de la misma (tabla,columna) SIEMPRE se agrupan,
+    //     sin importar si están interleaved en el array flat.
+    //   * conector INTRA-grupo = logic del filtro anterior (toggle AND/OR).
+    //   * conector ENTRE grupos = siempre AND.
+    const colGroups = new Map<string, {parts: string[]; logics: string[]}>();
+    const colOrder: string[] = [];
+    spec.filters.forEach((f) => {
       const key = `${f.table ?? spec.table}.${f.column}`;
       const cond = buildCond(f);
-      if (cur && key === prevKey) {
-        cur.cond = `${cur.cond} ${prevLogic} ${cond}`;
-      } else {
-        if (cur) groups.push(cur);
-        cur = {cond: `(${cond})`, incoming: i === 0 ? '' : prevLogic};
+      const logic = f.logic ?? 'AND';
+      let g = colGroups.get(key);
+      if (!g) {
+        g = {parts: [], logics: []};
+        colGroups.set(key, g);
+        colOrder.push(key);
       }
-      prevKey = key;
-      prevLogic = f.logic ?? 'AND';
+      g.parts.push(cond);
+      g.logics.push(logic);
     });
-    if (cur) groups.push(cur);
-    const where = groups.map((g) => (g.incoming ? `${g.incoming} ${g.cond}` : g.cond)).join(' ');
-    parts.push(`WHERE ${where}`);
+    const whereClauses: string[] = [];
+    colOrder.forEach((key) => {
+      const g = colGroups.get(key)!;
+      if (g.parts.length === 1) {
+        whereClauses.push(`(${g.parts[0]})`);
+      } else {
+        const inner: string[] = [g.parts[0]];
+        for (let j = 1; j < g.parts.length; j++) {
+          inner.push(g.logics[j - 1]);
+          inner.push(g.parts[j]);
+        }
+        whereClauses.push(`(${inner.join(' ')})`);
+      }
+    });
+    parts.push(`WHERE ${whereClauses.join(' AND ')}`);
   }
   if (spec.groupBy && spec.groupBy.length > 0) {
     parts.push(`GROUP BY ${spec.groupBy.join(', ')}`);
