@@ -239,9 +239,6 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const COMPAT_AVATAR = avatarSize ?? (isPortrait ? Math.round(W * 0.09) : 44);
   const COMPAT_VALUE_W = isPortrait ? Math.round(W * 0.16) : 110;
 
-  const fadeIn = interpolate(frame, [0, 24], [0, 1], {extrapolateRight: 'clamp'});
-  const titleDrop = spring({fps, frame, config: {damping: 15, stiffness: 80}}) * -20;
-
   const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
   if (rows.length === 0) {
     return <div style={{width: '100%', height: '100%', backgroundColor: '#0a0a0a'}} />;
@@ -325,7 +322,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     return (
       <div style={{width: '100%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", padding: `${PAD_T}px ${PAD_R}px ${PAD_B}px ${PAD_L}px`, boxSizing: 'border-box'}}>
         {bgLayer}
-        <div style={{position: 'absolute', top: PAD_T, left: PAD_L, zIndex: 1, opacity: fadeIn, transform: `translate(${titleX ?? 0}px, ${(titleY ?? 0) + titleDrop}px)`}}>
+        <div style={{position: 'absolute', top: PAD_T, left: PAD_L, zIndex: 1, transform: `translate(${titleX ?? 0}px, ${titleY ?? 0}px)`}}>
           <div style={{...textStyle(titleText, {color: '#ffffff', size: TITLE_SIZE, weight: 800}), whiteSpace: 'pre-line'}}>{title || 'Timeline Race'}</div>
           {subtitle && (
             <div style={{marginTop: 10, transform: `translate(${subtitleX ?? 0}px, ${subtitleY ?? 0}px)`, ...textStyle(subtitleText, {color: accentColor, size: Math.max(ROW_FONT, Math.round(TITLE_SIZE / 2)), weight: 600}), whiteSpace: 'pre-line'}}>{subtitle}</div>
@@ -735,7 +732,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   return (
     <div style={{width: '100%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", padding: `${PAD_T}px ${PAD_R}px ${PAD_B}px ${PAD_L}px`, boxSizing: 'border-box', overflow: 'hidden'}}>
       {bgLayer}
-      <div style={{position: 'absolute', top: PAD_T, left: PAD_L, zIndex: 1, opacity: fadeIn, transform: `translate(${titleX ?? 0}px, ${(titleY ?? 0) + titleDrop}px)`}}>
+      <div style={{position: 'absolute', top: PAD_T, left: PAD_L, zIndex: 1, transform: `translate(${titleX ?? 0}px, ${titleY ?? 0}px)`}}>
         <div style={{...textStyle(titleText, {color: '#ffffff', size: TITLE_SIZE, weight: 800}), whiteSpace: 'pre-line'}}>{title || 'Timeline Race'}</div>
         {subtitle && (
           <div style={{marginTop: 10, transform: `translate(${subtitleX ?? 0}px, ${subtitleY ?? 0}px)`, ...textStyle(subtitleText, {color: accentColor, size: Math.max(ROW_FONT, Math.round(TITLE_SIZE / 2)), weight: 600}), whiteSpace: 'pre-line'}}>{subtitle}</div>
