@@ -32,32 +32,8 @@ type AnimationPreviewProps = {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const LAZY_COMPONENTS: Record<string, React.LazyExoticComponent<React.FC<any>>> = {
-  'ranking-barras': React.lazy(() =>
-    import('@/remotion/templates/ranking-barras').then((m) => ({default: m.RankingBarras})),
-  ),
-  'head-to-head': React.lazy(() =>
-    import('@/remotion/templates/head-to-head').then((m) => ({default: m.HeadToHead})),
-  ),
-  'stats-kpi': React.lazy(() =>
-    import('@/remotion/templates/stats-kpi').then((m) => ({default: m.StatsKpi})),
-  ),
-  'win-streak': React.lazy(() =>
-    import('@/remotion/templates/win-streak').then((m) => ({default: m.WinStreak})),
-  ),
   'timeline-race': React.lazy(() =>
     import('@/remotion/templates/timeline-race').then((m) => ({default: m.TimelineRace})),
-  ),
-  'heatmap-luchas': React.lazy(() =>
-    import('@/remotion/templates/heatmap-luchas').then((m) => ({default: m.HeatmapLuchas})),
-  ),
-  'generic-bar': React.lazy(() =>
-    import('@/remotion/templates/generic-bar').then((m) => ({default: m.GenericBar})),
-  ),
-  'generic-line': React.lazy(() =>
-    import('@/remotion/templates/generic-line').then((m) => ({default: m.GenericLine})),
-  ),
-  'generic-kpi': React.lazy(() =>
-    import('@/remotion/templates/generic-kpi').then((m) => ({default: m.GenericKpi})),
   ),
 };
 

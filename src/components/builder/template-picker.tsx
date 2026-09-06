@@ -1,7 +1,7 @@
 'use client';
 
 import {useMemo} from 'react';
-import {BarChart3, Swords, Hash, Flame, Calendar, Map} from 'lucide-react';
+import {BarChart3, Calendar} from 'lucide-react';
 import type {ChartConfig} from '@/lib/chart-config';
 import {getCompatibleTemplates} from '@/lib/viz-to-remotion';
 import {TEMPLATES} from '@/remotion/generated/registry';
@@ -15,12 +15,7 @@ type TemplatePickerProps = {
 };
 
 const TEMPLATE_ICONS: Record<string, typeof BarChart3> = {
-  'ranking-barras': BarChart3,
-  'head-to-head': Swords,
-  'stats-kpi': Hash,
-  'win-streak': Flame,
   'timeline-race': Calendar,
-  'heatmap-luchas': Map,
 };
 
 export function TemplatePicker({data, config, selectedTemplate, onSelect}: TemplatePickerProps) {
