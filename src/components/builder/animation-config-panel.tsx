@@ -719,7 +719,7 @@ function RowImageSection({value, onChange, participants = []}: {
         Marco global en el costado derecho del canvas: las filas se comprimen a la izquierda y el marco muestra la imagen del puesto que se está revelando, con corte directo (sin fundido) y un traslado lento (dirección configurable por imagen) hasta que entra el siguiente puesto. Un zoom mínimo garantiza que foco y traslado funcionen aunque dejes el zoom en 1. El ancho no tiene tope: puede extenderse hasta todo el ancho del canvas (las filas se comprimen al mínimo).
       </p>
       <p className="text-[10px] text-amber-400/80">
-        Solo se muestra el Top {participants.length} (los mismos que se renderizan, según "Máximo de filas" en Datos).
+        Solo se listan y muestran las {participants.length} entidades definidas por "Máximo de entidades" en Ranking (el top-N por valor). Las imágenes que configures para entidades fuera de ese top-N quedan guardadas y se reactivan si subes el límite.
       </p>
       <div>
         <label className="text-sm font-medium mb-1 block">Ancho del marco (vacío = automático)</label>

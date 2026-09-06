@@ -412,10 +412,15 @@ function resolveRanking(
   const labelField = resolveLabelField(rows, config, rc);
   const valueField = resolveValueField(rows, config, rc);
   const imageField = rc?.imageField;
-  const limited = rc?.maxRows && rc.maxRows > 0 ? rows.slice(0, rc.maxRows) : rows;
-  const items = aggregateRankingRows(limited, labelField, valueField, imageField, rc?.valueAgg ?? 'none', rc?.weightField);
+  // Aggregate and order the whole dataset first, then trim to maxRows as the
+  // "top-N by value". Slicing raw rows before aggregation would make the limit
+  // depend on input order instead of the final ranking (the entities that end
+  // up outside the top-N never change at random maxRows values, so the panel
+  // list and the render would drift out of sync with the control).
+  const items = aggregateRankingRows(rows, labelField, valueField, imageField, rc?.valueAgg ?? 'none', rc?.weightField);
   const sorted = [...items].sort((a, b) => b.value - a.value);
-  return {items: sorted, valueField, labelField};
+  const trimmed = rc?.maxRows && rc.maxRows > 0 ? sorted.slice(0, rc.maxRows) : sorted;
+  return {items: trimmed, valueField, labelField};
 }
 
 export function getRankingParticipants(

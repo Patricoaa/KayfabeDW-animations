@@ -169,9 +169,11 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
     return <div style={{width: '100%', height: '100%', backgroundColor: background || '#0a0a0a'}} />;
   }
 
-  const limited = maxRows && maxRows > 0 ? rows.slice(0, maxRows) : rows;
-  // Final ranking: best value on top, rank 1 = index 0.
-  const ranked = [...limited].sort((a, b) => b.value - a.value);
+  // Final ranking: best value on top, rank 1 = index 0. maxRows keeps only the
+  // top-N by value (items usually arrive from resolveRanking already trimmed;
+  // this guard keeps external callers that feed the full set consistent).
+  const sorted = [...rows].sort((a, b) => b.value - a.value);
+  const ranked = maxRows && maxRows > 0 ? sorted.slice(0, maxRows) : sorted;
   const n = ranked.length;
   const maxValue = Math.max(...ranked.map((r) => r.value), 0) || 1;
 
