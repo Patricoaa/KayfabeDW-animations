@@ -367,13 +367,14 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
 
     // Table "wave" entry for horizontal directions: instead of sliding the whole
     // row as a rigid block (which made the value peek in first — LCD-ticker
-    // look), every element launches from the entry edge at the same time and
-    // travels at the same speed, so each one locks in place the moment the
+    // look), every element launches from beyond the canvas edge at the same time
+    // and travels at the same speed, so each one locks in place the moment the
     // sweep front passes its lane: rank → avatar → label → value (left entry).
-    // The front (in row px) moves S→0 or 0→S; unpinned elements ride it, and
-    // each element fades in as the front nears its lane so the brief clump at
-    // the origin reads as a clean burst.
+    // The front (in row px) moves S→−L or −L→S including a lead so the whole
+    // clump starts fully off-screen; unpinned elements ride it, and each one
+    // fades in as the front nears its lane so the brief clump reads as a burst.
     const sweepS = Math.max(rowsInnerW, 1);
+    const sweepLead = sweepS + PAD_L + Math.max(RANK_W, GAP_H * 2, 96);
     const sweepFog = 120;
     const sweepSeg: Record<RowEntryElement, number> = {
       rank: 0,
@@ -389,7 +390,7 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
       const pp = delayFrac > 0 && delayFrac < 1 ? (frameProg - delayFrac) / (1 - delayFrac) : frameProg;
       const e = Math.max(0, Math.min(pp, 1));
       const refPos = sweepSeg[element];
-      const front = dir === 'left' ? e * sweepS : (1 - e) * sweepS;
+      const front = dir === 'left' ? -sweepLead + e * (sweepS + sweepLead) : (1 - e) * (sweepS + sweepLead);
       const t = dir === 'left' ? -Math.max(refPos - front, 0) : Math.max(front - refPos, 0);
       const dist = dir === 'left' ? front - refPos : refPos - front;
       const opacity = Math.max(0.12, Math.min((dist + sweepFog) / sweepFog, 1));
@@ -474,9 +475,11 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
   // taken literally: values < 1 shrink the image inside the frame (zoom-out),
   // values > 1 enlarge it. When zoom is left unset it defaults to 1.12 so the
   // one-way pan still has overflow to travel over. `overX`/`overY` are the
-  // travel capacity in each axis (absolute overflow); focus places the crop
-  // across the full range and the pan sweeps the remaining room, clamped so a
-  // zoomed-in image never uncovers the frame.
+  // travel capacity in each axis (absolute overflow). The pan starts at the
+  // entry-side extreme and sweeps linearly into the focus placement, so the
+  // focus controls set the image's resting position on the last frame (and
+  // through the holds); without pan, the image sits directly at the focus
+  // crop. Clamped so a zoomed-in image never uncovers the frame.
   const ZOOM_DEFAULT = 1.12;
   const frameImgGeom = (label: string, pan: number) => {
     const ric = rowImageCrops?.[label];
@@ -485,8 +488,8 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
     const fy = Math.max(Math.min(ric?.focusY ?? 0, 1), -1);
     const overX = FRAME_W * Math.abs(z - 1);
     const overY = frameHeight * Math.abs(z - 1);
-    const baseX = -overX / 2 - (fx * overX) / 2;
-    const tx = rowImagePan === false ? baseX : Math.max(-overX, Math.min(0, baseX - pan * overX));
+    const endX = Math.max(-overX, Math.min(0, -overX / 2 - (fx * overX) / 2));
+    const tx = rowImagePan === false ? endX : -overX + (endX + overX) * pan;
     const ty = Math.max(-overY, Math.min(0, -overY / 2 - (fy * overY) / 2));
     return {z, tx, ty};
   };
