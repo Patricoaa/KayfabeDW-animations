@@ -46,6 +46,39 @@ export function avatarCropRect(zoom = 1, focusX = 0, focusY = 0, size: number) {
   return {w, h, dx: fx * extra / 2, dy: fy * extra / 2};
 }
 
+// ---- Shared animation config (reused by every template) ----
+
+// Header block: title + subtitle with per-text style and position offsets.
+// Empty fields fall back to each template's default layout.
+export type CommonHeaderConfig = {
+  title?: string;
+  titleX?: number;
+  titleY?: number;
+  titleText?: RaceTextStyle;
+  subtitle?: string;
+  subtitleText?: RaceTextStyle;
+  subtitleX?: number;
+  subtitleY?: number;
+};
+
+// Canvas background: solid color, pattern preset, gradient or image.
+// `background` is reused as the primary/foreground color depending on type.
+export type CommonCanvasConfig = {
+  backgroundType?: 'color' | 'pattern' | 'gradient' | 'image';
+  background?: string;            // solid | pattern fg | gradient color 1
+  backgroundSecondary?: string;   // gradient color 2
+  backgroundImage?: string;       // dataURL / remote URL (image type)
+  backgroundPattern?: 'dots' | 'stripes' | 'grid' | 'checkers';
+  backgroundAngle?: number;       // gradient/pattern angle (deg)
+  backgroundOpacity?: number;     // opacity of the background layer (0-1)
+  backgroundBlur?: number;        // blur (px) applied to the background
+  backgroundFit?: 'cover' | 'contain' | 'fill'; // how an image is fit
+};
+
+// Everything a template inherits from the shared config. Kept flat on purpose
+// so specs saved with older configs (flat fields) keep loading unchanged.
+export type CommonAnimationConfig = CommonHeaderConfig & CommonCanvasConfig;
+
 // Timeline Race: a date-driven ranked bar race. Each row is one entity /
 // event with an optional avatar image, a `dateField` that positions it on the
 // shared date axis (when the playback reaches an entity's date their
@@ -60,13 +93,12 @@ export function avatarCropRect(zoom = 1, focusX = 0, focusY = 0, size: number) {
 // drive are always active, so there are no show/hide toggles for them. The
 // bottom "x axis" shows the numeric min/max of the accumulated value (0 →
 // maxValue), not dates. The on-screen big date (bottom-right) is independent.
-export type TimelineRaceConfig = {
+export type TimelineRaceConfig = CommonAnimationConfig & {
   labelField?: string;
   imageField?: string;
   dateField?: string;
   valueField?: string;
   dateFormat?: DateFormat;
-  title?: string;
   maxRows?: number;
 
   // Pause (seconds) that freezes the final result on-screen after the sweep
@@ -111,17 +143,6 @@ export type TimelineRaceConfig = {
   // smaller gives the value/avatar columns more room so the value stays visible.
   barWidth?: number;
 
-  // Title position (px offset from the default top-left placement).
-  titleX?: number;
-  titleY?: number;
-
-  // Subtitle (optional), rendered under the title. Own text style + position
-  // offsets like the title.
-  subtitle?: string;
-  subtitleText?: RaceTextStyle;
-  subtitleX?: number;
-  subtitleY?: number;
-
   // On-screen date position (px offset from the default bottom-right placement).
   dateX?: number;
   dateY?: number;
@@ -154,27 +175,13 @@ export type TimelineRaceConfig = {
   valueFormat?: ValueFormat;
   currencySymbol?: string;
 
-  // Canvas background. Can be a solid color, a pattern preset, a gradient, or
-  // an uploaded/remote image. `background` is reused as the primary/foreground
-  // color depending on the type.
-  backgroundType?: 'color' | 'pattern' | 'gradient' | 'image';
-  background?: string;            // solid | pattern fg | gradient color 1
-  backgroundSecondary?: string;   // gradient color 2
-  backgroundImage?: string;       // dataURL / remote URL (image type)
-  backgroundPattern?: 'dots' | 'stripes' | 'grid' | 'checkers';
-  backgroundAngle?: number;       // gradient/pattern angle (deg)
-  backgroundOpacity?: number;     // opacity of the background layer (0-1)
-  backgroundBlur?: number;        // blur (px) applied to the background
-  backgroundFit?: 'cover' | 'contain' | 'fill'; // how an image is fit
-
   // Vertical (Y) plot axis: enable a simple axis line at the bars' origin and
   // configure its color and thickness (px).
   showYAxis?: boolean;
   yAxisColor?: string;
   yAxisWidth?: number;
 
-  // Typography overrides for the title and the on-screen date.
-  titleText?: RaceTextStyle;
+  // Typography overrides for the on-screen date.
   dateText?: RaceTextStyle;
 
   // Typography overrides for the entity label (parked on the contracted bar
@@ -183,10 +190,70 @@ export type TimelineRaceConfig = {
   valueText?: RaceTextStyle;
 };
 
+// Ranking: counters that drop in one by one, ordered best → worst (or the
+// reverse via `revealDirection`). Each entity (`labelField`) has a numeric
+// `valueField`; an optional `imageField` shows an avatar. `maxRows` trims how
+// many entities participate.
+export type RankingConfig = CommonAnimationConfig & {
+  labelField?: string;
+  valueField?: string;
+  imageField?: string;
+
+  // Cap on how many rows are animated (top-N by value, kept in the reveal
+  // order). Empty = no cap.
+  maxRows?: number;
+
+  // Reveal order: 'desc' (default) counts down from last place to #1, 'asc'
+  // builds up 1st → last.
+  revealDirection?: 'asc' | 'desc';
+
+  // Animate each datum counting up to its real value. Defaults to ON.
+  countUp?: boolean;
+
+  // Duration (seconds) of the whole reveal sweep (all rows dropping in).
+  // Empty = auto (stretches across the available duration minus holds).
+  countUpDurationSeconds?: number;
+
+  // Pause (seconds) frozen on the final ranking before the video ends.
+  holdFinalSeconds?: number;
+
+  // Show the rank number ("#1", ...) on each row and the raw value next to it.
+  showRank?: boolean;
+  showValue?: boolean;
+
+  // Prefix for the rank number (e.g. "#"), empty = no prefix.
+  rankPrefix?: string;
+
+  // Color of the row cursor/highlight when a row drops in.
+  accentColor?: string;
+
+  // Per-entity avatar crop overrides (key = entity label or image).
+  avatarCrops?: Record<string, AvatarCrop>;
+
+  // Per-entity row color overrides (label -> color).
+  rowColors?: Record<string, string>;
+
+  // Row spacing (px vertical gap between rows) and gap relative to width.
+  rowGap?: number;
+
+  // Show a rail/placeholder track behind each row while waiting.
+  showRail?: boolean;
+
+  // Horizontal position of the rows block (px offset).
+  rowsX?: number;
+  rowsY?: number;
+
+  // Typography overrides.
+  rankText?: RaceTextStyle;
+  valueText?: RaceTextStyle;
+  labelText?: RaceTextStyle;
+};
+
 // Keyed by TemplateId. Templates not listed here (or with no entry) inherit
 // the static chart's xField/yField mapping until their own config UI lands.
 export type AnimationTemplateConfig = {
   'timeline-race'?: TimelineRaceConfig;
+  'ranking'?: RankingConfig;
 };
 
 export function emptyAnimationConfig(): AnimationTemplateConfig {

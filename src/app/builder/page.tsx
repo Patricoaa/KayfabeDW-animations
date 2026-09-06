@@ -37,7 +37,7 @@ import {BuilderNav} from '@/components/builder/builder-nav';
 import {ExportPanel} from '@/components/builder/export-panel';
 import {TEMPLATES} from '@/remotion/generated/registry';
 import type {TemplateId} from '@/remotion/generated/registry';
-import type {AnimationTemplateConfig, TimelineRaceConfig} from '@/lib/animation-config';
+import type {AnimationTemplateConfig} from '@/lib/animation-config';
 import {emptyAnimationConfig} from '@/lib/animation-config';
 import {loadSafeZones, saveSafeZones, safeZonesFromConfig, type SafeZoneSettings} from '@/lib/safe-zones';
 import {useToast} from '@/components/ui/toast';
@@ -800,8 +800,10 @@ function BuilderContent() {
                     templateId={activeTemplate}
                     columns={columns}
                     fieldMeta={fieldMeta}
-                    value={templateConfig['timeline-race'] ?? {}}
-                    onChange={(tc) => setTemplateConfig((prev) => ({...prev, 'timeline-race': tc as TimelineRaceConfig}))}
+                    value={templateConfig[activeTemplate as keyof AnimationTemplateConfig] ?? {}}
+                    onChange={(tc) =>
+                      setTemplateConfig((prev) => ({...prev, [activeTemplate]: tc}))
+                    }
                     participants={timelineParticipants}
                   />
                 )}

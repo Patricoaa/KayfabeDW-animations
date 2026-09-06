@@ -2,7 +2,7 @@ import type {ChartConfig} from './chart-config';
 import {TEMPLATES} from '@/remotion/generated/registry';
 import type {TemplateId} from '@/remotion/generated/registry';
 import {matchTemplates} from './profile-matcher';
-import type {AnimationTemplateConfig, TimelineRaceConfig} from './animation-config';
+import type {AnimationTemplateConfig, CommonAnimationConfig, RankingConfig, TimelineRaceConfig} from './animation-config';
 
 export type RemotionInputProps = {
   templateId: string;
@@ -43,7 +43,7 @@ function isImageUrl(value: unknown): boolean {
 function resolveLabelField(
   rows: Record<string, unknown>[],
   config: ChartConfig,
-  tc?: TimelineRaceConfig,
+  tc?: {labelField?: string; imageField?: string} | null,
 ): string {
   const push = (f: string | undefined | null) => (f && f.trim() !== '' ? f : undefined);
   const explicit = push(tc?.labelField);
@@ -192,13 +192,39 @@ function parseDateValue(value: unknown): number | null {
   return null;
 }
 
+// Fields shared by every template (header + canvas background), mapped
+// straight through from the per-template config so the Remotion components
+// receive the same flat prop names they already render.
+function commonPropsOf(t: CommonAnimationConfig | undefined): Record<string, unknown> {
+  return {
+    title: t?.title,
+    titleX: t?.titleX,
+    titleY: t?.titleY,
+    titleText: t?.titleText,
+    subtitle: t?.subtitle,
+    subtitleText: t?.subtitleText,
+    subtitleX: t?.subtitleX,
+    subtitleY: t?.subtitleY,
+    backgroundType: t?.backgroundType,
+    background: t?.background,
+    backgroundSecondary: t?.backgroundSecondary,
+    backgroundImage: t?.backgroundImage,
+    backgroundPattern: t?.backgroundPattern,
+    backgroundAngle: t?.backgroundAngle,
+    backgroundOpacity: t?.backgroundOpacity,
+    backgroundBlur: t?.backgroundBlur,
+    backgroundFit: t?.backgroundFit,
+  };
+}
+
 function convertTimelineRace(
   data: Record<string, unknown>[],
   config: ChartConfig,
   tc?: TimelineRaceConfig,
 ): Record<string, unknown> {
-  // Presentation (avatar + canvas) fields shared by every output shape.
+  // Race-specific presentation fields (offset geometry, avatar/bar styling).
   const presentationOf = (t: TimelineRaceConfig | undefined) => ({
+    ...commonPropsOf(t),
     showDateLabel: t?.showDateLabel,
     showXAxis: t?.showXAxis,
     axisPosition: t?.axisPosition,
@@ -213,12 +239,6 @@ function convertTimelineRace(
     rowGapH: t?.rowGapH,
     rowGap: t?.rowGap,
     barWidth: t?.barWidth,
-    titleX: t?.titleX,
-    titleY: t?.titleY,
-    subtitle: t?.subtitle,
-    subtitleText: t?.subtitleText,
-    subtitleX: t?.subtitleX,
-    subtitleY: t?.subtitleY,
     dateX: t?.dateX,
     dateY: t?.dateY,
     avatarSize: t?.avatarSize,
@@ -231,19 +251,9 @@ function convertTimelineRace(
     barThickness: t?.barThickness,
     valueFormat: t?.valueFormat,
     currencySymbol: t?.currencySymbol,
-    backgroundType: t?.backgroundType,
-    background: t?.background,
-    backgroundSecondary: t?.backgroundSecondary,
-    backgroundImage: t?.backgroundImage,
-    backgroundPattern: t?.backgroundPattern,
-    backgroundAngle: t?.backgroundAngle,
-    backgroundOpacity: t?.backgroundOpacity,
-    backgroundBlur: t?.backgroundBlur,
-    backgroundFit: t?.backgroundFit,
     showYAxis: t?.showYAxis,
     yAxisColor: t?.yAxisColor,
     yAxisWidth: t?.yAxisWidth,
-    titleText: t?.titleText,
     dateText: t?.dateText,
     labelText: t?.labelText,
     valueText: t?.valueText,
@@ -386,8 +396,80 @@ export function getTimelineRaceParticipants(
   return out;
 }
 
+// Resolve the numeric "dato" column of a ranking: explicit mapping wins,
+// then the static yField, then the first column whose values all parse as
+// numbers (never picking the label/date/avatar).
+function resolveValueField(
+  rows: Record<string, unknown>[],
+  config: ChartConfig,
+  tc?: RankingConfig,
+): string {
+  const explicit = tc?.valueField;
+  if (explicit && explicit.trim() !== '') return explicit;
+  if (config.yField) return config.yField;
+  const numericCol = Object.keys(rows[0] ?? {}).find((f) => {
+    const vals = rows.map((r) => Number(r[f])).filter((v) => !isNaN(v));
+    return vals.length === rows.length && vals.length > 0;
+  });
+  return numericCol ?? '';
+}
+
+function convertRanking(
+  data: Record<string, unknown>[],
+  config: ChartConfig,
+  rc?: RankingConfig,
+): Record<string, unknown> {
+  const presentationOf = (t: RankingConfig | undefined) => ({
+    ...commonPropsOf(t),
+    maxRows: t?.maxRows,
+    revealDirection: t?.revealDirection,
+    countUp: t?.countUp,
+    countUpDurationSeconds: t?.countUpDurationSeconds,
+    holdFinalSeconds: t?.holdFinalSeconds,
+    showRank: t?.showRank,
+    showValue: t?.showValue,
+    rankPrefix: t?.rankPrefix,
+    avatarCrops: t?.avatarCrops,
+    rowColors: t?.rowColors,
+    rowGap: t?.rowGap,
+    showRail: t?.showRail,
+    rowsX: t?.rowsX,
+    rowsY: t?.rowsY,
+    rankText: t?.rankText,
+    valueText: t?.valueText,
+    labelText: t?.labelText,
+  });
+
+  const rows = data ?? [];
+  if (rows.length === 0) {
+    return {title: (rc?.title || config.title) ?? '', items: [], accentColor: config.colors?.[0] ?? '#FFD700', ...presentationOf(rc)};
+  }
+
+  const labelField = resolveLabelField(rows, config, rc);
+  const valueField = resolveValueField(rows, config, rc);
+  const imageField = rc?.imageField;
+
+  const items = rows
+    .map((row) => ({
+      label: String(row[labelField] ?? ''),
+      image: imageField ? avatarUrlOf(row[imageField]) : null,
+      value: Number(row[valueField] ?? 0),
+    }))
+    .filter((it) => !isNaN(it.value) && it.label !== '');
+
+  const sorted = [...items].sort((a, b) => b.value - a.value);
+
+  return {
+    title: (rc?.title || config.title) ?? '',
+    items: sorted,
+    accentColor: config.colors?.[0] ?? '#FFD700',
+    ...presentationOf(rc),
+  };
+}
+
 const CONVERTERS: Record<string, (data: Record<string, unknown>[], config: ChartConfig, templateConfig?: unknown) => Record<string, unknown>> = {
   'timeline-race': (data, config, tc) => convertTimelineRace(data, config, tc as TimelineRaceConfig | undefined),
+  'ranking': (data, config, rc) => convertRanking(data, config, rc as RankingConfig | undefined),
 };
 
 export function getCompatibleTemplates(
@@ -418,7 +500,7 @@ export function convertToRemotionProps(
   const converter = CONVERTERS[templateId];
   if (!converter) return null;
 
-  const tc = templateId === 'timeline-race' ? templateConfig?.['timeline-race'] : undefined;
+  const tc = templateConfig?.[templateId as keyof AnimationTemplateConfig];
 
   return {
     templateId,

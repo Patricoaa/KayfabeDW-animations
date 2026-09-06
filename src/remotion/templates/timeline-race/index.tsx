@@ -1,6 +1,11 @@
 import React from 'react';
-import {useCurrentFrame, useVideoConfig, interpolate, spring, Img, staticFile, Easing} from 'remotion';
-import {avatarCropRect, type RaceTextStyle, type ValueFormat} from '../../../lib/animation-config';
+import {useCurrentFrame, useVideoConfig, interpolate, spring, Easing} from 'remotion';
+import type {RaceTextStyle, ValueFormat} from '../../../lib/animation-config';
+import {Header} from '../shared/Header';
+import {BackgroundLayer} from '../shared/Background';
+import {Avatar} from '../shared/Avatar';
+import {fmtValue} from '../shared/fmt';
+import {textStyle} from '../shared/text';
 
 // A date-driven ranked bar race. Each entity has a `date` (timestamp on
 // the shared axis). A vertical guide sweeps left→right across the duration;
@@ -93,61 +98,6 @@ function fmtDate(t: number, fmt: TimelineRaceProps['dateFormat'] = 'day'): strin
   if (fmt === 'month') return `${mm}/${y}`;
   const dd = String(d.getDate()).padStart(2, '0');
   return `${dd}/${mm}/${y}`;
-}
-
-// Format the accumulated value for display: bar rows, the numeric axis and the
-// outro width estimate all share this so a long currency prefix or a H:MM:SS
-// clock doesn't push the outro over the track edge. `'number'` keeps the
-// current locale formatting (default, no rounding) so existing renders don't change.
-function fmtValue(v: number, format: TimelineRaceProps['valueFormat'] = 'number', symbol = '$'): string {
-  if (isNaN(v)) return '0';
-  switch (format) {
-    case 'short': {
-      const a = Math.abs(v);
-      if (a >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
-      if (a >= 1_000) return `${(v / 1_000).toFixed(1)}k`;
-      return Math.round(v).toString();
-    }
-    case 'decimal':
-      return v.toLocaleString('es', {maximumFractionDigits: 2});
-    case 'percent':
-      return `${Math.round(v * 100)}%`;
-    case 'currency':
-      return `${symbol}${Math.round(v).toLocaleString()}`;
-    case 'hhmmss': {
-      const s = Math.max(0, Math.round(v));
-      const h = Math.floor(s / 3600);
-      const m = Math.floor((s % 3600) / 60);
-      const sec = s % 60;
-      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
-    }
-    case 'number':
-    default:
-      return v.toLocaleString();
-  }
-}
-
-// Merge a RaceTextStyle override onto concrete defaults into a CSSProperties
-// subset, dropping undefined so the default wins when not configured.
-function textStyle(over: RaceTextStyle | undefined, defaults: {color: string; size: number; weight: number}) {
-  const s: React.CSSProperties = {
-    color: over?.color ?? defaults.color,
-    fontSize: over?.size ?? defaults.size,
-    fontWeight: over?.weight ?? defaults.weight,
-  };
-  if (over?.fontFamily) s.fontFamily = over.fontFamily;
-  if (over?.textTransform && over.textTransform !== 'none') s.textTransform = over.textTransform;
-  if (over?.letterSpacing !== undefined) s.letterSpacing = over.letterSpacing;
-  if (over?.lineHeight) s.lineHeight = over.lineHeight;
-  if (over?.align) s.textAlign = over.align;
-  if (over?.underline) s.textDecoration = 'underline';
-  if (over?.highlightColor) {
-    s.background = over.highlightColor;
-    s.borderRadius = over.highlightRadius;
-    s.display = 'inline-block';
-    s.padding = '0.14em 0.22em';
-  }
-  return s;
 }
 
 export const TimelineRace: React.FC<TimelineRaceProps> = ({
@@ -252,69 +202,17 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   }
 
   // ---- Canvas background layer (solid / pattern / gradient / image) ----
-  const bgStyle: React.CSSProperties = (() => {
-    let img: string | undefined;
-    if (backgroundType === 'color') {
-      return {backgroundColor: background};
-    }
-    if (backgroundType === 'image' && backgroundImage) {
-      img = backgroundImage;
-      const size =
-        backgroundFit === 'contain' ? 'contain' : backgroundFit === 'fill' ? '100% 100%' : 'cover';
-      return {
-        backgroundColor: background,
-        backgroundImage: `url(${img})`,
-        backgroundSize: size,
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-      };
-    }
-    if (backgroundType === 'gradient') {
-      return {
-        background: `linear-gradient(${backgroundAngle ?? 135}deg, ${background}, ${backgroundSecondary ?? '#1f2937'})`,
-      };
-    }
-    // pattern
-    const fg = background;
-    if (backgroundPattern === 'dots') {
-      return {
-        backgroundColor: '#000',
-        backgroundImage: `radial-gradient(${fg} 22%, transparent 24%)`,
-        backgroundSize: '26px 26px',
-        backgroundPosition: '0 0',
-      };
-    }
-    if (backgroundPattern === 'grid') {
-      return {
-        backgroundColor: '#000',
-        backgroundImage: `linear-gradient(${fg} 1px, transparent 1px), linear-gradient(90deg, ${fg} 1px, transparent 1px)`,
-        backgroundSize: '26px 26px',
-      };
-    }
-    if (backgroundPattern === 'checkers') {
-      return {
-        backgroundColor: '#000',
-        backgroundImage: `linear-gradient(45deg, ${fg} 25%, transparent 25%, transparent 75%, ${fg} 75%), linear-gradient(45deg, ${fg} 25%, transparent 25%, transparent 75%, ${fg} 75%)`,
-        backgroundSize: '26px 26px',
-        backgroundPosition: '0 0, 13px 13px',
-      };
-    }
-    // stripes
-    return {
-      backgroundColor: '#000',
-      backgroundImage: `repeating-linear-gradient(${backgroundAngle ?? 45}deg, ${fg} 0 10px, transparent 10px 22px)`,
-    };
-  })();
   const bgLayer = (
-    <div
-      style={{
-        position: 'absolute',
-        inset: 0,
-        zIndex: 0,
-        ...bgStyle,
-        opacity: backgroundOpacity ?? 1,
-        filter: backgroundBlur ? `blur(${backgroundBlur}px)` : undefined,
-      }}
+    <BackgroundLayer
+      backgroundType={backgroundType}
+      background={background}
+      backgroundSecondary={backgroundSecondary}
+      backgroundImage={backgroundImage}
+      backgroundPattern={backgroundPattern}
+      backgroundAngle={backgroundAngle}
+      backgroundOpacity={backgroundOpacity}
+      backgroundBlur={backgroundBlur}
+      backgroundFit={backgroundFit}
     />
   );
 
@@ -329,12 +227,22 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     return (
       <div style={{width: '100%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", padding: `${PAD_T}px ${PAD_R}px ${PAD_B}px ${PAD_L}px`, boxSizing: 'border-box'}}>
         {bgLayer}
-        <div style={{position: 'absolute', top: PAD_T, left: PAD_L, zIndex: 1, transform: `translate(${titleX ?? 0}px, ${titleY ?? 0}px)`}}>
-          <div style={{...textStyle(titleText, {color: '#ffffff', size: TITLE_SIZE, weight: 800}), whiteSpace: 'pre-line'}}>{title || 'Timeline Race'}</div>
-          {subtitle && (
-            <div style={{marginTop: 10, transform: `translate(${subtitleX ?? 0}px, ${subtitleY ?? 0}px)`, ...textStyle(subtitleText, {color: accentColor, size: Math.max(ROW_FONT, Math.round(TITLE_SIZE / 2)), weight: 600}), whiteSpace: 'pre-line'}}>{subtitle}</div>
-          )}
-        </div>
+        <Header
+          title={title}
+          titleX={titleX}
+          titleY={titleY}
+          titleText={titleText}
+          subtitle={subtitle}
+          subtitleText={subtitleText}
+          subtitleX={subtitleX}
+          subtitleY={subtitleY}
+          top={PAD_T}
+          left={PAD_L}
+          titleSize={TITLE_SIZE}
+          subSize={Math.max(ROW_FONT, Math.round(TITLE_SIZE / 2))}
+          accentColor={accentColor}
+          fallbackTitle="Timeline Race"
+        />
         <div style={{flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', marginTop: H * 0.04, zIndex: 1}}>
           {visible.map((item, index) => {
             const delay = 15 + index * 10;
@@ -749,12 +657,22 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   return (
     <div style={{width: '100%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", padding: `${PAD_T}px ${PAD_R}px ${PAD_B}px ${PAD_L}px`, boxSizing: 'border-box', overflow: 'hidden'}}>
       {bgLayer}
-      <div style={{position: 'absolute', top: PAD_T, left: PAD_L, zIndex: 1, transform: `translate(${titleX ?? 0}px, ${titleY ?? 0}px)`}}>
-        <div style={{...textStyle(titleText, {color: '#ffffff', size: TITLE_SIZE, weight: 800}), whiteSpace: 'pre-line'}}>{title || 'Timeline Race'}</div>
-        {subtitle && (
-          <div style={{marginTop: 10, transform: `translate(${subtitleX ?? 0}px, ${subtitleY ?? 0}px)`, ...textStyle(subtitleText, {color: accentColor, size: Math.max(ROW_FONT, Math.round(TITLE_SIZE / 2)), weight: 600}), whiteSpace: 'pre-line'}}>{subtitle}</div>
-        )}
-      </div>
+      <Header
+        title={title}
+        titleX={titleX}
+        titleY={titleY}
+        titleText={titleText}
+        subtitle={subtitle}
+        subtitleText={subtitleText}
+        subtitleX={subtitleX}
+        subtitleY={subtitleY}
+        top={PAD_T}
+        left={PAD_L}
+        titleSize={TITLE_SIZE}
+        subSize={Math.max(ROW_FONT, Math.round(TITLE_SIZE / 2))}
+        accentColor={accentColor}
+        fallbackTitle="Timeline Race"
+      />
 
       {showXAxis && axisPosition === 'top' && <div style={{position: 'relative', zIndex: 1}}>{numAxis}</div>}
 
@@ -781,52 +699,3 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     return index * (ROW_H + ROW_GAP);
   }
 };
-
-function Avatar({
-  src,
-  size = 44,
-  shape = 'circle',
-  radius,
-  crop,
-}: {
-  src: string;
-  size?: number;
-  shape?: 'circle' | 'rounded';
-  radius?: number;
-  crop?: {zoom?: number; focusX?: number; focusY?: number};
-}) {
-  const imgSrc = src.startsWith('/') && !src.startsWith('//') ? staticFile(src) : src;
-  const rect = avatarCropRect(crop?.zoom, crop?.focusX, crop?.focusY, size);
-  const imgX = -rect.w / 2 + rect.dx;
-  const imgY = -rect.h / 2 + rect.dy;
-  const borderRadius = shape === 'circle' ? '50%' : `${radius ?? Math.round(size * 0.25)}px`;
-  return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        borderRadius,
-        overflow: 'hidden',
-        flexShrink: 0,
-        backgroundColor: '#1f2937',
-        border: '2px solid #334155',
-        boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.2)',
-        position: 'relative',
-      }}
-    >
-      <Img
-        src={imgSrc}
-        style={{
-          position: 'absolute',
-          left: '50%',
-          top: '50%',
-          width: rect.w,
-          height: rect.h,
-          transform: `translate(${imgX}px, ${imgY}px)`,
-          objectFit: 'contain',
-          borderRadius,
-        }}
-      />
-    </div>
-  );
-}

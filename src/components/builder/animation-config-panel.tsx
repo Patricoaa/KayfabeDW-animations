@@ -3,7 +3,7 @@
 import React, {useState} from 'react';
 import {ChevronDown} from 'lucide-react';
 import type {ColumnMeta} from '@/components/builder/chart-config-panel';
-import type {TimelineRaceConfig, DateFormat, AvatarShape, AvatarCrop, RaceTextStyle, ValueFormat} from '@/lib/animation-config';
+import type {TimelineRaceConfig, RankingConfig, DateFormat, AvatarShape, AvatarCrop, RaceTextStyle, ValueFormat, CommonHeaderConfig, CommonCanvasConfig} from '@/lib/animation-config';
 import {avatarCropRect} from '@/lib/animation-config';
 import {FONT_PRESETS, PALETTES} from '@/lib/chart-config';
 import {ColorInput as AutoColorInput} from './text-controls';
@@ -23,8 +23,8 @@ type AnimationConfigPanelProps = {
   templateId: string;
   columns: string[];
   fieldMeta: ColumnMeta[];
-  value: TimelineRaceConfig;
-  onChange: (next: TimelineRaceConfig) => void;
+  value: TimelineRaceConfig | RankingConfig;
+  onChange: (next: TimelineRaceConfig | RankingConfig) => void;
   participants?: Participant[];
 };
 
@@ -80,11 +80,144 @@ function EntitySearch({value, onChange, shown, total}: {value: string; onChange:
   );
 }
 
-// Renders per-template column config. Currently only Timeline Race has an
-// explicit config UI; other templates inherit the static xField/yField mapping.
-export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onChange, participants = []}: AnimationConfigPanelProps) {
-  if (templateId !== 'timeline-race') return null;
+// Title + subtitle, position offsets and typography. Reused by every template
+// so the header settings stay identical everywhere.
+function HeaderSection({value, update}: {value: CommonHeaderConfig; update: (patch: Partial<CommonHeaderConfig>) => void}) {
+  return (
+    <Section title="Header" defaultOpen>
+      <div>
+        <label className="text-sm font-medium mb-1 block">Título (multilínea)</label>
+        <textarea
+          value={value.title ?? ''}
+          onChange={(e) => update({title: e.target.value || undefined})}
+          placeholder="Título de la animación"
+          rows={2}
+          className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500 resize-y"
+        />
+        <p className="text-[10px] text-muted mt-0.5">
+          Si se deja vacío se usa el título de la visualización. Usa Enter para saltar de línea.
+        </p>
+      </div>
+      <div className="pt-2 mt-1 border-t border-border-subtle">
+        <p className="text-[10px] text-muted mb-1.5">Posición del título (offset en px desde su lugar por defecto).</p>
+        <div className="grid grid-cols-2 gap-2">
+          <NumberInput label="X (px)" value={value.titleX} min={-400} max={400} step={4} onChange={(v) => update({titleX: v})} />
+          <NumberInput label="Y (px)" value={value.titleY} min={-400} max={400} step={4} onChange={(v) => update({titleY: v})} />
+        </div>
+      </div>
+      <div className="pt-2 mt-1 border-t border-border-subtle">
+        <RaceTextControls label="Texto del título" value={value.titleText} onChange={(patch) => update({titleText: {...(value.titleText ?? {}), ...patch}})} />
+      </div>
+      <div className="pt-2 mt-1 border-t border-border-subtle">
+        <label className="text-sm font-medium mb-1 block">Subtítulo</label>
+        <input
+          type="text"
+          value={value.subtitle ?? ''}
+          onChange={(e) => update({subtitle: e.target.value || undefined})}
+          placeholder="Subtítulo (opcional)"
+          className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+        />
+      </div>
+      <div className="pt-2 mt-1 border-t border-border-subtle">
+        <p className="text-[10px] text-muted mb-1.5">Posición del subtítulo (offset en px desde su lugar por defecto).</p>
+        <div className="grid grid-cols-2 gap-2">
+          <NumberInput label="X (px)" value={value.subtitleX} min={-400} max={400} step={4} onChange={(v) => update({subtitleX: v})} />
+          <NumberInput label="Y (px)" value={value.subtitleY} min={-400} max={400} step={4} onChange={(v) => update({subtitleY: v})} />
+        </div>
+      </div>
+      <div className="pt-2 mt-1 border-t border-border-subtle">
+        <RaceTextControls label="Texto del subtítulo" value={value.subtitleText} onChange={(patch) => update({subtitleText: {...(value.subtitleText ?? {}), ...patch}})} />
+      </div>
+    </Section>
+  );
+}
 
+// Canvas background: type, colors and pattern/gradient/image options. Reused by
+// every template so the canvas settings stay identical everywhere.
+function CanvasSection({value, update}: {value: CommonCanvasConfig; update: (patch: Partial<CommonCanvasConfig>) => void}) {
+  return (
+    <Section title="Canvas">
+      <SelectControl
+        label="Tipo de fondo"
+        value={value.backgroundType ?? 'color'}
+        options={[
+          {value: 'color', label: 'Color único'},
+          {value: 'pattern', label: 'Patrón'},
+          {value: 'gradient', label: 'Degradado'},
+          {value: 'image', label: 'Imagen'},
+        ]}
+        onChange={(v) => update({backgroundType: v as CommonCanvasConfig['backgroundType']})}
+      />
+
+      {(value.backgroundType ?? 'color') === 'color' && (
+        <ColorInput label="Color de fondo" value={value.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
+      )}
+
+      {(value.backgroundType ?? 'color') === 'pattern' && (
+        <>
+          <SelectControl
+            label="Patrón"
+            value={value.backgroundPattern ?? 'dots'}
+            options={[
+              {value: 'dots', label: 'Puntos'},
+              {value: 'stripes', label: 'Rayas'},
+              {value: 'grid', label: 'Cuadrícula'},
+              {value: 'checkers', label: 'Cuadros'},
+            ]}
+            onChange={(v) => update({backgroundPattern: v as CommonCanvasConfig['backgroundPattern']})}
+          />
+          <ColorInput label="Color del patrón" value={value.background ?? '#3b82f6'} onChange={(v) => update({background: v || undefined})} />
+          <SliderNumberInput label="Opacidad (%)" value={Math.round((value.backgroundOpacity ?? 1) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundOpacity: v ? v / 100 : undefined})} />
+        </>
+      )}
+
+      {(value.backgroundType ?? 'color') === 'gradient' && (
+        <>
+          <ColorInput label="Color inicial" value={value.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
+          <ColorInput label="Color final" value={value.backgroundSecondary ?? '#1f2937'} onChange={(v) => update({backgroundSecondary: v || undefined})} />
+          <SliderNumberInput label="Ángulo (grados)" value={value.backgroundAngle ?? 135} min={0} max={360} step={15} onChange={(v) => update({backgroundAngle: v || undefined})} />
+          <SliderNumberInput label="Opacidad (%)" value={Math.round((value.backgroundOpacity ?? 1) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundOpacity: v ? v / 100 : undefined})} />
+        </>
+      )}
+
+      {(value.backgroundType ?? 'color') === 'image' && (
+        <>
+          <FileUploadInput
+            label="Imagen de fondo"
+            value={value.backgroundImage}
+            onLoad={(dataUrl) => update({backgroundImage: dataUrl})}
+            onClear={() => update({backgroundImage: undefined})}
+          />
+          <SelectControl
+            label="Ajuste"
+            value={value.backgroundFit ?? 'cover'}
+            options={[
+              {value: 'cover', label: 'Cubrir'},
+              {value: 'contain', label: 'Contener'},
+              {value: 'fill', label: 'Rellenar'},
+            ]}
+            onChange={(v) => update({backgroundFit: v as CommonCanvasConfig['backgroundFit']})}
+          />
+          <ColorInput label="Color base (debajo)" value={value.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
+          <SliderNumberInput label="Opacidad (%)" value={Math.round((value.backgroundOpacity ?? 1) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundOpacity: v ? v / 100 : undefined})} />
+        </>
+      )}
+
+      <SliderNumberInput label="Desenfoque del fondo (blur px)" value={value.backgroundBlur ?? 0} min={0} max={30} step={1} onChange={(v) => update({backgroundBlur: v || undefined})} />
+    </Section>
+  );
+}
+
+// Typed subset for the Timeline Race branch (its config is a superset of the
+// shared fields, so the union prop is narrowed here for convenient access).
+type TimelineRacePanelProps = Omit<AnimationConfigPanelProps, 'value' | 'onChange'> & {
+  value: TimelineRaceConfig;
+  onChange: (next: TimelineRaceConfig) => void;
+};
+
+// Timeline Race config UI: header (shared) + cols + x/y axis + date + ranking
+// reveal + avatar + bars + label + canvas (shared).
+function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, participants = []}: TimelineRacePanelProps) {
   const update = (patch: Partial<TimelineRaceConfig>) => onChange({...value, ...patch});
   const fmt = (value.dateFormat ?? 'day') as DateFormat;
   const setCrop = (label: string, patch?: Partial<AvatarCrop>) => {
@@ -115,51 +248,7 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
 
   return (
     <div className="space-y-3">
-      <Section title="Header" defaultOpen>
-        <div>
-          <label className="text-sm font-medium mb-1 block">Título (multilínea)</label>
-          <textarea
-            value={value.title ?? ''}
-            onChange={(e) => update({title: e.target.value || undefined})}
-            placeholder="Título de la animación"
-            rows={2}
-            className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500 resize-y"
-          />
-          <p className="text-[10px] text-muted mt-0.5">
-            Si se deja vacío se usa el título de la visualización. Usa Enter para saltar de línea.
-          </p>
-        </div>
-        <div className="pt-2 mt-1 border-t border-border-subtle">
-          <p className="text-[10px] text-muted mb-1.5">Posición del título (offset en px desde su lugar por defecto).</p>
-          <div className="grid grid-cols-2 gap-2">
-            <NumberInput label="X (px)" value={value.titleX} min={-400} max={400} step={4} onChange={(v) => update({titleX: v})} />
-            <NumberInput label="Y (px)" value={value.titleY} min={-400} max={400} step={4} onChange={(v) => update({titleY: v})} />
-          </div>
-        </div>
-        <div className="pt-2 mt-1 border-t border-border-subtle">
-          <RaceTextControls label="Texto del título" value={value.titleText} onChange={(patch) => update({titleText: {...(value.titleText ?? {}), ...patch}})} />
-        </div>
-        <div className="pt-2 mt-1 border-t border-border-subtle">
-          <label className="text-sm font-medium mb-1 block">Subtítulo</label>
-          <input
-            type="text"
-            value={value.subtitle ?? ''}
-            onChange={(e) => update({subtitle: e.target.value || undefined})}
-            placeholder="Subtítulo (opcional)"
-            className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-          />
-        </div>
-        <div className="pt-2 mt-1 border-t border-border-subtle">
-          <p className="text-[10px] text-muted mb-1.5">Posición del subtítulo (offset en px desde su lugar por defecto).</p>
-          <div className="grid grid-cols-2 gap-2">
-            <NumberInput label="X (px)" value={value.subtitleX} min={-400} max={400} step={4} onChange={(v) => update({subtitleX: v})} />
-            <NumberInput label="Y (px)" value={value.subtitleY} min={-400} max={400} step={4} onChange={(v) => update({subtitleY: v})} />
-          </div>
-        </div>
-        <div className="pt-2 mt-1 border-t border-border-subtle">
-          <RaceTextControls label="Texto del subtítulo" value={value.subtitleText} onChange={(patch) => update({subtitleText: {...(value.subtitleText ?? {}), ...patch}})} />
-        </div>
-      </Section>
+      <HeaderSection value={value} update={update} />
 
       <Section title="Datos" defaultOpen>
         <FieldSelect
@@ -578,77 +667,186 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
       </Section>
 
       {/* ============ CANVAS ============ */}
-      <Section title="Canvas">
-        <SelectControl
-          label="Tipo de fondo"
-          value={value.backgroundType ?? 'color'}
-          options={[
-            {value: 'color', label: 'Color único'},
-            {value: 'pattern', label: 'Patrón'},
-            {value: 'gradient', label: 'Degradado'},
-            {value: 'image', label: 'Imagen'},
-          ]}
-          onChange={(v) => update({backgroundType: v as TimelineRaceConfig['backgroundType']})}
-        />
-
-        {(value.backgroundType ?? 'color') === 'color' && (
-          <ColorInput label="Color de fondo" value={value.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
-        )}
-
-        {(value.backgroundType ?? 'color') === 'pattern' && (
-          <>
-            <SelectControl
-              label="Patrón"
-              value={value.backgroundPattern ?? 'dots'}
-              options={[
-                {value: 'dots', label: 'Puntos'},
-                {value: 'stripes', label: 'Rayas'},
-                {value: 'grid', label: 'Cuadrícula'},
-                {value: 'checkers', label: 'Cuadros'},
-              ]}
-              onChange={(v) => update({backgroundPattern: v as TimelineRaceConfig['backgroundPattern']})}
-            />
-            <ColorInput label="Color del patrón" value={value.background ?? '#3b82f6'} onChange={(v) => update({background: v || undefined})} />
-            <SliderNumberInput label="Opacidad (%)" value={Math.round((value.backgroundOpacity ?? 1) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundOpacity: v ? v / 100 : undefined})} />
-          </>
-        )}
-
-        {(value.backgroundType ?? 'color') === 'gradient' && (
-          <>
-            <ColorInput label="Color inicial" value={value.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
-            <ColorInput label="Color final" value={value.backgroundSecondary ?? '#1f2937'} onChange={(v) => update({backgroundSecondary: v || undefined})} />
-            <SliderNumberInput label="Ángulo (grados)" value={value.backgroundAngle ?? 135} min={0} max={360} step={15} onChange={(v) => update({backgroundAngle: v || undefined})} />
-            <SliderNumberInput label="Opacidad (%)" value={Math.round((value.backgroundOpacity ?? 1) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundOpacity: v ? v / 100 : undefined})} />
-          </>
-        )}
-
-        {(value.backgroundType ?? 'color') === 'image' && (
-          <>
-            <FileUploadInput
-              label="Imagen de fondo"
-              value={value.backgroundImage}
-              onLoad={(dataUrl) => update({backgroundImage: dataUrl})}
-              onClear={() => update({backgroundImage: undefined})}
-            />
-            <SelectControl
-              label="Ajuste"
-              value={value.backgroundFit ?? 'cover'}
-              options={[
-                {value: 'cover', label: 'Cubrir'},
-                {value: 'contain', label: 'Contener'},
-                {value: 'fill', label: 'Rellenar'},
-              ]}
-              onChange={(v) => update({backgroundFit: v as TimelineRaceConfig['backgroundFit']})}
-            />
-            <ColorInput label="Color base (debajo)" value={value.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
-            <SliderNumberInput label="Opacidad (%)" value={Math.round((value.backgroundOpacity ?? 1) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundOpacity: v ? v / 100 : undefined})} />
-          </>
-        )}
-
-        <SliderNumberInput label="Desenfoque del fondo (blur px)" value={value.backgroundBlur ?? 0} min={0} max={30} step={1} onChange={(v) => update({backgroundBlur: v || undefined})} />
-      </Section>
+      <CanvasSection value={value} update={update} />
     </div>
   );
+}
+
+function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: {
+  columns: string[];
+  fieldMeta: ColumnMeta[];
+  value: RankingConfig;
+  onChange: (next: RankingConfig) => void;
+  participants?: Participant[];
+}) {
+  const update = (patch: Partial<RankingConfig>) => onChange({...value, ...patch});
+  const [colorQ, setColorQ] = useState('');
+  const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const filteredColors = participants.filter((p) => (colorQ.trim() === '' ? true : norm(p.label).includes(norm(colorQ))));
+  const setRowColor = (label: string, color?: string) => {
+    const next = {...(value.rowColors ?? {})};
+    if (color) next[label] = color;
+    else delete next[label];
+    update({rowColors: next});
+  };
+
+  return (
+    <div className="space-y-3">
+      <HeaderSection value={value} update={update} />
+
+      <Section title="Datos" defaultOpen>
+        <FieldSelect
+          label="Entidad / etiqueta"
+          value={value.labelField ?? ''}
+          options={fieldMeta}
+          fallback={columns}
+          onChange={(f) => update({labelField: f || undefined})}
+        />
+        <FieldSelect
+          label="Campo de valor"
+          value={value.valueField ?? ''}
+          options={fieldMeta}
+          fallback={columns}
+          role="numeric"
+          onChange={(f) => update({valueField: f || undefined})}
+        />
+        <FieldSelect
+          label="Imagen de la entidad (opcional)"
+          value={value.imageField ?? ''}
+          options={fieldMeta}
+          fallback={columns}
+          role="any"
+          optional
+          onChange={(f) => update({imageField: f || undefined})}
+        />
+      </Section>
+
+      <Section title="Ranking" defaultOpen>
+        <div>
+          <label className="text-sm font-medium mb-1 block">Revelado</label>
+          <div className="grid grid-cols-2 gap-1">
+            {([{v: 'desc', l: 'Cuenta regresiva'}, {v: 'asc', l: 'Ascendente'}] as const).map((o) => (
+              <button
+                key={o.v}
+                type="button"
+                onClick={() => update({revealDirection: o.v})}
+                className={`px-2 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  (value.revealDirection ?? 'desc') === o.v
+                    ? 'bg-amber-500 text-black'
+                    : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
+                }`}
+              >
+                {o.l}
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-muted mt-0.5">
+            Cuenta regresiva: cae primero el último puesto y el #1 se revela al final. Ascendente: entra primero el #1.
+          </p>
+        </div>
+        <div>
+          <label className="text-sm font-medium mb-1 block">Máximo de entidades</label>
+          <input
+            type="number"
+            min={0}
+            max={50}
+            value={value.maxRows ?? 0}
+            onChange={(e) => update({maxRows: Number(e.target.value) || undefined})}
+            className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+          />
+          <p className="text-[10px] text-muted mt-0.5">0 = sin límite. Limita cuántas entidades participan (el top-N por valor).</p>
+        </div>
+        <Toggle label="Contar cada dato hasta su valor" checked={value.countUp ?? true} onChange={(v) => update({countUp: v})} />
+        <SliderNumberInput
+          label="Duración del revelado (s)"
+          value={value.countUpDurationSeconds ?? 0}
+          min={0}
+          max={60}
+          step={1}
+          onChange={(v) => update({countUpDurationSeconds: v > 0 ? v : undefined})}
+        />
+        <p className="text-[10px] text-muted mt-0.5">
+          Tiempo en que entran todas las filas. 0 = automático (ocupa el tiempo disponible).
+        </p>
+        <SliderNumberInput
+          label="Congelar resultado final (s)"
+          value={value.holdFinalSeconds ?? 2}
+          min={0}
+          max={10}
+          step={1}
+          onChange={(v) => update({holdFinalSeconds: v})}
+        />
+        <Toggle label="Mostrar puesto (#1)" checked={value.showRank ?? true} onChange={(v) => update({showRank: v})} />
+        <Toggle label="Mostrar el dato" checked={value.showValue ?? true} onChange={(v) => update({showValue: v})} />
+        <Toggle label="Mostrar carril" checked={value.showRail ?? true} onChange={(v) => update({showRail: v})} />
+        <div>
+          <label className="text-sm font-medium mb-1 block">Prefijo del puesto</label>
+          <input
+            value={value.rankPrefix ?? '#'}
+            onChange={(e) => update({rankPrefix: e.target.value || undefined})}
+            className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+          />
+        </div>
+      </Section>
+
+      <Section title="Colores">
+        <ColorInput label="Color del líder" value={value.accentColor ?? '#FFD700'} onChange={(v) => update({accentColor: v || undefined})} />
+        {participants.length > 0 && (
+          <>
+            <div className="flex items-center justify-between mb-0.5">
+              <label className="text-sm font-medium block">Colores por entidad</label>
+              {Object.keys(value.rowColors ?? {}).length > 0 && (
+                <button type="button" onClick={() => update({rowColors: undefined})} className="text-[10px] text-muted hover:text-red-500">
+                  Limpiar todos
+                </button>
+              )}
+            </div>
+            <EntitySearch value={colorQ} onChange={setColorQ} shown={filteredColors.length} total={participants.length} />
+            <div className="space-y-1.5">
+              {filteredColors.map((p) => {
+                const color = value.rowColors?.[p.label] ?? '#475569';
+                return (
+                  <div key={p.label} className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={color}
+                      onChange={(e) => setRowColor(p.label, e.target.value)}
+                      className="w-8 h-8 rounded cursor-pointer border border-border-default bg-transparent"
+                      aria-label={`Color de ${p.label}`}
+                    />
+                    <span className="text-xs text-secondary truncate flex-1">{p.label}</span>
+                    {value.rowColors?.[p.label] && (
+                      <button onClick={() => setRowColor(p.label)} className="text-muted hover:text-red-500 px-1 text-xs" aria-label={`Restablecer color de ${p.label}`}>
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </Section>
+
+      <Section title="Etiqueta">
+        <RaceTextControls label="Texto del puesto (#1)" value={value.rankText} onChange={(patch) => update({rankText: {...(value.rankText ?? {}), ...patch}})} />
+        <div className="h-px bg-border-default my-3" />
+        <RaceTextControls label="Texto de la etiqueta" value={value.labelText} onChange={(patch) => update({labelText: {...(value.labelText ?? {}), ...patch}})} />
+        <div className="h-px bg-border-default my-3" />
+        <RaceTextControls label="Texto del dato" value={value.valueText} onChange={(patch) => update({valueText: {...(value.valueText ?? {}), ...patch}})} />
+      </Section>
+
+      <CanvasSection value={value} update={update} />
+    </div>
+  );
+}
+
+export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onChange, participants = []}: AnimationConfigPanelProps) {
+  if (templateId === 'ranking') {
+    return <RankingPanel columns={columns} fieldMeta={fieldMeta} value={value as RankingConfig} onChange={onChange as (n: RankingConfig) => void} participants={participants} />;
+  }
+  if (templateId !== 'timeline-race') return null;
+  return <TimelineRacePanel templateId={templateId} columns={columns} fieldMeta={fieldMeta} value={value as TimelineRaceConfig} onChange={onChange as (n: TimelineRaceConfig) => void} participants={participants} />;
 }
 
 function SelectControl({label, value, options, onChange}: {label: string; value: string; options: {value: string; label: string}[]; onChange: (v: string) => void}) {

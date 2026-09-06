@@ -44,6 +44,9 @@ const LAZY_COMPONENTS: Record<string, React.LazyExoticComponent<React.FC<any>>> 
   'timeline-race': React.lazy(() =>
     import('@/remotion/templates/timeline-race').then((m) => ({default: m.TimelineRace})),
   ),
+  'ranking': React.lazy(() =>
+    import('@/remotion/templates/ranking').then((m) => ({default: m.Ranking})),
+  ),
 };
 
 export function AnimationPreview({

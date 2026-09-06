@@ -139,9 +139,18 @@ export function matchTemplates(
     scoreTemplate(id, columns, normalizedColumns, data.length, colTypes),
   );
 
+  // Tie-break preference: among equally-scored templates, keep the original
+  // default first so adding new templates doesn't silently flip the suggested
+  // one (timeline-race stays preferred over ranking on identical scores).
+  const PREFER: TemplateId[] = ['timeline-race'];
+  const pref = (id: TemplateId) => {
+    const i = PREFER.indexOf(id);
+    return i === -1 ? PREFER.length : i;
+  };
+
   return results
     .filter((r) => r.score > 0)
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => b.score - a.score || pref(a.templateId) - pref(b.templateId));
 }
 
 export function suggestBestTemplate(
