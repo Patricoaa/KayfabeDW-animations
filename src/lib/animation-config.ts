@@ -227,6 +227,15 @@ export type RankingConfig = CommonAnimationConfig & {
   showRank?: boolean;
   showValue?: boolean;
 
+  // Display mode: 'bars' (default, animated bars) or 'table' (minimalist table
+  // with horizontal separators only; count-up, drop-in and the per-position
+  // image frame still apply).
+  rankMode?: 'bars' | 'table';
+
+  // Whether per-entity avatars render (default ON). When OFF no avatar is drawn
+  // and no width is reserved for it.
+  showAvatar?: boolean;
+
   // Prefix for the rank number (e.g. "#"), empty = no prefix.
   rankPrefix?: string;
 
@@ -251,6 +260,19 @@ export type RankingConfig = CommonAnimationConfig & {
   // positions + a slow one-way left→right pan over the reveal window).
   rowImages?: Record<string, string>;
   rowImageCrops?: Record<string, AvatarCrop>;
+
+  // Per-entity image source mode for the frame. 'entity' uses the entity's
+  // image field (the avatar source, falling back to `rowImages`); 'url'/'file'
+  // use the manually entered `rowImages` value.
+  rowImageModes?: Record<string, 'entity' | 'url' | 'file'>;
+
+  // Optional "puesto" label overlaid on the frame image (global): show/hide,
+  // offset inside the frame and its own text style. Content = rankPrefix +
+  // position.
+  rowImageLabel?: boolean;
+  rowImageLabelX?: number;
+  rowImageLabelY?: number;
+  rowImageLabelText?: RaceTextStyle;
 
   // Global frame (right side of the canvas). `rowImageWidth` is the frame width
   // in px (empty = auto, right side; no upper cap, can reach the full canvas

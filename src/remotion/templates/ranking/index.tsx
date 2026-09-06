@@ -19,10 +19,12 @@ export type RankingItem = {
 // reveals #1 first and closes with the tail of the ranking. When `countUp` is
 // on (default), each datum counts up from 0 to its real value as its row
 // drops in; the optional avatar renders via the shared Avatar (per-entity
-// crops supported). With `rowImages` set, a global frame takes the right side
-// of the canvas, the rows squeeze to the left, and the frame shows the image
-// of the position being revealed (fade in + one-way left→right pan). The frame
-// width has no cap, so it can span the full canvas. Fully responsive: reads
+// crops supported). `rankMode` switches between animated bars and a minimal
+// table (horizontal separators only); `showAvatar` hides all avatars. With
+// `rowImages` set, a global frame takes the right side of the canvas, the rows
+// squeeze to the left, and the frame shows the image of the position being
+// revealed (fade in + one-way left→right pan). The frame width has no cap, so
+// it can span the full canvas. Fully responsive: reads
 // `useVideoConfig()` and re-flows for portrait (9:16), post (4:5), square and
 // landscape while keeping the rows proportional.
 export type RankingProps = {
@@ -36,6 +38,8 @@ export type RankingProps = {
   holdFinalSeconds?: number;
   showRank?: boolean;
   showValue?: boolean;
+  rankMode?: 'bars' | 'table';
+  showAvatar?: boolean;
   rankPrefix?: string;
   avatarCrops?: Record<string, {zoom?: number; focusX?: number; focusY?: number}>;
   avatarSize?: number;
@@ -44,6 +48,11 @@ export type RankingProps = {
   rowColors?: Record<string, string>;
   rowImages?: Record<string, string>;
   rowImageCrops?: Record<string, {zoom?: number; focusX?: number; focusY?: number}>;
+  rowImageModes?: Record<string, 'entity' | 'url' | 'file'>;
+  rowImageLabel?: boolean;
+  rowImageLabelX?: number;
+  rowImageLabelY?: number;
+  rowImageLabelText?: RaceTextStyle;
   rowImageWidth?: number;
   rowImageHeight?: number;
   rowImageX?: number;
@@ -89,6 +98,8 @@ export const Ranking: React.FC<RankingProps> = ({
   holdFinalSeconds = 2,
   showRank = true,
   showValue = true,
+  rankMode = 'bars',
+  showAvatar = true,
   rankPrefix = '#',
   avatarCrops,
   avatarSize,
@@ -97,6 +108,11 @@ export const Ranking: React.FC<RankingProps> = ({
   rowColors,
   rowImages,
   rowImageCrops,
+  rowImageModes,
+  rowImageLabel,
+  rowImageLabelX = 12,
+  rowImageLabelY = 12,
+  rowImageLabelText,
   rowImageWidth,
   rowImageHeight,
   rowImageX,
@@ -154,14 +170,23 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
   const ROW_FONT = isPortrait ? Math.round(W * 0.045) : 21;
   const RANK_W = isPortrait ? Math.round(W * 0.11) : 72;
   const AVATAR = avatarSize ?? (isPortrait ? Math.round(W * 0.09) : 48);
+  const avatarVisible = showAvatar !== false && AVATAR > 0;
   const GAP = isPortrait ? 12 : 16;
   const GAP_H = rowGapH ?? GAP;
 
   const innerW = W - PAD_L - PAD_R;
 
+  // Effective per-position image source: 'entity' mode uses the entity's image
+  // field (the avatar source), falling back to the manual rowImages entry;
+  // 'url'/'file' (and the default) use the manual entry directly.
+  const rowImageFor = (label: string, image?: string | null) =>
+    rowImageModes?.[label] === 'entity' ? image ?? rowImages?.[label] ?? null : rowImages?.[label] ?? null;
+
   // Split layout when per-position images are configured: a global frame takes
   // the right side of the canvas and the ranking rows squeeze to the left.
-  const HAS_FRAME = rowImages != null && Object.keys(rowImages).length > 0;
+  const HAS_FRAME =
+    (rowImages != null && Object.keys(rowImages).length > 0) ||
+    ranked.some((r) => rowImageModes?.[r.label] === 'entity' && !!rowImageFor(r.label, r.image));
   const FRAME_W0 = rowImageWidth ?? Math.round(innerW * 0.36);
   const FRAME_W = HAS_FRAME ? Math.max(Math.round(FRAME_W0), 16) : 0;
   const FRAME_GAP = HAS_FRAME ? GAP_H : 0;
@@ -179,7 +204,7 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
   const rowLaneH = ROW_H + ROW_GAP;
 
   const segPixelW = (rankW: number, avatarW: number) =>
-    (showRank ? rankW + GAP_H : 0) + (avatarW > 0 ? avatarW + GAP_H : 0);
+    (showRank ? rankW + GAP_H : 0) + (avatarVisible && avatarW > 0 ? avatarW + GAP_H : 0);
   const BAR_FACTOR = Math.min(Math.max(barWidth ?? 1, 0.4), 1.5);
   const BAR_TRACK_W = Math.max(Math.round((rowsInnerW - segPixelW(RANK_W, AVATAR)) * BAR_FACTOR), 80);
   const GROOVE_H = Math.max(10, ROW_H * 0.42);
@@ -247,7 +272,7 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
             </span>
           </div>
         )}
-        {hasAvatar && <Avatar src={item.image!} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(item.label, item.image)} />}
+        {avatarVisible && hasAvatar && <Avatar src={item.image!} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(item.label, item.image)} />}
         <div style={{flex: 1, height: BAR_H, position: 'relative', display: 'flex', alignItems: 'center'}}>
           {showRail !== false && (
             <div style={{position: 'absolute', left: 0, right: 0, top: '50%', height: GROOVE_H, transform: 'translateY(-50%)', backgroundColor: '#171717', borderRadius: 999, opacity: pop}} />
@@ -270,17 +295,75 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
     );
   };
 
+  // Table mode: minimalist rows, only horizontal separators. Same timing
+  // (count-up, drop-in, leader highlight), no bars/rail.
+  const renderRowTable = (item: RankingItem, index: number) => {
+    const start = EASE + sequencePos(index) * step;
+    const prog = Math.max(0, Math.min((frame - start) / Math.max(step, 1), 1));
+    const easeOut = Easing.out(Easing.cubic)(prog);
+    const isLeader = index === 0;
+
+    const pop = spring({fps, frame: frame - start, config: {damping: 20, stiffness: 110}, durationInFrames: Math.max(step, 1)});
+    const displayValue = countUp ? Math.round(item.value * easeOut) : item.value;
+
+    const rowFinalY = rowsTop + index * rowLaneH;
+    const dropFrom = rowFinalY + ROW_H + ROW_GAP + ROW_H * 0.4;
+    const top = rowFinalY + (dropFrom - rowFinalY) * (1 - easeOut);
+
+    const hasAvatar = !!item.image;
+    const laneLabel = `${rankPrefix}${index + 1}`;
+
+    return (
+      <div
+        key={`${item.label}-${index}`}
+        style={{
+          position: 'absolute',
+          left: 0,
+          top,
+          width: rowsInnerW,
+          height: ROW_H,
+          display: 'flex',
+          alignItems: 'center',
+          gap: GAP_H,
+          opacity: Math.min(pop, 1),
+          borderBottom: '1px solid rgba(255,255,255,0.14)',
+        }}
+      >
+        {showRank && (
+          <div style={{width: RANK_W, flexShrink: 0, textAlign: 'left'}}>
+            <span style={{fontVariantNumeric: 'tabular-nums', ...textStyle(rankText, {color: isLeader ? accentColor : '#94a3b8', size: Math.round(ROW_FONT * (isLeader ? 1.25 : 1.05)), weight: 900})}}>
+              {laneLabel}
+            </span>
+          </div>
+        )}
+        {avatarVisible && hasAvatar && <Avatar src={item.image!} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(item.label, item.image)} />}
+        <div style={{flex: 1, minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', ...textStyle(labelText, {color: '#d4d4d8', size: Math.round(ROW_FONT * 0.92), weight: 700})}}>
+          {item.label}
+        </div>
+        {showValue && (
+          <div style={{flexShrink: 0, maxWidth: '36%', overflow: 'hidden', ...textStyle(valueText, {color: isLeader ? accentColor : '#ffffff', size: ROW_FONT, weight: 800})}}>
+            <span style={{fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', display: 'block', textAlign: 'right', textOverflow: 'ellipsis', overflow: 'hidden'}}>
+              {fmtValue(displayValue, valueFormat, currencySymbol)}
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // ---- Global right-side frame ----
   // The image of the position currently being revealed fills the frame: it
   // fades in over the reveal window and pans left→right once (slow, so the
   // travel lasts until the next position drops in).
   let activeLabel: string | undefined;
+  let activeIndex = -1;
   let activeStart = -Infinity;
   if (HAS_FRAME) {
     ranked.forEach((r, i) => {
       const st = EASE + sequencePos(i) * step;
       if (st <= frame && st >= activeStart) {
         activeLabel = r.label;
+        activeIndex = i;
         activeStart = st;
       }
     });
@@ -308,26 +391,35 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
     return {z: Math.max(z, 0.1), tx: clampX, ty: clampY};
   };
 
-  const frameLayer = (label: string, pan: number, opacity: number) => {
-    const src = rowImages?.[label];
+  const frameLayer = (item: RankingItem, index: number, pan: number, opacity: number) => {
+    const src = rowImageFor(item.label, item.image);
     if (!src) return null;
-    const g = frameImgGeom(label, pan);
+    const g = frameImgGeom(item.label, pan);
     return (
-      <Img
-        src={src}
-        style={{
-          position: 'absolute',
-          left: 0,
-          top: 0,
-          width: '100%',
-          height: '100%',
-          transform: `translate(${g.tx}px, ${g.ty}px) scale(${g.z})`,
-          transformOrigin: '0 0',
-          objectFit: 'cover',
-          maxWidth: 'none',
-          opacity,
-        }}
-      />
+      <>
+        <Img
+          src={src}
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            width: '100%',
+            height: '100%',
+            transform: `translate(${g.tx}px, ${g.ty}px) scale(${g.z})`,
+            transformOrigin: '0 0',
+            objectFit: 'cover',
+            maxWidth: 'none',
+            opacity,
+          }}
+        />
+        {rowImageLabel && (
+          <div style={{position: 'absolute', left: rowImageLabelX ?? 12, top: rowImageLabelY ?? 12, pointerEvents: 'none', opacity}}>
+            <span style={{fontVariantNumeric: 'tabular-nums', textShadow: '0 1px 3px rgba(0,0,0,0.6)', ...textStyle(rowImageLabelText, {color: '#ffffff', size: Math.round(ROW_FONT * 1.35), weight: 900})}}>
+              {rankPrefix}{index + 1}
+            </span>
+          </div>
+        )}
+      </>
     );
   };
 
@@ -373,7 +465,7 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
         fallbackTitle="Ranking"
       />
       <div style={{flex: 1, position: 'relative', marginTop: rowsMarginTop, overflow: 'hidden', transform: `translate(${rowsX ?? 0}px, ${rowsY ?? 0}px)`}}>
-        <div style={{position: 'absolute', inset: 0}}>{ranked.map((r, i) => renderRow(r, i))}</div>
+        <div style={{position: 'absolute', inset: 0}}>{ranked.map((r, i) => (rankMode === 'table' ? renderRowTable(r, i) : renderRow(r, i)))}</div>
       </div>
       {HAS_FRAME && (
         <div
@@ -389,7 +481,7 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
             boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)',
           }}
         >
-          {activeLabel && frameLayer(activeLabel, framePan, frameFade)}
+          {activeLabel && activeIndex >= 0 && frameLayer(ranked[activeIndex], activeIndex, framePan, frameFade)}
         </div>
       )}
     </div>

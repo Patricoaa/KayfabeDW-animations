@@ -700,6 +700,11 @@ function RowImageSection({value, onChange, participants = []}: {
     else delete next[label];
     onChange({rowImageCrops: next});
   };
+  const setImageMode = (label: string, mode: 'entity' | 'url' | 'file') => {
+    const next = {...(value.rowImageModes ?? {})};
+    next[label] = mode;
+    onChange({rowImageModes: next});
+  };
   const imageRefs = React.useRef<Record<string, HTMLInputElement | null>>({});
   return (
     <Section title="Imagen por puesto">
@@ -735,12 +740,27 @@ function RowImageSection({value, onChange, participants = []}: {
         <NumberInput label="Offset Y (px)" value={value.rowImageY} min={-1600} max={1600} step={8} onChange={(v) => onChange({rowImageY: v})} />
       </div>
       <Toggle label="Traslado izquierda→derecha (una vez, al relevar)" checked={value.rowImagePan ?? true} onChange={(v) => onChange({rowImagePan: v})} />
+      <hr className="border-border-subtle my-2" />
+      <Toggle label="Mostrar el puesto en la imagen" checked={value.rowImageLabel ?? false} onChange={(v) => onChange({rowImageLabel: v})} />
+      {value.rowImageLabel && (
+        <>
+          <div className="grid grid-cols-2 gap-2">
+            <NumberInput label="Offset X (px)" value={value.rowImageLabelX} min={-600} max={600} step={4} onChange={(v) => onChange({rowImageLabelX: v})} />
+            <NumberInput label="Offset Y (px)" value={value.rowImageLabelY} min={-600} max={600} step={4} onChange={(v) => onChange({rowImageLabelY: v})} />
+          </div>
+          <RaceTextControls
+            label="Texto del puesto"
+            value={value.rowImageLabelText}
+            onChange={(patch) => onChange({rowImageLabelText: {...(value.rowImageLabelText ?? {}), ...patch}})}
+          />
+        </>
+      )}
       {(participants.length > 0) && (
         <div className="pt-2 border-t border-border-subtle">
           <div className="flex items-center justify-between mb-0.5">
             <label className="text-sm font-medium block">Imagen por entidad</label>
-            {Object.keys(value.rowImages ?? {}).length > 0 && (
-              <button type="button" onClick={() => onChange({rowImages: undefined, rowImageCrops: undefined})} className="text-[10px] text-muted hover:text-red-500">
+            {((Object.keys(value.rowImages ?? {}).length > 0) || (Object.keys(value.rowImageModes ?? {}).length > 0)) && (
+              <button type="button" onClick={() => onChange({rowImages: undefined, rowImageCrops: undefined, rowImageModes: undefined})} className="text-[10px] text-muted hover:text-red-500">
                 Limpiar todas
               </button>
             )}
@@ -749,6 +769,8 @@ function RowImageSection({value, onChange, participants = []}: {
           <div className="space-y-2">
             {filtered.map((p) => {
               const src = value.rowImages?.[p.label];
+              const mode = value.rowImageModes?.[p.label] ?? 'url';
+              const effSrc = mode === 'entity' ? p.image : src;
               const cr = value.rowImageCrops?.[p.label];
               const PW = 56;
               const PH = 64;
@@ -770,15 +792,29 @@ function RowImageSection({value, onChange, participants = []}: {
                 <div key={p.label} className="border border-border-subtle rounded p-2">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs text-secondary truncate" title={p.label}>{p.label}</span>
-                    {src && (
+                    {src && mode !== 'entity' && (
                       <button type="button" onClick={() => setImage(p.label)} className="text-muted hover:text-red-500 text-xs" aria-label={`Quitar imagen de ${p.label}`}>✕</button>
                     )}
                   </div>
+                  <div className="grid grid-cols-3 gap-1 mb-2">
+                    {([['entity', 'Entidad'], ['url', 'URL'], ['file', 'Archivo']] as const).map(([v, l]) => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => setImageMode(p.label, v)}
+                        className={`px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                          mode === v ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
+                        }`}
+                      >
+                        {l}
+                      </button>
+                    ))}
+                  </div>
                   <div className="flex items-start gap-3">
                     <div className="shrink-0 mt-1">
-                      {src ? (
+                      {effSrc ? (
                         <div style={previewStyle}>
-                          <img src={src} alt="" style={{position: 'absolute' as const, left: 0, top: 0, width: '100%', height: '100%', transform: `translate(${ptx}px, ${pty}px) scale(${z})`, transformOrigin: '0 0', objectFit: 'cover' as const, maxWidth: 'none'}} />
+                          <img src={effSrc} alt="" style={{position: 'absolute' as const, left: 0, top: 0, width: '100%', height: '100%', transform: `translate(${ptx}px, ${pty}px) scale(${z})`, transformOrigin: '0 0', objectFit: 'cover' as const, maxWidth: 'none'}} />
                         </div>
                       ) : (
                         <div style={{...previewStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-elevated)'}}>
@@ -792,34 +828,45 @@ function RowImageSection({value, onChange, participants = []}: {
                       <NumberInput label="Foco Y" value={cr ? (cr.focusY ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setCrop(p.label, {...cr, focusY: (v ?? 0) / 100})} />
                     </div>
                   </div>
-                  <div className="mt-2">
-                    <label className="text-sm font-medium mb-1 block">URL</label>
-                    <input
-                      type="text"
-                      value={src ?? ''}
-                      onChange={(e) => setImage(p.label, e.target.value)}
-                      placeholder="https://… o archivo"
-                      className="w-full bg-elevated border border-border-default rounded-lg px-3 py-1.5 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-                    />
-                  </div>
-                  <div className="mt-1.5">
-                    <input
-                      ref={(el) => { imageRefs.current[p.label] = el; }}
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        const reader = new FileReader();
-                        reader.onload = () => {
-                          if (typeof reader.result === 'string') setImage(p.label, reader.result);
-                        };
-                        reader.readAsDataURL(file);
-                        e.target.value = '';
-                      }}
-                      className="w-full text-xs text-muted file:mr-2 file:rounded-lg file:border-0 file:bg-elevated file:px-2 file:py-1 file:text-xs file:font-medium"
-                    />
-                  </div>
+                  {mode === 'url' && (
+                    <div className="mt-2">
+                      <label className="text-sm font-medium mb-1 block">URL</label>
+                      <input
+                        type="text"
+                        value={src ?? ''}
+                        onChange={(e) => setImage(p.label, e.target.value)}
+                        placeholder="https://…"
+                        className="w-full bg-elevated border border-border-default rounded-lg px-3 py-1.5 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      />
+                    </div>
+                  )}
+                  {mode === 'file' && (
+                    <div className="mt-1.5">
+                      <input
+                        ref={(el) => { imageRefs.current[p.label] = el; }}
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            if (typeof reader.result === 'string') setImage(p.label, reader.result);
+                          };
+                          reader.readAsDataURL(file);
+                          e.target.value = '';
+                        }}
+                        className="w-full text-xs text-muted file:mr-2 file:rounded-lg file:border-0 file:bg-elevated file:px-2 file:py-1 file:text-xs file:font-medium"
+                      />
+                    </div>
+                  )}
+                  {mode === 'entity' && (
+                    <p className="text-[10px] text-muted mt-1.5">
+                      {p.image
+                        ? 'Usa la imagen de la entidad (campo de imagen del bloque Datos).'
+                        : 'La entidad no tiene imagen: define el campo de imagen en Datos o usa URL/Archivo.'}
+                    </p>
+                  )}
                 </div>
               );
             })}
@@ -902,6 +949,28 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
 
       <Section title="Ranking" defaultOpen>
         <div>
+          <label className="text-sm font-medium mb-1 block">Modo de ranking</label>
+          <div className="grid grid-cols-2 gap-1">
+            {([{v: 'bars', l: 'Barras'}, {v: 'table', l: 'Tabla'}] as const).map((o) => (
+              <button
+                key={o.v}
+                type="button"
+                onClick={() => update({rankMode: o.v})}
+                className={`px-2 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  (value.rankMode ?? 'bars') === o.v
+                    ? 'bg-amber-500 text-black'
+                    : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
+                }`}
+              >
+                {o.l}
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-muted mt-0.5">
+            Barras: barras animadas. Tabla: filas minimalistas con separadores horizontales (cuenta, revelado y marco de imagen se mantienen).
+          </p>
+        </div>
+        <div>
           <label className="text-sm font-medium mb-1 block">Revelado</label>
           <div className="grid grid-cols-2 gap-1">
             {([{v: 'desc', l: 'Cuenta regresiva'}, {v: 'asc', l: 'Ascendente'}] as const).map((o) => (
@@ -955,6 +1024,9 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
       <Section title="Filas">
         <SliderNumberInput label="Separación vertical (px)" value={value.rowGap ?? 0} min={0} max={120} step={2} onChange={(v) => update({rowGap: v || undefined})} />
         <SliderNumberInput label="Separación horizontal (px)" value={value.rowGapH ?? 0} min={0} max={80} step={2} onChange={(v) => update({rowGapH: v || undefined})} />
+        <p className="text-[10px] text-muted">
+          Aplican a los dos modos (barras y tabla); la separación horizontal también reserva espacio alrededor del puesto cuando está visible.
+        </p>
         <SelectControl
           label="Formato del valor"
           value={value.valueFormat ?? 'number'}
@@ -971,17 +1043,21 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
             />
           </div>
         )}
-        <SliderNumberInput
-          label="Ancho de las barras (%)"
-          value={value.barWidth ? Math.round(value.barWidth * 100) : 100}
-          min={40}
-          max={150}
-          step={5}
-          onChange={(v) => update({barWidth: v ? v / 100 : undefined})}
-        />
-        <p className="text-[10px] text-muted">
-          Multiplica el ancho automático de la barra (100% = el actual). Reduce para que el valor o el avatar respiren.
-        </p>
+        {(value.rankMode ?? 'bars') === 'bars' && (
+          <>
+            <SliderNumberInput
+              label="Ancho de las barras (%)"
+              value={value.barWidth ? Math.round(value.barWidth * 100) : 100}
+              min={40}
+              max={150}
+              step={5}
+              onChange={(v) => update({barWidth: v ? v / 100 : undefined})}
+            />
+            <p className="text-[10px] text-muted">
+              Multiplica el ancho automático de la barra (100% = el actual). Reduce para que el valor o el avatar respiren.
+            </p>
+          </>
+        )}
         <div className="pt-2 mt-1 border-t border-border-subtle">
           <p className="text-[10px] text-muted mb-1.5">Posición del grupo de filas (offset en px desde su lugar por defecto).</p>
           <div className="grid grid-cols-2 gap-2">
@@ -991,6 +1067,7 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
         </div>
       </Section>
 
+      <Toggle label="Mostrar avatares" checked={value.showAvatar ?? true} onChange={(v) => update({showAvatar: v})} />
       <AvatarSection value={value} onChange={update} participants={participants} />
 
       <RowImageSection value={value} onChange={update} participants={participants} />
