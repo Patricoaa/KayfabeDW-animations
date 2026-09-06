@@ -21,8 +21,8 @@ export type RankingItem = {
 // drops in; the optional avatar renders via the shared Avatar (per-entity
 // crops supported). With `rowImages` set, a global frame takes the right side
 // of the canvas, the rows squeeze to the left, and the frame shows the image
-// of the position being revealed (crossfade + one-way left→right pan). Fully
-// responsive: reads the composition size via
+// of the position being revealed (fade in + one-way left→right pan). The frame
+// width has no cap, so it can span the full canvas. Fully responsive: reads
 // `useVideoConfig()` and re-flows for portrait (9:16), post (4:5), square and
 // landscape while keeping the rows proportional.
 export type RankingProps = {
@@ -163,7 +163,7 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
   // the right side of the canvas and the ranking rows squeeze to the left.
   const HAS_FRAME = rowImages != null && Object.keys(rowImages).length > 0;
   const FRAME_W0 = rowImageWidth ?? Math.round(innerW * 0.36);
-  const FRAME_W = HAS_FRAME ? Math.min(Math.max(Math.round(FRAME_W0), 60), Math.round(innerW * 0.7)) : 0;
+  const FRAME_W = HAS_FRAME ? Math.max(Math.round(FRAME_W0), 16) : 0;
   const FRAME_GAP = HAS_FRAME ? GAP_H : 0;
   const rowsInnerW = HAS_FRAME ? Math.max(innerW - FRAME_W - FRAME_GAP, 80) : innerW;
   const rowsMarginTop = isPortrait ? Math.round(H * 0.03) : 36;
@@ -272,16 +272,14 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
 
   // ---- Global right-side frame ----
   // The image of the position currently being revealed fills the frame: it
-  // crossfades from the previous position and pans left→right once (slow, over
-  // the reveal window, so the travel lasts until the next position drops in).
+  // fades in over the reveal window and pans left→right once (slow, so the
+  // travel lasts until the next position drops in).
   let activeLabel: string | undefined;
   let activeStart = -Infinity;
-  let prevLabel: string | undefined;
   if (HAS_FRAME) {
     ranked.forEach((r, i) => {
       const st = EASE + sequencePos(i) * step;
       if (st <= frame && st >= activeStart) {
-        if (activeLabel !== undefined) prevLabel = activeLabel;
         activeLabel = r.label;
         activeStart = st;
       }
@@ -292,7 +290,6 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
       ? 0
       : Math.max(0, Math.min((frame - activeStart) / Math.max(step, 1), 1));
   const frameFade = Easing.out(Easing.cubic)(activeProg);
-  const framePrevFade = activeProg < 1 ? 1 - frameFade : 0;
   const framePan = rowImagePan !== false ? Easing.out(Easing.cubic)(activeProg) : 0;
 
   // Cover-crop geometry for the frame: the image scales by each entity's zoom
@@ -393,7 +390,6 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
             boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)',
           }}
         >
-          {prevLabel && frameLayer(prevLabel, 1, framePrevFade)}
           {activeLabel && frameLayer(activeLabel, framePan, frameFade)}
         </div>
       )}

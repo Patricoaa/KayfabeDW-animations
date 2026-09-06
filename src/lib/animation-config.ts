@@ -253,8 +253,9 @@ export type RankingConfig = CommonAnimationConfig & {
   rowImageCrops?: Record<string, AvatarCrop>;
 
   // Global frame (right side of the canvas). `rowImageWidth` is the frame width
-  // in px (empty = auto, right side); `rowImageHeight` empty = full height of
-  // the rows area. `rowImageX`/`rowImageY` offset the frame on the canvas.
+  // in px (empty = auto, right side; no upper cap, can reach the full canvas
+  // width — rows squeeze left); `rowImageHeight` empty = full height of the
+  // rows area. `rowImageX`/`rowImageY` offset the frame on the canvas.
   // Per-entity `rowImageCrops` zoom/focus adjust each image inside the frame.
   rowImageWidth?: number;
   rowImageHeight?: number;

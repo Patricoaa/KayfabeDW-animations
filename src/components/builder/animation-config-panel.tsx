@@ -704,14 +704,14 @@ function RowImageSection({value, onChange, participants = []}: {
   return (
     <Section title="Imagen por puesto">
       <p className="text-[10px] text-muted">
-        Marco global en el costado derecho del canvas: las filas se comprimen a la izquierda y el marco muestra la imagen del puesto que se está revelando, con fundido cruzado y un traslado lento de izquierda a derecha hasta que entra el siguiente puesto.
+        Marco global en el costado derecho del canvas: las filas se comprimen a la izquierda y el marco muestra la imagen del puesto que se está revelando, con fundido y un traslado lento de izquierda a derecha hasta que entra el siguiente puesto. El ancho no tiene tope: puede extenderse hasta todo el ancho del canvas (las filas se comprimen al mínimo).
       </p>
       <div>
-        <label className="text-sm font-medium mb-1 block">Ancho del marco (vacío = automático, costado derecho)</label>
+        <label className="text-sm font-medium mb-1 block">Ancho del marco (vacío = automático)</label>
         <input
           type="number"
-          min={80}
-          max={1600}
+          min={16}
+          max={5000}
           step={8}
           value={value.rowImageWidth ?? ''}
           onChange={(e) => onChange({rowImageWidth: e.target.value ? Number(e.target.value) : undefined})}
@@ -722,8 +722,8 @@ function RowImageSection({value, onChange, participants = []}: {
         <label className="text-sm font-medium mb-1 block">Alto del marco (vacío = toda la altura)</label>
         <input
           type="number"
-          min={80}
-          max={1600}
+          min={16}
+          max={3000}
           step={8}
           value={value.rowImageHeight ?? ''}
           onChange={(e) => onChange({rowImageHeight: e.target.value ? Number(e.target.value) : undefined})}
@@ -731,8 +731,8 @@ function RowImageSection({value, onChange, participants = []}: {
         />
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <NumberInput label="Offset X (px)" value={value.rowImageX} min={-800} max={800} step={4} onChange={(v) => onChange({rowImageX: v})} />
-        <NumberInput label="Offset Y (px)" value={value.rowImageY} min={-800} max={800} step={4} onChange={(v) => onChange({rowImageY: v})} />
+        <NumberInput label="Offset X (px)" value={value.rowImageX} min={-1600} max={1600} step={8} onChange={(v) => onChange({rowImageX: v})} />
+        <NumberInput label="Offset Y (px)" value={value.rowImageY} min={-1600} max={1600} step={8} onChange={(v) => onChange({rowImageY: v})} />
       </div>
       <Toggle label="Traslado izquierda→derecha (una vez, al relevar)" checked={value.rowImagePan ?? true} onChange={(v) => onChange({rowImagePan: v})} />
       {(participants.length > 0) && (
