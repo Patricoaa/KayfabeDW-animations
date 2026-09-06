@@ -245,20 +245,23 @@ export type RankingConfig = CommonAnimationConfig & {
   rowColors?: Record<string, string>;
 
   // Large per-position image (key = entity label). Manual entry: a remote URL or
-  // an uploaded dataURL. Rendered as an extra layer alongside the small avatar
-  // (never replaces it), revealed with a soft fade + a slow one-way left→right
-  // pan that spans until the next position drops in.
+  // an uploaded dataURL. When any image is set, a global frame appears on the
+  // right side of the canvas: the ranking rows squeeze to the left and the
+  // frame shows the image of the position being revealed (crossfade between
+  // positions + a slow one-way left→right pan over the reveal window).
   rowImages?: Record<string, string>;
   rowImageCrops?: Record<string, AvatarCrop>;
 
-  // Global layout defaults for the large image (per-entity crops override the
-  // zoom/focus; these sizes/offsets apply to every position).
+  // Global frame (right side of the canvas). `rowImageWidth` is the frame width
+  // in px (empty = auto, right side); `rowImageHeight` empty = full height of
+  // the rows area. `rowImageX`/`rowImageY` offset the frame on the canvas.
+  // Per-entity `rowImageCrops` zoom/focus adjust each image inside the frame.
   rowImageWidth?: number;
   rowImageHeight?: number;
   rowImageX?: number;
   rowImageY?: number;
 
-  // Enable the one-way left→right pan on reveal (default ON).
+  // Enable the one-way left→right pan that accompanies each reveal (default ON).
   rowImagePan?: boolean;
 
   // Row spacing (px vertical gap between rows) and horizontal gap (px)

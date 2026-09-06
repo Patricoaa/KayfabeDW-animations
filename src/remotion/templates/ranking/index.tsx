@@ -1,7 +1,6 @@
 import React from 'react';
 import {useCurrentFrame, useVideoConfig, spring, Easing, Img} from 'remotion';
 import type {RaceTextStyle, ValueFormat} from '../../../lib/animation-config';
-import {avatarCropRect} from '../../../lib/animation-config';
 import {Header} from '../shared/Header';
 import {BackgroundLayer} from '../shared/Background';
 import {Avatar} from '../shared/Avatar';
@@ -20,7 +19,10 @@ export type RankingItem = {
 // reveals #1 first and closes with the tail of the ranking. When `countUp` is
 // on (default), each datum counts up from 0 to its real value as its row
 // drops in; the optional avatar renders via the shared Avatar (per-entity
-// crops supported). Fully responsive: reads the composition size via
+// crops supported). With `rowImages` set, a global frame takes the right side
+// of the canvas, the rows squeeze to the left, and the frame shows the image
+// of the position being revealed (crossfade + one-way left→right pan). Fully
+// responsive: reads the composition size via
 // `useVideoConfig()` and re-flows for portrait (9:16), post (4:5), square and
 // landscape while keeping the rows proportional.
 export type RankingProps = {
@@ -156,6 +158,20 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
   const GAP_H = rowGapH ?? GAP;
 
   const innerW = W - PAD_L - PAD_R;
+
+  // Split layout when per-position images are configured: a global frame takes
+  // the right side of the canvas and the ranking rows squeeze to the left.
+  const HAS_FRAME = rowImages != null && Object.keys(rowImages).length > 0;
+  const FRAME_W0 = rowImageWidth ?? Math.round(innerW * 0.36);
+  const FRAME_W = HAS_FRAME ? Math.min(Math.max(Math.round(FRAME_W0), 60), Math.round(innerW * 0.7)) : 0;
+  const FRAME_GAP = HAS_FRAME ? GAP_H : 0;
+  const rowsInnerW = HAS_FRAME ? Math.max(innerW - FRAME_W - FRAME_GAP, 80) : innerW;
+  const rowsMarginTop = isPortrait ? Math.round(H * 0.03) : 36;
+  const frameHDefault = Math.max(80, Math.round(H - PAD_B - (PAD_T + TITLE_SIZE * 1.4 + rowsMarginTop)));
+  const frameHeight = rowImageHeight ?? frameHDefault;
+  const frameLeftPx = HAS_FRAME ? Math.round(PAD_L + rowsInnerW + FRAME_GAP + (rowImageX ?? 0)) : 0;
+  const frameTopPx = HAS_FRAME ? Math.round(PAD_T + rowsMarginTop + (rowImageY ?? 0)) : 0;
+
   const rowBudget = H - PAD_T - PAD_B - TITLE_SIZE * 1.4 - (isPortrait ? H * 0.12 : 100);
   const ROW_H = n <= 6 ? Math.min((rowBudget / n) * 0.7, isPortrait ? 130 : 84) : Math.max(46, (rowBudget / n) * 0.6);
   const ROW_GAP = rowGap ?? (isPortrait ? 14 : 8);
@@ -165,7 +181,7 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
   const segPixelW = (rankW: number, avatarW: number) =>
     (showRank ? rankW + GAP_H : 0) + (avatarW > 0 ? avatarW + GAP_H : 0);
   const BAR_FACTOR = Math.min(Math.max(barWidth ?? 1, 0.4), 1.5);
-  const BAR_TRACK_W = Math.max(Math.round((innerW - segPixelW(RANK_W, AVATAR)) * BAR_FACTOR), 80);
+  const BAR_TRACK_W = Math.max(Math.round((rowsInnerW - segPixelW(RANK_W, AVATAR)) * BAR_FACTOR), 80);
   const GROOVE_H = Math.max(10, ROW_H * 0.42);
   const BAR_H = GROOVE_H + Math.max(2, Math.round(ROW_H * 0.06));
 
@@ -209,27 +225,6 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
     const laneLabel = `${rankPrefix}${index + 1}`;
     const hasAvatar = !!item.image;
 
-    // Large per-position image (manual entry): extra layer alongside the small
-    // avatar, revealed with a soft fade and a slow one-way left→right pan that
-    // spans the reveal window (until the next position drops in). The crop is
-    // larger than the frame so there is horizontal overflow for the pan.
-    const rowImageSrc = rowImages?.[item.label];
-    const rh = rowImageHeight ?? (rowImageWidth ?? Math.round(W * 0.18));
-    const rw = rowImageWidth ?? rh;
-    const rowImgBase = rh;
-    const ric = rowImageCrops?.[item.label];
-    const riZoom = Math.max(ric?.zoom ?? 1, 0.1);
-    const riFX = Math.max(Math.min(ric?.focusX ?? 0, 1), -1);
-    const riFY = Math.max(Math.min(ric?.focusY ?? 0, 1), -1);
-    const riCW = rowImgBase * riZoom;
-    const riCH = rowImgBase * riZoom;
-    const riExtraX = riCW - rowImgBase;
-    const riExtraY = riCH - rowImgBase;
-    const riDX = (riFX * riExtraX) / 2;
-    const riDY = (riFY * riExtraY) / 2;
-    const rowImgPan = rowImagePan !== false ? prog : 0;
-    const rowImgFade = Math.min(1, easeOut * 1.4);
-
     return (
       <div
         key={`${item.label}-${index}`}
@@ -237,7 +232,7 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
           position: 'absolute',
           left: 0,
           top,
-          width: innerW,
+          width: rowsInnerW,
           height: ROW_H,
           display: 'flex',
           alignItems: 'center',
@@ -245,34 +240,6 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
           opacity: Math.min(pop, 1),
         }}
       >
-        {rowImageSrc && (
-          <div
-            style={{
-              position: 'absolute',
-              width: rw,
-              height: rh,
-              left: (rowImageX ?? 0),
-              top: (rowImageY ?? 0),
-              overflow: 'hidden',
-              pointerEvents: 'none',
-              opacity: rowImgFade,
-            }}
-          >
-            <Img
-              src={rowImageSrc}
-              style={{
-                position: 'absolute',
-                left: '50%',
-                top: '50%',
-                width: riCW,
-                height: riCH,
-                transform: `translate(${-riCW / 2 + riDX + riExtraX * rowImgPan}px, ${-riCH / 2 + riDY}px)`,
-                objectFit: 'contain',
-                maxWidth: 'none',
-              }}
-            />
-          </div>
-        )}
         {showRank && (
           <div style={{width: RANK_W, flexShrink: 0, textAlign: 'left'}}>
             <span style={{fontVariantNumeric: 'tabular-nums', ...textStyle(rankText, {color: isLeader ? accentColor : '#94a3b8', size: Math.round(ROW_FONT * (isLeader ? 1.25 : 1.05)), weight: 900})}}>
@@ -300,6 +267,71 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
           )}
         </div>
       </div>
+    );
+  };
+
+  // ---- Global right-side frame ----
+  // The image of the position currently being revealed fills the frame: it
+  // crossfades from the previous position and pans left→right once (slow, over
+  // the reveal window, so the travel lasts until the next position drops in).
+  let activeLabel: string | undefined;
+  let activeStart = -Infinity;
+  let prevLabel: string | undefined;
+  if (HAS_FRAME) {
+    ranked.forEach((r, i) => {
+      const st = EASE + sequencePos(i) * step;
+      if (st <= frame && st >= activeStart) {
+        if (activeLabel !== undefined) prevLabel = activeLabel;
+        activeLabel = r.label;
+        activeStart = st;
+      }
+    });
+  }
+  const activeProg =
+    activeLabel === undefined
+      ? 0
+      : Math.max(0, Math.min((frame - activeStart) / Math.max(step, 1), 1));
+  const frameFade = Easing.out(Easing.cubic)(activeProg);
+  const framePrevFade = activeProg < 1 ? 1 - frameFade : 0;
+  const framePan = rowImagePan !== false ? Easing.out(Easing.cubic)(activeProg) : 0;
+
+  // Cover-crop geometry for the frame: the image scales by each entity's zoom
+  // beyond the frame size and the focus shifts it; the horizontal overflow
+  // (`extraX`) is what the one-way pan travels.
+  const frameImgGeom = (label: string, pan: number) => {
+    const ric = rowImageCrops?.[label];
+    const z = Math.max(ric?.zoom ?? 1, 0.1);
+    const fx = Math.max(Math.min(ric?.focusX ?? 0, 1), -1);
+    const fy = Math.max(Math.min(ric?.focusY ?? 0, 1), -1);
+    const extraX = FRAME_W * (z - 1);
+    const extraY = frameHeight * (z - 1);
+    return {
+      w: FRAME_W * z,
+      h: frameHeight * z,
+      x: (fx * extraX) / 2 - extraX / 2 + extraX * pan,
+      y: (fy * extraY) / 2 - extraY / 2,
+    };
+  };
+
+  const frameLayer = (label: string, pan: number, opacity: number) => {
+    const src = rowImages?.[label];
+    if (!src) return null;
+    const g = frameImgGeom(label, pan);
+    return (
+      <Img
+        src={src}
+        style={{
+          position: 'absolute',
+          left: '50%',
+          top: '50%',
+          width: g.w,
+          height: g.h,
+          transform: `translate(${g.x}px, ${g.y}px)`,
+          objectFit: 'cover',
+          maxWidth: 'none',
+          opacity,
+        }}
+      />
     );
   };
 
@@ -344,9 +376,27 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
         accentColor={accentColor}
         fallbackTitle="Ranking"
       />
-      <div style={{flex: 1, position: 'relative', marginTop: isPortrait ? H * 0.03 : 36, overflow: 'hidden', transform: `translate(${rowsX ?? 0}px, ${rowsY ?? 0}px)`}}>
+      <div style={{flex: 1, position: 'relative', marginTop: rowsMarginTop, overflow: 'hidden', transform: `translate(${rowsX ?? 0}px, ${rowsY ?? 0}px)`}}>
         <div style={{position: 'absolute', inset: 0}}>{ranked.map((r, i) => renderRow(r, i))}</div>
       </div>
+      {HAS_FRAME && (
+        <div
+          style={{
+            position: 'absolute',
+            left: frameLeftPx,
+            top: frameTopPx,
+            width: FRAME_W,
+            height: frameHeight,
+            overflow: 'hidden',
+            backgroundColor: '#111827',
+            borderRadius: Math.round(ROW_H * 0.35),
+            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)',
+          }}
+        >
+          {prevLabel && frameLayer(prevLabel, 1, framePrevFade)}
+          {activeLabel && frameLayer(activeLabel, framePan, frameFade)}
+        </div>
+      )}
     </div>
   );
 };
