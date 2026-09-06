@@ -1,6 +1,6 @@
 'use client';
 
-import {useCallback} from 'react';
+import {useCallback, useEffect, useState} from 'react';
 import {X, Eye, LayoutGrid} from 'lucide-react';
 import type {TableInfo} from '@/lib/schema-metadata';
 import {isNumericType, isDateType, isBooleanType, getRelationCardinality} from '@/lib/schema-metadata';
@@ -56,6 +56,35 @@ export function PropertiesPanel({
   );
 }
 
+function useSuggestions(tableName: string, columnName: string) {
+  const [values, setValues] = useState<string[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!tableName || !columnName) {
+      setValues([]);
+      return;
+    }
+    const id = window.setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({table: tableName, column: columnName});
+        const res = await fetch(`/api/query/suggestions?${params.toString()}`);
+        if (!res.ok) return;
+        const json = (await res.json()) as {values?: string[]};
+        if (!cancelled) setValues(json.values ?? []);
+      } catch {
+        if (!cancelled) setValues([]);
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(id);
+    };
+  }, [tableName, columnName]);
+
+  return values;
+}
+
 function FilterRow({
   filter,
   table,
@@ -74,6 +103,9 @@ function FilterRow({
   const isNumeric = col ? isNumericType(col.type) : false;
   const isDate = col ? isDateType(col.type) : false;
   const cLogic = connector?.value ?? 'AND';
+  const isText = col ? !isNumericType(col.type) && !isDateType(col.type) && !isBooleanType(col.type) : false;
+  const suggestions = useSuggestions(filter.table ?? table.name, filter.column);
+  const listId = `suggestions-${filter.table ?? table.name}-${filter.column}`;
 
   return (
     <div className="flex items-center gap-1 min-w-0">
@@ -132,6 +164,24 @@ function FilterRow({
             onChange={(e) => onUpdate({value: e.target.value})}
             className="min-w-0 flex-1 bg-elevated border border-border-default rounded px-1.5 py-0.5 text-[10px] font-body"
           />
+        ) : isText ? (
+          <>
+            <input
+              type="text"
+              value={filter.value ?? ''}
+              onChange={(e) => onUpdate({value: e.target.value})}
+              list={suggestions.length > 0 ? listId : undefined}
+              className="min-w-0 flex-1 bg-elevated border border-border-default rounded px-1.5 py-0.5 text-[10px] font-body"
+              placeholder="valor"
+            />
+            {suggestions.length > 0 && (
+              <datalist id={listId}>
+                {suggestions.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
+            )}
+          </>
         ) : (
           <input
             type="text"
