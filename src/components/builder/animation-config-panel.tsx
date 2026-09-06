@@ -208,6 +208,141 @@ function CanvasSection({value, update}: {value: CommonCanvasConfig; update: (pat
   );
 }
 
+// Avatar fields shared by the Timeline Race and Ranking configs. The caller
+// merges the emitted patch into its own config object.
+type AvatarFields = {
+  avatarSize?: number;
+  avatarShape?: AvatarShape;
+  avatarRadius?: number;
+  avatarCrops?: Record<string, AvatarCrop>;
+};
+
+// Per-template Avatar section (size, shape, radius + per-entity crop). Shared
+// by both animated templates so the controls stay identical.
+function AvatarSection({value, onChange, participants = []}: {
+  value: AvatarFields;
+  onChange: (patch: Partial<AvatarFields>) => void;
+  participants?: Participant[];
+}) {
+  const [avatarQ, setAvatarQ] = useState('');
+  const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const matchQ = (label: string, q: string) => (q.trim() === '' ? true : norm(label).includes(norm(q)));
+  const filteredCrops = participants.filter((p) => matchQ(p.label, avatarQ));
+  const setCrop = (label: string, patch?: Partial<AvatarCrop>) => {
+    const next = {...(value.avatarCrops ?? {})};
+    if (patch) next[label] = {...(next[label] ?? {}), ...patch};
+    else delete next[label];
+    onChange({avatarCrops: next});
+  };
+  return (
+    <Section title="Avatar">
+      <div>
+        <label className="text-sm font-medium mb-1 block">Tamaño</label>
+        <input
+          type="number"
+          min={16}
+          max={160}
+          step={2}
+          value={value.avatarSize ?? ''}
+          onChange={(e) => onChange({avatarSize: e.target.value ? Number(e.target.value) : undefined})}
+          className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+        />
+        <p className="text-[10px] text-muted mt-0.5">Vacío = automático según el tamaño del lienzo.</p>
+      </div>
+      <div>
+        <label className="text-sm font-medium mb-1 block">Forma</label>
+        <div className="grid grid-cols-2 gap-1">
+          {(['circle', 'rounded'] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => onChange({avatarShape: s as AvatarShape})}
+              className={`px-2 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                (value.avatarShape ?? 'circle') === s
+                  ? 'bg-amber-500 text-black'
+                  : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
+              }`}
+            >
+              {s === 'circle' ? 'Círculo' : 'Redondeado'}
+            </button>
+          ))}
+        </div>
+      </div>
+      {(value.avatarShape ?? 'circle') === 'rounded' && (
+        <NumberInput label="Radio de esquina (vacío = auto)" value={value.avatarRadius} min={0} max={60} step={1} onChange={(v) => onChange({avatarRadius: v})} />
+      )}
+      {participants.length > 0 && (
+        <div className="pt-2 border-t border-border-subtle">
+          <div className="flex items-center justify-between mb-0.5">
+            <label className="text-sm font-medium block">Ajustar por entidad</label>
+            {Object.keys(value.avatarCrops ?? {}).length > 0 && (
+              <button type="button" onClick={() => onChange({avatarCrops: undefined})} className="text-[10px] text-muted hover:text-red-500">
+                Limpiar todas
+              </button>
+            )}
+          </div>
+          <p className="text-[10px] text-muted mb-1.5">Zoom y foco del recorte dentro del marco de cada avatar.</p>
+          <EntitySearch value={avatarQ} onChange={setAvatarQ} shown={filteredCrops.length} total={participants.length} />
+          <div className="space-y-2">
+            {filteredCrops.map((p) => {
+              const cr = value.avatarCrops?.[p.label];
+              const PREVIEW = 40;
+              const crop = avatarCropRect(cr?.zoom, cr?.focusX, cr?.focusY, PREVIEW);
+              const clipStyle = p.image
+                ? {
+                    position: 'relative' as const,
+                    width: PREVIEW,
+                    height: PREVIEW,
+                    borderRadius: (value.avatarShape ?? 'circle') === 'circle' ? '50%' : '8px',
+                    overflow: 'hidden' as const,
+                    boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.2)',
+                  }
+                : undefined;
+              const imgStyle = p.image
+                ? {
+                    width: crop.w,
+                    height: crop.h,
+                    transform: `translate(${-crop.w / 2 + crop.dx}px, ${-crop.h / 2 + crop.dy}px)`,
+                    objectFit: 'contain' as const,
+                    maxWidth: 'none',
+                  }
+                : undefined;
+              return (
+                <div key={p.label} className="border border-border-subtle rounded p-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-secondary truncate" title={p.label}>{p.label}</span>
+                    {cr && (
+                      <button type="button" onClick={() => setCrop(p.label)} className="text-muted hover:text-red-500 text-xs" aria-label={`Resetear recorte de ${p.label}`}>✕</button>
+                    )}
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="shrink-0 mt-1">
+                      {p.image ? (
+                        <div style={clipStyle}>
+                          <img src={p.image} alt="" style={{...imgStyle, position: 'absolute' as const, left: '50%', top: '50%', objectFit: 'contain' as const, maxWidth: 'none'}} />
+                        </div>
+                      ) : (
+                        <div style={{...clipStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-elevated)'}}>
+                          <span className="text-muted">sin img</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 flex-1">
+                      <NumberInput label="Zoom" value={cr?.zoom} min={0.1} max={3} step={0.05} onChange={(v) => setCrop(p.label, {...cr, zoom: v})} />
+                      <NumberInput label="Foco X" value={cr ? (cr.focusX ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setCrop(p.label, {...cr, focusX: (v ?? 0) / 100})} />
+                      <NumberInput label="Foco Y" value={cr ? (cr.focusY ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setCrop(p.label, {...cr, focusY: (v ?? 0) / 100})} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </Section>
+  );
+}
+
 // Typed subset for the Timeline Race branch (its config is a superset of the
 // shared fields, so the union prop is narrowed here for convenient access).
 type TimelineRacePanelProps = Omit<AnimationConfigPanelProps, 'value' | 'onChange'> & {
@@ -220,12 +355,6 @@ type TimelineRacePanelProps = Omit<AnimationConfigPanelProps, 'value' | 'onChang
 function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, participants = []}: TimelineRacePanelProps) {
   const update = (patch: Partial<TimelineRaceConfig>) => onChange({...value, ...patch});
   const fmt = (value.dateFormat ?? 'day') as DateFormat;
-  const setCrop = (label: string, patch?: Partial<AvatarCrop>) => {
-    const next = {...(value.avatarCrops ?? {})};
-    if (patch) next[label] = {...(next[label] ?? {}), ...patch};
-    else delete next[label];
-    update({avatarCrops: next});
-  };
   const setBarColor = (label: string, color?: string) => {
     const next = {...(value.barColors ?? {})};
     if (color) next[label] = color;
@@ -236,11 +365,9 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
 
   // Per-entity list filtering (zoom/focus + colors): accent/case-insensitive
   // substring match against the label, so "habana" finds "La Habana".
-  const [avatarQ, setAvatarQ] = useState('');
   const [colorQ, setColorQ] = useState('');
   const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const matchQ = (label: string, q: string) => (q.trim() === '' ? true : norm(label).includes(norm(q)));
-  const filteredCrops = participants.filter((p) => matchQ(p.label, avatarQ));
   const filteredColors = participants.filter((p) => matchQ(p.label, colorQ));
   const barPalette = value.barPalette ?? [];
   const palIndex = new Map(participants.map((p, i) => [p.label, i]));
@@ -419,112 +546,8 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
         </p>
       </Section>
 
-      {/* ============ AVATAR ============ */}
-      <Section title="Avatar">
-        <div>
-          <label className="text-sm font-medium mb-1 block">Tamaño</label>
-          <input
-            type="number"
-            min={16}
-            max={160}
-            step={2}
-            value={value.avatarSize ?? ''}
-            onChange={(e) => update({avatarSize: e.target.value ? Number(e.target.value) : undefined})}
-            className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-          />
-          <p className="text-[10px] text-muted mt-0.5">Vacío = automático según el tamaño del lienzo.</p>
-        </div>
-        <div>
-          <label className="text-sm font-medium mb-1 block">Forma</label>
-          <div className="grid grid-cols-2 gap-1">
-            {(['circle', 'rounded'] as const).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => update({avatarShape: s as AvatarShape})}
-                className={`px-2 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  (value.avatarShape ?? 'circle') === s
-                    ? 'bg-amber-500 text-black'
-                    : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
-                }`}
-              >
-                {s === 'circle' ? 'Círculo' : 'Redondeado'}
-              </button>
-            ))}
-          </div>
-        </div>
-        {(value.avatarShape ?? 'circle') === 'rounded' && (
-          <NumberInput label="Radio de esquina (vacío = auto)" value={value.avatarRadius} min={0} max={60} step={1} onChange={(v) => update({avatarRadius: v})} />
-        )}
-        {participants.length > 0 && (
-          <div className="pt-2 border-t border-border-subtle">
-            <div className="flex items-center justify-between mb-0.5">
-              <label className="text-sm font-medium block">Ajustar por entidad</label>
-              {Object.keys(value.avatarCrops ?? {}).length > 0 && (
-                <button type="button" onClick={() => update({avatarCrops: undefined})} className="text-[10px] text-muted hover:text-red-500">
-                  Limpiar todas
-                </button>
-              )}
-            </div>
-            <p className="text-[10px] text-muted mb-1.5">Zoom y foco del recorte dentro del marco de cada avatar.</p>
-            <EntitySearch value={avatarQ} onChange={setAvatarQ} shown={filteredCrops.length} total={participants.length} />
-            <div className="space-y-2">
-              {filteredCrops.map((p) => {
-                const cr = value.avatarCrops?.[p.label];
-                const PREVIEW = 40;
-                const crop = avatarCropRect(cr?.zoom, cr?.focusX, cr?.focusY, PREVIEW);
-                const clipStyle = p.image
-                  ? {
-                      position: 'relative' as const,
-                      width: PREVIEW,
-                      height: PREVIEW,
-                      borderRadius: (value.avatarShape ?? 'circle') === 'circle' ? '50%' : '8px',
-                      overflow: 'hidden' as const,
-                      boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.2)',
-                    }
-                  : undefined;
-                const imgStyle = p.image
-                  ? {
-                      width: crop.w,
-                      height: crop.h,
-                      transform: `translate(${-crop.w / 2 + crop.dx}px, ${-crop.h / 2 + crop.dy}px)`,
-                      objectFit: 'contain' as const,
-                      maxWidth: 'none',
-                    }
-                  : undefined;
-                return (
-                  <div key={p.label} className="border border-border-subtle rounded p-2">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-secondary truncate" title={p.label}>{p.label}</span>
-                      {cr && (
-                        <button type="button" onClick={() => setCrop(p.label)} className="text-muted hover:text-red-500 text-xs" aria-label={`Resetear recorte de ${p.label}`}>✕</button>
-                      )}
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <div className="shrink-0 mt-1">
-                        {p.image ? (
-                          <div style={clipStyle}>
-                            <img src={p.image} alt="" style={{...imgStyle, position: 'absolute' as const, left: '50%', top: '50%', objectFit: 'contain' as const, maxWidth: 'none'}} />
-                          </div>
-                        ) : (
-                          <div style={{...clipStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-elevated)'}}>
-                            <span className="text-muted">sin img</span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 flex-1">
-                        <NumberInput label="Zoom" value={cr?.zoom} min={0.1} max={3} step={0.05} onChange={(v) => setCrop(p.label, {...cr, zoom: v})} />
-                        <NumberInput label="Foco X" value={cr ? (cr.focusX ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setCrop(p.label, {...cr, focusX: (v ?? 0) / 100})} />
-                        <NumberInput label="Foco Y" value={cr ? (cr.focusY ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setCrop(p.label, {...cr, focusY: (v ?? 0) / 100})} />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </Section>
+      {/* ============ AVATAR (compartido) ============ */}
+      <AvatarSection value={value} onChange={update} participants={participants} />
 
       {/* ============ BARRAS ============ */}
       {participants.length > 0 && (
@@ -653,11 +676,12 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
   );
 }
 
-function RankingPanel({columns, fieldMeta, value, onChange}: {
+function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: {
   columns: string[];
   fieldMeta: ColumnMeta[];
   value: RankingConfig;
   onChange: (next: RankingConfig) => void;
+  participants?: Participant[];
 }) {
   const update = (patch: Partial<RankingConfig>) => onChange({...value, ...patch});
 
@@ -774,12 +798,62 @@ function RankingPanel({columns, fieldMeta, value, onChange}: {
         </div>
       </Section>
 
+      <Section title="Filas">
+        <SliderNumberInput label="Separación vertical (px)" value={value.rowGap ?? 0} min={0} max={120} step={2} onChange={(v) => update({rowGap: v || undefined})} />
+        <SliderNumberInput label="Separación horizontal (px)" value={value.rowGapH ?? 0} min={0} max={80} step={2} onChange={(v) => update({rowGapH: v || undefined})} />
+        <SelectControl
+          label="Formato del valor"
+          value={value.valueFormat ?? 'number'}
+          options={VALUE_FORMATS}
+          onChange={(v) => update({valueFormat: v as ValueFormat})}
+        />
+        {(value.valueFormat ?? 'number') === 'currency' && (
+          <div>
+            <label className="text-sm font-medium mb-1 block">Símbolo de moneda</label>
+            <input
+              value={value.currencySymbol ?? '$'}
+              onChange={(e) => update({currencySymbol: e.target.value || undefined})}
+              className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+            />
+          </div>
+        )}
+        <SliderNumberInput
+          label="Ancho de las barras (%)"
+          value={value.barWidth ? Math.round(value.barWidth * 100) : 100}
+          min={40}
+          max={150}
+          step={5}
+          onChange={(v) => update({barWidth: v ? v / 100 : undefined})}
+        />
+        <p className="text-[10px] text-muted">
+          Multiplica el ancho automático de la barra (100% = el actual). Reduce para que el valor o el avatar respiren.
+        </p>
+        <div className="pt-2 mt-1 border-t border-border-subtle">
+          <p className="text-[10px] text-muted mb-1.5">Posición del grupo de filas (offset en px desde su lugar por defecto).</p>
+          <div className="grid grid-cols-2 gap-2">
+            <NumberInput label="X (px)" value={value.rowsX} min={-400} max={400} step={4} onChange={(v) => update({rowsX: v})} />
+            <NumberInput label="Y (px)" value={value.rowsY} min={-400} max={400} step={4} onChange={(v) => update({rowsY: v})} />
+          </div>
+        </div>
+      </Section>
+
+      <AvatarSection value={value} onChange={update} participants={participants} />
+
       <Section title="Etiqueta">
         <RaceTextControls label="Texto del puesto (#1)" value={value.rankText} onChange={(patch) => update({rankText: {...(value.rankText ?? {}), ...patch}})} />
+        <p className="text-[10px] text-muted mt-0.5">
+          El número de posición (#1, #2...) que aparece a la izquierda de cada fila.
+        </p>
         <div className="h-px bg-border-default my-3" />
         <RaceTextControls label="Texto de la etiqueta" value={value.labelText} onChange={(patch) => update({labelText: {...(value.labelText ?? {}), ...patch}})} />
+        <p className="text-[10px] text-muted mt-0.5">
+          El nombre de la entidad dentro de la barra.
+        </p>
         <div className="h-px bg-border-default my-3" />
         <RaceTextControls label="Texto del dato" value={value.valueText} onChange={(patch) => update({valueText: {...(value.valueText ?? {}), ...patch}})} />
+        <p className="text-[10px] text-muted mt-0.5">
+          El valor numérico que viaja dentro de la barra.
+        </p>
       </Section>
 
       <CanvasSection value={value} update={update} />
@@ -789,7 +863,7 @@ function RankingPanel({columns, fieldMeta, value, onChange}: {
 
 export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onChange, participants = []}: AnimationConfigPanelProps) {
   if (templateId === 'ranking') {
-    return <RankingPanel columns={columns} fieldMeta={fieldMeta} value={value as RankingConfig} onChange={onChange as (n: RankingConfig) => void} />;
+    return <RankingPanel columns={columns} fieldMeta={fieldMeta} value={value as RankingConfig} onChange={onChange as (n: RankingConfig) => void} participants={participants} />;
   }
   if (templateId !== 'timeline-race') return null;
   return <TimelineRacePanel templateId={templateId} columns={columns} fieldMeta={fieldMeta} value={value as TimelineRaceConfig} onChange={onChange as (n: TimelineRaceConfig) => void} participants={participants} />;

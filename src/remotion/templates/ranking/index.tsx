@@ -1,10 +1,11 @@
 import React from 'react';
 import {useCurrentFrame, useVideoConfig, spring, Easing} from 'remotion';
-import type {RaceTextStyle} from '../../../lib/animation-config';
+import type {RaceTextStyle, ValueFormat} from '../../../lib/animation-config';
 import {Header} from '../shared/Header';
 import {BackgroundLayer} from '../shared/Background';
 import {Avatar} from '../shared/Avatar';
 import {textStyle} from '../shared/text';
+import {fmtValue} from '../shared/fmt';
 
 export type RankingItem = {
   label: string;
@@ -34,8 +35,15 @@ export type RankingProps = {
   showValue?: boolean;
   rankPrefix?: string;
   avatarCrops?: Record<string, {zoom?: number; focusX?: number; focusY?: number}>;
+  avatarSize?: number;
+  avatarShape?: 'circle' | 'rounded';
+  avatarRadius?: number;
   rowColors?: Record<string, string>;
   rowGap?: number;
+  rowGapH?: number;
+  valueFormat?: ValueFormat;
+  currencySymbol?: string;
+  barWidth?: number;
   showRail?: boolean;
   rowsX?: number;
   rowsY?: number;
@@ -73,8 +81,15 @@ export const Ranking: React.FC<RankingProps> = ({
   showValue = true,
   rankPrefix = '#',
   avatarCrops,
+  avatarSize,
+  avatarShape = 'circle',
+  avatarRadius,
   rowColors,
   rowGap,
+  rowGapH,
+  valueFormat = 'number',
+  currencySymbol = '$',
+  barWidth,
   showRail = true,
   rowsX,
   rowsY,
@@ -121,8 +136,9 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
   const TITLE_SIZE = isPortrait ? Math.round(W * 0.075) : 42;
   const ROW_FONT = isPortrait ? Math.round(W * 0.045) : 21;
   const RANK_W = isPortrait ? Math.round(W * 0.11) : 72;
-  const AVATAR = isPortrait ? Math.round(W * 0.09) : 48;
+  const AVATAR = avatarSize ?? (isPortrait ? Math.round(W * 0.09) : 48);
   const GAP = isPortrait ? 12 : 16;
+  const GAP_H = rowGapH ?? GAP;
 
   const innerW = W - PAD_L - PAD_R;
   const rowBudget = H - PAD_T - PAD_B - TITLE_SIZE * 1.4 - (isPortrait ? H * 0.12 : 100);
@@ -132,8 +148,9 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
   const rowLaneH = ROW_H + ROW_GAP;
 
   const segPixelW = (rankW: number, avatarW: number) =>
-    (showRank ? rankW + GAP : 0) + (avatarW > 0 ? avatarW + GAP : 0);
-  const BAR_TRACK_W = Math.max(innerW - segPixelW(RANK_W, AVATAR), 80);
+    (showRank ? rankW + GAP_H : 0) + (avatarW > 0 ? avatarW + GAP_H : 0);
+  const BAR_FACTOR = Math.min(Math.max(barWidth ?? 1, 0.4), 1.5);
+  const BAR_TRACK_W = Math.max(Math.round((innerW - segPixelW(RANK_W, AVATAR)) * BAR_FACTOR), 80);
   const GROOVE_H = Math.max(10, ROW_H * 0.42);
   const BAR_H = GROOVE_H + Math.max(2, Math.round(ROW_H * 0.06));
 
@@ -188,7 +205,7 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
           height: ROW_H,
           display: 'flex',
           alignItems: 'center',
-          gap: GAP,
+          gap: GAP_H,
           opacity: Math.min(pop, 1),
         }}
       >
@@ -199,7 +216,7 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
             </span>
           </div>
         )}
-        {hasAvatar && <Avatar src={item.image!} size={AVATAR} crop={avatarCropFor(item.label, item.image)} />}
+        {hasAvatar && <Avatar src={item.image!} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(item.label, item.image)} />}
         <div style={{flex: 1, height: BAR_H, position: 'relative', display: 'flex', alignItems: 'center'}}>
           {showRail !== false && (
             <div style={{position: 'absolute', left: 0, right: 0, top: '50%', height: GROOVE_H, transform: 'translateY(-50%)', backgroundColor: '#171717', borderRadius: 999, opacity: pop}} />
@@ -213,7 +230,7 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
           {showValue && (
             <div style={{position: 'absolute', right: 12, top: 0, bottom: 0, maxWidth: Math.max(0, barW - 24), minWidth: 0, display: 'flex', alignItems: 'center', overflow: 'hidden', pointerEvents: 'none', zIndex: 2}}>
               <span style={{fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textShadow: '0 1px 2px rgba(0,0,0,0.45)', ...textStyle(valueText, {color: isLeader ? '#000000' : '#ffffff', size: ROW_FONT, weight: 800})}}>
-                {displayValue.toLocaleString()}
+                {fmtValue(displayValue, valueFormat, currencySymbol)}
               </span>
             </div>
           )}

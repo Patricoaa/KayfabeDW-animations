@@ -236,11 +236,26 @@ export type RankingConfig = CommonAnimationConfig & {
   // Per-entity avatar crop overrides (key = entity label or image).
   avatarCrops?: Record<string, AvatarCrop>;
 
+  // Avatar look (mirrors the timeline race / static bar chart).
+  avatarSize?: number;
+  avatarShape?: AvatarShape;
+  avatarRadius?: number;
+
   // Per-entity row color overrides (label -> color).
   rowColors?: Record<string, string>;
 
-  // Row spacing (px vertical gap between rows) and gap relative to width.
+  // Row spacing (px vertical gap between rows) and horizontal gap (px)
+  // between row segments (rank, avatar, bar).
   rowGap?: number;
+  rowGapH?: number;
+
+  // Display format for the value shown on each row. Default `number` keeps
+  // the current locale formatting. `currencySymbol` is prepended when `currency`.
+  valueFormat?: ValueFormat;
+  currencySymbol?: string;
+
+  // Bar width as a multiplier of the automatic track width (1 = as today).
+  barWidth?: number;
 
   // Show a rail/placeholder track behind each row while waiting.
   showRail?: boolean;
