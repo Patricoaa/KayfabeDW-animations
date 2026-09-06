@@ -495,12 +495,20 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
 
     const cur = specRef.current;
 
+    // A pure wildcard select means "all columns, raw rows". A residual GROUP
+    // BY from an earlier explicit-column config would make the query invalid
+    // ("column X must appear in the GROUP BY clause" for every column in "*"),
+    // so reset it.
+    let nextGroupBy = [...(cur.groupBy ?? [])];
+    if (nextSelect.length === 1 && nextSelect[0].column === '*') {
+      nextGroupBy = [];
+    }
+
     // Auto-grouping: when any selected column has an aggregate (sum, count, …),
     // every OTHER selected column without an aggregate must be in GROUP BY or
     // Postgres rejects the query ("column X must appear in the GROUP BY
     // clause"). Merge those non-aggregated columns into groupBy automatically so
     // users don't have to press the "G" toggle on each one (e.g. imagen_url).
-    let nextGroupBy = [...(cur.groupBy ?? [])];
     if (nextSelect.some((s) => s.column !== '*' && s.aggregate)) {
       for (const s of nextSelect) {
         if (s.column === '*' || s.aggregate) continue;
