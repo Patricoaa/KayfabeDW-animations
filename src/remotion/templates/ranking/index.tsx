@@ -64,6 +64,7 @@ export type RankingProps = {
   rowImageY?: number;
   rowImagePan?: boolean;
   rowImagePanDirs?: Record<string, 'ltr' | 'rtl'>;
+  rowImageFrameBg?: 'canvas' | 'dark';
   rowEntryDir?: 'left' | 'right' | 'top' | 'bottom';
   rowEntryMode?: 'together' | 'custom';
   rowEntryDirs?: Partial<Record<RowEntryElement, 'left' | 'right' | 'top' | 'bottom'>>;
@@ -131,6 +132,7 @@ export const Ranking: React.FC<RankingProps> = ({
   rowImageY,
   rowImagePan = true,
   rowImagePanDirs,
+  rowImageFrameBg = 'canvas',
   rowEntryDir = 'bottom',
   rowEntryMode = 'together',
   rowEntryDirs,
@@ -407,7 +409,10 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
   // ---- Global right-side frame ----
   // The image of the position currently being revealed fills the frame: it cuts
   // in instantly (no fade) the moment its row starts, then performs its one-way
-  // pan (per-position direction) over the reveal window.
+  // pan (per-position direction) over the reveal window. The pan is linear, so
+  // each image keeps a constant velocity until the next position cuts in — the
+  // motion never decelerates to a stop between reveals. The last revealed
+  // position extends its pan across the final hold so the video ends in motion.
   let activeLabel: string | undefined;
   let activeIndex = -1;
   let activeStart = -Infinity;
@@ -421,14 +426,16 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
       }
     });
   }
+  const lastRevealIndex = revealDirection === 'asc' ? n - 1 : 0;
+  const isLastReveal = activeIndex === lastRevealIndex;
+  const panDenom = isLastReveal ? Math.max(step + holdFrames, 1) : Math.max(step, 1);
   const activeProg =
     activeLabel === undefined
       ? 0
-      : Math.max(0, Math.min((frame - activeStart) / Math.max(step, 1), 1));
+      : Math.max(0, Math.min((frame - activeStart) / panDenom, 1));
   const activeItem = activeLabel !== undefined && activeIndex >= 0 ? ranked[activeIndex] : undefined;
   const panProg = rowImagePanDirs?.[activeItem?.label ?? ''] === 'rtl' ? 1 - activeProg : activeProg;
-  const framePan =
-    activeItem && rowImagePan !== false ? Easing.out(Easing.cubic)(panProg) : 0;
+  const framePan = activeItem && rowImagePan !== false ? panProg : 0;
 
   // Cover-crop geometry for the frame. The image always fills the frame box
   // (`objectFit: 'cover'`, so the browser auto-rescales to match width and
@@ -444,7 +451,12 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
     const fy = Math.max(Math.min(ric?.focusY ?? 0, 1), -1);
     const extraX = FRAME_W * (z - 1);
     const extraY = frameHeight * (z - 1);
-    const clampX = z >= 1 ? Math.max(-extraX, Math.min(0, -extraX / 2 - (fx * extraX) / 2 + extraX * pan)) : -extraX / 2 - (fx * extraX) / 2 + extraX * pan;
+    const clampX =
+      z >= 1
+        ? rowImagePan === false
+          ? Math.max(-extraX, Math.min(0, -extraX / 2 - (fx * extraX) / 2))
+          : Math.max(-extraX, Math.min(0, -extraX * (1 - pan) - (fx * extraX) / 4))
+        : -extraX * (1 - pan) - (fx * extraX) / 4;
     const clampY = z >= 1 ? Math.max(-extraY, Math.min(0, -extraY / 2 - (fy * extraY) / 2)) : -extraY / 2 - (fy * extraY) / 2;
     return {z: Math.max(z, 0.1), tx: clampX, ty: clampY};
   };
@@ -534,7 +546,7 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
             width: FRAME_W,
             height: frameHeight,
             overflow: 'hidden',
-            backgroundColor: '#111827',
+            backgroundColor: rowImageFrameBg === 'dark' ? '#111827' : 'transparent',
             borderRadius: Math.round(ROW_H * 0.35),
             boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)',
           }}

@@ -759,6 +759,26 @@ function RowImageSection({value, onChange, participants = []}: {
         <NumberInput label="Offset Y (px)" value={value.rowImageY} min={-1600} max={1600} step={8} onChange={(v) => onChange({rowImageY: v})} />
       </div>
       <Toggle label="Traslado al relevar" checked={value.rowImagePan ?? true} onChange={(v) => onChange({rowImagePan: v})} />
+      <div className="mt-3">
+        <label className="text-sm font-medium mb-1 block">Fondo del marco</label>
+        <div className="grid grid-cols-2 gap-1">
+          {([['canvas', 'Fondo del canvas'], ['dark', 'Oscuro']] as const).map(([v, l]) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => onChange({rowImageFrameBg: v})}
+              className={`px-1 py-1 rounded-md text-xs font-medium transition-colors ${
+                (value.rowImageFrameBg ?? 'canvas') === v ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
+              }`}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
+        <p className="text-[10px] text-muted mt-1">
+          Con «Fondo del canvas», el fondo del lienzo se ve detrás de la imagen del marco (útil con logos/PNG transparentes).
+        </p>
+      </div>
       <hr className="border-border-subtle my-2" />
       <Toggle label="Mostrar el puesto en la imagen" checked={value.rowImageLabel ?? false} onChange={(v) => onChange({rowImageLabel: v})} />
       {value.rowImageLabel && (

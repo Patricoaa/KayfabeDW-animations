@@ -534,6 +534,7 @@ function convertRanking(
     rowImageY: t?.rowImageY,
     rowImagePan: t?.rowImagePan,
     rowImagePanDirs: t?.rowImagePanDirs,
+    rowImageFrameBg: t?.rowImageFrameBg,
     rowEntryDir: t?.rowEntryDir,
     rowEntryMode: t?.rowEntryMode,
     rowEntryDirs: t?.rowEntryDirs,

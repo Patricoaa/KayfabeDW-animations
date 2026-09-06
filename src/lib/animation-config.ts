@@ -315,6 +315,11 @@ export type RankingConfig = CommonAnimationConfig & {
   // the master switch.
   rowImagePanDirs?: Record<string, 'ltr' | 'rtl'>;
 
+  // Frame backdrop behind the per-position image. `'canvas'` (default) makes
+  // the frame transparent so the canvas background shows through where the
+  // image is transparent (logos/cutouts); `'dark'` uses a flat dark panel.
+  rowImageFrameBg?: 'canvas' | 'dark';
+
   // Row spacing (px vertical gap between rows) and horizontal gap (px)
   // between row segments (rank, avatar, bar).
   rowGap?: number;
