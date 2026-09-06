@@ -199,6 +199,12 @@ export type RankingConfig = CommonAnimationConfig & {
   valueField?: string;
   imageField?: string;
 
+  // How the value is computed when the dataset has several rows per entity
+  // (rows grouped by labelField). 'none' (default) keeps one ranking entry per
+  // data row. 'weightedAvg' uses `weightField` as the per-row weight.
+  valueAgg?: 'none' | 'sum' | 'count' | 'countDistinct' | 'avg' | 'weightedAvg' | 'min' | 'max';
+  weightField?: string;
+
   // Cap on how many rows are animated (top-N by value, kept in the reveal
   // order). Empty = no cap.
   maxRows?: number;

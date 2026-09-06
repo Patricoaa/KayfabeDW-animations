@@ -448,14 +448,7 @@ function convertRanking(
   const labelField = resolveLabelField(rows, config, rc);
   const valueField = resolveValueField(rows, config, rc);
   const imageField = rc?.imageField;
-
-  const items = rows
-    .map((row) => ({
-      label: String(row[labelField] ?? ''),
-      image: imageField ? avatarUrlOf(row[imageField]) : null,
-      value: Number(row[valueField] ?? 0),
-    }))
-    .filter((it) => !isNaN(it.value) && it.label !== '');
+  const items = aggregateRankingRows(rows, labelField, valueField, imageField, rc?.valueAgg ?? 'none', rc?.weightField);
 
   const sorted = [...items].sort((a, b) => b.value - a.value);
 
@@ -465,6 +458,68 @@ function convertRanking(
     accentColor: config.colors?.[0] ?? '#FFD700',
     ...presentationOf(rc),
   };
+}
+
+// Group the dataset rows by entity label and compute each entity's value with
+// the chosen aggregation. 'none' keeps the current behavior: one ranking entry
+// per data row (the label repeats if the dataset repeats it).
+function aggregateRankingRows(
+  rows: Record<string, unknown>[],
+  labelField: string,
+  valueField: string,
+  imageField: string | undefined,
+  agg: NonNullable<RankingConfig['valueAgg']>,
+  weightField: string | undefined,
+): {label: string; image: string | null; value: number}[] {
+  if (agg === 'none') {
+    return rows
+      .map((row) => ({
+        label: String(row[labelField] ?? ''),
+        image: imageField ? avatarUrlOf(row[imageField]) : null,
+        value: Number(row[valueField] ?? 0),
+      }))
+      .filter((it) => !isNaN(it.value) && it.label !== '');
+  }
+
+  type Group = {image: string | null; values: number[]; raws: string[]; weights: number[]; count: number};
+  const groups = new Map<string, Group>();
+  for (const row of rows) {
+    const label = String(row[labelField] ?? '');
+    if (label === '') continue;
+    let g = groups.get(label);
+    if (!g) {
+      g = {image: imageField ? avatarUrlOf(row[imageField]) : null, values: [], raws: [], weights: [], count: 0};
+      groups.set(label, g);
+    }
+    const v = Number(row[valueField] ?? 0);
+    g.count += 1;
+    g.values.push(isNaN(v) ? 0 : v);
+    if (agg === 'countDistinct' && row[valueField] !== undefined && row[valueField] !== null && String(row[valueField]).trim() !== '') {
+      g.raws.push(String(row[valueField]));
+    }
+    if (agg === 'weightedAvg') {
+      g.weights.push(Number(row[weightField ?? ''] ?? 0));
+    }
+    if (!g.image && imageField) g.image = avatarUrlOf(row[imageField]);
+  }
+
+  const valueOf = (g: Group): number => {
+    if (agg === 'count') return g.count;
+    if (agg === 'countDistinct') return new Set(g.raws).size;
+    if (agg === 'sum') return g.values.reduce((a, b) => a + b, 0);
+    if (agg === 'avg') return g.values.length ? g.values.reduce((a, b) => a + b, 0) / g.values.length : 0;
+    if (agg === 'weightedAvg') {
+      const wsum = g.weights.reduce((a, b) => a + b, 0);
+      return wsum > 0 ? g.values.reduce((acc, v, i) => acc + v * (g.weights[i] ?? 0), 0) / wsum : 0;
+    }
+    if (agg === 'min') return g.values.length ? Math.min(...g.values) : 0;
+    if (agg === 'max') return g.values.length ? Math.max(...g.values) : 0;
+    return 0;
+  };
+
+  return [...groups.entries()]
+    .map(([label, g]) => ({label, image: g.image, value: valueOf(g)}))
+    .filter((it) => !isNaN(it.value));
 }
 
 const CONVERTERS: Record<string, (data: Record<string, unknown>[], config: ChartConfig, templateConfig?: unknown) => Record<string, unknown>> = {
