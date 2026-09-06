@@ -399,17 +399,6 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
           </p>
         </div>
         <SliderNumberInput
-          label="Congelar resultado final (s)"
-          value={value.holdFinalSeconds ?? 2}
-          min={0}
-          max={10}
-          step={1}
-          onChange={(v) => update({holdFinalSeconds: v})}
-        />
-        <p className="text-[10px] text-muted mt-0.5">
-          Mantiene el resultado final en pantalla unos segundos antes del outro de salida. 0 = sin congelado.
-        </p>
-        <SliderNumberInput
           label="Duración de la carrera (s)"
           value={value.raceDurationSeconds ?? 0}
           min={0}
@@ -427,14 +416,6 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
         />
         <p className="text-[10px] text-muted">
           Cuando se revela el ganador, lo agranda con brillo y atenúa a los que no quedaron primeros. Apagado = sin atenuación ni brillo.
-        </p>
-        <Toggle
-          label="Mostrar carril"
-          checked={value.showRail ?? true}
-          onChange={(v) => update({showRail: v})}
-        />
-        <p className="text-[10px] text-muted">
-          Muestra el riel de fondo sobre el que se desliza cada barra. Apagado = solo se ven las barras.
         </p>
       </Section>
 
@@ -672,23 +653,13 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
   );
 }
 
-function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: {
+function RankingPanel({columns, fieldMeta, value, onChange}: {
   columns: string[];
   fieldMeta: ColumnMeta[];
   value: RankingConfig;
   onChange: (next: RankingConfig) => void;
-  participants?: Participant[];
 }) {
   const update = (patch: Partial<RankingConfig>) => onChange({...value, ...patch});
-  const [colorQ, setColorQ] = useState('');
-  const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  const filteredColors = participants.filter((p) => (colorQ.trim() === '' ? true : norm(p.label).includes(norm(colorQ))));
-  const setRowColor = (label: string, color?: string) => {
-    const next = {...(value.rowColors ?? {})};
-    if (color) next[label] = color;
-    else delete next[label];
-    update({rowColors: next});
-  };
 
   return (
     <div className="space-y-3">
@@ -787,75 +758,20 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
           <p className="text-[10px] text-muted mt-0.5">0 = sin límite. Limita cuántas entidades participan (el top-N por valor).</p>
         </div>
         <Toggle label="Contar cada dato hasta su valor" checked={value.countUp ?? true} onChange={(v) => update({countUp: v})} />
-        <SliderNumberInput
-          label="Duración del revelado (s)"
-          value={value.countUpDurationSeconds ?? 0}
-          min={0}
-          max={60}
-          step={1}
-          onChange={(v) => update({countUpDurationSeconds: v > 0 ? v : undefined})}
-        />
         <p className="text-[10px] text-muted mt-0.5">
-          Tiempo en que entran todas las filas. 0 = automático (ocupa el tiempo disponible).
+          El valor de cada fila cuenta desde 0 hasta su cifra real mientras la fila entra en pantalla. Apagado = el valor aparece ya resuelto.
         </p>
-        <SliderNumberInput
-          label="Congelar resultado final (s)"
-          value={value.holdFinalSeconds ?? 2}
-          min={0}
-          max={10}
-          step={1}
-          onChange={(v) => update({holdFinalSeconds: v})}
-        />
         <Toggle label="Mostrar puesto (#1)" checked={value.showRank ?? true} onChange={(v) => update({showRank: v})} />
         <Toggle label="Mostrar el dato" checked={value.showValue ?? true} onChange={(v) => update({showValue: v})} />
-        <Toggle label="Mostrar carril" checked={value.showRail ?? true} onChange={(v) => update({showRail: v})} />
         <div>
           <label className="text-sm font-medium mb-1 block">Prefijo del puesto</label>
           <input
             value={value.rankPrefix ?? '#'}
-            onChange={(e) => update({rankPrefix: e.target.value || undefined})}
+            onChange={(e) => update({rankPrefix: e.target.value})}
             className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
           />
+          <p className="text-[10px] text-muted mt-0.5">Vacío = sin prefijo (en vez de #1 muestra 1).</p>
         </div>
-      </Section>
-
-      <Section title="Colores">
-        <ColorInput label="Color del líder" value={value.accentColor ?? '#FFD700'} onChange={(v) => update({accentColor: v || undefined})} />
-        {participants.length > 0 && (
-          <>
-            <div className="flex items-center justify-between mb-0.5">
-              <label className="text-sm font-medium block">Colores por entidad</label>
-              {Object.keys(value.rowColors ?? {}).length > 0 && (
-                <button type="button" onClick={() => update({rowColors: undefined})} className="text-[10px] text-muted hover:text-red-500">
-                  Limpiar todos
-                </button>
-              )}
-            </div>
-            <EntitySearch value={colorQ} onChange={setColorQ} shown={filteredColors.length} total={participants.length} />
-            <div className="space-y-1.5">
-              {filteredColors.map((p) => {
-                const color = value.rowColors?.[p.label] ?? '#475569';
-                return (
-                  <div key={p.label} className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={color}
-                      onChange={(e) => setRowColor(p.label, e.target.value)}
-                      className="w-8 h-8 rounded cursor-pointer border border-border-default bg-transparent"
-                      aria-label={`Color de ${p.label}`}
-                    />
-                    <span className="text-xs text-secondary truncate flex-1">{p.label}</span>
-                    {value.rowColors?.[p.label] && (
-                      <button onClick={() => setRowColor(p.label)} className="text-muted hover:text-red-500 px-1 text-xs" aria-label={`Restablecer color de ${p.label}`}>
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
       </Section>
 
       <Section title="Etiqueta">
@@ -873,7 +789,7 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
 
 export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onChange, participants = []}: AnimationConfigPanelProps) {
   if (templateId === 'ranking') {
-    return <RankingPanel columns={columns} fieldMeta={fieldMeta} value={value as RankingConfig} onChange={onChange as (n: RankingConfig) => void} participants={participants} />;
+    return <RankingPanel columns={columns} fieldMeta={fieldMeta} value={value as RankingConfig} onChange={onChange as (n: RankingConfig) => void} />;
   }
   if (templateId !== 'timeline-race') return null;
   return <TimelineRacePanel templateId={templateId} columns={columns} fieldMeta={fieldMeta} value={value as TimelineRaceConfig} onChange={onChange as (n: TimelineRaceConfig) => void} participants={participants} />;
