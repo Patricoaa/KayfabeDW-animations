@@ -365,6 +365,37 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
     const hasAvatar = !!item.image;
     const laneLabel = `${rankPrefix}${index + 1}`;
 
+    // Table "wave" entry for horizontal directions: instead of sliding the whole
+    // row as a rigid block (which made the value peek in first — LCD-ticker
+    // look), every element launches from the entry edge at the same time and
+    // travels at the same speed, so each one locks in place the moment the
+    // sweep front passes its lane: rank → avatar → label → value (left entry).
+    // The front (in row px) moves S→0 or 0→S; unpinned elements ride it, and
+    // each element fades in as the front nears its lane so the brief clump at
+    // the origin reads as a clean burst.
+    const sweepS = Math.max(rowsInnerW, 1);
+    const sweepFog = 120;
+    const sweepSeg: Record<RowEntryElement, number> = {
+      rank: 0,
+      avatar: showRank ? RANK_W + GAP_H : 0,
+      bar: (showRank ? RANK_W + GAP_H : 0) + (avatarVisible && hasAvatar ? AVATAR + GAP_H : 0),
+      value: sweepS,
+    };
+    const tableEntry = (element: RowEntryElement, frameProg: number) => {
+      const custom = rowEntryMode === 'custom';
+      const dir = custom ? (rowEntryDirs?.[element] ?? rowEntryDir ?? 'bottom') : (rowEntryDir ?? 'bottom');
+      if (dir === 'top' || dir === 'bottom') return entryTransform(element, frameProg);
+      const delayFrac = custom ? Math.max(0, Math.min((rowEntryDelays?.[element] ?? 0) / Math.max(step, 1), 1)) : 0;
+      const pp = delayFrac > 0 && delayFrac < 1 ? (frameProg - delayFrac) / (1 - delayFrac) : frameProg;
+      const e = Math.max(0, Math.min(pp, 1));
+      const refPos = sweepSeg[element];
+      const front = dir === 'left' ? e * sweepS : (1 - e) * sweepS;
+      const t = dir === 'left' ? -Math.max(refPos - front, 0) : Math.max(front - refPos, 0);
+      const dist = dir === 'left' ? front - refPos : refPos - front;
+      const opacity = Math.max(0.12, Math.min((dist + sweepFog) / sweepFog, 1));
+      return {transform: `translate(${t}px, 0px)`, opacity};
+    };
+
     return (
       <div
         key={`${item.label}-${index}`}
@@ -381,22 +412,22 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
         }}
       >
         {showRank && (
-          <div style={{width: RANK_W, flexShrink: 0, textAlign: 'left', ...entryTransform('rank', prog)}}>
+          <div style={{width: RANK_W, flexShrink: 0, textAlign: 'left', ...tableEntry('rank', prog)}}>
             <span style={{fontVariantNumeric: 'tabular-nums', ...textStyle(rankText, {color: isLeader ? accentColor : '#94a3b8', size: Math.round(ROW_FONT * (isLeader ? 1.25 : 1.05)), weight: 900})}}>
               {laneLabel}
             </span>
           </div>
         )}
         {avatarVisible && hasAvatar && (
-          <div style={{flexShrink: 0, ...entryTransform('avatar', prog)}}>
+          <div style={{flexShrink: 0, ...tableEntry('avatar', prog)}}>
             <Avatar src={item.image!} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(item.label, item.image)} />
           </div>
         )}
-        <div style={{flex: 1, minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', ...entryTransform('bar', prog), ...textStyle(labelText, {color: '#d4d4d8', size: Math.round(ROW_FONT * 0.92), weight: 700})}}>
+        <div style={{flex: 1, minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', ...tableEntry('bar', prog), ...textStyle(labelText, {color: '#d4d4d8', size: Math.round(ROW_FONT * 0.92), weight: 700})}}>
           {item.label}
         </div>
         {showValue && (
-          <div style={{flexShrink: 0, maxWidth: '36%', overflow: 'hidden', ...entryTransform('value', prog), ...textStyle(valueText, {color: isLeader ? accentColor : '#ffffff', size: ROW_FONT, weight: 800})}}>
+          <div style={{flexShrink: 0, maxWidth: '36%', overflow: 'hidden', ...tableEntry('value', prog), ...textStyle(valueText, {color: isLeader ? accentColor : '#ffffff', size: ROW_FONT, weight: 800})}}>
             <span style={{fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', display: 'block', textAlign: 'right', textOverflow: 'ellipsis', overflow: 'hidden'}}>
               {fmtValue(displayValue, valueFormat, currencySymbol)}
             </span>
