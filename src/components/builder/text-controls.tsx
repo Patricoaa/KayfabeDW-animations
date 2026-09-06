@@ -6,7 +6,7 @@ import {
 } from '@/lib/chart-config';
 import type {FontWeight, SectionFont, TextAlign, TextOverflow} from '@/lib/chart-config';
 
-function ColorInput({label, value, onChange}: {label: string; value?: string; onChange: (v?: string) => void}) {
+export function ColorInput({label, value, onChange}: {label: string; value?: string; onChange: (v?: string) => void}) {
   return (
     <div>
       <label className="text-sm font-medium mb-1 block">{label}</label>

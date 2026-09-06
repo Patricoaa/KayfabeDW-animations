@@ -30,6 +30,7 @@ export type TimelineRaceProps = {
   dateFormat?: 'day' | 'month' | 'year';
   maxRows?: number;
   holdFinalSeconds?: number;
+  raceDurationSeconds?: number;
   podiumEffect?: boolean;
   barsX?: number;
   barsY?: number;
@@ -135,6 +136,13 @@ function textStyle(over: RaceTextStyle | undefined, defaults: {color: string; si
   if (over?.letterSpacing !== undefined) s.letterSpacing = over.letterSpacing;
   if (over?.lineHeight) s.lineHeight = over.lineHeight;
   if (over?.align) s.textAlign = over.align;
+  if (over?.underline) s.textDecoration = 'underline';
+  if (over?.highlightColor) {
+    s.background = over.highlightColor;
+    s.borderRadius = over.highlightRadius;
+    s.display = 'inline-block';
+    s.padding = '0.14em 0.22em';
+  }
   return s;
 }
 
@@ -147,6 +155,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   dateFormat = 'day',
   maxRows,
   holdFinalSeconds = 2,
+  raceDurationSeconds,
   podiumEffect = true,
   barsX,
   barsY,
@@ -385,11 +394,22 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   // finishes `OUTRO` frames before the last frame so the bars can collapse and
   // the entity labels fade in on top of the shrunken bars.
   const OUTRO = Math.min(45, Math.max(0, Math.floor(durationInFrames * 0.12)));
-  // Hold the final result before the outro: a configurable pause (seconds)
-  // where the winner stays on screen once the sweep has finished. The frames
-  // come out of the sweep so the total duration is preserved.
-  const holdFrames = Math.max(0, Math.min(Math.round(holdFinalSeconds * fps), Math.max(0, durationInFrames - EASE * 2 - OUTRO - 1)));
-  const sweepFrames = Math.max(durationInFrames - EASE * 2 - OUTRO - holdFrames, 1);
+  // Time available for the sweep plus the final hold (everything except the
+  // ease-in/out margins and the outro tail).
+  const sweepBudget = Math.max(0, durationInFrames - EASE * 2 - OUTRO);
+  const holdCap = Math.max(0, sweepBudget - 1);
+  const holdFinalFrames = Math.max(0, Math.min(Math.round(holdFinalSeconds * fps), holdCap));
+  // By default the race stretches across every frame that isn't ease-in/out,
+  // hold or outro. When `raceDurationSeconds` is pinned, the sweep instead
+  // lasts exactly that long (clamped to what the video allows) and any leftover
+  // time is absorbed as extra hold on the final result so the total duration
+  // is preserved.
+  const sweepFrames = raceDurationSeconds != null
+    ? Math.max(1, Math.min(Math.max(1, Math.round(raceDurationSeconds * fps)), sweepBudget))
+    : Math.max(sweepBudget - holdFinalFrames, 1);
+  const holdFrames = raceDurationSeconds != null
+    ? (sweepFrames >= sweepBudget ? 0 : Math.max(holdFinalFrames, sweepBudget - sweepFrames))
+    : holdFinalFrames;
   const raceEndFrame = EASE + sweepFrames;
   const guideTAt = (f: number) => {
     const r = interpolate(f, [EASE, EASE + sweepFrames], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});

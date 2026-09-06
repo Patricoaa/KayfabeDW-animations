@@ -6,6 +6,7 @@ import type {ColumnMeta} from '@/components/builder/chart-config-panel';
 import type {TimelineRaceConfig, DateFormat, AvatarShape, AvatarCrop, RaceTextStyle, ValueFormat} from '@/lib/animation-config';
 import {avatarCropRect} from '@/lib/animation-config';
 import {FONT_PRESETS, PALETTES} from '@/lib/chart-config';
+import {ColorInput as AutoColorInput} from './text-controls';
 
 const VALUE_FORMATS: {value: ValueFormat; label: string}[] = [
   {value: 'number', label: 'Número (1.234)'},
@@ -318,6 +319,17 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
         />
         <p className="text-[10px] text-muted mt-0.5">
           Mantiene el resultado final en pantalla unos segundos antes del outro de salida. 0 = sin congelado.
+        </p>
+        <SliderNumberInput
+          label="Duración de la carrera (s)"
+          value={value.raceDurationSeconds ?? 0}
+          min={0}
+          max={60}
+          step={1}
+          onChange={(v) => update({raceDurationSeconds: v > 0 ? v : undefined})}
+        />
+        <p className="text-[10px] text-muted mt-0.5">
+          Tiempo del barrido de la carrera. 0 = automático (la carrera ocupa todo el tiempo disponible). Al fijarla, el tiempo sobrante queda congelado en el resultado final.
         </p>
         <Toggle
           label="Efecto podio al final"
@@ -905,6 +917,29 @@ function RaceTextControls({label, value, onChange}: {label: string; value?: Race
           ))}
         </div>
       </div>
+      <div className="rounded-lg border border-border-subtle p-2.5 space-y-2">
+        <p className="text-sm font-medium">Resaltado</p>
+        <AutoColorInput
+          label="Color de fondo"
+          value={v.highlightColor}
+          onChange={(c) => onChange({highlightColor: c || undefined})}
+        />
+        {v.highlightColor && (
+          <SliderNumberInput
+            label="Radio de esquinas (px)"
+            value={v.highlightRadius ?? 0}
+            min={0}
+            max={48}
+            step={1}
+            onChange={(n) => onChange({highlightRadius: n || undefined})}
+          />
+        )}
+      </div>
+      <Toggle
+        label="Subrayado"
+        checked={!!v.underline}
+        onChange={(b) => onChange({underline: b || undefined})}
+      />
     </div>
   );
 }

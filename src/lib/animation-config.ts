@@ -24,6 +24,13 @@ export type RaceTextStyle = {
   letterSpacing?: number;
   lineHeight?: number;
   align?: 'left' | 'center' | 'right';
+
+  // Highlight box behind the text. `highlightColor` enables it (background);
+  // `highlightRadius` (px) rounds its corners (0 = square). `underline` adds
+  // an underline to the text.
+  highlightColor?: string;
+  highlightRadius?: number;
+  underline?: boolean;
 };
 
 // Shared crop math: how a zoomed (and focus-shifted) image is placed inside a
@@ -65,6 +72,13 @@ export type TimelineRaceConfig = {
   // Pause (seconds) that freezes the final result on-screen after the sweep
   // finishes and before the outro contracts the bars. 0 = no extra hold.
   holdFinalSeconds?: number;
+
+  // Duration (seconds) of the race sweep itself (the sliding guide traveling
+  // across the date axis). Empty/0 = automatic: the race stretches across all
+  // the time left after the ease-in, hold and outro. When pinned to a value,
+  // the race finishes exactly at that duration and any leftover time is kept
+  // frozen on the final result (in addition to `holdFinalSeconds`).
+  raceDurationSeconds?: number;
 
   // Podium effect at the race end: when the winner is revealed, the leader
   // grows + glows and the rest are dimmed. false disables the whole effect
