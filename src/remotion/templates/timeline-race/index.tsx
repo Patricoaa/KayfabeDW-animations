@@ -796,6 +796,7 @@ function Avatar({
         flexShrink: 0,
         backgroundColor: '#1f2937',
         border: '2px solid #334155',
+        boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.2)',
         position: 'relative',
       }}
     >
@@ -809,6 +810,7 @@ function Avatar({
           height: rect.h,
           transform: `translate(${imgX}px, ${imgY}px)`,
           objectFit: 'contain',
+          borderRadius,
         }}
       />
     </div>
