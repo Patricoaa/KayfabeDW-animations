@@ -1,5 +1,5 @@
 import React from 'react';
-import {useCurrentFrame, useVideoConfig, spring, Easing, Img} from 'remotion';
+import {useCurrentFrame, useVideoConfig, Easing, Img} from 'remotion';
 import type {RaceTextStyle, ValueFormat, RowEntryElement} from '../../../lib/animation-config';
 import {Header} from '../shared/Header';
 import {BackgroundLayer} from '../shared/Background';
@@ -252,15 +252,17 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
     return {zoom: c?.zoom ?? 1, focusX: c?.focusX ?? 0, focusY: c?.focusY ?? 0};
   };
 
-  // Row entry animation: which side each element (rank/avatar/bar/label/datum)
-  // travels from. The row itself stays put; the motion lives on the per-element
-  // transform, so each element slides in along a straight cardinal path.
-  // Row entry: each element (rank/avatar/bar/label/datum) travels a straight
-  // path from the selected cardinal side. In 'together' mode every element
-  // shares the general direction; in 'custom' each element can override its
-  // direction (`rowEntryDirs`) and add its own sequential delay in frames
-  // (`rowEntryDelays`). The row container itself stays put — the whole motion
-  // lives on the per-element transform, so the trajectory is purely axis-aligned.
+  // Row entry: the row container stays fixed in its lane; only the elements
+  // (rank/avatar/bar/label/datum) translate along a pure axis. Horizontal
+  // (`left`/`right`) sweeps span the full list width; vertical (`top`/`bottom`)
+  // sweeps span the full list height, so each element emerges from the rows
+  // area's own edge and travels perpendicularly into its slot — no diagonal
+  // component at any frame. Opacity ramps linearly 0→1 across the whole travel,
+  // so the element materializes while it moves and lands at full opacity the
+  // instant it settles (no "appear in place, then drift" ghosting).
+  // In 'together' mode every element shares the general direction; in 'custom'
+  // each element can override its direction (`rowEntryDirs`) and add its own
+  // sequential delay in frames (`rowEntryDelays`).
   const entryTransform = (element: RowEntryElement, prog: number) => {
     const custom = rowEntryMode === 'custom';
     const dir = custom
@@ -269,10 +271,11 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
     const delayFrac = custom ? Math.max(0, Math.min((rowEntryDelays?.[element] ?? 0) / Math.max(step, 1), 1)) : 0;
     const p = delayFrac > 0 && delayFrac < 1 ? (prog - delayFrac) / (1 - delayFrac) : prog;
     const e = Math.max(0, Math.min(p, 1));
-    const off = (1 - e) * (dir === 'left' || dir === 'right' ? rowsInnerW : ROW_H + ROW_GAP);
+    const sweep = dir === 'left' || dir === 'right' ? rowsInnerW : rowLaneH * n;
+    const off = (1 - e) * sweep;
     const tx = dir === 'left' ? -off : dir === 'right' ? off : 0;
     const ty = dir === 'bottom' ? off : dir === 'top' ? -off : 0;
-    return {transform: `translate(${tx}px, ${ty}px)`, opacity: Math.min(e * 1.6, 1)};
+    return {transform: `translate(${tx}px, ${ty}px)`, opacity: e};
   };
 
   const renderRow = (item: RankingItem, index: number) => {
@@ -282,7 +285,6 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
     const shown = prog >= 1;
     const isLeader = index === 0;
 
-    const pop = spring({fps, frame: frame - start, config: {damping: 20, stiffness: 110}, durationInFrames: Math.max(step, 1)});
     // Bar width as a % of its own flex track: rank/avatar/value and their gaps
     // are consumed by the flex layout, so the bar always fills the exact space
     // that remains (rank included when visible).
@@ -312,7 +314,6 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
           display: 'flex',
           alignItems: 'center',
           gap: GAP_H,
-          opacity: Math.min(pop, 1),
         }}
       >
         {showRank && (
@@ -329,7 +330,7 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
         )}
         <div style={{flex: 1, minWidth: 0, height: BAR_H, position: 'relative', display: 'flex', alignItems: 'center', ...entryTransform('bar', prog)}}>
           {showRail !== false && (
-            <div style={{position: 'absolute', left: 0, right: 0, top: '50%', height: GROOVE_H, transform: 'translateY(-50%)', backgroundColor: '#171717', borderRadius: 999, opacity: pop}} />
+            <div style={{position: 'absolute', left: 0, right: 0, top: '50%', height: GROOVE_H, transform: 'translateY(-50%)', backgroundColor: '#171717', borderRadius: 999}} />
           )}
           <div style={{position: 'absolute', left: 0, top: '50%', width: `${Math.max(0, barW)}%`, height: BAR_H, transform: 'translateY(-50%)', backgroundColor: fill, borderRadius: 999, boxShadow: isLeader && shown ? `0 0 ${18}px ${accentColor}99` : 'none'}} />
         </div>
@@ -352,7 +353,6 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
     const easeOut = Easing.out(Easing.cubic)(prog);
     const isLeader = index === 0;
 
-    const pop = spring({fps, frame: frame - start, config: {damping: 20, stiffness: 110}, durationInFrames: Math.max(step, 1)});
     const displayValue = countUp ? Math.round(item.value * easeOut) : item.value;
 
     const rowFinalY = rowsTop + index * rowLaneH;
@@ -375,7 +375,6 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
           display: 'flex',
           alignItems: 'center',
           gap: GAP_H,
-          opacity: Math.min(pop, 1),
           borderBottom: `${tableSepWidth}px solid ${tableSepColor}`,
         }}
       >
