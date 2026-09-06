@@ -4,6 +4,8 @@ import os from 'os';
 import chromium from '@sparticuz/chromium';
 import {put} from '@vercel/blob';
 import {isValidCompId} from '@/remotion/generated/schema';
+import {TEMPLATES} from '@/remotion/generated/registry';
+import {createClient} from '@/lib/supabase/server';
 import type {RenderProgress} from './helpers';
 
 export const maxDuration = 120;
@@ -108,6 +110,7 @@ export async function POST(req: Request) {
   };
 
   try {
+    const renderStartedAt = Date.now();
     await send({type: 'phase', phase: 'Bundling project...', progress: 0.05});
     const bundleUrl = await getBundleUrl();
 
@@ -188,6 +191,26 @@ export async function POST(req: Request) {
 
     await send({type: 'done', url, size: videoBuffer.length});
     console.log(`[render] Done: ${url}`);
+
+    // Record the render server-side so the history survives even if the
+    // browser tab is closed right after the export finishes. The client no
+    // longer posts to /api/renders (would duplicate rows). Best-effort.
+    try {
+      const templateId =
+        Object.entries(TEMPLATES).find(([, t]) => t.meta.componentId === body.compositionId)?.[0]
+        ?? body.compositionId;
+      const supabase = await createClient();
+      await supabase.rpc('record_render', {
+        p_template_id: templateId,
+        p_input_props: body.inputProps,
+        p_output_url: url,
+        p_output_size: videoBuffer.length,
+        p_render_time_ms: Date.now() - renderStartedAt,
+        p_status: 'done',
+      });
+    } catch (err) {
+      console.error('[render] Failed to record history entry:', err);
+    }
   } catch (err) {
     console.error('[render] ERROR:', err);
     await send({type: 'error', message: (err as Error).message});

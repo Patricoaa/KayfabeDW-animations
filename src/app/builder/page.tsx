@@ -115,12 +115,34 @@ function BuilderContent() {
   const staticExportRef = useRef<HTMLDivElement | null>(null);
   const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosavedOnceRef = useRef(false);
+  const lastPersistedKeyRef = useRef<string | null>(null);
 
   // Derived template state (must be before effects that reference activeTemplate)
   const bestTemplate = outputMode === 'animated' && data.length > 0
     ? suggestBestTemplate(chartConfig, data)
     : null;
   const activeTemplate = selectedTemplate ?? bestTemplate;
+
+  // Canonical key of everything that gets persisted (query, chart AND
+  // animation config). Comparing it with the last persisted key tells us
+  // whether there are unsaved changes, without scattering `setSaved(false)`
+  // across every setter.
+  const persistKey = useMemo(
+    () =>
+      JSON.stringify({
+        name: vizName,
+        spec,
+        chartConfig,
+        outputMode,
+        activeTemplate,
+        duration,
+        templateConfig,
+        exportPresetId,
+        customSize,
+        safeZones,
+      }),
+    [vizName, spec, chartConfig, outputMode, activeTemplate, duration, templateConfig, exportPresetId, customSize, safeZones],
+  );
 
   // Load schema metadata
   useEffect(() => {
@@ -186,17 +208,24 @@ function BuilderContent() {
         }
         if (d.chart_config) setChartConfig(d.chart_config);
         if (d.name) setVizName(d.name);
+        // Modo explícito desde la columna output_mode (0125). Para filas
+        // viejas (sin la columna) se cae a la inferencia por templateId.
+        if (d.output_mode === 'static' || d.output_mode === 'animated') {
+          setOutputMode(d.output_mode);
+        }
         if (d.animation_config) {
           const ac = d.animation_config;
-          if (ac.templateId) {
-            setSelectedTemplate(ac.templateId);
+          if (ac.templateId) setSelectedTemplate(ac.templateId);
+          if (ac.outputMode === 'static' || ac.outputMode === 'animated') {
+            setOutputMode(ac.outputMode);
+          } else if (ac.templateId && d.output_mode !== 'static') {
             setOutputMode('animated');
-            if (EXPORT_PRESETS.some((p) => p.id === ac.presetId)) {
-              setExportPresetId(ac.presetId);
-            }
-            if (ac.customSize && Number.isFinite(ac.customSize.width) && Number.isFinite(ac.customSize.height)) {
-              setCustomSize({width: ac.customSize.width, height: ac.customSize.height});
-            }
+          }
+          if (EXPORT_PRESETS.some((p) => p.id === ac.presetId)) {
+            setExportPresetId(ac.presetId);
+          }
+          if (ac.customSize && Number.isFinite(ac.customSize.width) && Number.isFinite(ac.customSize.height)) {
+            setCustomSize({width: ac.customSize.width, height: ac.customSize.height});
           }
           if (ac.duration) {
             setDuration(ac.duration);
@@ -233,15 +262,17 @@ function BuilderContent() {
       // shared link reopens the full animated setup (template, duration, size).
       if (decoded.animationConfig) {
         const ac = decoded.animationConfig;
-        if (ac.templateId) {
-          setSelectedTemplate(ac.templateId);
+        if (ac.templateId) setSelectedTemplate(ac.templateId);
+        if (ac.outputMode === 'static' || ac.outputMode === 'animated') {
+          setOutputMode(ac.outputMode);
+        } else if (ac.templateId) {
           setOutputMode('animated');
-          if (EXPORT_PRESETS.some((p) => p.id === ac.presetId)) {
-            setExportPresetId(ac.presetId);
-          }
-          if (ac.customSize && Number.isFinite(ac.customSize.width) && Number.isFinite(ac.customSize.height)) {
-            setCustomSize({width: ac.customSize.width, height: ac.customSize.height});
-          }
+        }
+        if (EXPORT_PRESETS.some((p) => p.id === ac.presetId)) {
+          setExportPresetId(ac.presetId);
+        }
+        if (ac.customSize && Number.isFinite(ac.customSize.width) && Number.isFinite(ac.customSize.height)) {
+          setCustomSize({width: ac.customSize.width, height: ac.customSize.height});
         }
         if (ac.duration) {
           setDuration(ac.duration);
@@ -328,10 +359,36 @@ function BuilderContent() {
     autoMappedRef.current = true;
   }, [data, chartConfig.xField, chartConfig.yField]);
 
-  // E2E: Auto-save draft when there is a table selected and unsaved changes,
+  // Payload compartido por autosave, flush al cerrar y guardado manual.
+  // animation_config siempre va completo (nunca null) + output_mode explícito,
+  // para que el modo se decida por columna y alternar estático <-> animado
+  // no destruya la config animada (0125).
+  const buildDraftPayload = useCallback(
+    () => ({
+      name: vizName,
+      query_spec: spec,
+      chart_config: chartConfig,
+      animation_config: {
+        outputMode,
+        templateId: activeTemplate,
+        duration,
+        templateConfig: Object.keys(templateConfig).length > 0 ? templateConfig : null,
+        presetId: exportPresetId,
+        customSize: exportPresetId === 'custom' ? customSize : null,
+        safeZones,
+      },
+      output_mode: outputMode,
+      is_draft: true,
+    }),
+    [vizName, spec, chartConfig, outputMode, activeTemplate, duration, templateConfig, exportPresetId, customSize, safeZones],
+  );
+
+  // Auto-save draft when there is a table selected and unsaved changes,
   // debounced after the query settles. Writes auto_saved_at + is_draft.
+  // Covers query AND animation config changes.
   const persistDraft = useCallback(async () => {
     if (!spec.table || spec.select?.length === 0) return;
+    if (persistKey === lastPersistedKeyRef.current) return;
     const isEdit = !!editIdRef.current;
     try {
       const url = isEdit ? `/api/viz-specs/${editIdRef.current}` : '/api/viz-specs';
@@ -339,22 +396,7 @@ function BuilderContent() {
       const res = await fetch(url, {
         method,
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          name: vizName,
-          query_spec: spec,
-          chart_config: chartConfig,
-          animation_config: outputMode === 'animated' && activeTemplate
-            ? {
-                templateId: activeTemplate,
-                duration,
-                templateConfig: Object.keys(templateConfig).length > 0 ? templateConfig : null,
-                presetId: exportPresetId,
-                customSize: exportPresetId === 'custom' ? customSize : null,
-                safeZones,
-              }
-            : null,
-          is_draft: true,
-        }),
+        body: JSON.stringify(buildDraftPayload()),
       });
       if (!res.ok) return;
       const created = await res.json();
@@ -362,32 +404,62 @@ function BuilderContent() {
         editIdRef.current = created.id;
         window.history.replaceState(null, '', `/builder?edit=${created.id}`);
       }
+      lastPersistedKeyRef.current = persistKey;
       autosavedOnceRef.current = true;
+      setSaved(true);
     } catch {
       // Silent — autosave is best-effort
     }
-  }, [spec, vizName, chartConfig, outputMode, activeTemplate, duration, templateConfig, exportPresetId, customSize, safeZones]);
+  }, [spec, persistKey, buildDraftPayload]);
 
   useEffect(() => {
-    if (saved || !spec.table || spec.select?.length === 0) return;
+    if (!spec.table || spec.select?.length === 0) return;
+    if (persistKey === lastPersistedKeyRef.current) return;
     if (autosaveRef.current) clearTimeout(autosaveRef.current);
     autosaveRef.current = setTimeout(() => {
-      persistDraft();
+      void persistDraft();
     }, 3000);
     return () => {
       if (autosaveRef.current) clearTimeout(autosaveRef.current);
     };
-  }, [spec, saved, chartConfig, vizName, persistDraft]);
+  }, [spec.table, spec.select, persistKey, persistDraft]);
 
-  // Warn before leaving with unsaved changes
+  const dirty = !!spec.table && (spec.select?.length ?? 0) > 0 && persistKey !== lastPersistedKeyRef.current;
+
+  // If any persisted field changes, the "Guardado" status is stale.
   useEffect(() => {
-    if (saved) return;
+    if (dirty) setSaved(false);
+  }, [dirty]);
+
+  // Warn before leaving with genuine unsaved changes.
+  useEffect(() => {
+    if (!dirty) return;
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault();
     };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
-  }, [saved]);
+  }, [dirty]);
+
+  // Flush pending changes on unload so the 3 s autosave window can't lose the
+  // last edit. `keepalive` lets the request survive the page being torn down.
+  useEffect(() => {
+    const flush = () => {
+      if (!spec.table || spec.select?.length === 0) return;
+      if (persistKey === lastPersistedKeyRef.current) return;
+      const isEdit = !!editIdRef.current;
+      fetch(isEdit ? `/api/viz-specs/${editIdRef.current}` : '/api/viz-specs', {
+        method: isEdit ? 'PUT' : 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(buildDraftPayload()),
+        keepalive: true,
+      }).catch(() => {
+        // Best-effort flush — autosave / manual save remain the fallback.
+      });
+    };
+    window.addEventListener('pagehide', flush);
+    return () => window.removeEventListener('pagehide', flush);
+  }, [spec.table, spec.select, persistKey, buildDraftPayload]);
 
   // C17: Re-apply URL template param when switching back to animated mode
   // (only if user hasn't explicitly deselected a template)
@@ -431,25 +503,14 @@ function BuilderContent() {
         method,
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-          name: vizName,
-          query_spec: spec,
-          chart_config: chartConfig,
-          animation_config: outputMode === 'animated' && activeTemplate
-            ? {
-                templateId: activeTemplate,
-                duration,
-                templateConfig: Object.keys(templateConfig).length > 0 ? templateConfig : null,
-                presetId: exportPresetId,
-                customSize: exportPresetId === 'custom' ? customSize : null,
-                safeZones,
-              }
-            : null,
+          ...buildDraftPayload(),
           thumbnail_url: thumbnailUrl,
           is_draft: false,
           version_bump: true,
         }),
       });
       if (!res.ok) throw new Error('Error saving');
+      lastPersistedKeyRef.current = persistKey;
       setSaved(true);
       addToast('Guardado correctamente', 'success');
       // If newly created, update the URL to edit mode

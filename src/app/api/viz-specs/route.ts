@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
       p_query_spec: body.query_spec ?? {},
       p_chart_config: body.chart_config ?? {},
       p_animation_config: body.animation_config ?? null,
+      p_output_mode: body.output_mode ?? null,
       p_folder_id: body.folder_id ?? null,
       p_is_draft: body.is_draft ?? true,
       p_version_bump: body.version_bump === true,

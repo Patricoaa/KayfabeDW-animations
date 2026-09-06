@@ -110,7 +110,6 @@ export function ExportPanel({
     if (!remotionProps || !compositionId) return;
     const controller = new AbortController();
     abortRef.current = controller;
-    const startedAt = Date.now();
     setRenderState({status: 'rendering', phase: 'Iniciando...', progress: 0.05});
     try {
       const res = await fetch('/api/render', {
@@ -130,21 +129,6 @@ export function ExportPanel({
       const result = await res.json();
       if (result.type === 'done') {
         setRenderState({status: 'done', url: result.url, size: result.size});
-        try {
-          await fetch('/api/renders', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-              template_id: templateId,
-              input_props: remotionProps,
-              output_url: result.url,
-              output_size: result.size,
-              render_time_ms: Date.now() - startedAt,
-            }),
-          });
-        } catch {
-          // Non-fatal
-        }
       } else if (result.type === 'error') {
         setRenderState({status: 'error', message: result.message});
       } else {
