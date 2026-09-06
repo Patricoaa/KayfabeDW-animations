@@ -564,6 +564,19 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
         </Section>
       )}
 
+      {/* ============ ETIQUETA ============ */}
+      <Section title="Etiqueta">
+        <RaceTextControls label="Texto de la etiqueta" value={value.labelText} onChange={(patch) => update({labelText: {...(value.labelText ?? {}), ...patch}})} />
+        <p className="text-[10px] text-muted mt-0.5">
+          El nombre de la entidad que se apoya sobre la barra en el outro final.
+        </p>
+        <div className="h-px bg-border-default my-3" />
+        <RaceTextControls label="Texto del dato (dentro de la barra)" value={value.valueText} onChange={(patch) => update({valueText: {...(value.valueText ?? {}), ...patch}})} />
+        <p className="text-[10px] text-muted mt-0.5">
+          El valor acumulado que viaja dentro de cada barra.
+        </p>
+      </Section>
+
       {/* ============ CANVAS ============ */}
       <Section title="Canvas">
         <SelectControl

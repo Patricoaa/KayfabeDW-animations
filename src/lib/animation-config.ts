@@ -176,6 +176,11 @@ export type TimelineRaceConfig = {
   // Typography overrides for the title and the on-screen date.
   titleText?: RaceTextStyle;
   dateText?: RaceTextStyle;
+
+  // Typography overrides for the entity label (parked on the contracted bar
+  // during the outro) and for the datum that travels inside each bar.
+  labelText?: RaceTextStyle;
+  valueText?: RaceTextStyle;
 };
 
 // Keyed by TemplateId. Templates not listed here (or with no entry) inherit

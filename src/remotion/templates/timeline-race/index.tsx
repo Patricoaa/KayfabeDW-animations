@@ -81,6 +81,8 @@ export type TimelineRaceProps = {
   yAxisWidth?: number;
   titleText?: RaceTextStyle;
   dateText?: RaceTextStyle;
+  labelText?: RaceTextStyle;
+  valueText?: RaceTextStyle;
 };
 
 function fmtDate(t: number, fmt: TimelineRaceProps['dateFormat'] = 'day'): string {
@@ -201,6 +203,8 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   yAxisWidth = 2,
   titleText,
   dateText,
+  labelText,
+  valueText,
 }) => {
   const frame = useCurrentFrame();
   const {fps, durationInFrames, width: W, height: H} = useVideoConfig();
@@ -348,7 +352,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
               ),
               value: (
                 <div style={{width: COMPAT_VALUE_W, flexShrink: 0, textAlign: 'right'}}>
-                  <span style={{fontSize: ROW_FONT, fontWeight: 800, color: isLeader ? accentColor : '#ffffff', fontVariantNumeric: 'tabular-nums'}}>{fmtValue(item.value, valueFormat, currencySymbol)}</span>
+                  <span style={{fontVariantNumeric: 'tabular-nums', ...textStyle(valueText, {color: isLeader ? accentColor : '#ffffff', size: ROW_FONT, weight: 800})}}>{fmtValue(item.value, valueFormat, currencySymbol)}</span>
                 </div>
               ),
               avatar: (
@@ -688,11 +692,11 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
         <div style={{flexShrink: 0, width: BAR_MAX_W, height: BAR_H, position: 'relative', display: 'flex', alignItems: 'center'}}>
           {showRail !== false && <div style={{position: 'absolute', left: 0, right: 0, top: '50%', height: GROOVE_H, transform: 'translateY(-50%)', backgroundColor: '#171717', borderRadius: barRadius ?? 999, opacity: pop}} />}
 <div style={{position: 'absolute', left: 0, top: 0, bottom: 0, width: '100%', display: 'flex', alignItems: 'center', opacity: outro, transform: `translateX(${(1 - outro) * -18}px)`}}>
-  <span style={{fontSize: Math.round(ROW_FONT * 0.92), fontWeight: 700, color: '#d4d4d8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', paddingLeft: 12, paddingRight: 8}}>{p.label}</span>
+  <span style={{whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', paddingLeft: 12, paddingRight: 8, ...textStyle(labelText, {color: '#d4d4d8', size: Math.round(ROW_FONT * 0.92), weight: 700})}}>{p.label}</span>
 </div>
           <div style={{position: 'absolute', left: leftOff, top: '50%', width: Math.max(0, w), height: BAR_H, transform: `translateY(-50%) scaleY(${scale})`, backgroundColor: barFill, borderRadius: barRadius ?? 999, boxShadow: isLeader && podiumEffect ? `0 0 ${18 * scale}px ${accentColor}99` : 'none'}} />
           <div style={{position: 'absolute', right: (BAR_MAX_W - barRight) + valuePad, top: 0, bottom: 0, maxWidth: Math.max(0, w - valuePad * 2), minWidth: 0, display: 'flex', alignItems: 'center', overflow: 'hidden', pointerEvents: 'none', opacity: pop}}>
-            <span style={{fontSize: ROW_FONT, fontWeight: 800, color: '#ffffff', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textShadow: '0 1px 2px rgba(0,0,0,0.45)'}}>
+            <span style={{fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textShadow: '0 1px 2px rgba(0,0,0,0.45)', ...textStyle(valueText, {color: '#ffffff', size: ROW_FONT, weight: 800})}}>
               {fmtValue(Math.round(p.current), valueFormat, currencySymbol)}
             </span>
           </div>

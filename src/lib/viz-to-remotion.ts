@@ -245,6 +245,8 @@ function convertTimelineRace(
     yAxisWidth: t?.yAxisWidth,
     titleText: t?.titleText,
     dateText: t?.dateText,
+    labelText: t?.labelText,
+    valueText: t?.valueText,
   });
 
   const rows = data ?? [];
