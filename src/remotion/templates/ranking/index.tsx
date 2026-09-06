@@ -20,10 +20,14 @@ export type RankingItem = {
 // on (default), each datum counts up from 0 to its real value as its row
 // drops in; the optional avatar renders via the shared Avatar (per-entity
 // crops supported). `rankMode` switches between animated bars and a minimal
-// table (horizontal separators only); `showAvatar` hides all avatars. With
-// `rowImages` set, a global frame takes the right side of the canvas, the rows
-// squeeze to the left, and the frame shows the image of the position being
-// revealed (fade in + one-way left→right pan). The frame width has no cap, so
+// table (horizontal separators only, thickness/color configurable); `showAvatar`
+// hides all avatars. Each row's entry is configurable: from which side its
+// elements travel (rank/avatar/bar/label/datum) and whether they come together
+// or staggered, globally or per entity. With `rowImages` set, a global frame
+// takes the right side of the canvas, the rows squeeze to the left, and the
+// frame shows the image of the position being revealed — a hard cut (no fade)
+// followed by a one-way pan whose direction is per position. A minimum zoom
+// keeps focus/pan functional at any zoom level. The frame width has no cap, so
 // it can span the full canvas. Fully responsive: reads
 // `useVideoConfig()` and re-flows for portrait (9:16), post (4:5), square and
 // landscape while keeping the rows proportional.
@@ -58,6 +62,12 @@ export type RankingProps = {
   rowImageX?: number;
   rowImageY?: number;
   rowImagePan?: boolean;
+  rowImagePanDirs?: Record<string, 'ltr' | 'rtl' | 'none'>;
+  rowEntryDir?: 'left' | 'right' | 'top' | 'bottom';
+  rowEntryMode?: 'together' | 'staggered' | 'custom';
+  rowEntryOverrides?: Record<string, {dir?: 'left' | 'right' | 'top' | 'bottom'; stagger?: boolean}>;
+  tableSepWidth?: number;
+  tableSepColor?: string;
   rowGap?: number;
   rowGapH?: number;
   valueFormat?: ValueFormat;
@@ -118,6 +128,12 @@ export const Ranking: React.FC<RankingProps> = ({
   rowImageX,
   rowImageY,
   rowImagePan = true,
+  rowImagePanDirs,
+  rowEntryDir = 'bottom',
+  rowEntryMode = 'together',
+  rowEntryOverrides,
+  tableSepWidth = 1,
+  tableSepColor = 'rgba(255,255,255,0.14)',
   rowGap,
   rowGapH,
   valueFormat = 'number',
@@ -172,7 +188,13 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
   const AVATAR = avatarSize ?? (isPortrait ? Math.round(W * 0.09) : 48);
   const avatarVisible = showAvatar !== false && AVATAR > 0;
   const GAP = isPortrait ? 12 : 16;
+  // Horizontal gap between row segments (rank/avatar/bar/datum). 0 is honored
+  // literally — users can collapse the segments without retriggering the auto
+  // default.
   const GAP_H = rowGapH ?? GAP;
+  // Vertical spacing between rows (independent of the horizontal gap). When
+  // `rowGap` is provided its value is stored literally — 0 means 0 (no gap).
+  const ROW_GAP = rowGap ?? (isPortrait ? 14 : 8);
 
   const innerW = W - PAD_L - PAD_R;
 
@@ -199,14 +221,10 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
 
   const rowBudget = H - PAD_T - PAD_B - TITLE_SIZE * 1.4 - (isPortrait ? H * 0.12 : 100);
   const ROW_H = n <= 6 ? Math.min((rowBudget / n) * 0.7, isPortrait ? 130 : 84) : Math.max(46, (rowBudget / n) * 0.6);
-  const ROW_GAP = rowGap ?? (isPortrait ? 14 : 8);
   const rowsTop = Math.max(0, (rowBudget - n * ROW_H - (n - 1) * ROW_GAP) / 2);
   const rowLaneH = ROW_H + ROW_GAP;
 
-  const segPixelW = (rankW: number, avatarW: number) =>
-    (showRank ? rankW + GAP_H : 0) + (avatarVisible && avatarW > 0 ? avatarW + GAP_H : 0);
   const BAR_FACTOR = Math.min(Math.max(barWidth ?? 1, 0.4), 1.5);
-  const BAR_TRACK_W = Math.max(Math.round((rowsInnerW - segPixelW(RANK_W, AVATAR)) * BAR_FACTOR), 80);
   const GROOVE_H = Math.max(10, ROW_H * 0.42);
   const BAR_H = GROOVE_H + Math.max(2, Math.round(ROW_H * 0.06));
 
@@ -229,6 +247,30 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
     return {zoom: c?.zoom ?? 1, focusX: c?.focusX ?? 0, focusY: c?.focusY ?? 0};
   };
 
+  // Row entry animation: which side each element (rank/avatar/bar/label/datum)
+  // travels from and whether the elements of a row move together or staggered.
+  // Resolves the effective direction + stagger for a label, then maps a 0..1
+  // `prog` to a transform so the element slides in from that side.
+  const entryFor = (label: string) => {
+    const o = rowEntryOverrides?.[label];
+    const dir = o?.dir ?? rowEntryDir ?? 'bottom';
+    const stagger = rowEntryMode === 'custom' ? (o?.stagger ?? false) : rowEntryMode === 'staggered';
+    return {dir, stagger};
+  };
+  // Element order, so stagger knows which element is early/late. Tablet mode
+  // and total width determine the layout; bar mode lists the datum last.
+  const ELEMENT_ORDER = ['rank', 'avatar', 'bar', 'value'] as const;
+  const entryTransform = (label: string, element: string, prog: number, inc: number) => {
+    const {dir, stagger} = entryFor(label);
+    const p = stagger ? Math.max(0, Math.min((prog - inc) / (1 - inc * (ELEMENT_ORDER.length - 1)), 1)) : prog;
+    const e = Math.max(0, Math.min(p, 1));
+    const off = (1 - e) * (ROW_H * 0.9);
+    if (dir === 'left') return {transform: `translateX(${-off}px)`, opacity: Math.min(e * 1.6, 1)};
+    if (dir === 'right') return {transform: `translateX(${off}px)`, opacity: Math.min(e * 1.6, 1)};
+    if (dir === 'top') return {transform: `translateY(${-off}px)`, opacity: Math.min(e * 1.6, 1)};
+    return {transform: `translateY(${off}px)`, opacity: Math.min(e * 1.6, 1)};
+  };
+
   const renderRow = (item: RankingItem, index: number) => {
     const start = EASE + sequencePos(index) * step;
     const prog = Math.max(0, Math.min((frame - start) / Math.max(step, 1), 1));
@@ -237,7 +279,10 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
     const isLeader = index === 0;
 
     const pop = spring({fps, frame: frame - start, config: {damping: 20, stiffness: 110}, durationInFrames: Math.max(step, 1)});
-    const barW = (item.value / maxValue) * BAR_TRACK_W * pop;
+    // Bar width as a % of its own flex track: rank/avatar/value and their gaps
+    // are consumed by the flex layout, so the bar always fills the exact space
+    // that remains (rank included when visible).
+    const barW = (item.value / maxValue) * BAR_FACTOR * 100;
     const fill = rowColors?.[item.label] ?? (isLeader ? accentColor : '#475569');
 
     // Count-up datum (or static value when `countUp` is off).
@@ -249,6 +294,9 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
 
     const laneLabel = `${rankPrefix}${index + 1}`;
     const hasAvatar = !!item.image;
+
+    // Per-element entry: element order index drives the stagger offset.
+    const elemIdx = (el: string) => ELEMENT_ORDER.indexOf(el as (typeof ELEMENT_ORDER)[number]);
 
     return (
       <div
@@ -266,31 +314,30 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
         }}
       >
         {showRank && (
-          <div style={{width: RANK_W, flexShrink: 0, textAlign: 'left'}}>
+          <div style={{width: RANK_W, flexShrink: 0, textAlign: 'left', ...entryTransform(item.label, 'rank', prog, elemIdx('rank') * 0.16)}}>
             <span style={{fontVariantNumeric: 'tabular-nums', ...textStyle(rankText, {color: isLeader ? accentColor : '#94a3b8', size: Math.round(ROW_FONT * (isLeader ? 1.25 : 1.05)), weight: 900})}}>
               {laneLabel}
             </span>
           </div>
         )}
-        {avatarVisible && hasAvatar && <Avatar src={item.image!} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(item.label, item.image)} />}
-        <div style={{flex: 1, height: BAR_H, position: 'relative', display: 'flex', alignItems: 'center'}}>
+        {avatarVisible && hasAvatar && (
+          <div style={{flexShrink: 0, ...entryTransform(item.label, 'avatar', prog, elemIdx('avatar') * 0.16)}}>
+            <Avatar src={item.image!} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(item.label, item.image)} />
+          </div>
+        )}
+        <div style={{flex: 1, minWidth: 0, height: BAR_H, position: 'relative', display: 'flex', alignItems: 'center', ...entryTransform(item.label, 'bar', prog, elemIdx('bar') * 0.16)}}>
           {showRail !== false && (
             <div style={{position: 'absolute', left: 0, right: 0, top: '50%', height: GROOVE_H, transform: 'translateY(-50%)', backgroundColor: '#171717', borderRadius: 999, opacity: pop}} />
           )}
-          <div style={{position: 'absolute', left: 0, top: 0, bottom: 0, width: '100%', display: 'flex', alignItems: 'center', zIndex: 1}}>
-            <div style={{flexShrink: 0, maxWidth: '62%', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', paddingRight: 10, ...textStyle(labelText, {color: '#d4d4d8', size: Math.round(ROW_FONT * 0.92), weight: 700})}}>
-              {item.label}
-            </div>
-          </div>
-          <div style={{position: 'absolute', left: 0, top: '50%', width: Math.max(0, barW), height: BAR_H, transform: 'translateY(-50%)', backgroundColor: fill, borderRadius: 999, boxShadow: isLeader && shown ? `0 0 ${18}px ${accentColor}99` : 'none'}} />
-          {showValue && (
-            <div style={{position: 'absolute', right: 12, top: 0, bottom: 0, maxWidth: Math.max(0, barW - 24), minWidth: 0, display: 'flex', alignItems: 'center', overflow: 'hidden', pointerEvents: 'none', zIndex: 2}}>
-              <span style={{fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textShadow: '0 1px 2px rgba(0,0,0,0.45)', ...textStyle(valueText, {color: isLeader ? '#000000' : '#ffffff', size: ROW_FONT, weight: 800})}}>
-                {fmtValue(displayValue, valueFormat, currencySymbol)}
-              </span>
-            </div>
-          )}
+          <div style={{position: 'absolute', left: 0, top: '50%', width: `${Math.max(0, barW)}%`, height: BAR_H, transform: 'translateY(-50%)', backgroundColor: fill, borderRadius: 999, boxShadow: isLeader && shown ? `0 0 ${18}px ${accentColor}99` : 'none'}} />
         </div>
+        {showValue && (
+          <div style={{flexShrink: 0, maxWidth: '28%', overflow: 'hidden', ...entryTransform(item.label, 'value', prog, elemIdx('value') * 0.16), ...textStyle(valueText, {color: isLeader ? accentColor : '#ffffff', size: ROW_FONT, weight: 800})}}>
+            <span style={{fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', display: 'block', textAlign: 'right', textOverflow: 'ellipsis', overflow: 'hidden'}}>
+              {fmtValue(displayValue, valueFormat, currencySymbol)}
+            </span>
+          </div>
+        )}
       </div>
     );
   };
@@ -312,6 +359,7 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
 
     const hasAvatar = !!item.image;
     const laneLabel = `${rankPrefix}${index + 1}`;
+    const elemIdx = (el: string) => ELEMENT_ORDER.indexOf(el as (typeof ELEMENT_ORDER)[number]);
 
     return (
       <div
@@ -326,22 +374,26 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
           alignItems: 'center',
           gap: GAP_H,
           opacity: Math.min(pop, 1),
-          borderBottom: '1px solid rgba(255,255,255,0.14)',
+          borderBottom: `${tableSepWidth}px solid ${tableSepColor}`,
         }}
       >
         {showRank && (
-          <div style={{width: RANK_W, flexShrink: 0, textAlign: 'left'}}>
+          <div style={{width: RANK_W, flexShrink: 0, textAlign: 'left', ...entryTransform(item.label, 'rank', prog, elemIdx('rank') * 0.16)}}>
             <span style={{fontVariantNumeric: 'tabular-nums', ...textStyle(rankText, {color: isLeader ? accentColor : '#94a3b8', size: Math.round(ROW_FONT * (isLeader ? 1.25 : 1.05)), weight: 900})}}>
               {laneLabel}
             </span>
           </div>
         )}
-        {avatarVisible && hasAvatar && <Avatar src={item.image!} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(item.label, item.image)} />}
-        <div style={{flex: 1, minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', ...textStyle(labelText, {color: '#d4d4d8', size: Math.round(ROW_FONT * 0.92), weight: 700})}}>
+        {avatarVisible && hasAvatar && (
+          <div style={{flexShrink: 0, ...entryTransform(item.label, 'avatar', prog, elemIdx('avatar') * 0.16)}}>
+            <Avatar src={item.image!} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(item.label, item.image)} />
+          </div>
+        )}
+        <div style={{flex: 1, minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', ...entryTransform(item.label, 'bar', prog, elemIdx('bar') * 0.16), ...textStyle(labelText, {color: '#d4d4d8', size: Math.round(ROW_FONT * 0.92), weight: 700})}}>
           {item.label}
         </div>
         {showValue && (
-          <div style={{flexShrink: 0, maxWidth: '36%', overflow: 'hidden', ...textStyle(valueText, {color: isLeader ? accentColor : '#ffffff', size: ROW_FONT, weight: 800})}}>
+          <div style={{flexShrink: 0, maxWidth: '36%', overflow: 'hidden', ...entryTransform(item.label, 'value', prog, elemIdx('value') * 0.16), ...textStyle(valueText, {color: isLeader ? accentColor : '#ffffff', size: ROW_FONT, weight: 800})}}>
             <span style={{fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', display: 'block', textAlign: 'right', textOverflow: 'ellipsis', overflow: 'hidden'}}>
               {fmtValue(displayValue, valueFormat, currencySymbol)}
             </span>
@@ -352,9 +404,9 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
   };
 
   // ---- Global right-side frame ----
-  // The image of the position currently being revealed fills the frame: it
-  // fades in over the reveal window and pans left→right once (slow, so the
-  // travel lasts until the next position drops in).
+  // The image of the position currently being revealed fills the frame: it cuts
+  // in instantly (no fade) the moment its row starts, then performs its one-way
+  // pan (per-position direction) over the reveal window.
   let activeLabel: string | undefined;
   let activeIndex = -1;
   let activeStart = -Infinity;
@@ -372,16 +424,23 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
     activeLabel === undefined
       ? 0
       : Math.max(0, Math.min((frame - activeStart) / Math.max(step, 1), 1));
-  const frameFade = Easing.out(Easing.cubic)(activeProg);
-  const framePan = rowImagePan !== false ? Easing.out(Easing.cubic)(activeProg) : 0;
+  const activeItem = activeLabel !== undefined && activeIndex >= 0 ? ranked[activeIndex] : undefined;
+  const panProg = rowImagePanDirs?.[activeItem?.label ?? ''] === 'rtl' ? 1 - activeProg : activeProg;
+  const framePan =
+    activeItem && rowImagePan !== false && rowImagePanDirs?.[activeItem.label] !== 'none'
+      ? Easing.out(Easing.cubic)(panProg)
+      : 0;
 
   // Cover-crop geometry for the frame. The image always fills the frame box
   // (`objectFit: 'cover'`, so the browser auto-rescales to match width and
   // height); zoom/focus/pan run through a top-left-origin transform. `extraX`
-  // is the horizontal overflow the one-way pan travels.
+  // is the horizontal overflow the one-way pan travels. A guaranteed minimum
+  // zoom keeps overflow in both axes so focus and pan work even when the user
+  // leaves zoom at its default.
+  const ZOOM_FLOOR = 1.12;
   const frameImgGeom = (label: string, pan: number) => {
     const ric = rowImageCrops?.[label];
-    const z = Math.max(ric?.zoom ?? 1, 0.1);
+    const z = Math.max(ric?.zoom ?? 1, ZOOM_FLOOR);
     const fx = Math.max(Math.min(ric?.focusX ?? 0, 1), -1);
     const fy = Math.max(Math.min(ric?.focusY ?? 0, 1), -1);
     const extraX = FRAME_W * (z - 1);
@@ -391,7 +450,7 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
     return {z: Math.max(z, 0.1), tx: clampX, ty: clampY};
   };
 
-  const frameLayer = (item: RankingItem, index: number, pan: number, opacity: number) => {
+  const frameLayer = (item: RankingItem, index: number, pan: number) => {
     const src = rowImageFor(item.label, item.image);
     if (!src) return null;
     const g = frameImgGeom(item.label, pan);
@@ -409,11 +468,11 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
             transformOrigin: '0 0',
             objectFit: 'cover',
             maxWidth: 'none',
-            opacity,
+            opacity: 1,
           }}
         />
         {rowImageLabel && (
-          <div style={{position: 'absolute', left: rowImageLabelX ?? 12, top: rowImageLabelY ?? 12, pointerEvents: 'none', opacity}}>
+          <div style={{position: 'absolute', left: rowImageLabelX ?? 12, top: rowImageLabelY ?? 12, pointerEvents: 'none'}}>
             <span style={{fontVariantNumeric: 'tabular-nums', textShadow: '0 1px 3px rgba(0,0,0,0.6)', ...textStyle(rowImageLabelText, {color: '#ffffff', size: Math.round(ROW_FONT * 1.35), weight: 900})}}>
               {rankPrefix}{index + 1}
             </span>
@@ -481,7 +540,7 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
             boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)',
           }}
         >
-          {activeLabel && activeIndex >= 0 && frameLayer(ranked[activeIndex], activeIndex, framePan, frameFade)}
+          {activeItem && frameLayer(activeItem, activeIndex, framePan)}
         </div>
       )}
     </div>

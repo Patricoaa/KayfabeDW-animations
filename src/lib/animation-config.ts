@@ -149,7 +149,8 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
 
   // Avatar controls (mirror the static bar chart): shape + per-entity crop
   // overrides via `avatarCrops` (key = entity label). Zoom/focus are
-  // per-entity only (no global fallback).
+  // per-entity only (no global fallback). `showAvatar` hides all avatars.
+  showAvatar?: boolean;
   avatarSize?: number;
   avatarShape?: AvatarShape;
   avatarRadius?: number;
@@ -236,6 +237,20 @@ export type RankingConfig = CommonAnimationConfig & {
   // and no width is reserved for it.
   showAvatar?: boolean;
 
+  // Row entry animation for both modes: which side each element of the row
+  // (rank, avatar, bar/label, datum) travels from, and whether all elements
+  // move together or staggered. 'custom' enables per-entity overrides
+  // (`rowEntryOverrides`); entities without an override fall back to the
+  // global direction with element stagger off.
+  rowEntryDir?: 'left' | 'right' | 'top' | 'bottom';
+  rowEntryMode?: 'together' | 'staggered' | 'custom';
+  rowEntryOverrides?: Record<string, {dir?: 'left' | 'right' | 'top' | 'bottom'; stagger?: boolean}>;
+
+  // Table-mode row separators (horizontal rule under each row): thickness (px)
+  // and color. Bars mode has no separators.
+  tableSepWidth?: number;
+  tableSepColor?: string;
+
   // Prefix for the rank number (e.g. "#"), empty = no prefix.
   rankPrefix?: string;
 
@@ -287,6 +302,11 @@ export type RankingConfig = CommonAnimationConfig & {
 
   // Enable the one-way left→right pan that accompanies each reveal (default ON).
   rowImagePan?: boolean;
+
+  // Per-position pan direction override for the frame image: 'ltr' (default,
+  // left→right), 'rtl' (right→left) or 'none' (no pan). The global
+  // `rowImagePan` toggle stays the master switch.
+  rowImagePanDirs?: Record<string, 'ltr' | 'rtl' | 'none'>;
 
   // Row spacing (px vertical gap between rows) and horizontal gap (px)
   // between row segments (rank, avatar, bar).

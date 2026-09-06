@@ -211,6 +211,7 @@ function CanvasSection({value, update}: {value: CommonCanvasConfig; update: (pat
 // Avatar fields shared by the Timeline Race and Ranking configs. The caller
 // merges the emitted patch into its own config object.
 type AvatarFields = {
+  showAvatar?: boolean;
   avatarSize?: number;
   avatarShape?: AvatarShape;
   avatarRadius?: number;
@@ -236,6 +237,7 @@ function AvatarSection({value, onChange, participants = []}: {
   };
   return (
     <Section title="Avatar">
+      <Toggle label="Mostrar avatares" checked={value.showAvatar ?? true} onChange={(v) => onChange({showAvatar: v})} />
       <div>
         <label className="text-sm font-medium mb-1 block">Tamaño</label>
         <input
@@ -705,11 +707,19 @@ function RowImageSection({value, onChange, participants = []}: {
     next[label] = mode;
     onChange({rowImageModes: next});
   };
+  const setPanDir = (label: string, dir?: 'ltr' | 'rtl' | 'none') => {
+    const next = {...(value.rowImagePanDirs ?? {})};
+    if (dir) next[label] = dir; else delete next[label];
+    onChange({rowImagePanDirs: next});
+  };
   const imageRefs = React.useRef<Record<string, HTMLInputElement | null>>({});
   return (
     <Section title="Imagen por puesto">
       <p className="text-[10px] text-muted">
-        Marco global en el costado derecho del canvas: las filas se comprimen a la izquierda y el marco muestra la imagen del puesto que se está revelando, con fundido y un traslado lento de izquierda a derecha hasta que entra el siguiente puesto. El ancho no tiene tope: puede extenderse hasta todo el ancho del canvas (las filas se comprimen al mínimo).
+        Marco global en el costado derecho del canvas: las filas se comprimen a la izquierda y el marco muestra la imagen del puesto que se está revelando, con corte directo (sin fundido) y un traslado lento (dirección configurable por imagen) hasta que entra el siguiente puesto. Un zoom mínimo garantiza que foco y traslado funcionen aunque dejes el zoom en 1. El ancho no tiene tope: puede extenderse hasta todo el ancho del canvas (las filas se comprimen al mínimo).
+      </p>
+      <p className="text-[10px] text-amber-400/80">
+        Solo se muestra el Top {participants.length} (los mismos que se renderizan, según "Máximo de filas" en Datos).
       </p>
       <div>
         <label className="text-sm font-medium mb-1 block">Ancho del marco (vacío = automático)</label>
@@ -774,7 +784,7 @@ function RowImageSection({value, onChange, participants = []}: {
               const cr = value.rowImageCrops?.[p.label];
               const PW = 56;
               const PH = 64;
-              const z = Math.max(cr?.zoom ?? 1, 0.1);
+              const z = Math.max(cr?.zoom ?? 1, 1.12);
               const fx = Math.max(Math.min(cr?.focusX ?? 0, 1), -1);
               const fy = Math.max(Math.min(cr?.focusY ?? 0, 1), -1);
               const ex = PW * (z - 1);
@@ -826,6 +836,23 @@ function RowImageSection({value, onChange, participants = []}: {
                       <NumberInput label="Zoom" value={cr?.zoom} min={0.1} max={3} step={0.05} onChange={(v) => setCrop(p.label, {...cr, zoom: v})} />
                       <NumberInput label="Foco X" value={cr ? (cr.focusX ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setCrop(p.label, {...cr, focusX: (v ?? 0) / 100})} />
                       <NumberInput label="Foco Y" value={cr ? (cr.focusY ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setCrop(p.label, {...cr, focusY: (v ?? 0) / 100})} />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <label className="text-sm font-medium mb-1 block">Pan al relevar</label>
+                    <div className="grid grid-cols-4 gap-1">
+                      {([['', 'Auto'], ['ltr', '←→'], ['rtl', '→←'], ['none', 'Nada']] as const).map(([v, l]) => (
+                        <button
+                          key={v}
+                          type="button"
+                          onClick={() => setPanDir(p.label, v || undefined)}
+                          className={`px-1 py-1 rounded-md text-xs font-medium transition-colors ${
+                            (value.rowImagePanDirs?.[p.label] ?? '') === v ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
+                          }`}
+                        >
+                          {l}
+                        </button>
+                      ))}
                     </div>
                   </div>
                   {mode === 'url' && (
@@ -1022,10 +1049,10 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
       </Section>
 
       <Section title="Filas">
-        <SliderNumberInput label="Separación vertical (px)" value={value.rowGap ?? 0} min={0} max={120} step={2} onChange={(v) => update({rowGap: v || undefined})} />
-        <SliderNumberInput label="Separación horizontal (px)" value={value.rowGapH ?? 0} min={0} max={80} step={2} onChange={(v) => update({rowGapH: v || undefined})} />
+        <SliderNumberInput label="Separación vertical (px)" value={value.rowGap ?? 0} min={0} max={120} step={2} onChange={(v) => update({rowGap: v})} />
+        <SliderNumberInput label="Separación horizontal (px)" value={value.rowGapH ?? 0} min={0} max={80} step={2} onChange={(v) => update({rowGapH: v})} />
         <p className="text-[10px] text-muted">
-          Aplican a los dos modos (barras y tabla); la separación horizontal también reserva espacio alrededor del puesto cuando está visible.
+          Aplican a los dos modos (barras y tabla). La separación horizontal incluye el puesto en el cálculo (su ancho más el hueco) y puede establecerse a 0.
         </p>
         <SelectControl
           label="Formato del valor"
@@ -1054,9 +1081,82 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
               onChange={(v) => update({barWidth: v ? v / 100 : undefined})}
             />
             <p className="text-[10px] text-muted">
-              Multiplica el ancho automático de la barra (100% = el actual). Reduce para que el valor o el avatar respiren.
+              Multiplica el ancho de la barra dentro de su propio espacio flex (100% = el actual). Reduce para que el valor o el avatar respiren.
             </p>
           </>
+        )}
+        <div className="pt-2 mt-1 border-t border-border-subtle">
+          <p className="text-[10px] text-muted mb-1.5">Entrada de la fila (puesto, avatar, barra/etiqueta, dato).</p>
+          <label className="text-sm font-medium mb-1 block">Dirección</label>
+          <div className="grid grid-cols-4 gap-1 mb-2">
+            {([['left', '←'], ['bottom', '↓'], ['right', '→'], ['top', '↑']] as const).map(([v, l]) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => update({rowEntryDir: v as 'left'|'right'|'top'|'bottom'})}
+                className={`px-2 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  (value.rowEntryDir ?? 'bottom') === v ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
+                }`}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+          <label className="text-sm font-medium mb-1 block">Modo</label>
+          <div className="grid grid-cols-3 gap-1">
+            {([['together', 'Junto'], ['staggered', 'Escalonado'], ['custom', 'Personalizado']] as const).map(([v, l]) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => update({rowEntryMode: v as 'together'|'staggered'|'custom'})}
+                className={`px-2 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  (value.rowEntryMode ?? 'together') === v ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
+                }`}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+        {(value.rowEntryMode ?? 'together') === 'custom' && (
+          <div className="pt-2 mt-1 border-t border-border-subtle">
+            <p className="text-[10px] text-muted mb-1.5">Personalización por entidad (la dirección y escalonado aquí anulan la global).</p>
+            {participants.map((p) => {
+              const ov = value.rowEntryOverrides?.[p.label];
+              return (
+                <div key={p.label} className="flex items-center gap-2 mb-1">
+                  <span className="text-xs text-secondary truncate w-28" title={p.label}>{p.label}</span>
+                  <select
+                    value={ov?.dir ?? ''}
+                    onChange={(e) => update({rowEntryOverrides: {...(value.rowEntryOverrides ?? {}), [p.label]: {...(value.rowEntryOverrides?.[p.label] ?? {}), dir: e.target.value ? (e.target.value as 'left'|'right'|'top'|'bottom') : undefined}}})}
+                    className="bg-elevated border border-border-default rounded px-1 py-0.5 text-xs text-secondary focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  >
+                    <option value="">Auto</option>
+                    <option value="left">←</option>
+                    <option value="bottom">↓</option>
+                    <option value="right">→</option>
+                    <option value="top">↑</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => update({rowEntryOverrides: {...(value.rowEntryOverrides ?? {}), [p.label]: {...(value.rowEntryOverrides?.[p.label] ?? {}), stagger: !ov?.stagger}}})}
+                    className={`px-1.5 py-0.5 rounded text-xs font-medium transition-colors ${
+                      ov?.stagger ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
+                    }`}
+                  >
+                    Escalonar
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {(value.rankMode ?? 'bars') === 'table' && (
+          <div className="pt-2 mt-1 border-t border-border-subtle">
+            <p className="text-[10px] text-muted mb-1.5">Separadores inferiores de la tabla.</p>
+            <SliderNumberInput label="Grosor (px)" value={value.tableSepWidth ?? 1} min={0} max={8} step={1} onChange={(v) => update({tableSepWidth: v || undefined})} />
+            <ColorInput label="Color" value={value.tableSepColor} onChange={(v) => update({tableSepColor: v})} />
+          </div>
         )}
         <div className="pt-2 mt-1 border-t border-border-subtle">
           <p className="text-[10px] text-muted mb-1.5">Posición del grupo de filas (offset en px desde su lugar por defecto).</p>
@@ -1067,7 +1167,6 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
         </div>
       </Section>
 
-      <Toggle label="Mostrar avatares" checked={value.showAvatar ?? true} onChange={(v) => update({showAvatar: v})} />
       <AvatarSection value={value} onChange={update} participants={participants} />
 
       <RowImageSection value={value} onChange={update} participants={participants} />

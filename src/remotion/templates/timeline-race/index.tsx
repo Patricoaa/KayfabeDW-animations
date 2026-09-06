@@ -56,6 +56,7 @@ export type TimelineRaceProps = {
   subtitleY?: number;
   dateX?: number;
   dateY?: number;
+  showAvatar?: boolean;
   avatarSize?: number;
   avatarShape?: 'circle' | 'rounded';
   avatarRadius?: number;
@@ -129,6 +130,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   subtitleY,
   dateX,
   dateY,
+  showAvatar = true,
   avatarSize,
   avatarShape = 'circle',
   avatarRadius,
@@ -265,7 +267,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
               ),
               avatar: (
                 <div style={{flexShrink: 0}}>
-                  {item.image && <Avatar src={item.image} size={COMPAT_AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(item.label, item.image)} />}
+                  {showAvatar && item.image && <Avatar src={item.image} size={COMPAT_AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(item.label, item.image)} />}
                 </div>
               ),
             };
@@ -612,7 +614,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
       ),
       avatar: (
         <div style={{width: AVATAR, flexShrink: 0, textAlign: 'right'}}>
-          {p.image && <Avatar src={p.image} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(p.label, p.image)} />}
+          {showAvatar && p.image && <Avatar src={p.image} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(p.label, p.image)} />}
         </div>
       ),
     };

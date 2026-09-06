@@ -241,6 +241,7 @@ function convertTimelineRace(
     barWidth: t?.barWidth,
     dateX: t?.dateX,
     dateY: t?.dateY,
+    showAvatar: t?.showAvatar,
     avatarSize: t?.avatarSize,
     avatarShape: t?.avatarShape,
     avatarRadius: t?.avatarRadius,
@@ -399,6 +400,24 @@ export function getTimelineRaceParticipants(
 // Distinct participants (label + avatar) for the per-participant large-image
 // controls in the Ranking config panel. Mirrors getTimelineRaceParticipants
 // resolution (label from the ranking's labelField, avatar from imageField).
+// Resolve the ranking the "ranking" template actually renders: aggregate the
+// (optionally maxRows-trimmed) input by the resolved value field, then order
+// best value on top. Shared by the renderer and the builder participants list
+// so both reference the exact same top-N set.
+function resolveRanking(
+  rows: Record<string, unknown>[],
+  config: ChartConfig,
+  rc?: RankingConfig,
+): {items: ReturnType<typeof aggregateRankingRows>; valueField: string; labelField: string} {
+  const labelField = resolveLabelField(rows, config, rc);
+  const valueField = resolveValueField(rows, config, rc);
+  const imageField = rc?.imageField;
+  const limited = rc?.maxRows && rc.maxRows > 0 ? rows.slice(0, rc.maxRows) : rows;
+  const items = aggregateRankingRows(limited, labelField, valueField, imageField, rc?.valueAgg ?? 'none', rc?.weightField);
+  const sorted = [...items].sort((a, b) => b.value - a.value);
+  return {items: sorted, valueField, labelField};
+}
+
 export function getRankingParticipants(
   data: Record<string, unknown>[],
   config: ChartConfig,
@@ -406,17 +425,7 @@ export function getRankingParticipants(
 ): {label: string; image?: string | null}[] {
   const rows = data ?? [];
   if (rows.length === 0) return [];
-  const labelField = resolveLabelField(rows, config, rc);
-  const imageField = rc?.imageField;
-  const seen = new Map<string, true>();
-  const out: {label: string; image?: string | null}[] = [];
-  for (const row of rows) {
-    const label = String(row[labelField] ?? '');
-    if (!label || seen.has(label)) continue;
-    seen.set(label, true);
-    out.push({label, image: imageField ? avatarUrlOf(row[imageField]) : null});
-  }
-  return out;
+  return resolveRanking(rows, config, rc).items.map((it) => ({label: it.label, image: it.image ?? null}));
 }
 
 // Coerce a cell to a number as tolerant as possible: numbers, booleans,
@@ -519,6 +528,12 @@ function convertRanking(
     rowImageX: t?.rowImageX,
     rowImageY: t?.rowImageY,
     rowImagePan: t?.rowImagePan,
+    rowImagePanDirs: t?.rowImagePanDirs,
+    rowEntryDir: t?.rowEntryDir,
+    rowEntryMode: t?.rowEntryMode,
+    rowEntryOverrides: t?.rowEntryOverrides,
+    tableSepWidth: t?.tableSepWidth,
+    tableSepColor: t?.tableSepColor,
     rowGap: t?.rowGap,
     rowGapH: t?.rowGapH,
     valueFormat: t?.valueFormat,
@@ -537,12 +552,7 @@ function convertRanking(
     return {title: (rc?.title || config.title) ?? '', items: [], accentColor: config.colors?.[0] ?? '#FFD700', ...presentationOf(rc)};
   }
 
-  const labelField = resolveLabelField(rows, config, rc);
-  const valueField = resolveValueField(rows, config, rc);
-  const imageField = rc?.imageField;
-  const items = aggregateRankingRows(rows, labelField, valueField, imageField, rc?.valueAgg ?? 'none', rc?.weightField);
-
-  const sorted = [...items].sort((a, b) => b.value - a.value);
+  const {items: sorted, valueField} = resolveRanking(rows, config, rc);
 
   // Diagnostics: if the dataset has numeric candidates but every aggregated
   // value collapsed to 0, the resolved value field is almost certainly wrong
