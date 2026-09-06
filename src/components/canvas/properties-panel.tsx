@@ -267,13 +267,48 @@ function buildSql(spec: QuerySpec): string[] {
     spec.joins.forEach((j) => parts.push(`${j.type ?? 'INNER'} JOIN ${j.table} ON ${j.on}`));
   }
   if (spec.filters && spec.filters.length > 0) {
-    const clauses: string[] = [];
+    // Mismo algoritmo que la RPC query_builder (migración 0124):
+    //   * filtros consecutivos sobre la misma (tabla,columna) forman un
+    //     grupo con paréntesis; su conector interno es el logic del filtro
+    //     ANTERIOR del grupo.
+    //   * el conector ENTRANTE de un grupo es el logic del último filtro del
+    //     grupo previo (v_prev_logic); al final se cosen "c1 (g1) c2 (g2)".
+    const quote = (v: string) => `'${v.replaceAll("'", "''")}'`;
+    const buildCond = (f: FilterRule) => {
+      const col = `${f.table ?? spec.table}.${f.column}`;
+      switch (f.op) {
+        case 'is_null': return `${col} IS NULL`;
+        case 'is_not_null': return `${col} IS NOT NULL`;
+        case 'in': return `${col} IN (${(f.value ?? '').split(',').map((x) => quote(x.trim())).filter(Boolean).join(', ')})`;
+        case 'between': {
+          const [a, b] = (f.value ?? '').split(',').map((x) => x.trim());
+          return `${col} BETWEEN ${quote(a)} AND ${quote(b)}`;
+        }
+        case 'like': return `${col} LIKE ${quote(f.value ?? '')}`;
+        case 'ilike': return `${col} ILIKE ${quote(f.value ?? '')}`;
+        case '!=': return `${col} <> ${quote(f.value ?? '')}`;
+        default: return `${col} ${f.op} ${quote(f.value ?? '')}`;
+      }
+    };
+    const groups: {cond: string; incoming: string}[] = [];
+    let prevKey: string | null = null;
+    let prevLogic = 'AND';
+    let cur: {cond: string; incoming: string} | null = null;
     spec.filters.forEach((f, i) => {
-      const clause = `${f.table ?? spec.table}.${f.column} ${f.op} ${f.value ?? ''}`;
-      if (i > 0) clauses.push((spec.filters?.[i - 1].logic ?? 'AND'));
-      clauses.push(clause);
+      const key = `${f.table ?? spec.table}.${f.column}`;
+      const cond = buildCond(f);
+      if (cur && key === prevKey) {
+        cur.cond = `${cur.cond} ${prevLogic} ${cond}`;
+      } else {
+        if (cur) groups.push(cur);
+        cur = {cond: `(${cond})`, incoming: i === 0 ? '' : prevLogic};
+      }
+      prevKey = key;
+      prevLogic = f.logic ?? 'AND';
     });
-    parts.push(`WHERE ${clauses.join(' ')}`);
+    if (cur) groups.push(cur);
+    const where = groups.map((g) => (g.incoming ? `${g.incoming} ${g.cond}` : g.cond)).join(' ');
+    parts.push(`WHERE ${where}`);
   }
   if (spec.groupBy && spec.groupBy.length > 0) {
     parts.push(`GROUP BY ${spec.groupBy.join(', ')}`);
