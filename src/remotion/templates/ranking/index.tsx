@@ -470,26 +470,25 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
 
   // Cover-crop geometry for the frame. The image always fills the frame box
   // (`objectFit: 'cover'`, so the browser auto-rescales to match width and
-  // height); zoom/focus/pan run through a top-left-origin transform. `extraX`
-  // is the horizontal overflow the one-way pan travels. A guaranteed minimum
-  // zoom keeps overflow in both axes so focus and pan work even when the user
-  // leaves zoom at its default.
-  const ZOOM_FLOOR = 1.12;
+  // height); zoom/focus/pan run through a top-left-origin transform. Zoom is
+  // taken literally: values < 1 shrink the image inside the frame (zoom-out),
+  // values > 1 enlarge it. When zoom is left unset it defaults to 1.12 so the
+  // one-way pan still has overflow to travel over. `overX`/`overY` are the
+  // travel capacity in each axis (absolute overflow); focus places the crop
+  // across the full range and the pan sweeps the remaining room, clamped so a
+  // zoomed-in image never uncovers the frame.
+  const ZOOM_DEFAULT = 1.12;
   const frameImgGeom = (label: string, pan: number) => {
     const ric = rowImageCrops?.[label];
-    const z = Math.max(ric?.zoom ?? 1, ZOOM_FLOOR);
+    const z = Math.max(Math.min(ric?.zoom ?? ZOOM_DEFAULT, 3), 0.1);
     const fx = Math.max(Math.min(ric?.focusX ?? 0, 1), -1);
     const fy = Math.max(Math.min(ric?.focusY ?? 0, 1), -1);
-    const extraX = FRAME_W * (z - 1);
-    const extraY = frameHeight * (z - 1);
-    const clampX =
-      z >= 1
-        ? rowImagePan === false
-          ? Math.max(-extraX, Math.min(0, -extraX / 2 - (fx * extraX) / 2))
-          : Math.max(-extraX, Math.min(0, -extraX * (1 - pan) - (fx * extraX) / 4))
-        : -extraX * (1 - pan) - (fx * extraX) / 4;
-    const clampY = z >= 1 ? Math.max(-extraY, Math.min(0, -extraY / 2 - (fy * extraY) / 2)) : -extraY / 2 - (fy * extraY) / 2;
-    return {z: Math.max(z, 0.1), tx: clampX, ty: clampY};
+    const overX = FRAME_W * Math.abs(z - 1);
+    const overY = frameHeight * Math.abs(z - 1);
+    const baseX = -overX / 2 - (fx * overX) / 2;
+    const tx = rowImagePan === false ? baseX : Math.max(-overX, Math.min(0, baseX - pan * overX));
+    const ty = Math.max(-overY, Math.min(0, -overY / 2 - (fy * overY) / 2));
+    return {z, tx, ty};
   };
 
   const frameLayer = (item: RankingItem, index: number, pan: number) => {
@@ -579,7 +578,6 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
             overflow: 'hidden',
             backgroundColor: rowImageFrameBg === 'dark' ? '#111827' : 'transparent',
             borderRadius: Math.round(ROW_H * 0.35),
-            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)',
           }}
         >
           {activeItem && frameLayer(activeItem, activeIndex, framePan)}

@@ -725,7 +725,7 @@ function RowImageSection({value, onChange, participants = []}: {
   return (
     <Section title="Imagen por puesto">
       <p className="text-[10px] text-muted">
-        Marco global en el costado derecho del canvas: las filas se comprimen a la izquierda y el marco muestra la imagen del puesto que se está revelando, con corte directo (sin fundido) y un traslado lento (dirección configurable por imagen) hasta que entra el siguiente puesto. Un zoom mínimo garantiza que foco y traslado funcionen aunque dejes el zoom en 1. El ancho no tiene tope: puede extenderse hasta todo el ancho del canvas (las filas se comprimen al mínimo).
+        Marco global en el costado derecho del canvas: las filas se comprimen a la izquierda y el marco muestra la imagen del puesto que se está revelando, con corte directo (sin fundido) y un traslado lento (dirección configurable por imagen) hasta que entra el siguiente puesto. El zoom se aplica tal cual (valores menores a 1 alejan la imagen dentro del marco); si lo dejas en blanco, se usa un mínimo por defecto para que el foco y el traslado siempre tengan margen. El ancho no tiene tope: puede extenderse hasta todo el ancho del canvas (las filas se comprimen al mínimo).
       </p>
       <p className="text-[10px] text-amber-400/80">
         Solo se listan y muestran las {participants.length} entidades definidas por "Máximo de entidades" en Ranking (el top-N por valor). Las imágenes que configures para entidades fuera de ese top-N quedan guardadas y se reactivan si subes el límite.
@@ -813,13 +813,13 @@ function RowImageSection({value, onChange, participants = []}: {
               const cr = value.rowImageCrops?.[p.label];
               const PW = 56;
               const PH = 64;
-              const z = Math.max(cr?.zoom ?? 1, 1.12);
+              const z = Math.max(Math.min(cr?.zoom ?? 1.12, 3), 0.1);
               const fx = Math.max(Math.min(cr?.focusX ?? 0, 1), -1);
               const fy = Math.max(Math.min(cr?.focusY ?? 0, 1), -1);
-              const ex = PW * (z - 1);
-              const ey = PH * (z - 1);
-              const ptx = z >= 1 ? Math.max(-ex, Math.min(0, -ex / 2 - (fx * ex) / 2)) : -ex / 2 - (fx * ex) / 2;
-              const pty = z >= 1 ? Math.max(-ey, Math.min(0, -ey / 2 - (fy * ey) / 2)) : -ey / 2 - (fy * ey) / 2;
+              const ex = PW * Math.abs(z - 1);
+              const ey = PH * Math.abs(z - 1);
+              const ptx = Math.max(-ex, Math.min(0, -ex / 2 - (fx * ex) / 2));
+              const pty = Math.max(-ey, Math.min(0, -ey / 2 - (fy * ey) / 2));
               const previewStyle = {
                 position: 'relative' as const,
                 width: PW,
