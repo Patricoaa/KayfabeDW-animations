@@ -596,7 +596,11 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   };
 
   const renderRow = (p: {label: string; image?: string | null; current: number; active: boolean; firstX: number}) => {
-    const display = p.active ? p.current : 0;
+    // "Invisible" placeholders: a row only exists once its date is crossed by
+    // the guide. Its lane stays reserved (rowCount still counts it), so rows
+    // enter their lane smoothly instead of showing empty black rails.
+    if (!p.active) return null;
+    const display = p.current;
     const isLeader = p.active && visibleActive[0] && p.current === visibleActive[0].current && visibleActive[0].current > 0;
     const rawW = Math.max(0, (display / currentMax) * BAR_MAX_W * (p.active ? 1 : 0));
     const pop = spring({
@@ -610,6 +614,14 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     // FINAL_W block (the leader's right edge stays pinned to the track end).
     const w = fulW + (FINAL_W - fulW) * outro;
     const leftOff = (BAR_MAX_W - FINAL_W) * outro;
+
+    // Traveling datum: pinned to the bar's right edge so it rides along as the
+    // bar grows. Clamped so the text never passes the track's right edge nor
+    // runs into the avatar (the clamp takes over only when the bar is ~full).
+    const vText = fmtValue(Math.round(p.current), valueFormat, currencySymbol);
+    const estVW = vText.length * ROW_FONT * 0.58 + 28;
+    const barRight = leftOff + Math.max(0, w);
+    const vLeft = Math.min(barRight + 12, Math.max(12, BAR_MAX_W - estVW));
     const scale = isLeader ? winnerScale : 1;
     const dim = isLeader ? 1 : dimOthers;
 
@@ -673,14 +685,14 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     const segments: Record<'bar' | 'avatar', React.ReactNode> = {
       bar: (
         <div style={{flexShrink: 0, width: BAR_MAX_W, height: BAR_H, position: 'relative', display: 'flex', alignItems: 'center'}}>
-          <div style={{position: 'absolute', left: 0, right: 0, top: '50%', height: GROOVE_H, transform: 'translateY(-50%)', backgroundColor: '#171717', borderRadius: barRadius ?? 999}} />
+          <div style={{position: 'absolute', left: 0, right: 0, top: '50%', height: GROOVE_H, transform: 'translateY(-50%)', backgroundColor: '#171717', borderRadius: barRadius ?? 999, opacity: pop}} />
 <div style={{position: 'absolute', left: 0, top: 0, bottom: 0, width: '100%', display: 'flex', alignItems: 'center', opacity: outro, transform: `translateX(${(1 - outro) * -18}px)`}}>
   <span style={{fontSize: Math.round(ROW_FONT * 0.92), fontWeight: 700, color: '#d4d4d8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', paddingLeft: 12, paddingRight: 8}}>{p.label}</span>
 </div>
           <div style={{position: 'absolute', left: leftOff, top: '50%', width: Math.max(0, w), height: BAR_H, transform: `translateY(-50%) scaleY(${scale})`, backgroundColor: barFill, borderRadius: barRadius ?? 999, boxShadow: isLeader && podiumEffect ? `0 0 ${18 * scale}px ${accentColor}99` : 'none'}} />
-          <div style={{position: 'absolute', right: 10, top: 0, bottom: 0, display: 'flex', alignItems: 'center', pointerEvents: 'none'}}>
-            <span style={{fontSize: ROW_FONT, fontWeight: 800, color: '#ffffff', fontVariantNumeric: 'tabular-nums', opacity: p.active ? 1 : 0.25, whiteSpace: 'nowrap'}}>
-              {p.active ? fmtValue(Math.round(p.current), valueFormat, currencySymbol) : '–'}
+          <div style={{position: 'absolute', left: vLeft, top: 0, bottom: 0, display: 'flex', alignItems: 'center', pointerEvents: 'none', opacity: pop}}>
+            <span style={{fontSize: ROW_FONT, fontWeight: 800, color: '#ffffff', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap'}}>
+              {fmtValue(Math.round(p.current), valueFormat, currencySymbol)}
             </span>
           </div>
         </div>
