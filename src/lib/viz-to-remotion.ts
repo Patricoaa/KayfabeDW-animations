@@ -206,6 +206,7 @@ function convertTimelineRace(
     holdFinalSeconds: t?.holdFinalSeconds,
     raceDurationSeconds: t?.raceDurationSeconds,
     podiumEffect: t?.podiumEffect,
+    showRail: t?.showRail,
     barsX: t?.barsX,
     barsY: t?.barsY,
     rowOrder: t?.rowOrder,

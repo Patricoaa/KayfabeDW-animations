@@ -85,6 +85,10 @@ export type TimelineRaceConfig = {
   // (no dimming, no scale/glow). Defaults to ON.
   podiumEffect?: boolean;
 
+  // Show the rail/groove under each bar (the "track" the bar slides along).
+  // false renders only the bars.
+  showRail?: boolean;
+
   // Bar-group position (px offset from the default center placement). Moves
   // the whole row block (avatars + bars + track + accumulated value), the
   // numeric X axis and the Y axis together.

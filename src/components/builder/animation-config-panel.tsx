@@ -339,6 +339,14 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
         <p className="text-[10px] text-muted">
           Cuando se revela el ganador, lo agranda con brillo y atenúa a los que no quedaron primeros. Apagado = sin atenuación ni brillo.
         </p>
+        <Toggle
+          label="Mostrar carril"
+          checked={value.showRail ?? true}
+          onChange={(v) => update({showRail: v})}
+        />
+        <p className="text-[10px] text-muted">
+          Muestra el riel de fondo sobre el que se desliza cada barra. Apagado = solo se ven las barras.
+        </p>
       </Section>
 
       {/* ============ AVATAR ============ */}

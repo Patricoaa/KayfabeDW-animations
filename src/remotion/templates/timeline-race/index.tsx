@@ -32,6 +32,8 @@ export type TimelineRaceProps = {
   holdFinalSeconds?: number;
   raceDurationSeconds?: number;
   podiumEffect?: boolean;
+  // Show the rail/groove under each bar. false renders only the bars.
+  showRail?: boolean;
   barsX?: number;
   barsY?: number;
   showDateLabel?: boolean;
@@ -157,6 +159,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   holdFinalSeconds = 2,
   raceDurationSeconds,
   podiumEffect = true,
+  showRail = true,
   barsX,
   barsY,
   showDateLabel = true,
@@ -339,7 +342,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
             const barFill = barColors?.[item.label] ?? (isLeader ? accentColor : '#475569');
             const segments: Record<'bar' | 'value' | 'avatar', React.ReactNode> = {
               bar: (
-                <div style={{flex: 1, height: barThickness ?? ROW_H * 0.5, backgroundColor: '#1a1a1a', borderRadius: barRadius ?? ROW_H * 0.25, overflow: 'hidden', display: 'flex'}}>
+                <div style={{flex: 1, height: barThickness ?? ROW_H * 0.5, backgroundColor: showRail !== false ? '#1a1a1a' : 'transparent', borderRadius: barRadius ?? ROW_H * 0.25, overflow: 'hidden', display: 'flex'}}>
                   <div style={{width: Math.max(0, barWidth), height: '100%', backgroundColor: barFill, borderRadius: barRadius ?? ROW_H * 0.25, boxShadow: isLeader ? `0 0 ${16 * winnerScale}px ${accentColor}66` : 'none'}} />
                 </div>
               ),
@@ -615,13 +618,11 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     const w = fulW + (FINAL_W - fulW) * outro;
     const leftOff = (BAR_MAX_W - FINAL_W) * outro;
 
-    // Traveling datum: pinned to the bar's right edge so it rides along as the
-    // bar grows. Clamped so the text never passes the track's right edge nor
-    // runs into the avatar (the clamp takes over only when the bar is ~full).
-    const vText = fmtValue(Math.round(p.current), valueFormat, currencySymbol);
-    const estVW = vText.length * ROW_FONT * 0.58 + 28;
+    // Traveling datum: pinned INSIDE the bar, flush against its right edge, so it
+    // rides along as the bar grows. The bar's own width caps the text (ellipsis
+    // truncation) when it's too narrow to fit a long formatted value.
     const barRight = leftOff + Math.max(0, w);
-    const vLeft = Math.min(barRight + 12, Math.max(12, BAR_MAX_W - estVW));
+    const valuePad = 12;
     const scale = isLeader ? winnerScale : 1;
     const dim = isLeader ? 1 : dimOthers;
 
@@ -685,13 +686,13 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     const segments: Record<'bar' | 'avatar', React.ReactNode> = {
       bar: (
         <div style={{flexShrink: 0, width: BAR_MAX_W, height: BAR_H, position: 'relative', display: 'flex', alignItems: 'center'}}>
-          <div style={{position: 'absolute', left: 0, right: 0, top: '50%', height: GROOVE_H, transform: 'translateY(-50%)', backgroundColor: '#171717', borderRadius: barRadius ?? 999, opacity: pop}} />
+          {showRail !== false && <div style={{position: 'absolute', left: 0, right: 0, top: '50%', height: GROOVE_H, transform: 'translateY(-50%)', backgroundColor: '#171717', borderRadius: barRadius ?? 999, opacity: pop}} />}
 <div style={{position: 'absolute', left: 0, top: 0, bottom: 0, width: '100%', display: 'flex', alignItems: 'center', opacity: outro, transform: `translateX(${(1 - outro) * -18}px)`}}>
   <span style={{fontSize: Math.round(ROW_FONT * 0.92), fontWeight: 700, color: '#d4d4d8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', paddingLeft: 12, paddingRight: 8}}>{p.label}</span>
 </div>
           <div style={{position: 'absolute', left: leftOff, top: '50%', width: Math.max(0, w), height: BAR_H, transform: `translateY(-50%) scaleY(${scale})`, backgroundColor: barFill, borderRadius: barRadius ?? 999, boxShadow: isLeader && podiumEffect ? `0 0 ${18 * scale}px ${accentColor}99` : 'none'}} />
-          <div style={{position: 'absolute', left: vLeft, top: 0, bottom: 0, display: 'flex', alignItems: 'center', pointerEvents: 'none', opacity: pop}}>
-            <span style={{fontSize: ROW_FONT, fontWeight: 800, color: '#ffffff', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap'}}>
+          <div style={{position: 'absolute', right: (BAR_MAX_W - barRight) + valuePad, top: 0, bottom: 0, maxWidth: Math.max(0, w - valuePad * 2), minWidth: 0, display: 'flex', alignItems: 'center', overflow: 'hidden', pointerEvents: 'none', opacity: pop}}>
+            <span style={{fontSize: ROW_FONT, fontWeight: 800, color: '#ffffff', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textShadow: '0 1px 2px rgba(0,0,0,0.45)'}}>
               {fmtValue(Math.round(p.current), valueFormat, currencySymbol)}
             </span>
           </div>
