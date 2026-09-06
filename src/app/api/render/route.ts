@@ -8,7 +8,7 @@ import {TEMPLATES} from '@/remotion/generated/registry';
 import {createClient} from '@/lib/supabase/server';
 import type {RenderProgress} from './helpers';
 
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 interface RenderBody {
   compositionId: string;
@@ -28,7 +28,30 @@ interface RenderBody {
 const GIF_MAX_W = 1080;
 const GIF_FPS = 12;
 
+// Serverless MP4 profile: on Hobby the function cap is 300s, so heavy renders
+// (more than ~6s of frames or 1000+ items) are reflowed to a capped viewport
+// at 24fps so the encode fits in the budget. Matches the client thresholds in
+// src/lib/render-export.ts.
+const RENDER_PROFILE_W = 1280;
+const RENDER_PROFILE_H = 720;
+const RENDER_PROFILE_FPS = 24;
+const RENDER_PROFILE_FRAMES = 180;
+const RENDER_PROFILE_MAX_ITEMS = 1000;
+
 const ENTRY = path.join(process.cwd(), 'src', 'remotion', 'index.ts');
+
+function countRenderItems(inputProps: Record<string, unknown> | null | undefined): number {
+  if (!inputProps || typeof inputProps !== 'object') return 0;
+  const wrapped = inputProps.props as {items?: unknown[]} | undefined;
+  const items = Array.isArray(wrapped?.items) ? wrapped.items : (inputProps.items as unknown[] | undefined);
+  return Array.isArray(items) ? items.length : 0;
+}
+
+function serverlessViewport(w: number, h: number): {width: number; height: number} {
+  const scale = Math.min(RENDER_PROFILE_W / w, RENDER_PROFILE_H / h);
+  if (scale >= 1) return {width: w, height: h};
+  return {width: Math.max(1, Math.round(w * scale)), height: Math.max(1, Math.round(h * scale))};
+}
 
 process.env.WEBPACK_CACHE_DIRECTORY = path.join(os.tmpdir(), 'webpack-cache');
 process.env.NODE_OPTIONS = (process.env.NODE_OPTIONS || '') + ' --no-experimental-require-module';
@@ -88,11 +111,18 @@ async function ensureChrome(): Promise<string> {
 export async function POST(req: Request) {
   const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
   if (!blobToken) {
-    throw new Error('BLOB_READ_WRITE_TOKEN is not set. Create a Blob store at vercel.com → Storage.');
+    return Response.json(
+      {type: 'error', message: 'BLOB_READ_WRITE_TOKEN is not set. Create a Blob store at vercel.com → Storage.'},
+      {status: 503},
+    );
   }
 
-  const payload = await req.json();
-  const body = payload as RenderBody;
+  let body: RenderBody;
+  try {
+    body = (await req.json()) as RenderBody;
+  } catch {
+    return Response.json({type: 'error', message: 'Body inválido: se esperaba JSON.'}, {status: 400});
+  }
 
   if (!body.compositionId || !isValidCompId(body.compositionId)) {
     return Response.json({type: 'error', message: `Invalid composition ID: ${body.compositionId}`}, {status: 400});
@@ -144,6 +174,33 @@ export async function POST(req: Request) {
     if (body.width && body.height) {
       composition.width = Math.round(body.width);
       composition.height = Math.round(body.height);
+    }
+
+    // Serverless profile: heavy MP4 renders get reflowed to a capped viewport
+    // and 24fps so the encode finishes inside the 300s function budget. Frame
+    // count is rescaled along with fps so the output keeps the requested
+    // length (progress-based templates render identically).
+    const serverlessProfile =
+      codec !== 'gif' &&
+      (composition.durationInFrames > RENDER_PROFILE_FRAMES ||
+        countRenderItems(body.inputProps) > RENDER_PROFILE_MAX_ITEMS);
+    if (serverlessProfile) {
+      const capped = serverlessViewport(composition.width, composition.height);
+      if (capped.width < composition.width || capped.height < composition.height) {
+        composition.width = capped.width;
+        composition.height = capped.height;
+      }
+      if (composition.fps > RENDER_PROFILE_FPS) {
+        const oldFps = composition.fps;
+        composition.fps = RENDER_PROFILE_FPS;
+        composition.durationInFrames = Math.max(
+          1,
+          Math.round(composition.durationInFrames * (RENDER_PROFILE_FPS / oldFps)),
+        );
+      }
+      console.log(
+        `[render] Serverless profile: ${composition.width}x${composition.height} @ ${composition.fps}fps, ${composition.durationInFrames} frames, ${countRenderItems(body.inputProps)} items`,
+      );
     }
 
     // GIF: cap resolution and drop fps to avoid OOM in the render container.
