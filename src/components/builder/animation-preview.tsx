@@ -252,7 +252,9 @@ export function AnimationPreview({
                   controls
                   acknowledgeRemotionLicense
                 />
-                {showSafeZones && <SafeZoneOverlay width={compW} height={compH} settings={safeZones} />}
+                {showSafeZones && boxPx && (
+                  <SafeZoneOverlay width={compW} height={compH} scale={boxPx.w / compW} settings={safeZones} />
+                )}
               </div>
             </div>
           </React.Suspense>
