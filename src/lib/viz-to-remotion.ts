@@ -396,6 +396,45 @@ export function getTimelineRaceParticipants(
   return out;
 }
 
+// Coerce a cell to a number as tolerant as possible: numbers, booleans,
+// numeric strings (int/float, dot or comma decimals, thousands, trailing %),
+// and common "yes/no/win/loss" words. Returns NaN when truly unparseable.
+function toNumeric(v: unknown): number {
+  if (v === null || v === undefined) return NaN;
+  if (typeof v === 'number') return v;
+  if (typeof v === 'boolean') return v ? 1 : 0;
+  if (typeof v === 'string') {
+    const s = v.trim();
+    if (s === '') return NaN;
+    const lower = s.toLowerCase();
+    if (['true', 'yes', 'si', 'sí', 'v', 'win', 'w', 'ganó', 'ganado'].includes(lower)) return 1;
+    if (['false', 'no', 'n', 'loss', 'l', 'draw', 'd', 'perdió', 'empate', 'derrota'].includes(lower)) return 0;
+    const cleaned = s.replace(/[%\s]/g, '').replace(/,/g, '.');
+    const n = Number(cleaned);
+    return isNaN(n) ? NaN : n;
+  }
+  return NaN;
+}
+
+// Map a configured field (possibly a qualified "table.column" path or a stale
+// alias) onto an actual key present in the first data row. Exact match wins,
+// then the last path segment, then a case-insensitive or fuzzy match.
+function resolveKey(rows: Record<string, unknown>[], field: string | undefined | null): string {
+  const trimmed = (field ?? '').trim();
+  if (trimmed === '') return '';
+  const keys = Object.keys(rows[0] ?? {});
+  if (keys.includes(trimmed)) return trimmed;
+  const tail = trimmed.split('.').pop()?.trim() ?? '';
+  if (tail !== '' && keys.includes(tail)) return tail;
+  if (tail !== '') {
+    const byTail = keys.find((k) => k.toLowerCase() === tail.toLowerCase());
+    if (byTail) return byTail;
+  }
+  const lower = trimmed.toLowerCase();
+  const fuzzy = keys.find((k) => k.toLowerCase().includes(lower) || lower.includes(k.toLowerCase()));
+  return fuzzy ?? trimmed;
+}
+
 // Resolve the numeric "dato" column of a ranking: explicit mapping wins,
 // then the static yField, then the first column whose values all parse as
 // numbers (never picking the label/date/avatar).
@@ -404,12 +443,21 @@ function resolveValueField(
   config: ChartConfig,
   tc?: RankingConfig,
 ): string {
-  const explicit = tc?.valueField;
-  if (explicit && explicit.trim() !== '') return explicit;
-  if (config.yField) return config.yField;
+  const explicit = resolveKey(rows, tc?.valueField);
+  if (explicit) return explicit;
+  const yField = resolveKey(rows, config.yField);
+  if (yField) return yField;
+  const isStrictNumeric = (v: unknown) => {
+    if (typeof v === 'number') return true;
+    if (typeof v === 'string' && v.trim() !== '') {
+      const cleaned = v.trim().replace(/[%\s]/g, '').replace(/,/g, '.');
+      return !isNaN(Number(cleaned));
+    }
+    return false;
+  };
   const numericCol = Object.keys(rows[0] ?? {}).find((f) => {
-    const vals = rows.map((r) => Number(r[f])).filter((v) => !isNaN(v));
-    return vals.length === rows.length && vals.length > 0;
+    const vals = rows.map((r) => r[f]);
+    return vals.length > 0 && vals.every(isStrictNumeric);
   });
   return numericCol ?? '';
 }
@@ -452,6 +500,37 @@ function convertRanking(
 
   const sorted = [...items].sort((a, b) => b.value - a.value);
 
+  // Diagnostics: if the dataset has numeric candidates but every aggregated
+  // value collapsed to 0, the resolved value field is almost certainly wrong
+  // (NaN on every row). Log exactly what was resolved so the cause is visible.
+  if (sorted.length > 0 && sorted.every((it) => it.value === 0)) {
+    const isStrictNumeric = (v: unknown) => {
+      if (typeof v === 'number') return true;
+      if (typeof v === 'string' && v.trim() !== '') {
+        const cleaned = v.trim().replace(/[%\s]/g, '').replace(/,/g, '.');
+        return !isNaN(Number(cleaned));
+      }
+      return false;
+    };
+    const numericCandidates = Object.keys(rows[0] ?? {}).filter((f) =>
+      rows.some((r) => isStrictNumeric(r[f])),
+    );
+    if (numericCandidates.length > 0) {
+      console.warn(
+        '[ranking] todos los valores resultaron 0 con datos numéricos disponibles; revisar el campo de valor',
+        {
+          valueField,
+          explicit: rc?.valueField,
+          yField: config.yField,
+          valueAgg: rc?.valueAgg,
+          keys: Object.keys(rows[0] ?? {}),
+          sample: rows.slice(0, 3).map((r) => ({key: valueField, value: r[valueField], typeof: typeof r[valueField]})),
+          numericCandidates,
+        },
+      );
+    }
+  }
+
   return {
     title: (rc?.title || config.title) ?? '',
     items: sorted,
@@ -476,7 +555,7 @@ function aggregateRankingRows(
       .map((row) => ({
         label: String(row[labelField] ?? ''),
         image: imageField ? avatarUrlOf(row[imageField]) : null,
-        value: Number(row[valueField] ?? 0),
+        value: toNumeric(row[valueField] ?? 0),
       }))
       .filter((it) => !isNaN(it.value) && it.label !== '');
   }
@@ -491,14 +570,14 @@ function aggregateRankingRows(
       g = {image: imageField ? avatarUrlOf(row[imageField]) : null, values: [], raws: [], weights: [], count: 0};
       groups.set(label, g);
     }
-    const v = Number(row[valueField] ?? 0);
+    const v = toNumeric(row[valueField]);
     g.count += 1;
     g.values.push(isNaN(v) ? 0 : v);
     if (agg === 'countDistinct' && row[valueField] !== undefined && row[valueField] !== null && String(row[valueField]).trim() !== '') {
       g.raws.push(String(row[valueField]));
     }
     if (agg === 'weightedAvg') {
-      g.weights.push(Number(row[weightField ?? ''] ?? 0));
+      g.weights.push(toNumeric(row[weightField ?? '']));
     }
     if (!g.image && imageField) g.image = avatarUrlOf(row[imageField]);
   }
