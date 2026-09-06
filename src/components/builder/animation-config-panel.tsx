@@ -676,6 +676,159 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
   );
 }
 
+// Large per-position image (manual: file upload or pasted URL) for the Ranking
+// template. Rendered alongside the small avatar, not replacing it. Per-entity
+// zoom/focus crop + global size, canvas offset and one-way pan toggle.
+function RowImageSection({value, onChange, participants = []}: {
+  value: RankingConfig;
+  onChange: (patch: Partial<RankingConfig>) => void;
+  participants?: Participant[];
+}) {
+  const [q, setQ] = useState('');
+  const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const matchQ = (label: string, query: string) => (query.trim() === '' ? true : norm(label).includes(norm(query)));
+  const filtered = participants.filter((p) => matchQ(p.label, q));
+  const setImage = (label: string, src?: string) => {
+    const next = {...(value.rowImages ?? {})};
+    if (src && src.trim() !== '') next[label] = src.trim();
+    else delete next[label];
+    onChange({rowImages: next});
+  };
+  const setCrop = (label: string, patch?: Partial<AvatarCrop>) => {
+    const next = {...(value.rowImageCrops ?? {})};
+    if (patch) next[label] = {...(next[label] ?? {}), ...patch};
+    else delete next[label];
+    onChange({rowImageCrops: next});
+  };
+  const imageRefs = React.useRef<Record<string, HTMLInputElement | null>>({});
+  return (
+    <Section title="Imagen por puesto">
+      <p className="text-[10px] text-muted">
+        Imagen grande que se revela con cada puesto (convive con el avatar pequeño). Se carga con un fundido y un traslado lento de izquierda a derecha hasta que entra el siguiente puesto.
+      </p>
+      <div>
+        <label className="text-sm font-medium mb-1 block">Ancho (vacío = auto)</label>
+        <input
+          type="number"
+          min={16}
+          max={1000}
+          step={4}
+          value={value.rowImageWidth ?? ''}
+          onChange={(e) => onChange({rowImageWidth: e.target.value ? Number(e.target.value) : undefined})}
+          className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+        />
+      </div>
+      <div>
+        <label className="text-sm font-medium mb-1 block">Alto (vacío = igual al ancho)</label>
+        <input
+          type="number"
+          min={16}
+          max={1000}
+          step={4}
+          value={value.rowImageHeight ?? ''}
+          onChange={(e) => onChange({rowImageHeight: e.target.value ? Number(e.target.value) : undefined})}
+          className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <NumberInput label="Offset X (px)" value={value.rowImageX} min={-800} max={800} step={4} onChange={(v) => onChange({rowImageX: v})} />
+        <NumberInput label="Offset Y (px)" value={value.rowImageY} min={-800} max={800} step={4} onChange={(v) => onChange({rowImageY: v})} />
+      </div>
+      <Toggle label="Traslado izquierda→derecha al revelar" checked={value.rowImagePan ?? true} onChange={(v) => onChange({rowImagePan: v})} />
+      {(participants.length > 0) && (
+        <div className="pt-2 border-t border-border-subtle">
+          <div className="flex items-center justify-between mb-0.5">
+            <label className="text-sm font-medium block">Imagen por entidad</label>
+            {Object.keys(value.rowImages ?? {}).length > 0 && (
+              <button type="button" onClick={() => onChange({rowImages: undefined, rowImageCrops: undefined})} className="text-[10px] text-muted hover:text-red-500">
+                Limpiar todas
+              </button>
+            )}
+          </div>
+          <EntitySearch value={q} onChange={setQ} shown={filtered.length} total={participants.length} />
+          <div className="space-y-2">
+            {filtered.map((p) => {
+              const src = value.rowImages?.[p.label];
+              const cr = value.rowImageCrops?.[p.label];
+              const PREVIEW = 48;
+              const z = Math.max(cr?.zoom ?? 1, 0.1);
+              const fx = Math.max(Math.min(cr?.focusX ?? 0, 1), -1);
+              const fy = Math.max(Math.min(cr?.focusY ?? 0, 1), -1);
+              const cw = PREVIEW * z;
+              const ch = PREVIEW * z;
+              const dx = (fx * (cw - PREVIEW)) / 2;
+              const dy = (fy * (ch - PREVIEW)) / 2;
+              const previewStyle = {
+                position: 'relative' as const,
+                width: PREVIEW,
+                height: PREVIEW,
+                overflow: 'hidden' as const,
+                boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.2)',
+              };
+              return (
+                <div key={p.label} className="border border-border-subtle rounded p-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-secondary truncate" title={p.label}>{p.label}</span>
+                    {src && (
+                      <button type="button" onClick={() => setImage(p.label)} className="text-muted hover:text-red-500 text-xs" aria-label={`Quitar imagen de ${p.label}`}>✕</button>
+                    )}
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="shrink-0 mt-1">
+                      {src ? (
+                        <div style={previewStyle}>
+                          <img src={src} alt="" style={{position: 'absolute' as const, left: '50%', top: '50%', width: cw, height: ch, transform: `translate(${-cw/2 + dx}px, ${-ch/2 + dy}px)`, objectFit: 'contain' as const, maxWidth: 'none'}} />
+                        </div>
+                      ) : (
+                        <div style={{...previewStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-elevated)'}}>
+                          <span className="text-muted text-[10px]">vacío</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 flex-1">
+                      <NumberInput label="Zoom" value={cr?.zoom} min={0.1} max={3} step={0.05} onChange={(v) => setCrop(p.label, {...cr, zoom: v})} />
+                      <NumberInput label="Foco X" value={cr ? (cr.focusX ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setCrop(p.label, {...cr, focusX: (v ?? 0) / 100})} />
+                      <NumberInput label="Foco Y" value={cr ? (cr.focusY ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setCrop(p.label, {...cr, focusY: (v ?? 0) / 100})} />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <label className="text-sm font-medium mb-1 block">URL</label>
+                    <input
+                      type="text"
+                      value={src ?? ''}
+                      onChange={(e) => setImage(p.label, e.target.value)}
+                      placeholder="https://… o archivo"
+                      className="w-full bg-elevated border border-border-default rounded-lg px-3 py-1.5 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    />
+                  </div>
+                  <div className="mt-1.5">
+                    <input
+                      ref={(el) => { imageRefs.current[p.label] = el; }}
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          if (typeof reader.result === 'string') setImage(p.label, reader.result);
+                        };
+                        reader.readAsDataURL(file);
+                        e.target.value = '';
+                      }}
+                      className="w-full text-xs text-muted file:mr-2 file:rounded-lg file:border-0 file:bg-elevated file:px-2 file:py-1 file:text-xs file:font-medium"
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </Section>
+  );
+}
+
 function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: {
   columns: string[];
   fieldMeta: ColumnMeta[];
@@ -838,6 +991,8 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
       </Section>
 
       <AvatarSection value={value} onChange={update} participants={participants} />
+
+      <RowImageSection value={value} onChange={update} participants={participants} />
 
       <Section title="Etiqueta">
         <RaceTextControls label="Texto del puesto (#1)" value={value.rankText} onChange={(patch) => update({rankText: {...(value.rankText ?? {}), ...patch}})} />

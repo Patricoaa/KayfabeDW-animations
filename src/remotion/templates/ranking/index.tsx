@@ -1,6 +1,7 @@
 import React from 'react';
-import {useCurrentFrame, useVideoConfig, spring, Easing} from 'remotion';
+import {useCurrentFrame, useVideoConfig, spring, Easing, Img} from 'remotion';
 import type {RaceTextStyle, ValueFormat} from '../../../lib/animation-config';
+import {avatarCropRect} from '../../../lib/animation-config';
 import {Header} from '../shared/Header';
 import {BackgroundLayer} from '../shared/Background';
 import {Avatar} from '../shared/Avatar';
@@ -39,6 +40,13 @@ export type RankingProps = {
   avatarShape?: 'circle' | 'rounded';
   avatarRadius?: number;
   rowColors?: Record<string, string>;
+  rowImages?: Record<string, string>;
+  rowImageCrops?: Record<string, {zoom?: number; focusX?: number; focusY?: number}>;
+  rowImageWidth?: number;
+  rowImageHeight?: number;
+  rowImageX?: number;
+  rowImageY?: number;
+  rowImagePan?: boolean;
   rowGap?: number;
   rowGapH?: number;
   valueFormat?: ValueFormat;
@@ -85,6 +93,13 @@ export const Ranking: React.FC<RankingProps> = ({
   avatarShape = 'circle',
   avatarRadius,
   rowColors,
+  rowImages,
+  rowImageCrops,
+  rowImageWidth,
+  rowImageHeight,
+  rowImageX,
+  rowImageY,
+  rowImagePan = true,
   rowGap,
   rowGapH,
   valueFormat = 'number',
@@ -194,6 +209,27 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
     const laneLabel = `${rankPrefix}${index + 1}`;
     const hasAvatar = !!item.image;
 
+    // Large per-position image (manual entry): extra layer alongside the small
+    // avatar, revealed with a soft fade and a slow one-way left→right pan that
+    // spans the reveal window (until the next position drops in). The crop is
+    // larger than the frame so there is horizontal overflow for the pan.
+    const rowImageSrc = rowImages?.[item.label];
+    const rh = rowImageHeight ?? (rowImageWidth ?? Math.round(W * 0.18));
+    const rw = rowImageWidth ?? rh;
+    const rowImgBase = rh;
+    const ric = rowImageCrops?.[item.label];
+    const riZoom = Math.max(ric?.zoom ?? 1, 0.1);
+    const riFX = Math.max(Math.min(ric?.focusX ?? 0, 1), -1);
+    const riFY = Math.max(Math.min(ric?.focusY ?? 0, 1), -1);
+    const riCW = rowImgBase * riZoom;
+    const riCH = rowImgBase * riZoom;
+    const riExtraX = riCW - rowImgBase;
+    const riExtraY = riCH - rowImgBase;
+    const riDX = (riFX * riExtraX) / 2;
+    const riDY = (riFY * riExtraY) / 2;
+    const rowImgPan = rowImagePan !== false ? prog : 0;
+    const rowImgFade = Math.min(1, easeOut * 1.4);
+
     return (
       <div
         key={`${item.label}-${index}`}
@@ -209,6 +245,34 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
           opacity: Math.min(pop, 1),
         }}
       >
+        {rowImageSrc && (
+          <div
+            style={{
+              position: 'absolute',
+              width: rw,
+              height: rh,
+              left: (rowImageX ?? 0),
+              top: (rowImageY ?? 0),
+              overflow: 'hidden',
+              pointerEvents: 'none',
+              opacity: rowImgFade,
+            }}
+          >
+            <Img
+              src={rowImageSrc}
+              style={{
+                position: 'absolute',
+                left: '50%',
+                top: '50%',
+                width: riCW,
+                height: riCH,
+                transform: `translate(${-riCW / 2 + riDX + riExtraX * rowImgPan}px, ${-riCH / 2 + riDY}px)`,
+                objectFit: 'contain',
+                maxWidth: 'none',
+              }}
+            />
+          </div>
+        )}
         {showRank && (
           <div style={{width: RANK_W, flexShrink: 0, textAlign: 'left'}}>
             <span style={{fontVariantNumeric: 'tabular-nums', ...textStyle(rankText, {color: isLeader ? accentColor : '#94a3b8', size: Math.round(ROW_FONT * (isLeader ? 1.25 : 1.05)), weight: 900})}}>

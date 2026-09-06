@@ -244,6 +244,23 @@ export type RankingConfig = CommonAnimationConfig & {
   // Per-entity row color overrides (label -> color).
   rowColors?: Record<string, string>;
 
+  // Large per-position image (key = entity label). Manual entry: a remote URL or
+  // an uploaded dataURL. Rendered as an extra layer alongside the small avatar
+  // (never replaces it), revealed with a soft fade + a slow one-way left→right
+  // pan that spans until the next position drops in.
+  rowImages?: Record<string, string>;
+  rowImageCrops?: Record<string, AvatarCrop>;
+
+  // Global layout defaults for the large image (per-entity crops override the
+  // zoom/focus; these sizes/offsets apply to every position).
+  rowImageWidth?: number;
+  rowImageHeight?: number;
+  rowImageX?: number;
+  rowImageY?: number;
+
+  // Enable the one-way left→right pan on reveal (default ON).
+  rowImagePan?: boolean;
+
   // Row spacing (px vertical gap between rows) and horizontal gap (px)
   // between row segments (rank, avatar, bar).
   rowGap?: number;

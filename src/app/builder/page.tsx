@@ -22,7 +22,7 @@ import type {ChartConfig} from '@/lib/chart-config';
 import {DEFAULT_CHART_CONFIG, applyChartDefaults} from '@/lib/chart-config';
 import type {SchemaMetadata} from '@/lib/schema-metadata';
 import {getSchemaMetadata, getTableDepth, isNumericType} from '@/lib/schema-metadata';
-import {suggestBestTemplate, convertToRemotionProps, getTimelineRaceParticipants} from '@/lib/viz-to-remotion';
+import {suggestBestTemplate, convertToRemotionProps, getTimelineRaceParticipants, getRankingParticipants} from '@/lib/viz-to-remotion';
 import {applyChartFilters} from '@/lib/chart-data';
 import {chartToDataUrl} from '@/lib/export-static';
 import dynamic from 'next/dynamic';
@@ -501,11 +501,18 @@ function BuilderContent() {
   );
 
   // Distinct participants (label + avatar) for the per-participant avatar crop
-  // controls in the Timeline Race config panel.
+  // and large-image controls. Populated for each animated template so its config
+  // panel can list the entities.
   const timelineParticipants = useMemo(
-    () => (activeTemplate === 'timeline-race'
-      ? getTimelineRaceParticipants(filteredData, chartConfig, templateConfig['timeline-race'])
-      : []),
+    () => {
+      if (activeTemplate === 'timeline-race') {
+        return getTimelineRaceParticipants(filteredData, chartConfig, templateConfig['timeline-race']);
+      }
+      if (activeTemplate === 'ranking') {
+        return getRankingParticipants(filteredData, chartConfig, templateConfig['ranking']);
+      }
+      return [];
+    },
     [activeTemplate, filteredData, chartConfig, templateConfig],
   );
 

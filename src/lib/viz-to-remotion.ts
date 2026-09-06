@@ -396,6 +396,29 @@ export function getTimelineRaceParticipants(
   return out;
 }
 
+// Distinct participants (label + avatar) for the per-participant large-image
+// controls in the Ranking config panel. Mirrors getTimelineRaceParticipants
+// resolution (label from the ranking's labelField, avatar from imageField).
+export function getRankingParticipants(
+  data: Record<string, unknown>[],
+  config: ChartConfig,
+  rc?: RankingConfig,
+): {label: string; image?: string | null}[] {
+  const rows = data ?? [];
+  if (rows.length === 0) return [];
+  const labelField = resolveLabelField(rows, config, rc);
+  const imageField = rc?.imageField;
+  const seen = new Map<string, true>();
+  const out: {label: string; image?: string | null}[] = [];
+  for (const row of rows) {
+    const label = String(row[labelField] ?? '');
+    if (!label || seen.has(label)) continue;
+    seen.set(label, true);
+    out.push({label, image: imageField ? avatarUrlOf(row[imageField]) : null});
+  }
+  return out;
+}
+
 // Coerce a cell to a number as tolerant as possible: numbers, booleans,
 // numeric strings (int/float, dot or comma decimals, thousands, trailing %),
 // and common "yes/no/win/loss" words. Returns NaN when truly unparseable.
@@ -482,6 +505,13 @@ function convertRanking(
     avatarShape: t?.avatarShape,
     avatarRadius: t?.avatarRadius,
     rowColors: t?.rowColors,
+    rowImages: t?.rowImages,
+    rowImageCrops: t?.rowImageCrops,
+    rowImageWidth: t?.rowImageWidth,
+    rowImageHeight: t?.rowImageHeight,
+    rowImageX: t?.rowImageX,
+    rowImageY: t?.rowImageY,
+    rowImagePan: t?.rowImagePan,
     rowGap: t?.rowGap,
     rowGapH: t?.rowGapH,
     valueFormat: t?.valueFormat,
