@@ -191,6 +191,11 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
   valueText?: RaceTextStyle;
 };
 
+// The movable elements of a ranking row. During entry each one travels along a
+// straight cardinal path; per-element direction/delay overrides are keyed by
+// these ids ('bar' is the bar in bars mode and the label in table mode).
+export type RowEntryElement = 'rank' | 'avatar' | 'bar' | 'value';
+
 // Ranking: counters that drop in one by one, ordered best → worst (or the
 // reverse via `revealDirection`). Each entity (`labelField`) has a numeric
 // `valueField`; an optional `imageField` shows an avatar. `maxRows` trims how
@@ -237,14 +242,16 @@ export type RankingConfig = CommonAnimationConfig & {
   // and no width is reserved for it.
   showAvatar?: boolean;
 
-  // Row entry animation for both modes: which side each element of the row
-  // (rank, avatar, bar/label, datum) travels from, and whether all elements
-  // move together or staggered. 'custom' enables per-entity overrides
-  // (`rowEntryOverrides`); entities without an override fall back to the
-  // global direction with element stagger off.
+  // Row entry animation (both modes): the side each element of the row (rank,
+  // avatar, bar/label, datum) travels from, along a straight cardinal path.
+  // 'together' (default) makes every element use the same general direction;
+  // 'custom' lets each element pick its own direction (`rowEntryDirs`) and its
+  // own sequential delay in frames (`rowEntryDelays`). Elements without an
+  // override fall back to the general direction.
   rowEntryDir?: 'left' | 'right' | 'top' | 'bottom';
-  rowEntryMode?: 'together' | 'staggered' | 'custom';
-  rowEntryOverrides?: Record<string, {dir?: 'left' | 'right' | 'top' | 'bottom'; stagger?: boolean}>;
+  rowEntryMode?: 'together' | 'custom';
+  rowEntryDirs?: Partial<Record<RowEntryElement, 'left' | 'right' | 'top' | 'bottom'>>;
+  rowEntryDelays?: Partial<Record<RowEntryElement, number>>;
 
   // Table-mode row separators (horizontal rule under each row): thickness (px)
   // and color. Bars mode has no separators.
@@ -304,9 +311,9 @@ export type RankingConfig = CommonAnimationConfig & {
   rowImagePan?: boolean;
 
   // Per-position pan direction override for the frame image: 'ltr' (default,
-  // left→right), 'rtl' (right→left) or 'none' (no pan). The global
-  // `rowImagePan` toggle stays the master switch.
-  rowImagePanDirs?: Record<string, 'ltr' | 'rtl' | 'none'>;
+  // left→right) or 'rtl' (right→left). The global `rowImagePan` toggle stays
+  // the master switch.
+  rowImagePanDirs?: Record<string, 'ltr' | 'rtl'>;
 
   // Row spacing (px vertical gap between rows) and horizontal gap (px)
   // between row segments (rank, avatar, bar).

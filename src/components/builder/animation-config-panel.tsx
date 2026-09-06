@@ -3,7 +3,7 @@
 import React, {useState} from 'react';
 import {ChevronDown} from 'lucide-react';
 import type {ColumnMeta} from '@/components/builder/chart-config-panel';
-import type {TimelineRaceConfig, RankingConfig, DateFormat, AvatarShape, AvatarCrop, RaceTextStyle, ValueFormat, CommonHeaderConfig, CommonCanvasConfig} from '@/lib/animation-config';
+import type {TimelineRaceConfig, RankingConfig, DateFormat, AvatarShape, AvatarCrop, RaceTextStyle, ValueFormat, RowEntryElement, CommonHeaderConfig, CommonCanvasConfig} from '@/lib/animation-config';
 import {avatarCropRect} from '@/lib/animation-config';
 import {FONT_PRESETS, PALETTES} from '@/lib/chart-config';
 import {ColorInput as AutoColorInput} from './text-controls';
@@ -18,6 +18,15 @@ const VALUE_FORMATS: {value: ValueFormat; label: string}[] = [
 ];
 
 type Participant = {label: string; image?: string | null};
+
+// Per-element row entry overrides: the four movable pieces of a ranking row,
+// each able to pick its own entry direction and sequential delay.
+const ROW_ENTRY_ELEMENTS: {id: RowEntryElement; label: string}[] = [
+  {id: 'rank', label: 'Puesto (#)'},
+  {id: 'avatar', label: 'Avatar'},
+  {id: 'bar', label: 'Barra / etiqueta'},
+  {id: 'value', label: 'Dato (valor)'},
+];
 
 type AnimationConfigPanelProps = {
   templateId: string;
@@ -707,7 +716,7 @@ function RowImageSection({value, onChange, participants = []}: {
     next[label] = mode;
     onChange({rowImageModes: next});
   };
-  const setPanDir = (label: string, dir?: 'ltr' | 'rtl' | 'none') => {
+  const setPanDir = (label: string, dir?: 'ltr' | 'rtl') => {
     const next = {...(value.rowImagePanDirs ?? {})};
     if (dir) next[label] = dir; else delete next[label];
     onChange({rowImagePanDirs: next});
@@ -749,7 +758,7 @@ function RowImageSection({value, onChange, participants = []}: {
         <NumberInput label="Offset X (px)" value={value.rowImageX} min={-1600} max={1600} step={8} onChange={(v) => onChange({rowImageX: v})} />
         <NumberInput label="Offset Y (px)" value={value.rowImageY} min={-1600} max={1600} step={8} onChange={(v) => onChange({rowImageY: v})} />
       </div>
-      <Toggle label="Traslado izquierda→derecha (una vez, al relevar)" checked={value.rowImagePan ?? true} onChange={(v) => onChange({rowImagePan: v})} />
+      <Toggle label="Traslado al relevar" checked={value.rowImagePan ?? true} onChange={(v) => onChange({rowImagePan: v})} />
       <hr className="border-border-subtle my-2" />
       <Toggle label="Mostrar el puesto en la imagen" checked={value.rowImageLabel ?? false} onChange={(v) => onChange({rowImageLabel: v})} />
       {value.rowImageLabel && (
@@ -840,14 +849,14 @@ function RowImageSection({value, onChange, participants = []}: {
                   </div>
                   <div className="mt-2">
                     <label className="text-sm font-medium mb-1 block">Pan al relevar</label>
-                    <div className="grid grid-cols-4 gap-1">
-                      {([['', 'Auto'], ['ltr', '←→'], ['rtl', '→←'], ['none', 'Nada']] as const).map(([v, l]) => (
+                    <div className="grid grid-cols-2 gap-1">
+                      {([['ltr', '←→ Izq→Der'], ['rtl', '→← Der→Izq']] as const).map(([v, l]) => (
                         <button
                           key={v}
                           type="button"
-                          onClick={() => setPanDir(p.label, v || undefined)}
+                          onClick={() => setPanDir(p.label, v)}
                           className={`px-1 py-1 rounded-md text-xs font-medium transition-colors ${
-                            (value.rowImagePanDirs?.[p.label] ?? '') === v ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
+                            (value.rowImagePanDirs?.[p.label] ?? 'ltr') === v ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
                           }`}
                         >
                           {l}
@@ -1086,14 +1095,14 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
           </>
         )}
         <div className="pt-2 mt-1 border-t border-border-subtle">
-          <p className="text-[10px] text-muted mb-1.5">Entrada de la fila (puesto, avatar, barra/etiqueta, dato).</p>
-          <label className="text-sm font-medium mb-1 block">Dirección</label>
+          <p className="text-[10px] text-muted mb-1.5">Entrada de la fila (puesto, avatar, barra/etiqueta, dato) con trayectoria recta según la dirección cardinal.</p>
+          <label className="text-sm font-medium mb-1 block">Dirección general</label>
           <div className="grid grid-cols-4 gap-1 mb-2">
             {([['left', '←'], ['bottom', '↓'], ['right', '→'], ['top', '↑']] as const).map(([v, l]) => (
               <button
                 key={v}
                 type="button"
-                onClick={() => update({rowEntryDir: v as 'left'|'right'|'top'|'bottom'})}
+                onClick={() => update({rowEntryDir: v})}
                 className={`px-2 py-1.5 rounded-md text-sm font-medium transition-colors ${
                   (value.rowEntryDir ?? 'bottom') === v ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
                 }`}
@@ -1102,13 +1111,13 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
               </button>
             ))}
           </div>
-          <label className="text-sm font-medium mb-1 block">Modo</label>
-          <div className="grid grid-cols-3 gap-1">
-            {([['together', 'Junto'], ['staggered', 'Escalonado'], ['custom', 'Personalizado']] as const).map(([v, l]) => (
+          <label className="text-sm font-medium mb-1 block">Elementos</label>
+          <div className="grid grid-cols-2 gap-1">
+            {([['together', 'Todos iguales'], ['custom', 'Por elemento']] as const).map(([v, l]) => (
               <button
                 key={v}
                 type="button"
-                onClick={() => update({rowEntryMode: v as 'together'|'staggered'|'custom'})}
+                onClick={() => update({rowEntryMode: v})}
                 className={`px-2 py-1.5 rounded-md text-sm font-medium transition-colors ${
                   (value.rowEntryMode ?? 'together') === v ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
                 }`}
@@ -1117,38 +1126,55 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
               </button>
             ))}
           </div>
+          <p className="text-[10px] text-muted mt-1.5">
+            "Todos iguales" usa la dirección general. "Por elemento" deja fijar la dirección y el retardo secuencial de cada elemento.
+          </p>
         </div>
         {(value.rowEntryMode ?? 'together') === 'custom' && (
-          <div className="pt-2 mt-1 border-t border-border-subtle">
-            <p className="text-[10px] text-muted mb-1.5">Personalización por entidad (la dirección y escalonado aquí anulan la global).</p>
-            {participants.map((p) => {
-              const ov = value.rowEntryOverrides?.[p.label];
+          <div className="pt-2 mt-1 border-t border-border-subtle space-y-2">
+            {ROW_ENTRY_ELEMENTS.map(({id, label: elLabel}) => {
+              const dir = value.rowEntryDirs?.[id];
+              const delay = value.rowEntryDelays?.[id] ?? 0;
+              const reset = () => {
+                const dirs = {...(value.rowEntryDirs ?? {})};
+                const delays = {...(value.rowEntryDelays ?? {})};
+                delete dirs[id];
+                delete delays[id];
+                update({rowEntryDirs: dirs, rowEntryDelays: delays});
+              };
               return (
-                <div key={p.label} className="flex items-center gap-2 mb-1">
-                  <span className="text-xs text-secondary truncate w-28" title={p.label}>{p.label}</span>
-                  <select
-                    value={ov?.dir ?? ''}
-                    onChange={(e) => update({rowEntryOverrides: {...(value.rowEntryOverrides ?? {}), [p.label]: {...(value.rowEntryOverrides?.[p.label] ?? {}), dir: e.target.value ? (e.target.value as 'left'|'right'|'top'|'bottom') : undefined}}})}
-                    className="bg-elevated border border-border-default rounded px-1 py-0.5 text-xs text-secondary focus:outline-none focus:ring-1 focus:ring-amber-500"
-                  >
-                    <option value="">Auto</option>
-                    <option value="left">←</option>
-                    <option value="bottom">↓</option>
-                    <option value="right">→</option>
-                    <option value="top">↑</option>
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => update({rowEntryOverrides: {...(value.rowEntryOverrides ?? {}), [p.label]: {...(value.rowEntryOverrides?.[p.label] ?? {}), stagger: !ov?.stagger}}})}
-                    className={`px-1.5 py-0.5 rounded text-xs font-medium transition-colors ${
-                      ov?.stagger ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
-                    }`}
-                  >
-                    Escalonar
-                  </button>
+                <div key={id} className="border border-border-subtle rounded-lg p-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-secondary">{elLabel}</span>
+                    <div className="flex gap-1">
+                      {([['left', '←'], ['bottom', '↓'], ['right', '→'], ['top', '↑']] as const).map(([v, l]) => (
+                        <button
+                          key={v}
+                          type="button"
+                          onClick={() => update({rowEntryDirs: {...(value.rowEntryDirs ?? {}), [id]: v}})}
+                          className={`px-1.5 py-0.5 rounded text-xs font-medium transition-colors ${
+                            (dir ?? value.rowEntryDir ?? 'bottom') === v ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
+                          }`}
+                        >
+                          {l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <NumberInput label="Retardo (frames)" value={delay} min={0} max={30} step={1} onChange={(v) => update({rowEntryDelays: {...(value.rowEntryDelays ?? {}), [id]: v ?? 0}})} />
+                    </div>
+                    {(dir !== undefined || delay > 0) && (
+                      <button type="button" onClick={reset} className="text-[10px] text-muted hover:text-red-500 underline shrink-0 mt-4">
+                        restablecer
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
+            <p className="text-[10px] text-muted">Sin dirección propia = usa la dirección general. El retardo entra a cada elemento en orden secuencial.</p>
           </div>
         )}
         {(value.rankMode ?? 'bars') === 'table' && (
