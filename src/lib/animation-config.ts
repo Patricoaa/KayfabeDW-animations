@@ -7,6 +7,11 @@ export type AvatarCrop = {zoom?: number; focusX?: number; focusY?: number};
 
 export type RowSegment = 'bar' | 'avatar';
 
+// Display format for the accumulated value shown next to each bar and on the
+// numeric value axis. `hhmmss` interprets the value as a total of seconds.
+// Empty = plain locale number (current behavior).
+export type ValueFormat = 'number' | 'short' | 'decimal' | 'percent' | 'currency' | 'hhmmss';
+
 // Typography overrides for the title and the on-screen date. Empty = the
 // template's default (font family/color/size/weight). `multiline` is only
 // used for the title (wrapping of line breaks).
@@ -117,6 +122,19 @@ export type TimelineRaceConfig = {
 
   // Bar corner radius (px). Empty = full pill.
   barRadius?: number;
+
+  // Color palette cycled across entities (by entity order). Per-entity
+  // `barColors` overrides win over the palette; without a palette the leader
+  // uses the accent color and the rest default gray.
+  barPalette?: string[];
+
+  // Bar/groove thickness override (px). Empty = automatic (42% of row height).
+  barThickness?: number;
+
+  // Display format for the accumulated value (bar rows + numeric axis).
+  // Default `number` keeps the current locale formatting.
+  valueFormat?: ValueFormat;
+  currencySymbol?: string;
 
   // Canvas background. Can be a solid color, a pattern preset, a gradient, or
   // an uploaded/remote image. `background` is reused as the primary/foreground

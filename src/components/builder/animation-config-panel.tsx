@@ -3,9 +3,18 @@
 import React, {useState} from 'react';
 import {ChevronDown} from 'lucide-react';
 import type {ColumnMeta} from '@/components/builder/chart-config-panel';
-import type {TimelineRaceConfig, DateFormat, AvatarShape, AvatarCrop, RaceTextStyle} from '@/lib/animation-config';
+import type {TimelineRaceConfig, DateFormat, AvatarShape, AvatarCrop, RaceTextStyle, ValueFormat} from '@/lib/animation-config';
 import {avatarCropRect} from '@/lib/animation-config';
-import {FONT_PRESETS} from '@/lib/chart-config';
+import {FONT_PRESETS, PALETTES} from '@/lib/chart-config';
+
+const VALUE_FORMATS: {value: ValueFormat; label: string}[] = [
+  {value: 'number', label: 'Número (1.234)'},
+  {value: 'short', label: 'Compacto (1,2k)'},
+  {value: 'decimal', label: 'Decimal (1,23)'},
+  {value: 'percent', label: 'Porcentaje (%)'},
+  {value: 'currency', label: 'Moneda ($1.234)'},
+  {value: 'hhmmss', label: 'Duración (hh:mm:ss)'},
+];
 
 type Participant = {label: string; image?: string | null};
 
@@ -39,6 +48,37 @@ function Section({title, defaultOpen = false, children}: {title: string; default
   );
 }
 
+// Search box that filters a per-entity list by label, plus an "N de M" counter
+// so it's obvious a filter is active (and how many rows matched).
+function EntitySearch({value, onChange, shown, total}: {value: string; onChange: (v: string) => void; shown: number; total: number}) {
+  const active = value.trim() !== '';
+  return (
+    <div>
+      <div className="relative">
+        <input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Buscar entidad…"
+          className="w-full bg-elevated border border-border-default rounded-lg pl-8 pr-3 py-1.5 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+        />
+        <svg
+          className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <circle cx="11" cy="11" r="7" />
+          <path d="m21 21-4.3-4.3" />
+        </svg>
+      </div>
+      {active && <p className="text-[10px] text-muted mt-1">{shown} de {total} entidades</p>}
+    </div>
+  );
+}
+
 // Renders per-template column config. Currently only Timeline Race has an
 // explicit config UI; other templates inherit the static xField/yField mapping.
 export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onChange, participants = []}: AnimationConfigPanelProps) {
@@ -59,6 +99,18 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
     update({barColors: next});
   };
   const setRowOrder = (order: ('bar' | 'avatar')[]) => update({rowOrder: order});
+
+  // Per-entity list filtering (zoom/focus + colors): accent/case-insensitive
+  // substring match against the label, so "habana" finds "La Habana".
+  const [avatarQ, setAvatarQ] = useState('');
+  const [colorQ, setColorQ] = useState('');
+  const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const matchQ = (label: string, q: string) => (q.trim() === '' ? true : norm(label).includes(norm(q)));
+  const filteredCrops = participants.filter((p) => matchQ(p.label, avatarQ));
+  const filteredColors = participants.filter((p) => matchQ(p.label, colorQ));
+  const barPalette = value.barPalette ?? [];
+  const palIndex = new Map(participants.map((p, i) => [p.label, i]));
+  const setBarPalette = (colors?: string[]) => update({barPalette: colors});
 
   return (
     <div className="space-y-3">
@@ -189,6 +241,22 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
         </div>
         <SliderNumberInput label="Separación vertical entre filas (px)" value={value.rowGap ?? 0} min={0} max={120} step={2} onChange={(v) => update({rowGap: v || undefined})} />
         <SliderNumberInput label="Separación horizontal (px)" value={value.rowGapH ?? 0} min={0} max={80} step={2} onChange={(v) => update({rowGapH: v || undefined})} />
+        <SelectControl
+          label="Formato del valor acumulado"
+          value={value.valueFormat ?? 'number'}
+          options={VALUE_FORMATS}
+          onChange={(v) => update({valueFormat: v as ValueFormat})}
+        />
+        {(value.valueFormat ?? 'number') === 'currency' && (
+          <div>
+            <label className="text-sm font-medium mb-1 block">Símbolo de moneda</label>
+            <input
+              value={value.currencySymbol ?? '$'}
+              onChange={(e) => update({currencySymbol: e.target.value || undefined})}
+              className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+            />
+          </div>
+        )}
         <p className="text-[10px] text-muted">
           El eje X muestra el valor acumulado (mínimo 0 y máximo), no las fechas. La fecha en pantalla se muestra abajo a la derecha como texto e indica el momento del recorrido.
         </p>
@@ -309,8 +377,9 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
               )}
             </div>
             <p className="text-[10px] text-muted mb-1.5">Zoom y foco del recorte dentro del marco de cada avatar.</p>
+            <EntitySearch value={avatarQ} onChange={setAvatarQ} shown={filteredCrops.length} total={participants.length} />
             <div className="space-y-2">
-              {participants.map((p) => {
+              {filteredCrops.map((p) => {
                 const cr = value.avatarCrops?.[p.label];
                 const PREVIEW = 40;
                 const crop = avatarCropRect(cr?.zoom, cr?.focusX, cr?.focusY, PREVIEW);
@@ -382,6 +451,7 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
             Reduce el porcentaje para dar más espacio al valor y al avatar (útil cuando el valor se sale de pantalla).
           </p>
           <NumberInput label="Radio de esquina de la barra (vacío = píldora)" value={value.barRadius} min={0} max={60} step={1} onChange={(v) => update({barRadius: v})} />
+          <NumberInput label="Grosor de la barra (px, vacío = automático)" value={value.barThickness} min={4} max={120} step={2} onChange={(v) => update({barThickness: v})} />
           <div className="pt-2 mt-1 border-t border-border-subtle">
             <p className="text-[10px] text-muted mb-1.5">Posición del grupo de filas y eje X (offset en px desde su lugar por defecto).</p>
             <div className="grid grid-cols-2 gap-2">
@@ -397,12 +467,59 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
               </button>
             )}
           </div>
-          <p className="text-[10px] text-muted mb-1.5">Personaliza el color de la barra de cada entidad. Dejar vacío usa el color por defecto.</p>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Paleta de colores</label>
+            <div className="space-y-2">
+              {PALETTES.map((p) => (
+                <button
+                  key={p.name}
+                  type="button"
+                  onClick={() => setBarPalette(p.colors)}
+                  className={`w-full text-left rounded-lg border p-1.5 transition-colors ${
+                    JSON.stringify(barPalette) === JSON.stringify(p.colors)
+                      ? 'border-amber-500/60'
+                      : 'border-border-subtle hover:border-amber-500/40'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] text-secondary">{p.name}</span>
+                    <span className="text-[10px] text-muted">Aplicar</span>
+                  </div>
+                  <div className="flex gap-0.5">
+                    {p.colors.slice(0, 8).map((c, i) => (
+                      <div key={i} className="flex-1 h-3 rounded-sm" style={{backgroundColor: c}} />
+                    ))}
+                  </div>
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setBarPalette(undefined)}
+                className="w-full text-left rounded-lg border border-border-subtle p-1.5 hover:border-amber-500/40 transition-colors"
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] text-secondary">Ninguna (por defecto)</span>
+                  <span className="text-[10px] text-muted">Quitar</span>
+                </div>
+                <div className="flex gap-0.5">
+                  <div className="flex-1 h-3 rounded-sm" style={{backgroundColor: '#FFD700'}} />
+                  <div className="flex-1 h-3 rounded-sm" style={{backgroundColor: '#3f3f46'}} />
+                </div>
+              </button>
+            </div>
+          </div>
+          <p className="text-[10px] text-muted">
+            La paleta colorea cada entidad cíclicamente; un color manual por entidad tiene prioridad sobre ella.
+          </p>
+          <EntitySearch value={colorQ} onChange={setColorQ} shown={filteredColors.length} total={participants.length} />
           <div className="space-y-1.5">
-            {participants.map((p) => {
-              const color = value.barColors?.[p.label] ?? '#3f3f46';
+            {filteredColors.map((p) => {
+              const paletteColor = barPalette.length ? barPalette[(palIndex.get(p.label) ?? 0) % barPalette.length] : undefined;
+              const color = value.barColors?.[p.label] ?? paletteColor ?? '#3f3f46';
               return (
                 <div key={p.label} className="flex items-center gap-2">
+                  <span className="w-12 h-8 shrink-0 rounded border border-border-default" style={{backgroundColor: paletteColor ?? 'transparent', boxShadow: value.barColors?.[p.label] ? `inset 0 0 0 2px ${color}` : 'none'}} />
+                  <span className="sr-only">{paletteColor ? 'Color de paleta' : 'Color manual'}</span>
                   <input
                     type="color"
                     value={color}

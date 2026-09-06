@@ -1,6 +1,6 @@
 import React from 'react';
 import {useCurrentFrame, useVideoConfig, interpolate, spring, Img, staticFile, Easing} from 'remotion';
-import {avatarCropRect, type RaceTextStyle} from '../../../lib/animation-config';
+import {avatarCropRect, type RaceTextStyle, type ValueFormat} from '../../../lib/animation-config';
 
 // A date-driven ranked bar race. Each entity has a `date` (timestamp on
 // the shared axis). A vertical guide sweeps left→right across the duration;
@@ -54,6 +54,16 @@ export type TimelineRaceProps = {
   avatarCrops?: Record<string, {zoom?: number; focusX?: number; focusY?: number}>;
   barColors?: Record<string, string>;
   barRadius?: number;
+  // Color palette cycled across entities (by entity order). Per-entity
+  // `barColors` overrides win over the palette; without a palette the leader
+  // uses the accent color and the rest default gray.
+  barPalette?: string[];
+  // Bar/groove thickness override (px). Empty = automatic (42% of row height).
+  barThickness?: number;
+  // Display format for the accumulated value (bar rows + numeric axis).
+  // `currencySymbol` is the sign prepended when format is `currency`.
+  valueFormat?: ValueFormat;
+  currencySymbol?: string;
   backgroundType?: 'color' | 'pattern' | 'gradient' | 'image';
   background?: string;
   backgroundSecondary?: string;
@@ -78,6 +88,38 @@ function fmtDate(t: number, fmt: TimelineRaceProps['dateFormat'] = 'day'): strin
   if (fmt === 'month') return `${mm}/${y}`;
   const dd = String(d.getDate()).padStart(2, '0');
   return `${dd}/${mm}/${y}`;
+}
+
+// Format the accumulated value for display: bar rows, the numeric axis and the
+// outro width estimate all share this so a long currency prefix or a H:MM:SS
+// clock doesn't push the outro over the track edge. `'number'` keeps the
+// current locale formatting (default, no rounding) so existing renders don't change.
+function fmtValue(v: number, format: TimelineRaceProps['valueFormat'] = 'number', symbol = '$'): string {
+  if (isNaN(v)) return '0';
+  switch (format) {
+    case 'short': {
+      const a = Math.abs(v);
+      if (a >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+      if (a >= 1_000) return `${(v / 1_000).toFixed(1)}k`;
+      return Math.round(v).toString();
+    }
+    case 'decimal':
+      return v.toLocaleString('es', {maximumFractionDigits: 2});
+    case 'percent':
+      return `${Math.round(v * 100)}%`;
+    case 'currency':
+      return `${symbol}${Math.round(v).toLocaleString()}`;
+    case 'hhmmss': {
+      const s = Math.max(0, Math.round(v));
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const sec = s % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+    }
+    case 'number':
+    default:
+      return v.toLocaleString();
+  }
 }
 
 // Merge a RaceTextStyle override onto concrete defaults into a CSSProperties
@@ -129,6 +171,10 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   avatarCrops,
   barColors,
   barRadius,
+  barPalette,
+  barThickness,
+  valueFormat = 'number',
+  currencySymbol = '$',
   backgroundType = 'color',
   background = '#0a0a0a',
   backgroundSecondary = '#1f2937',
@@ -287,13 +333,13 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
             const barFill = barColors?.[item.label] ?? (isLeader ? accentColor : '#475569');
             const segments: Record<'bar' | 'value' | 'avatar', React.ReactNode> = {
               bar: (
-                <div style={{flex: 1, height: ROW_H * 0.5, backgroundColor: '#1a1a1a', borderRadius: barRadius ?? ROW_H * 0.25, overflow: 'hidden', display: 'flex'}}>
+                <div style={{flex: 1, height: barThickness ?? ROW_H * 0.5, backgroundColor: '#1a1a1a', borderRadius: barRadius ?? ROW_H * 0.25, overflow: 'hidden', display: 'flex'}}>
                   <div style={{width: Math.max(0, barWidth), height: '100%', backgroundColor: barFill, borderRadius: barRadius ?? ROW_H * 0.25, boxShadow: isLeader ? `0 0 ${16 * winnerScale}px ${accentColor}66` : 'none'}} />
                 </div>
               ),
               value: (
                 <div style={{width: COMPAT_VALUE_W, flexShrink: 0, textAlign: 'right'}}>
-                  <span style={{fontSize: ROW_FONT, fontWeight: 800, color: isLeader ? accentColor : '#ffffff', fontVariantNumeric: 'tabular-nums'}}>{item.value.toLocaleString()}</span>
+                  <span style={{fontSize: ROW_FONT, fontWeight: 800, color: isLeader ? accentColor : '#ffffff', fontVariantNumeric: 'tabular-nums'}}>{fmtValue(item.value, valueFormat, currencySymbol)}</span>
                 </div>
               ),
               avatar: (
@@ -312,7 +358,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
         {showXAxis && (
           <div style={{marginTop: 16, paddingTop: 14, borderTop: '1px solid #1f2937', display: 'flex', justifyContent: 'space-between', fontSize: 15, color: '#64748b', fontVariantNumeric: 'tabular-nums'}}>
             {[0, 0.25, 0.5, 0.75, 1].map((p) => (
-              <span key={p}>{Math.round(maxValue * p).toLocaleString()}</span>
+              <span key={p}>{fmtValue(maxValue * p, valueFormat, currencySymbol)}</span>
             ))}
           </div>
         )}
@@ -484,8 +530,9 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const rowsTop = Math.max(0, (rowBudget - rowCount * ROW_H - (rowCount - 1) * ROW_GAP) / 2);
 
   // Bar geometry: the fill is slightly thicker than the track ("camino") it
-  // slides along, so the groove reads as a rail the bar is drawn over.
-  const GROOVE_H = Math.max(12, ROW_H * 0.42);
+  // slides along, so the groove reads as a rail the bar is drawn over. A fixed
+  // `barThickness` (px) overrides the automatic 42%-of-row-height sizing.
+  const GROOVE_H = barThickness != null ? Math.min(Math.max(4, Math.round(barThickness)), Math.max(12, ROW_H * 0.7)) : Math.max(12, ROW_H * 0.42);
   const BAR_H = GROOVE_H + Math.max(2, Math.round(ROW_H * 0.06));
 
   // ---- Winner reveal: scale up + glow the leader as the race finishes ----
@@ -510,7 +557,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   // (computed from the widest formatted number across every entity).
   const FINAL_W = Math.min(
     BAR_MAX_W * 0.9,
-    Math.max(48, Math.max(...withDate.map((r) => r.value), 0).toLocaleString().length * ROW_FONT * 0.58 + 28),
+    Math.max(48, fmtValue(Math.max(...withDate.map((r) => r.value), 0), valueFormat, currencySymbol).length * ROW_FONT * 0.58 + 28),
   );
 
   // Per-entity crop; nothing global (zoom/focus are per-entity only).
@@ -521,6 +568,14 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
       focusX: c?.focusX ?? 0,
       focusY: c?.focusY ?? 0,
     };
+  };
+
+  // Stable entity order (byLabel insertion order) used to cycle the color
+  // palette across entities, so re-coloring is consistent per race.
+  const entityOrder = [...byLabel.keys()];
+  const palColor = (label: string): string | undefined => {
+    if (!barPalette || barPalette.length === 0) return undefined;
+    return barPalette[Math.max(0, entityOrder.indexOf(label)) % barPalette.length];
   };
 
   const renderRow = (p: {label: string; image?: string | null; current: number; active: boolean; firstX: number}) => {
@@ -593,9 +648,10 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     }
 
     // Bar fill: per-entity override wins (label, or its avatar URL as fallback
-    // for configs saved before labels switched to names); otherwise the leader
-    // uses the accent color and the rest a neutral gray.
-    const barFill = barColors?.[p.label] ?? (p.image ? barColors?.[p.image] : undefined) ?? (isLeader ? accentColor : '#3f3f46');
+    // for configs saved before labels switched to names); otherwise the color
+    // palette cycles by entity order; finally the leader uses the accent color
+    // and the rest a neutral gray.
+    const barFill = barColors?.[p.label] ?? (p.image ? barColors?.[p.image] : undefined) ?? palColor(p.label) ?? (isLeader ? accentColor : '#3f3f46');
 
     const segments: Record<'bar' | 'avatar', React.ReactNode> = {
       bar: (
@@ -607,7 +663,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
           <div style={{position: 'absolute', left: leftOff, top: '50%', width: Math.max(0, w), height: BAR_H, transform: `translateY(-50%) scaleY(${scale})`, backgroundColor: barFill, borderRadius: barRadius ?? 999, boxShadow: isLeader && podiumEffect ? `0 0 ${18 * scale}px ${accentColor}99` : 'none'}} />
           <div style={{position: 'absolute', right: 10, top: 0, bottom: 0, display: 'flex', alignItems: 'center', pointerEvents: 'none'}}>
             <span style={{fontSize: ROW_FONT, fontWeight: 800, color: '#ffffff', fontVariantNumeric: 'tabular-nums', opacity: p.active ? 1 : 0.25, whiteSpace: 'nowrap'}}>
-              {p.active ? Math.round(p.current).toLocaleString() : '–'}
+              {p.active ? fmtValue(Math.round(p.current), valueFormat, currencySymbol) : '–'}
             </span>
           </div>
         </div>
@@ -634,10 +690,10 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const numAxis = (
     <div style={{position: 'relative', flexShrink: 0, marginTop: 8, paddingTop: 12, borderTop: '1px solid #1f2937', width: '100%', height: 22, transform: `translate(${barsX ?? 0}px, ${barsY ?? 0}px)`}}>
       <div style={{position: 'absolute', left: -6, top: 0, fontSize: axisFont, color: '#64748b', fontVariantNumeric: 'tabular-nums'}}>
-        {0}
+        {fmtValue(0, valueFormat, currencySymbol)}
       </div>
       <div style={{position: 'absolute', left: BAR_MAX_W - 6, top: 0, fontSize: axisFont, color: '#64748b', fontVariantNumeric: 'tabular-nums', textAlign: 'right'}}>
-        {currentMax.toLocaleString()}
+        {fmtValue(currentMax, valueFormat, currencySymbol)}
       </div>
     </div>
   );
