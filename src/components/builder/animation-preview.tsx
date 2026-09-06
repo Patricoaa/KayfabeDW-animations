@@ -9,6 +9,9 @@ import {TEMPLATES} from '@/remotion/generated/registry';
 import type {TemplateId} from '@/remotion/generated/registry';
 import {EXPORT_PRESETS} from '@/lib/export-presets';
 import type {ExportPresetId} from '@/lib/export-presets';
+import {loadSafeZones, saveSafeZones, type SafeZoneSettings} from '@/lib/safe-zones';
+import {SafeZoneControls} from '@/components/builder/safe-zone-controls';
+import {SafeZoneOverlay} from '@/components/builder/safe-zone-overlay';
 
 type RenderState =
   | {status: 'idle'}
@@ -28,6 +31,7 @@ type AnimationPreviewProps = {
   height?: number;
   presetId?: ExportPresetId;
   onPresetChange?: (id: ExportPresetId) => void;
+  showSafeZones?: boolean;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -49,12 +53,19 @@ export function AnimationPreview({
   height,
   presetId,
   onPresetChange,
+  showSafeZones = false,
 }: AnimationPreviewProps) {
   const [renderState, setRenderState] = useState<RenderState>({status: 'idle'});
   const [duration, setDuration] = useState(externalDuration ?? 10);
   const [mounted, setMounted] = useState(false);
+  const [safeZones, setSafeZones] = useState<SafeZoneSettings>(() => loadSafeZones());
   const abortRef = useRef<AbortController | null>(null);
   useEffect(() => setMounted(true), []);
+
+  // Preview-only safe-zone overlay: persisted locally, never part of an export.
+  useEffect(() => {
+    saveSafeZones(safeZones);
+  }, [safeZones]);
 
   // Keep the internal duration in sync when the parent controls it (the
   // duration slider lives under the preview in the builder).
@@ -157,14 +168,14 @@ export function AnimationPreview({
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Preview player — fits fully inside the area (no scroll/zoom needed) by
           constraining the player to the canvas aspect ratio and centering it. */}
-      <div className="flex-1 flex items-center justify-center p-6 bg-card overflow-hidden">
+      <div className="flex-1 flex items-center justify-center p-6 bg-card overflow-hidden relative">
         {!mounted && (
           <div className="p-8 text-muted text-sm text-center">Cargando preview...</div>
         )}
         {mounted && Comp && (
           <React.Suspense fallback={<div className="p-8 text-muted text-sm text-center">Cargando template...</div>}>
             <div
-              className="border border-border-default rounded-lg overflow-hidden"
+              className="border border-border-default rounded-lg overflow-hidden relative"
               style={{
                 maxWidth: '100%',
                 maxHeight: '100%',
@@ -183,8 +194,12 @@ export function AnimationPreview({
                 controls
                 acknowledgeRemotionLicense
               />
+              {showSafeZones && <SafeZoneOverlay width={compW} height={compH} settings={safeZones} />}
             </div>
           </React.Suspense>
+        )}
+        {showSafeZones && (
+          <SafeZoneControls settings={safeZones} onChange={setSafeZones} width={compW} height={compH} />
         )}
       </div>
 

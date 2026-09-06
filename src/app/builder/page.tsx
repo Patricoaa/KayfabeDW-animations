@@ -656,6 +656,7 @@ function BuilderContent() {
                 height={exportSize.height}
                 presetId={exportPresetId}
                 onPresetChange={setExportPresetId}
+                showSafeZones
               />
             ) : (
               <div className="h-full flex items-center justify-center text-muted text-sm font-body">
