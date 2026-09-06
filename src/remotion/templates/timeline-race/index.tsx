@@ -443,7 +443,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   const rowCount = Math.max(visibleActive.length + visibleInactive.length, 1);
 
   // Current rank (index in the visible / full order) per entity.
-  const rankNow = (label: string) => currentRank.listIndex.get(label) ?? 0;
+  const rankNow = (label: string) => currentRank.listIndex.get(label) ?? rowCount;
 
   // Duration (frames) of the slide when an entity changes rank.
   const SWAP = 24;
@@ -547,8 +547,8 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
       if (!(maxRows && maxRows > 0)) return null;
       const from = frame - SWAP > 0 ? frame - SWAP : 0;
       for (let f = frame; f > from; f--) {
-        const inNow = insideAt(guideTAt(f), label);
-        const inPrev = insideAt(guideTAt(f - 1), label);
+        const inNow = insideAt(f, label);
+        const inPrev = insideAt(f - 1, label);
         if (inNow !== inPrev) {
           return inNow
             ? {atFrame: f, entering: true as const, fromRank: -1, nowRank: rankFullAt(f, label)}
