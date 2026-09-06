@@ -243,12 +243,6 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
     countUpDurationSeconds != null && countUpDurationSeconds > 0
       ? Math.max(1, Math.min(Math.round(countUpDurationSeconds * fps), sweepBudget))
       : sweepBudget;
-  // The right-side frame image holds over for a few frames whenever the next
-  // position reveals: the previous image stays on screen a couple of beats
-  // longer, so the swap lands with the new row's elements already materializing
-  // instead of a hard instant cut at the row boundary.
-  const FRAME_IMAGE_DELAY = 6;
-
   // Drop-in order by direction: 'desc' reveals the tail first and saves #1 for
   // last; 'asc' opens with the leader.
   const sequencePos = (i: number) => (revealDirection === 'asc' ? i : n - 1 - i);
@@ -469,20 +463,20 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
   };
 
   // ---- Global right-side frame ----
-  // The image of the position currently being revealed fills the frame. Each
-  // image is delayed FRAME_IMAGE_DELAY frames past its row's reveal start, so
-  // when a new position begins the previous image simply stays put a few beats
-  // longer — the swap is a clean land, not a hard instant cut. The swap anchors
-  // to the previous image's resting position (already at its focus crop), and
-  // the incoming image starts its one-way pan (per-position direction) from its
-  // entrance edge, easing smoothly into the focus placement by the reveal end.
-  // Across holds it rests at the focus crop instead of decelerating to a stop.
+  // The image swaps to a position the moment that position's row has finished
+  // its entry trajectory (the chase completes: every element locked in place),
+  // driving the cut off the row's actual motion instead of a fixed beat. Each
+  // image is therefore on screen for exactly one reveal window: it fades in
+  // just as its row lands, then its one-way pan (per-position direction) eases
+  // smoothly across the following reveal into the focus placement. The last
+  // revealed position spreads its pan across the final hold so the video ends
+  // settled at the focus crop.
   let activeLabel: string | undefined;
   let activeIndex = -1;
   let activeStart = -Infinity;
   if (HAS_FRAME) {
     ranked.forEach((r, i) => {
-      const st = EASE + sequencePos(i) * step + FRAME_IMAGE_DELAY;
+      const st = EASE + (sequencePos(i) + 1) * step;
       if (st <= frame && st >= activeStart) {
         activeLabel = r.label;
         activeIndex = i;
@@ -491,10 +485,13 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
     });
   }
   const activeItem = activeLabel !== undefined && activeIndex >= 0 ? ranked[activeIndex] : undefined;
+  const lastRevealIndex = revealDirection === 'asc' ? n - 1 : 0;
+  const isLastReveal = activeIndex === lastRevealIndex;
+  const panDenom = isLastReveal ? Math.max(step + holdFrames, 1) : Math.max(step, 1);
   const rowProg =
     activeLabel === undefined
       ? 0
-      : Math.max(0, Math.min((frame - activeStart) / Math.max(step, 1), 1));
+      : Math.max(0, Math.min((frame - activeStart) / panDenom, 1));
   const panEased = Easing.inOut(Easing.cubic)(rowProg);
   const panProg = rowImagePanDirs?.[activeItem?.label ?? ''] === 'rtl' ? 1 - panEased : panEased;
   const framePan = activeItem && rowImagePan !== false ? panProg : 0;
