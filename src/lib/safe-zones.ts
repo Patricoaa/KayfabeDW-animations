@@ -60,6 +60,21 @@ export function saveSafeZones(settings: SafeZoneSettings) {
   }
 }
 
+// Validate an untrusted / JSON round-tripped value into a full SafeZoneSettings
+// (used when restoring a saved viz_spec or a shared link). Returns undefined
+// when the payload carries no safe-zone fields at all.
+export function safeZonesFromConfig(value: Partial<SafeZoneSettings> | null | undefined): SafeZoneSettings | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const {visible, platform, margins} = value as Partial<SafeZoneSettings>;
+  if (visible === undefined && platform === undefined && !margins) return undefined;
+  const isPlatform = platform === 'tiktok' || platform === 'reels' || platform === 'shorts' || platform === 'custom';
+  return {
+    visible: visible ?? DEFAULT_SAFE_ZONES.visible,
+    platform: isPlatform ? platform : DEFAULT_SAFE_ZONES.platform,
+    margins: {...DEFAULT_SAFE_ZONES.margins, ...(margins ?? {})},
+  };
+}
+
 // Convert reference-frame (1080×1920) margins to pixels in the actual canvas.
 export function toCanvasMargins(margins: SafeZoneMargins, width: number, height: number): SafeZoneMargins {
   const sx = width / SAFE_ZONE_REF.width;

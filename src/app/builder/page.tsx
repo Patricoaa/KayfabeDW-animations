@@ -39,6 +39,7 @@ import {TEMPLATES} from '@/remotion/generated/registry';
 import type {TemplateId} from '@/remotion/generated/registry';
 import type {AnimationTemplateConfig, TimelineRaceConfig} from '@/lib/animation-config';
 import {emptyAnimationConfig} from '@/lib/animation-config';
+import {loadSafeZones, saveSafeZones, safeZonesFromConfig, type SafeZoneSettings} from '@/lib/safe-zones';
 import {useToast} from '@/components/ui/toast';
 import {DEFAULT_EXPORT_PRESET, EXPORT_PRESETS, getExportPreset} from '@/lib/export-presets';
 import type {ExportPresetId} from '@/lib/export-presets';
@@ -101,6 +102,7 @@ function BuilderContent() {
   const [templateConfig, setTemplateConfig] = useState<AnimationTemplateConfig>(emptyAnimationConfig());
   const [exportPresetId, setExportPresetId] = useState<ExportPresetId>(DEFAULT_EXPORT_PRESET.id);
   const [customSize, setCustomSize] = useState<{width: number; height: number}>({width: 1280, height: 720});
+  const [safeZones, setSafeZones] = useState<SafeZoneSettings>(() => loadSafeZones());
   const exportPreset = getExportPreset(exportPresetId);
   const exportSize: {width: number; height: number} =
     exportPresetId === 'custom' ? customSize : {width: exportPreset.width, height: exportPreset.height};
@@ -203,6 +205,13 @@ function BuilderContent() {
           if (ac.templateConfig) {
             setTemplateConfig({...emptyAnimationConfig(), ...ac.templateConfig});
           }
+          if (ac.safeZones) {
+            const sz = safeZonesFromConfig(ac.safeZones);
+            if (sz) {
+              setSafeZones(sz);
+              saveSafeZones(sz);
+            }
+          }
         }
         setSaved(true);
       })
@@ -220,6 +229,35 @@ function BuilderContent() {
         executeQuery(decoded.spec);
       }
       if (decoded.chartConfig) setChartConfig(decoded.chartConfig);
+      // Animated config travels as `animationConfig` in the shared payload so a
+      // shared link reopens the full animated setup (template, duration, size).
+      if (decoded.animationConfig) {
+        const ac = decoded.animationConfig;
+        if (ac.templateId) {
+          setSelectedTemplate(ac.templateId);
+          setOutputMode('animated');
+          if (EXPORT_PRESETS.some((p) => p.id === ac.presetId)) {
+            setExportPresetId(ac.presetId);
+          }
+          if (ac.customSize && Number.isFinite(ac.customSize.width) && Number.isFinite(ac.customSize.height)) {
+            setCustomSize({width: ac.customSize.width, height: ac.customSize.height});
+          }
+        }
+        if (ac.duration) {
+          setDuration(ac.duration);
+          durationLoadedRef.current = true;
+        }
+        if (ac.templateConfig) {
+          setTemplateConfig({...emptyAnimationConfig(), ...ac.templateConfig});
+        }
+        if (ac.safeZones) {
+          const sz = safeZonesFromConfig(ac.safeZones);
+          if (sz) {
+            setSafeZones(sz);
+            saveSafeZones(sz);
+          }
+        }
+      }
       // Clear the share param from URL
       window.history.replaceState(null, '', '/builder');
     } catch {
@@ -312,6 +350,7 @@ function BuilderContent() {
                 templateConfig: Object.keys(templateConfig).length > 0 ? templateConfig : null,
                 presetId: exportPresetId,
                 customSize: exportPresetId === 'custom' ? customSize : null,
+                safeZones,
               }
             : null,
           is_draft: true,
@@ -327,7 +366,7 @@ function BuilderContent() {
     } catch {
       // Silent — autosave is best-effort
     }
-  }, [spec, vizName, chartConfig, outputMode, activeTemplate, duration, templateConfig, exportPresetId, customSize]);
+  }, [spec, vizName, chartConfig, outputMode, activeTemplate, duration, templateConfig, exportPresetId, customSize, safeZones]);
 
   useEffect(() => {
     if (saved || !spec.table || spec.select?.length === 0) return;
@@ -402,6 +441,7 @@ function BuilderContent() {
                 templateConfig: Object.keys(templateConfig).length > 0 ? templateConfig : null,
                 presetId: exportPresetId,
                 customSize: exportPresetId === 'custom' ? customSize : null,
+                safeZones,
               }
             : null,
           thumbnail_url: thumbnailUrl,
@@ -675,6 +715,8 @@ function BuilderContent() {
                 presetId={exportPresetId}
                 onPresetChange={setExportPresetId}
                 showSafeZones
+                safeZones={safeZones}
+                onSafeZonesChange={setSafeZones}
               />
             ) : (
               <div className="h-full flex items-center justify-center text-muted text-sm font-body">

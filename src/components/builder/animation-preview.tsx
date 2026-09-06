@@ -33,6 +33,10 @@ type AnimationPreviewProps = {
   presetId?: ExportPresetId;
   onPresetChange?: (id: ExportPresetId) => void;
   showSafeZones?: boolean;
+  // Controlled safe-zone settings. When omitted, the preview manages its own
+  // state (initialized from and written back to localStorage).
+  safeZones?: SafeZoneSettings;
+  onSafeZonesChange?: (s: SafeZoneSettings) => void;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -55,17 +59,26 @@ export function AnimationPreview({
   presetId,
   onPresetChange,
   showSafeZones = false,
+  safeZones: safeZonesProp,
+  onSafeZonesChange,
 }: AnimationPreviewProps) {
   const [renderState, setRenderState] = useState<RenderState>({status: 'idle'});
   const [duration, setDuration] = useState(externalDuration ?? 10);
   const [mounted, setMounted] = useState(false);
-  const [safeZones, setSafeZones] = useState<SafeZoneSettings>(() => loadSafeZones());
+  const [internalSafeZones, setInternalSafeZones] = useState<SafeZoneSettings>(() => loadSafeZones());
   const abortRef = useRef<AbortController | null>(null);
   useEffect(() => setMounted(true), []);
 
   const entry = TEMPLATES[templateId as TemplateId];
 
-  // Preview-only safe-zone overlay: persisted locally, never part of an export.
+  const safeZones = safeZonesProp ?? internalSafeZones;
+  const handleSafeZonesChange = (s: SafeZoneSettings) => {
+    setInternalSafeZones(s);
+    onSafeZonesChange?.(s);
+  };
+
+  // Preview-only safe-zone overlay: persisted locally (keeps them as global
+  // defaults across vizs), never part of an export.
   useEffect(() => {
     saveSafeZones(safeZones);
   }, [safeZones]);
@@ -308,7 +321,7 @@ export function AnimationPreview({
         </div>
 
         {showSafeZones && (
-          <SafeZoneControls settings={safeZones} onChange={setSafeZones} width={compW} height={compH} />
+          <SafeZoneControls settings={safeZones} onChange={handleSafeZonesChange} width={compW} height={compH} />
         )}
       </div>
 
