@@ -40,7 +40,7 @@ import type {TemplateId} from '@/remotion/generated/registry';
 import type {AnimationTemplateConfig, TimelineRaceConfig} from '@/lib/animation-config';
 import {emptyAnimationConfig} from '@/lib/animation-config';
 import {useToast} from '@/components/ui/toast';
-import {DEFAULT_EXPORT_PRESET, getExportPreset} from '@/lib/export-presets';
+import {DEFAULT_EXPORT_PRESET, EXPORT_PRESETS, getExportPreset} from '@/lib/export-presets';
 import type {ExportPresetId} from '@/lib/export-presets';
 
 const QueryCanvas = dynamic(
@@ -189,6 +189,12 @@ function BuilderContent() {
           if (ac.templateId) {
             setSelectedTemplate(ac.templateId);
             setOutputMode('animated');
+            if (EXPORT_PRESETS.some((p) => p.id === ac.presetId)) {
+              setExportPresetId(ac.presetId);
+            }
+            if (ac.customSize && Number.isFinite(ac.customSize.width) && Number.isFinite(ac.customSize.height)) {
+              setCustomSize({width: ac.customSize.width, height: ac.customSize.height});
+            }
           }
           if (ac.duration) {
             setDuration(ac.duration);
@@ -300,7 +306,13 @@ function BuilderContent() {
           query_spec: spec,
           chart_config: chartConfig,
           animation_config: outputMode === 'animated' && activeTemplate
-            ? {templateId: activeTemplate, duration, templateConfig: Object.keys(templateConfig).length > 0 ? templateConfig : null}
+            ? {
+                templateId: activeTemplate,
+                duration,
+                templateConfig: Object.keys(templateConfig).length > 0 ? templateConfig : null,
+                presetId: exportPresetId,
+                customSize: exportPresetId === 'custom' ? customSize : null,
+              }
             : null,
           is_draft: true,
         }),
@@ -315,7 +327,7 @@ function BuilderContent() {
     } catch {
       // Silent — autosave is best-effort
     }
-  }, [spec, vizName, chartConfig, outputMode, activeTemplate, duration, templateConfig]);
+  }, [spec, vizName, chartConfig, outputMode, activeTemplate, duration, templateConfig, exportPresetId, customSize]);
 
   useEffect(() => {
     if (saved || !spec.table || spec.select?.length === 0) return;
@@ -384,7 +396,13 @@ function BuilderContent() {
           query_spec: spec,
           chart_config: chartConfig,
           animation_config: outputMode === 'animated' && activeTemplate
-            ? {templateId: activeTemplate, duration, templateConfig: Object.keys(templateConfig).length > 0 ? templateConfig : null}
+            ? {
+                templateId: activeTemplate,
+                duration,
+                templateConfig: Object.keys(templateConfig).length > 0 ? templateConfig : null,
+                presetId: exportPresetId,
+                customSize: exportPresetId === 'custom' ? customSize : null,
+              }
             : null,
           thumbnail_url: thumbnailUrl,
           is_draft: false,

@@ -62,10 +62,41 @@ export function AnimationPreview({
   const abortRef = useRef<AbortController | null>(null);
   useEffect(() => setMounted(true), []);
 
+  const entry = TEMPLATES[templateId as TemplateId];
+
   // Preview-only safe-zone overlay: persisted locally, never part of an export.
   useEffect(() => {
     saveSafeZones(safeZones);
   }, [safeZones]);
+
+  // Effective composition size (export canvas). Known before the early return
+  // so the fit-measure hook below can depend on it.
+  const compW = width ?? entry?.meta.width ?? 1920;
+  const compH = height ?? entry?.meta.height ?? 1080;
+
+  // Pixel-exact fit box: size the player frame to the composition's aspect
+  // ratio within the measured area. Avoiding the CSS `aspect-ratio + maxHeight`
+  // combo, which breaks on vertical canvases (9:16 wide preview area squishes
+  // the box, the Player letterboxes, and the safe-zone overlay misaligns).
+  const [fitBox, setFitBox] = useState<{w: number; h: number} | null>(null);
+  const areaRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const el = areaRef.current;
+    if (!el) return;
+    const measure = () => {
+      const PAD = 24; // p-6 around the preview
+      const availW = Math.max(0, el.clientWidth - PAD * 2);
+      const availH = Math.max(0, el.clientHeight - PAD * 2);
+      if (availW <= 0 || availH <= 0) return;
+      const scale = Math.min(availW / compW, availH / compH);
+      setFitBox({w: Math.max(1, Math.round(compW * scale)), h: Math.max(1, Math.round(compH * scale))});
+    };
+    measure();
+    const obs = new ResizeObserver(measure);
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [compW, compH]);
 
   // Keep the internal duration in sync when the parent controls it (the
   // duration slider lives under the preview in the builder).
@@ -75,7 +106,6 @@ export function AnimationPreview({
     }
   }, [externalDuration]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const entry = TEMPLATES[templateId as TemplateId];
   const fps = entry?.meta.fps ?? 30;
   const compositionId = entry?.meta.componentId ?? templateId;
 
@@ -161,14 +191,12 @@ export function AnimationPreview({
   }
 
   const Comp = LAZY_COMPONENTS[templateId];
-  const compW = width ?? entry?.meta.width ?? 1920;
-  const compH = height ?? entry?.meta.height ?? 1080;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Preview player — fits fully inside the area (no scroll/zoom needed) by
           constraining the player to the canvas aspect ratio and centering it. */}
-      <div className="flex-1 flex items-center justify-center p-6 bg-card overflow-hidden relative">
+      <div className="flex-1 flex items-center justify-center p-6 bg-card overflow-hidden relative" ref={areaRef}>
         {!mounted && (
           <div className="p-8 text-muted text-sm text-center">Cargando preview...</div>
         )}
@@ -176,12 +204,11 @@ export function AnimationPreview({
           <React.Suspense fallback={<div className="p-8 text-muted text-sm text-center">Cargando template...</div>}>
             <div
               className="border border-border-default rounded-lg overflow-hidden relative"
-              style={{
-                maxWidth: '100%',
-                maxHeight: '100%',
-                width: '100%',
-                aspectRatio: `${compW} / ${compH}`,
-              }}
+              style={
+                fitBox
+                  ? {width: fitBox.w, height: fitBox.h}
+                  : {width: '100%', maxHeight: '100%', aspectRatio: `${compW} / ${compH}`}
+              }
             >
               <Player
                 component={Comp}
