@@ -463,20 +463,41 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
   };
 
   // ---- Global right-side frame ----
-  // The image swaps to a position the moment that position's row has finished
-  // its entry trajectory (the chase completes: every element locked in place),
-  // driving the cut off the row's actual motion instead of a fixed beat. Each
-  // image is therefore on screen for exactly one reveal window: it fades in
-  // just as its row lands, then its one-way pan (per-position direction) eases
+  // The image swaps to a position the moment that position's "puesto" — the
+  // rank, first element from the left — finishes its entry trajectory, not when
+  // the whole row lands: the image cuts as the rank locks and the rest of the
+  // chase is still arriving, keeping the swap tied to the row's actual motion.
+  // Each image is therefore on screen for exactly one reveal window: it fades
+  // in as its rank locks, then its one-way pan (per-position direction) eases
   // smoothly across the following reveal into the focus placement. The last
   // revealed position spreads its pan across the final hold so the video ends
   // settled at the focus crop.
+  const rankEntryDir = rowEntryMode === 'custom'
+    ? (rowEntryDirs?.rank ?? rowEntryDir ?? 'bottom')
+    : (rowEntryDir ?? 'bottom');
+  let rankLockFrac = 1; // right/vertical: the rank arrives last / with the row
+  if (rankEntryDir === 'left') {
+    const sweepS = Math.max(rowsInnerW, 1);
+    const sweepLead = sweepS + PAD_L + Math.max(RANK_W, GAP_H * 2, 96);
+    const segL: Record<RowEntryElement, number> = {
+      rank: 0,
+      avatar: showRank ? RANK_W + GAP_H : 0,
+      bar: (showRank ? RANK_W + GAP_H : 0) + (avatarVisible ? AVATAR + GAP_H : 0),
+      value: sweepS,
+    };
+    const distL = (el: RowEntryElement) => sweepLead + segL[el];
+    const factor = (['rank', 'avatar', 'bar', 'value'] as RowEntryElement[]).reduce(
+      (s, el, i) => s + distL(el) / (sweepLead * Math.pow(1.5, i)),
+      0
+    );
+    rankLockFrac = 1 / factor;
+  }
   let activeLabel: string | undefined;
   let activeIndex = -1;
   let activeStart = -Infinity;
   if (HAS_FRAME) {
     ranked.forEach((r, i) => {
-      const st = EASE + (sequencePos(i) + 1) * step;
+      const st = EASE + (sequencePos(i) + rankLockFrac) * step;
       if (st <= frame && st >= activeStart) {
         activeLabel = r.label;
         activeIndex = i;
