@@ -11,6 +11,7 @@ import type {TemplateId} from '@/remotion/generated/registry';
 import {EXPORT_PRESETS, getExportPreset} from '@/lib/export-presets';
 import type {ExportPresetId} from '@/lib/export-presets';
 import {getItems, parseRenderResponse, renderPhaseLabel} from '@/lib/render-export';
+import {STATIC_SIZE_PRESETS, staticSizeKey} from '@/lib/static-sizes';
 
 type StaticFormat = 'png' | 'jpg' | 'svg';
 type AnimatedFormat = 'mp4' | 'gif';
@@ -37,6 +38,8 @@ type ExportPanelProps = {
   onPresetChange: (id: ExportPresetId) => void;
   customSize: {width: number; height: number};
   onCustomSizeChange: (s: {width: number; height: number}) => void;
+  // Static: resizes the chart canvas to a platform preset (drives the preview).
+  onCanvasSizeChange: (width: number, height: number) => void;
 };
 
 export function ExportPanel({
@@ -53,6 +56,7 @@ export function ExportPanel({
   onPresetChange,
   customSize,
   onCustomSizeChange,
+  onCanvasSizeChange,
 }: ExportPanelProps) {
   const {addToast} = useToast();
 
@@ -174,6 +178,39 @@ export function ExportPanel({
             </div>
             <div className="text-[10px] text-muted mt-1">
               Resultado: {canvasWidth * staticScale} × {canvasHeight * staticScale} px
+            </div>
+          </div>
+
+          {/* Size / preset — resizes the chart canvas so the exported file hits
+              the target pixels exactly (preview mirrors it via the config). */}
+          <div>
+            <label className="text-[10px] font-semibold text-muted uppercase tracking-widest mb-2 block font-display">
+              Tamaño / preset
+            </label>
+            <div className="grid grid-cols-1 gap-1">
+              {STATIC_SIZE_PRESETS.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => onCanvasSizeChange(p.width, p.height)}
+                  className={`px-3 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2 ${
+                    staticSizeKey(canvasWidth, canvasHeight) === p.id
+                      ? 'bg-amber-500 text-black'
+                      : 'bg-elevated text-secondary hover:bg-card-hover'
+                  }`}
+                  title={`${p.width} × ${p.height}`}
+                >
+                  <span>{p.label}</span>
+                  <span className={`ml-auto text-[9px] font-mono ${staticSizeKey(canvasWidth, canvasHeight) === p.id ? 'opacity-80' : 'opacity-60'}`}>
+                    {p.width}×{p.height}
+                  </span>
+                </button>
+              ))}
+              {staticSizeKey(canvasWidth, canvasHeight) === 'custom' && (
+                <span className="px-3 py-2 rounded-lg text-xs font-semibold bg-elevated text-secondary flex items-center gap-2">
+                  Lienzo actual
+                  <span className="ml-auto text-[9px] font-mono opacity-60">{canvasWidth}×{canvasHeight}</span>
+                </span>
+              )}
             </div>
           </div>
 

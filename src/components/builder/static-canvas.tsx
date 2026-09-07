@@ -15,15 +15,27 @@ const PAD = 40;
  * keeps its natural size (export reads user-space geometry and stays
  * untouched). Wheel zooms keeping the center pinned; the toolbar offers −/+,
  * a 25–300% slider, "100%" and "Ajustar". Default scale is "fit".
+ *
+ * Optional preview-only layers:
+ * - `overlay` renders *inside* the scaled stage (a sibling of the chart), so
+ *   layers like safe-zone guides can use literal canvas coordinates (scale=1)
+ *   and inherit the exact same CSS transform as the chart at any zoom. It
+ *   lives outside the export subtree and can never leak into a downloaded file.
+ * - `panel` renders as a floating absolute layer inside the viewport (used for
+ *   floating tools such as the safe-zone controls).
  */
 export default function CanvasZoom({
   children,
   contentWidth,
   contentHeight,
+  overlay,
+  panel,
 }: {
   children: ReactNode;
   contentWidth?: number;
   contentHeight?: number;
+  overlay?: ReactNode;
+  panel?: ReactNode;
 }) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -102,17 +114,19 @@ export default function CanvasZoom({
             className="relative shrink-0"
             style={{width: w || '100%', height: h || '100%'}}
           >
-            <div
-              className="h-full"
+<div
+              className="h-full relative"
               style={{
                 transform: `scale(${scale})`,
                 transformOrigin: 'center center',
               }}
             >
               {children}
+              {overlay}
             </div>
           </div>
         </div>
+        {panel}
       </div>
       <div className="flex items-center justify-center gap-2 px-4 py-2 border-t border-border-default bg-card shrink-0">
         <button

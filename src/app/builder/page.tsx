@@ -28,8 +28,7 @@ import {chartToDataUrl} from '@/lib/export-static';
 import dynamic from 'next/dynamic';
 import {ChartConfigPanel} from '@/components/builder/chart-config-panel';
 import type {ColumnMeta} from '@/components/builder/chart-config-panel';
-import {ChartPreview} from '@/components/charts/chart-preview';
-import CanvasZoom from '@/components/builder/static-canvas';
+import {StaticPreview} from '@/components/builder/static-preview';
 import {TemplatePicker} from '@/components/builder/template-picker';
 import {AnimationPreview} from '@/components/builder/animation-preview';
 import {AnimationConfigPanel} from '@/components/builder/animation-config-panel';
@@ -756,19 +755,14 @@ function BuilderContent() {
                 </div>
               )
             ) : outputMode === 'static' ? (
-              <CanvasZoom contentWidth={chartConfig.width ?? 600} contentHeight={chartConfig.height ?? 380}>
-                <div ref={staticExportRef} className="w-full">
-                  {filteredData.length === 0 ? (
-                    <div className="text-center text-muted text-sm font-body p-6">
-                      {data.length > 0
-                        ? 'Ninguna fila coincide con el filtro del gráfico'
-                        : 'Cargá datos en el canvas para ver tu gráfico'}
-                    </div>
-                  ) : (
-                    <ChartPreview data={filteredData} config={chartConfig} />
-                  )}
-                </div>
-              </CanvasZoom>
+              <StaticPreview
+                data={filteredData}
+                config={chartConfig}
+                exportRef={staticExportRef}
+                safeZones={safeZones}
+                onSafeZonesChange={setSafeZones}
+                onCanvasSizeChange={(w, h) => setChartConfig((c) => ({...c, width: w, height: h}))}
+              />
             ) : activeTemplate ? (
               <AnimationPreview
                 templateId={activeTemplate}
@@ -914,6 +908,7 @@ function BuilderContent() {
             onPresetChange={setExportPresetId}
             customSize={customSize}
             onCustomSizeChange={setCustomSize}
+            onCanvasSizeChange={(w, h) => setChartConfig((c) => ({...c, width: w, height: h}))}
           />
         </aside>
         )}

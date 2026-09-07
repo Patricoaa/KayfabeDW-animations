@@ -245,6 +245,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
     '600x380': {width: 600, height: 380},
     '1080x1080': {width: 1080, height: 1080},
     '1080x1350': {width: 1080, height: 1350},
+    '1080x1440': {width: 1080, height: 1440},
     '1080x1920': {width: 1080, height: 1920},
     '1280x720': {width: 1280, height: 720},
     '900x320': {width: 900, height: 320},
@@ -1190,15 +1191,16 @@ const setLegendTextOverride = (label: string, value?: string) => {
           >
             <option value="600x380">Estándar (600×380)</option>
             <option value="1080x1080">IG Cuadrado (1080×1080)</option>
-            <option value="1080x1350">IG 4:5 (1080×1350)</option>
-            <option value="1080x1920">Story 9:16 (1080×1920)</option>
+            <option value="1080x1350">Publicaciones 4:5 (1080×1350)</option>
+            <option value="1080x1440">Publicaciones (1080×1440)</option>
+            <option value="1080x1920">Shorts / Reels / TikTok (1080×1920)</option>
             <option value="1280x720">YouTube 16:9 (1280×720)</option>
             <option value="900x320">Panorámica (900×320)</option>
             <option value="custom">Personalizado</option>
           </select>
           <div className="grid grid-cols-2 gap-2 mt-2">
-            <NumberInput label="Ancho" value={config.width} min={300} max={1600} step={20} onChange={(v) => update({width: v})} />
-            <NumberInput label="Alto" value={config.height} min={200} max={1000} step={20} onChange={(v) => update({height: v})} />
+            <NumberInput label="Ancho" value={config.width} min={300} max={2400} step={20} onChange={(v) => update({width: v})} />
+            <NumberInput label="Alto" value={config.height} min={200} max={2400} step={20} onChange={(v) => update({height: v})} />
           </div>
         </div>
         <div className="pt-1 border-t border-border-subtle">
