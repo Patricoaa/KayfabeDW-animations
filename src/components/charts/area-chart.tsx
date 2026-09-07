@@ -39,7 +39,7 @@ function MultiArea({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
   const labelAngle = config.labelAngle ?? (n > 8 ? -30 : 0);
   const showMarkers = config.showMarkers ?? true;
   const showLegend = config.showLegend ?? true;
-  const legendPosition = config.legendPosition ?? 'bottom';
+  const legendPosition = 'bottom';
   const smooth = config.lineSmooth ?? false;
   const catColor = config.xLabelFont?.color ?? st.textColor;
   const catSize = config.xLabelFont?.size ?? st.labelFontSize;

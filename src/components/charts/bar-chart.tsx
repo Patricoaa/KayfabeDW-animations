@@ -281,7 +281,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const stacked = (config.groupMode ?? 'grouped') === 'stacked' || !!config.stacked;
   const stackedPercent = config.groupMode === 'stacked-percent';
   const showLegend = config.showLegend ?? true;
-  const legendPosition = config.legendPosition ?? 'bottom';
+  const legendPosition = 'bottom';
   const labelAngle = config.labelAngle ?? (multi.categories.length > 8 ? -30 : 0);
 
   const avatarField = config.avatarField;

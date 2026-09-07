@@ -507,8 +507,13 @@ export function prepareMultiSeries(
     color: legendColors.get(name) ?? pickColor(config.colors, i),
   }));
 
+  // Drop series that carry no data at all (every aggregated value 0), so they
+  // draw nothing, don't show up in the legend, and don't skew grouping. Colors
+  // are assigned above, before any filtering, so existing mappings survive.
+  const visible = series.filter((s) => s.values.some((v) => v !== 0));
+
   const categoryTotals = categories.map((_, ci) =>
-    series.reduce((s, se) => s + (se.values[ci] ?? 0), 0),
+    visible.reduce((s, se) => s + (se.values[ci] ?? 0), 0),
   );
 
   // Respect sortBy + limit the same way prepareSeries does, so the "Ordenar
@@ -523,7 +528,7 @@ export function prepareMultiSeries(
   }
   const orderedCategories = indexOrder.map((i) => categories[i]);
   const orderedTotals = indexOrder.map((i) => categoryTotals[i]);
-  const orderedSeries = series.map((s) => ({
+  const orderedSeries = visible.map((s) => ({
     ...s,
     values: indexOrder.map((i) => s.values[i] ?? 0),
   }));

@@ -103,7 +103,7 @@ export function ScatterChart({data, config}: Props) {
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
         {frameRect(config)}
         {(config.title || config.subtitle) && <SvgHeader config={config} st={st} width={width} />}
-        {showLegend !== false && legendItems.length > 0 && <SvgLegend items={legendItems} position={config.legendPosition ?? 'bottom'} width={width} height={height} st={st} config={config} headerOffset={headerH} />}
+        {showLegend !== false && legendItems.length > 0 && <SvgLegend items={legendItems} position="bottom" width={width} height={height} st={st} config={config} headerOffset={headerH} />}
       {config.showGrid !== false && yDom.ticks.map((v, i) => {
         const y = toY(v);
         return (

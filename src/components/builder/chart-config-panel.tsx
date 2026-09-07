@@ -2,7 +2,7 @@
 
 import React, {useEffect, useState} from 'react';
 import {BarChart3, PieChart, LineChart, AreaChart, ScatterChart, Table2, ChevronDown} from 'lucide-react';
-import type {ChartConfig, ChartType, ChartOverlay, NumberFormat, SortBy, ChartFilter, ChartFilterOp, LegendPosition, ChartStyle, AvatarShape, AvatarCrop, SectionFont, TextLayout} from '@/lib/chart-config';
+import type {ChartConfig, ChartType, ChartOverlay, NumberFormat, SortBy, ChartFilter, ChartFilterOp, ChartStyle, AvatarShape, AvatarCrop, SectionFont, TextLayout} from '@/lib/chart-config';
 import {FONT_PRESETS, PALETTES} from '@/lib/chart-config';
 import {pickColor, colorFor} from '@/lib/chart-data';
 import {TextControls} from '@/components/builder/text-controls';
@@ -1044,19 +1044,6 @@ const setLegendTextOverride = (label: string, value?: string) => {
           <Toggle label="Mostrar leyenda" checked={config.showLegend ?? true} onChange={(v) => update({showLegend: v})} />
           {(config.showLegend ?? true) && (
             <>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Posición de leyenda</label>
-                <select
-                  value={config.legendPosition ?? 'bottom'}
-                  onChange={(e) => update({legendPosition: e.target.value as LegendPosition})}
-                  className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-                >
-                  <option value="top">Arriba</option>
-                  <option value="bottom">Abajo</option>
-                  <option value="right">Derecha</option>
-                </select>
-                <p className="text-[10px] text-muted mt-1.5">Las coordenadas de abajo reemplazan la posición fija cuando se definen.</p>
-              </div>
               <LayoutControls title="Coordenadas libres (offset, px)" value={config.legendLayout} onChange={setLegendLayout} />
             </>
           )}

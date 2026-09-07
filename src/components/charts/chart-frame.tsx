@@ -478,15 +478,13 @@ export function legendReserve(config: ChartConfig, items: LegendItem[], width = 
   if (!(config.showLegend ?? true) || items.length === 0) return {top: 0, right: 0, bottom: 0};
   const l = config.legendLayout;
   if (l && (l.x != null || l.y != null)) return {top: 0, right: 0, bottom: 0};
-  const pos = config.legendPosition ?? 'bottom';
-  if (pos === 'right') return {top: 0, right: 118, bottom: 0};
   const fs = config.legendFont?.size ?? 10;
   const sw = Math.max(6, Math.round(fs));
   const overflow = config.legendFont?.overflow;
   const avail = Math.max(120, width - 24);
   const rows = wrapLegendItems(items, (it) => legendItemW(legendDisplay(it.label, 24, overflow), fs, sw), avail);
   const extra = (rows.length - 1) * (fs + 6);
-  return pos === 'top' ? {top: 20 + extra, right: 0, bottom: 0} : {top: 0, right: 0, bottom: 16 + extra};
+  return {top: 0, right: 0, bottom: 16 + extra};
 }
 
 // Legend rendered inside the SVG, adapting to top/right/bottom positions and

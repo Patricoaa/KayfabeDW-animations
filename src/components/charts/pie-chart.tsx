@@ -95,7 +95,7 @@ export function PieChart({data, config}: Props) {
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
         {frameRect(config)}
         {(config.title || config.subtitle) && <SvgHeader config={config} st={st} width={width} />}
-        {showLegend && legendItems.length > 0 && <SvgLegend items={legendItems} position={config.legendPosition ?? 'bottom'} width={width} height={height} st={st} config={config} headerOffset={headerH} />}
+        {showLegend && legendItems.length > 0 && <SvgLegend items={legendItems} position="bottom" width={width} height={height} st={st} config={config} headerOffset={headerH} />}
         {visible.map((s) => {
           const angle = (s.value / total) * 2 * Math.PI;
           const startAngle = cumAngle;
