@@ -180,6 +180,9 @@ export type ChartConfig = {
   xLabel?: string;
   yLabel?: string;
   legendPosition?: LegendPosition;
+  // Free-form legend placement (canvas offset coordinates). When X or Y are
+  // set, the legend ignores `legendPosition` and renders at these coordinates.
+  legendLayout?: TextLayout;
   numberFormat?: NumberFormat;
   sortBy?: SortBy;
   limit?: number;

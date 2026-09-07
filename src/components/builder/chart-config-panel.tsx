@@ -232,6 +232,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
   const setSubtitleFont = (patch: Partial<SectionFont>) => update({subtitleFont: {...(config.subtitleFont ?? {}), ...patch}});
   const setTitleLayout = (patch: Partial<TextLayout>) => update({titleLayout: {...(config.titleLayout ?? {}), ...patch}});
   const setSubtitleLayout = (patch: Partial<TextLayout>) => update({subtitleLayout: {...(config.subtitleLayout ?? {}), ...patch}});
+  const setLegendLayout = (patch: Partial<TextLayout>) => update({legendLayout: {...(config.legendLayout ?? {}), ...patch}});
   const setXLabelFont = (patch: Partial<SectionFont>) => update({xLabelFont: {...(config.xLabelFont ?? {}), ...patch}});
   const setYLabelFont = (patch: Partial<SectionFont>) => update({yLabelFont: {...(config.yLabelFont ?? {}), ...patch}});
   const setLegendFont = (patch: Partial<SectionFont>) => update({legendFont: {...(config.legendFont ?? {}), ...patch}});
@@ -1028,18 +1029,22 @@ const setLegendTextOverride = (label: string, value?: string) => {
         <Section title="Leyendas">
           <Toggle label="Mostrar leyenda" checked={config.showLegend ?? true} onChange={(v) => update({showLegend: v})} />
           {(config.showLegend ?? true) && (
-            <div>
-              <label className="text-sm font-medium mb-1 block">Posición de leyenda</label>
-              <select
-                value={config.legendPosition ?? 'bottom'}
-                onChange={(e) => update({legendPosition: e.target.value as LegendPosition})}
-                className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-              >
-                <option value="top">Arriba</option>
-                <option value="bottom">Abajo</option>
-                <option value="right">Derecha</option>
-              </select>
-            </div>
+            <>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Posición de leyenda</label>
+                <select
+                  value={config.legendPosition ?? 'bottom'}
+                  onChange={(e) => update({legendPosition: e.target.value as LegendPosition})}
+                  className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+                >
+                  <option value="top">Arriba</option>
+                  <option value="bottom">Abajo</option>
+                  <option value="right">Derecha</option>
+                </select>
+                <p className="text-[10px] text-muted mt-1.5">Las coordenadas de abajo reemplazan la posición fija cuando se definen.</p>
+              </div>
+              <LayoutControls title="Coordenadas libres (offset, px)" value={config.legendLayout} onChange={setLegendLayout} />
+            </>
           )}
           {(config.type === 'line' || config.type === 'area') && (
             <Toggle label="Mostrar puntos" checked={config.showMarkers ?? true} onChange={(v) => update({showMarkers: v})} />

@@ -283,7 +283,8 @@ export function headerHeight(config: ChartConfig, st: ResolvedChartStyle, width 
   const hasTitle = !!config.title;
   const hasSub = !!config.subtitle;
   if (!hasTitle && !hasSub) return 0;
-  const freePlacement = !!config.titleLayout?.y || !!config.subtitleLayout?.y;
+  const freePlacement = (config.titleLayout && (config.titleLayout.x != null || config.titleLayout.y != null))
+    || (config.subtitleLayout && (config.subtitleLayout.x != null || config.subtitleLayout.y != null));
   if (freePlacement) return 0;
   const titleSize = config.headerFont?.size ?? st.titleFontSize;
   const subSize = config.subtitleFont?.size ?? Math.max(8, titleSize - 3);
@@ -380,7 +381,8 @@ export function SvgHeader({config, st, width}: {config: ChartConfig; st: Resolve
   const subSize = config.subtitleFont?.size ?? Math.max(8, titleSize - 3);
   const subColor = config.subtitleFont?.color ?? st.textColor;
 
-  if (config.titleLayout?.y || config.subtitleLayout?.y) {
+  if ((config.titleLayout && (config.titleLayout.x != null || config.titleLayout.y != null))
+      || (config.subtitleLayout && (config.subtitleLayout.x != null || config.subtitleLayout.y != null))) {
     // Free-form placement: render each block independently at its own position.
     return (
       <g>
@@ -420,8 +422,12 @@ export function SvgHeader({config, st, width}: {config: ChartConfig; st: Resolve
 }
 
 // Reserved margins (SVG units) for a rendered legend outside the plot area.
+// Free coordinates (legendLayout with explicit x/y) reserve nothing: the
+// legend is drawn over the canvas wherever the offsets point.
 export function legendReserve(config: ChartConfig, items: LegendItem[]): {top: number; right: number; bottom: number} {
   if (!(config.showLegend ?? true) || items.length === 0) return {top: 0, right: 0, bottom: 0};
+  const l = config.legendLayout;
+  if (l && (l.x != null || l.y != null)) return {top: 0, right: 0, bottom: 0};
   const pos = config.legendPosition ?? 'bottom';
   if (pos === 'right') return {top: 0, right: 118, bottom: 0};
   return pos === 'top' ? {top: 20, right: 0, bottom: 0} : {top: 0, right: 0, bottom: 16};
@@ -455,6 +461,35 @@ export function SvgLegend({
   const weight = config.legendFont?.weight ?? 500;
   const align = config.legendFont?.align ?? 'center';
   const labelOf = (s: string, max: number) => (config.legendFont?.overflow === 'none' ? s : truncate(s, max));
+
+  const layout = config.legendLayout;
+  if (layout && (layout.x != null || layout.y != null)) {
+    // Free placement via canvas offset coordinates (anchor/align/rotation).
+    const anchor = layout.anchor ?? 'center';
+    const refX = anchor === 'left' ? (layout.x ?? 0) : anchor === 'right' ? width - (layout.x ?? 0) : width / 2 + (layout.x ?? 0);
+    const boxW = items.reduce((acc, it) => acc + sw + 6 + textWidth(it.label, fs) + gap, 0) - gap;
+    const lAlign = layout.align ?? 'center';
+    const startX = lAlign === 'left' ? refX : lAlign === 'right' ? refX - boxW : refX - boxW / 2;
+    const baseY = layout.y ?? 0;
+    const ls = layout.letterSpacing;
+    return (
+      <g
+        fontFamily={family}
+        opacity={layout.opacity ?? 1}
+        transform={layout.rotation ? `rotate(${layout.rotation}, ${refX}, ${baseY})` : undefined}
+      >
+        {items.map((it, i) => {
+          const x = startX + i * (sw + 6 + textWidth(it.label, fs) + gap);
+          return (
+            <g key={it.label} transform={`translate(${x}, ${baseY})`}>
+              <rect x={0} y={-sw / 2} width={sw} height={sw} fill={it.color} />
+              <text x={sw + 6} y={0} fontSize={fs} fill={color} fontWeight={weight} letterSpacing={ls}>{labelOf(it.label, 24)}</text>
+            </g>
+          );
+        })}
+      </g>
+    );
+  }
 
   if (position === 'right') {
     const x = width - 112;
