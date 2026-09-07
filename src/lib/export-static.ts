@@ -155,12 +155,20 @@ async function ensurePageFonts(faces: FontFaceSpec[]): Promise<void> {
 
 type TextLineSpec = {x: number; y: number; text: string};
 
+// 2×3 affine matrix (column-vector convention): x' = a*x + c*y + e, y' = b*x + d*y + f.
+// Maps a <text>'s local coordinates (its own x/y attributes) up to the root SVG
+// viewBox by composing the element's own transform with every ancestor's.
+type Mat = [number, number, number, number, number, number];
+
+const IDENTITY_MAT: Mat = [1, 0, 0, 1, 0, 0];
+
 type TextSpec = {
   align: CanvasTextAlign;
   font: string;
   fill: string;
   letterSpacing: number;
-  rotate?: {a: number; cx: number; cy: number};
+  baseline: CanvasTextBaseline;
+  ctm: Mat;
   lines: TextLineSpec[];
 };
 
@@ -180,9 +188,10 @@ function captureTextSpecs(svgEl: SVGSVGElement): TextSpec[] {
     const fill = cs.fill && !cs.fill.startsWith('url(') ? cs.fill : '#000';
     const align: CanvasTextAlign = cs.textAnchor === 'middle' ? 'center' : cs.textAnchor === 'end' ? 'right' : 'left';
     const letterSpacing = lsOf(cs.letterSpacing);
+    const baseline = baselineOf(cs);
+    const ctm = composeTransform(el);
     const x = numOf(el.getAttribute('x'), 0);
     const y = numOf(el.getAttribute('y'), 0);
-    const rotate = parseRotate(el.getAttribute('transform'));
 
     let lines: TextLineSpec[];
     const tspans = Array.from(el.querySelectorAll('tspan'));
@@ -201,24 +210,19 @@ function captureTextSpecs(svgEl: SVGSVGElement): TextSpec[] {
       lines = [{x, y, text: collapseWhitespace(el.textContent ?? '')}];
     }
 
-    specs.push({align, font: `${style} ${weight} ${size}px "${family}"`, fill, letterSpacing, rotate, lines});
+    specs.push({align, font: `${style} ${weight} ${size}px "${family}"`, fill, letterSpacing, baseline, ctm, lines});
   }
   return specs;
 }
 
 function drawTextLayer(ctx: CanvasRenderingContext2D, specs: TextSpec[], scale: number): void {
   ctx.save();
-  ctx.setTransform(scale, 0, 0, scale, 0, 0);
-  ctx.textBaseline = 'alphabetic';
   ctx.lineWidth = 0;
   for (const spec of specs) {
+    const [a, b, c, d, e, f] = spec.ctm;
     ctx.save();
-    if (spec.rotate) {
-      const {a, cx, cy} = spec.rotate;
-      ctx.translate(cx, cy);
-      ctx.rotate((a * Math.PI) / 180);
-      ctx.translate(-cx, -cy);
-    }
+    ctx.setTransform(scale * a, scale * b, scale * c, scale * d, scale * e, scale * f);
+    ctx.textBaseline = spec.baseline;
     ctx.fillStyle = spec.fill;
     ctx.font = spec.font;
     for (const line of spec.lines) {
@@ -288,11 +292,99 @@ function collapseWhitespace(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
 }
 
-function parseRotate(transform: string | null): {a: number; cx: number; cy: number} | undefined {
-  if (!transform) return undefined;
-  const m = transform.match(/rotate\(\s*([-\d.]+)(?:\s*,\s*([-\d.]+)\s*,\s*([-\d.]+))?\s*\)/);
-  if (!m) return undefined;
-  return {a: parseFloat(m[1]) || 0, cx: parseFloat(m[2]) || 0, cy: parseFloat(m[3]) || 0};
+// Maps an SVG text baseline to the equivalent canvas one. Legend labels and pie
+// slices center vertically (central/middle); anything else keeps alphabetic.
+function baselineOf(cs: CSSStyleDeclaration): CanvasTextBaseline {
+  const db = String((cs as CSSStyleDeclaration & {dominantBaseline?: string}).dominantBaseline ?? '');
+  switch (db) {
+    case 'central':
+    case 'middle':
+      return 'middle';
+    case 'hanging':
+      return 'hanging';
+    case 'text-before-edge':
+      return 'top';
+    case 'text-after-edge':
+      return 'bottom';
+    case 'top':
+      return 'top';
+    case 'bottom':
+      return 'bottom';
+    case 'ideographic':
+      return 'ideographic';
+    default:
+      return 'alphabetic';
+  }
+}
+
+// CTM mapping the text's local coordinates (its own x/y/transform) up to the
+// root SVG's coordinate system, composing the element's own transform with every
+// ancestor transform in order (legend items are placed inside translated <g>s).
+function composeTransform(el: SVGElement): Mat {
+  const ops: Mat[] = [];
+  let cur: SVGElement | null = el;
+  while (cur) {
+    const a = cur.getAttribute('transform');
+    if (a && a.trim()) ops.unshift(parseTransformList(a));
+    if (cur.tagName.toLowerCase() === 'svg') break;
+    cur = cur.parentElement as SVGElement | null;
+  }
+  let m: Mat = IDENTITY_MAT;
+  for (const op of ops) m = mulMat(m, op);
+  return m;
+}
+
+function parseTransformList(value: string): Mat {
+  let m: Mat = IDENTITY_MAT;
+  const re = /(translate|rotate|scale|matrix|skewX|skewY)\(([^)]*)\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(value))) {
+    const args = match[2].split(/[\s,]+/).filter(Boolean).map((s) => parseFloat(s));
+    m = mulMat(m, transformOp(match[1], args));
+  }
+  return m;
+}
+
+function transformOp(fn: string, a: number[]): Mat {
+  switch (fn) {
+    case 'translate':
+      return [1, 0, 0, 1, a[0] || 0, a[1] || 0];
+    case 'scale': {
+      const sx = a[0] ?? 1;
+      return [sx, 0, 0, (a[1] ?? a[0]) ?? 1, 0, 0];
+    }
+    case 'rotate': {
+      const ang = ((a[0] || 0) * Math.PI) / 180;
+      const cos = Math.cos(ang);
+      const sin = Math.sin(ang);
+      const r: Mat = [cos, sin, -sin, cos, 0, 0];
+      if (a.length >= 3) {
+        const cx = a[1] || 0;
+        const cy = a[2] || 0;
+        return mulMat(mulMat([1, 0, 0, 1, cx, cy], r), [1, 0, 0, 1, -cx, -cy]);
+      }
+      return r;
+    }
+    case 'matrix':
+      return [a[0] || 0, a[1] || 0, a[2] || 0, a[3] || 0, a[4] || 0, a[5] || 0];
+    case 'skewX':
+      return [1, 0, Math.tan(((a[0] || 0) * Math.PI) / 180), 1, 0, 0];
+    case 'skewY':
+      return [1, Math.tan(((a[0] || 0) * Math.PI) / 180), 0, 1, 0, 0];
+    default:
+      return IDENTITY_MAT;
+  }
+}
+
+function mulMat(m1: Mat, m2: Mat): Mat {
+  return [
+    m1[0] * m2[0] + m1[2] * m2[1],
+    m1[1] * m2[0] + m1[3] * m2[1],
+    m1[0] * m2[2] + m1[2] * m2[3],
+    m1[1] * m2[2] + m1[3] * m2[3],
+    m1[0] * m2[4] + m1[2] * m2[5] + m1[4],
+    m1[1] * m2[4] + m1[3] * m2[5] + m1[5],
+  ];
 }
 
 /**
