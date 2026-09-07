@@ -518,7 +518,9 @@ export function SvgLegend({
   const sw = Math.max(6, Math.round(fs));
   const rowH = fs + 6;
   const family = config.legendFont?.fontFamily ?? st.fontFamily;
-  const color = config.legendFont?.color ?? st.textColor;
+  // Label color: an explicit `legendFont.color` wins; otherwise (default/Auto)
+  // the label inherits the color of the category/series it represents.
+  const colorFor = (it: LegendItem) => config.legendFont?.color ?? it.color;
   const weight = config.legendFont?.weight ?? 500;
   const align = config.legendFont?.align ?? 'center';
   const overflow = config.legendFont?.overflow;
@@ -547,7 +549,7 @@ export function SvgLegend({
           return (
             <g key={it.label} transform={`translate(${x}, ${baseY})`}>
               <rect x={0} y={-sw / 2} width={sw} height={sw} fill={it.color} />
-              <text x={sw + LEGEND_PAD} y={0} dominantBaseline="central" fontSize={fs} fill={color} fontWeight={weight} letterSpacing={ls}>{labelOf(it.label, 24)}</text>
+              <text x={sw + LEGEND_PAD} y={0} dominantBaseline="central" fontSize={fs} fill={colorFor(it)} fontWeight={weight} letterSpacing={ls}>{labelOf(it.label, 24)}</text>
             </g>
           );
         })}
@@ -565,7 +567,7 @@ export function SvgLegend({
           const el = (
             <g key={it.label} transform={`translate(${x}, ${y})`}>
               <rect x={0} y={-sw / 2} width={sw} height={sw} fill={it.color} />
-              <text x={sw + LEGEND_PAD} y={0} dominantBaseline="central" fontSize={fs} fill={color} fontWeight={weight}>{labelOf(it.label, 15)}</text>
+              <text x={sw + LEGEND_PAD} y={0} dominantBaseline="central" fontSize={fs} fill={colorFor(it)} fontWeight={weight}>{labelOf(it.label, 15)}</text>
             </g>
           );
           y += rowH;
@@ -590,7 +592,7 @@ export function SvgLegend({
               const el = (
                 <g key={it.label} transform={`translate(${x}, ${y})`}>
                   <rect x={0} y={-sw / 2} width={sw} height={sw} fill={it.color} />
-                  <text x={sw + LEGEND_PAD} y={0} dominantBaseline="central" fontSize={fs} fill={color} fontWeight={weight}>{labelOf(it.label, 24)}</text>
+                  <text x={sw + LEGEND_PAD} y={0} dominantBaseline="central" fontSize={fs} fill={colorFor(it)} fontWeight={weight}>{labelOf(it.label, 24)}</text>
                 </g>
               );
               x += slotFor(it);
