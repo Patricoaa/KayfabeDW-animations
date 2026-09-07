@@ -454,21 +454,21 @@ const setLegendTextOverride = (label: string, value?: string) => {
         <Section title="Header">
           <div>
             <label className="text-sm font-medium mb-1 block">Título</label>
-            <input
-              type="text"
+            <textarea
               value={config.title ?? ''}
               onChange={(e) => update({title: e.target.value})}
-              placeholder="Título del gráfico"
+              placeholder="Título del gráfico (Enter = nueva línea)"
+              rows={2}
               className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
             />
           </div>
           <div>
             <label className="text-sm font-medium mb-1 block">Subtítulo</label>
-            <input
-              type="text"
+            <textarea
               value={config.subtitle ?? ''}
               onChange={(e) => update({subtitle: e.target.value})}
-              placeholder="Subtítulo opcional"
+              placeholder="Subtítulo opcional (Enter = nueva línea)"
+              rows={2}
               className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
             />
           </div>

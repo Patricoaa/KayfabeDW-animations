@@ -216,20 +216,23 @@ export function YAxisTitle({text, height, color, size, family, weight, align, x 
   );
 }
 
-// Breaks a text into display lines honoring a font's overflow setting. 'auto'
-// behaves as 'none' for header text (single, full line).
+// Breaks a text into display lines honoring hard line breaks (`\n`) and a
+// font's overflow setting. 'auto' behaves as 'none' for header text (single,
+// full line). Each explicit paragraph is processed independently.
 function textLines(s: string | undefined, fs: number, maxW: number, overflow?: TextOverflow): string[] {
   if (!s) return [];
   const cpl = Math.max(4, Math.floor(maxW / (fs * 0.62)));
   const mode = overflow ?? 'none';
-  if (mode === 'none' || s.length <= cpl) return [s];
-  if (mode === 'wrap') {
-    const first = s.slice(0, cpl);
-    const rest = s.slice(cpl);
-    if (rest.length <= cpl) return [first, rest];
-    return [first, rest.slice(0, cpl - 1) + '…'];
-  }
-  return [s.slice(0, cpl - 1) + '…'];
+  const seg = (t: string): string[] => {
+    if (mode === 'none' || t.length <= cpl) return [t];
+    if (mode === 'wrap') {
+      const out: string[] = [];
+      for (let i = 0; i < t.length; i += cpl) out.push(t.slice(i, i + cpl));
+      return out;
+    }
+    return [t.slice(0, cpl - 1) + '…'];
+  };
+  return s.split('\n').flatMap((ln) => seg(ln));
 }
 
 // Estimated text width (px) for the SVG legend layout. Fonts are small and
@@ -323,7 +326,9 @@ function TitleBlock({
     refX = width / 2;
   }
 
-  const textStart = align === 'left' ? refX : align === 'right' ? refX - textWidth(text, size) : refX - textWidth(text, size) / 2;
+  const boxW = Math.max(...lines.map((l) => textWidth(l, size)));
+
+  const textStart = align === 'left' ? refX : align === 'right' ? refX - boxW : refX - boxW / 2;
   const top = (layout?.y ?? 0) + 4;
   const bgPad = layout?.bgPadding ?? 4;
   const lineTops = lines.map((_, i) => top + i * lineH + size / 2);
@@ -339,7 +344,7 @@ function TitleBlock({
         <rect
           x={textStart - bgPad}
           y={top - bgPad}
-          width={textWidth(text, size) + bgPad * 2}
+          width={boxW + bgPad * 2}
           height={lines.length * lineH + bgPad * 2}
           rx={layout.bgRadius ?? 4}
           fill={layout.bgColor}
@@ -349,7 +354,7 @@ function TitleBlock({
       {lines.map((ln, i) => (
         <text
           key={i}
-          x={align === 'right' ? textStart + textWidth(text, size) : textStart}
+          x={align === 'right' ? textStart + boxW : textStart}
           y={lineTops[i]}
           fill={color}
           fontSize={size}
