@@ -48,48 +48,57 @@ export async function downloadChartJpg(container: HTMLElement, filename: string,
 }
 
 /**
- * Rasterizes the inline SVG chart to a transparent-background PNG data URL.
- * Shared by the PNG download flow and thumbnail generation.
+ * Rasterizes the inline SVG chart to a pixel data URL.
+ * Shared by the PNG download flow, JPG download flow and thumbnail generation.
+ *
+ * Only the *graphics* of the chart go through the SVG-as-<img> raster; the text
+ * layer is redrawn directly on the canvas with the page's own webfonts. So the
+ * exported pixels keep the configured typography in every browser, including
+ * Firefox, which does not load @font-face fonts inside SVG images.
  */
 export async function chartToDataUrl(container: HTMLElement, scale = 2): Promise<string | null> {
   const svg = findChartSvg(container);
   if (!svg) return null;
-  const bbox = svg.getBBox();
-  const width = Math.max(bbox.width || svg.viewBox.baseVal.width, svg.getBoundingClientRect().width || 600);
-  const height = Math.max(bbox.height || svg.viewBox.baseVal.height, svg.getBoundingClientRect().height || 380);
-
-  const svgText = await prepareSvgForExport(svg);
-  const url = URL.createObjectURL(new Blob([svgText], {type: 'image/svg+xml;charset=utf-8'}));
-
-  try {
-    await document.fonts.ready.catch(() => undefined);
-    const img = new Image();
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error('No se pudo cargar el SVG para PNG'));
-      img.src = url;
-    });
-    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-    const canvas = document.createElement('canvas');
-    canvas.width = width * scale;
-    canvas.height = height * scale;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Canvas no disponible');
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL('image/png');
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+  const {width, height} = exportSvgSize(svg);
+  return rasterizeChart(svg, width, height, scale, 'png');
 }
 
 async function chartToDataUrlJpg(container: HTMLElement, scale: number, quality: number): Promise<string | null> {
   const svg = findChartSvg(container);
   if (!svg) return null;
+  const {width, height} = exportSvgSize(svg);
+  return rasterizeChart(svg, width, height, scale, 'jpeg', quality);
+}
+
+function exportSvgSize(svg: SVGSVGElement): {width: number; height: number} {
   const bbox = svg.getBBox();
   const width = Math.max(bbox.width || svg.viewBox.baseVal.width, svg.getBoundingClientRect().width || 600);
   const height = Math.max(bbox.height || svg.viewBox.baseVal.height, svg.getBoundingClientRect().height || 380);
+  return {width, height};
+}
 
-  const svgText = await prepareSvgForExport(svg);
+type RasterFormat = 'png' | 'jpeg';
+
+async function rasterizeChart(
+  svg: SVGSVGElement,
+  width: number,
+  height: number,
+  scale: number,
+  format: RasterFormat,
+  jpegQuality?: number,
+): Promise<string | null> {
+  // Typography is captured from the *live* chart (attached element -> computed
+  // styles resolve), then the graphics-only copy is what gets rasterized.
+  const textSpecs = captureTextSpecs(svg);
+  const {clone, usedFamilies} = cloneResolvedSvg(svg);
+  const graphics = clone.cloneNode(true) as SVGSVGElement;
+  graphics.querySelectorAll('text').forEach((t) => t.remove());
+  await Promise.all(Array.from(graphics.querySelectorAll('image')).map((img) => inlineImage(img)));
+
+  const faces = await buildFontFaceList(usedFamilies);
+  await ensurePageFonts(faces);
+
+  const svgText = new XMLSerializer().serializeToString(graphics);
   const url = URL.createObjectURL(new Blob([svgText], {type: 'image/svg+xml;charset=utf-8'}));
 
   try {
@@ -97,22 +106,193 @@ async function chartToDataUrlJpg(container: HTMLElement, scale: number, quality:
     const img = new Image();
     await new Promise<void>((resolve, reject) => {
       img.onload = () => resolve();
-      img.onerror = () => reject(new Error('No se pudo cargar el SVG para JPG'));
+      img.onerror = () => reject(new Error('No se pudo cargar el SVG para la exportación'));
       img.src = url;
     });
     await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
     const canvas = document.createElement('canvas');
-    canvas.width = width * scale;
-    canvas.height = height * scale;
+    canvas.width = Math.max(1, Math.round(width * scale));
+    canvas.height = Math.max(1, Math.round(height * scale));
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Canvas no disponible');
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (format === 'jpeg') {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL('image/jpeg', quality);
+    drawTextLayer(ctx, textSpecs, scale);
+    return format === 'jpeg' ? canvas.toDataURL('image/jpeg', jpegQuality) : canvas.toDataURL('image/png');
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+// Registers every family/weight used in the chart as a page-level font so the
+// canvas text layer renders the exact configured webfonts (Chromium and Firefox
+// both honour document fonts for canvas fillText).
+async function ensurePageFonts(faces: FontFaceSpec[]): Promise<void> {
+  await document.fonts.ready.catch(() => undefined);
+  const loaded = new Set<string>();
+  for (const f of faces) {
+    try {
+      await document.fonts.load(`${f.weight} 16px "${f.family}"`).catch(() => undefined);
+      loaded.add(`${f.family}|${f.weight}`);
+    } catch {
+      /* best-effort */
+    }
+  }
+  for (const f of faces) {
+    if (loaded.has(`${f.family}|${f.weight}`)) continue;
+    try {
+      const face = new FontFace(f.family, `url(${f.dataUrl}) format('${f.format}')`, {weight: f.weight, style: f.style});
+      document.fonts.add(face);
+      await face.load().catch(() => undefined);
+    } catch {
+      /* best-effort */
+    }
+  }
+}
+
+type TextLineSpec = {x: number; y: number; text: string};
+
+type TextSpec = {
+  align: CanvasTextAlign;
+  font: string;
+  fill: string;
+  letterSpacing: number;
+  rotate?: {a: number; cx: number; cy: number};
+  lines: TextLineSpec[];
+};
+
+// Reads the exact layout+typography of every live <text> so the canvas text
+// layer can reproduce the preview glyph for glyph (single line, truncated,
+// wrapped tspans and rotated labels).
+function captureTextSpecs(svgEl: SVGSVGElement): TextSpec[] {
+  const specs: TextSpec[] = [];
+  for (const el of Array.from(svgEl.querySelectorAll('text'))) {
+    const cs = getComputedStyle(el) as CSSStyleDeclaration & {fill?: string; textAnchor?: string};
+    const family = resolveFontFamily(el.getAttribute('font-family') ?? '', el);
+    if (!family) continue;
+    const size = numOf(el.getAttribute('font-size') || cs.fontSize, 16);
+    const weightValue = el.getAttribute('font-weight') || cs.fontWeight;
+    const weight = weightValue === 'normal' ? '400' : weightValue;
+    const style = cs.fontStyle;
+    const fill = cs.fill && !cs.fill.startsWith('url(') ? cs.fill : '#000';
+    const align: CanvasTextAlign = cs.textAnchor === 'middle' ? 'center' : cs.textAnchor === 'end' ? 'right' : 'left';
+    const letterSpacing = lsOf(cs.letterSpacing);
+    const x = numOf(el.getAttribute('x'), 0);
+    const y = numOf(el.getAttribute('y'), 0);
+    const rotate = parseRotate(el.getAttribute('transform'));
+
+    let lines: TextLineSpec[];
+    const tspans = Array.from(el.querySelectorAll('tspan'));
+    if (tspans.length > 0) {
+      lines = [];
+      let yAcc = 0;
+      for (const ts of tspans) {
+        yAcc += unitValue(ts.getAttribute('dy'), size);
+        lines.push({
+          x: numOf(ts.getAttribute('x'), x),
+          y: y + yAcc,
+          text: collapseWhitespace(ts.textContent ?? ''),
+        });
+      }
+    } else {
+      lines = [{x, y, text: collapseWhitespace(el.textContent ?? '')}];
+    }
+
+    specs.push({align, font: `${style} ${weight} ${size}px "${family}"`, fill, letterSpacing, rotate, lines});
+  }
+  return specs;
+}
+
+function drawTextLayer(ctx: CanvasRenderingContext2D, specs: TextSpec[], scale: number): void {
+  ctx.save();
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.textBaseline = 'alphabetic';
+  ctx.lineWidth = 0;
+  for (const spec of specs) {
+    ctx.save();
+    if (spec.rotate) {
+      const {a, cx, cy} = spec.rotate;
+      ctx.translate(cx, cy);
+      ctx.rotate((a * Math.PI) / 180);
+      ctx.translate(-cx, -cy);
+    }
+    ctx.fillStyle = spec.fill;
+    ctx.font = spec.font;
+    for (const line of spec.lines) {
+      if (!line.text) continue;
+      if (spec.letterSpacing) {
+        ctx.textAlign = 'left';
+        drawSpacedText(ctx, line.text, line.x, line.y, spec.align, spec.letterSpacing);
+      } else {
+        ctx.textAlign = spec.align;
+        ctx.fillText(line.text, line.x, line.y);
+      }
+    }
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+// Canvas fillText ignores the letter-spacing CSS property, so spaced text is
+// drawn character by character with the spacing folded in (SVG applies
+// letter-spacing after every glyph, including in `wrap` tspans).
+function drawSpacedText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  align: CanvasTextAlign,
+  spacing: number,
+): void {
+  const chars = Array.from(text);
+  let total = 0;
+  const widths: number[] = [];
+  for (const ch of chars) {
+    const w = ctx.measureText(ch).width;
+    widths.push(w);
+    total += w;
+  }
+  if (chars.length > 1) total += spacing * (chars.length - 1);
+  let cursor = x;
+  if (align === 'center') cursor = x - total / 2;
+  else if (align === 'right') cursor = x - total;
+  for (let i = 0; i < chars.length; i++) {
+    ctx.fillText(chars[i], cursor, y);
+    cursor += widths[i] + spacing;
+  }
+}
+
+function numOf(value: string | null, fallback: number): number {
+  if (value == null) return fallback;
+  const n = parseFloat(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function unitValue(value: string | null, fontSize: number): number {
+  if (!value) return 0;
+  if (value.endsWith('em')) return (parseFloat(value) || 0) * fontSize;
+  return parseFloat(value) || 0;
+}
+
+function lsOf(value: string): number {
+  if (!value || value === 'normal') return 0;
+  return numOf(value, 0);
+}
+
+// SVG collapses whitespace in text content; canvas fillText does not, so match
+// the browser's rendering before drawing.
+function collapseWhitespace(text: string): string {
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+function parseRotate(transform: string | null): {a: number; cx: number; cy: number} | undefined {
+  if (!transform) return undefined;
+  const m = transform.match(/rotate\(\s*([-\d.]+)(?:\s*,\s*([-\d.]+)\s*,\s*([-\d.]+))?\s*\)/);
+  if (!m) return undefined;
+  return {a: parseFloat(m[1]) || 0, cx: parseFloat(m[2]) || 0, cy: parseFloat(m[3]) || 0};
 }
 
 /**
@@ -120,6 +300,23 @@ async function chartToDataUrlJpg(container: HTMLElement, scale: number, quality:
  * and inlines external images. Returns the serialized SVG string.
  */
 async function prepareSvgForExport(svg: SVGSVGElement): Promise<string> {
+  const {clone, usedFamilies} = cloneResolvedSvg(svg);
+  const faces = await buildFontFaceList(usedFamilies);
+  if (faces.length > 0) {
+    const styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+    styleEl.textContent = fontFaceCss(faces);
+    clone.insertBefore(styleEl, clone.firstChild);
+  }
+  await Promise.all(Array.from(clone.querySelectorAll('image')).map((img) => inlineImage(img)));
+  return new XMLSerializer().serializeToString(clone);
+}
+
+type ResolvedSvg = {clone: SVGSVGElement; usedFamilies: Set<string>};
+
+// Clones the chart and projects every resolution that must survive the XML
+// clone onto the copy: concrete font families, computed weight/style and
+// (when inherited) font-size.
+function cloneResolvedSvg(svg: SVGSVGElement): ResolvedSvg {
   const clone = svg.cloneNode(true) as SVGSVGElement;
   clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
 
@@ -143,17 +340,7 @@ async function prepareSvgForExport(svg: SVGSVGElement): Promise<string> {
     if (!originals[i].hasAttribute('font-size') && cs.fontSize) clones[i]?.setAttribute('font-size', cs.fontSize);
   }
 
-  const faces = await buildFontFaceStyles(usedFamilies);
-  if (faces) {
-    const styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style');
-    styleEl.textContent = faces;
-    clone.insertBefore(styleEl, clone.firstChild);
-  }
-
-  const images = Array.from(clone.querySelectorAll('image'));
-  await Promise.all(images.map((img) => inlineImage(img)));
-
-  return new XMLSerializer().serializeToString(clone);
+  return {clone, usedFamilies};
 }
 
 // Resolves a font-family attribute to the concrete family the live document uses.
@@ -183,8 +370,13 @@ function cleanFamily(family: string): string {
   return first.replace(/^['"]|['"]$/g, '');
 }
 
-async function buildFontFaceStyles(families: Set<string>): Promise<string> {
-  const styles: string[] = [];
+type FontFaceSpec = {family: string; dataUrl: string; format: string; weight: string; style: string};
+
+// Resolves every font used by `families` down to a base64 data URL. The same
+// specs feed both the SVG's embedded @font-face rules and the page-level
+// FontFace registrations used for the canvas text layer.
+async function buildFontFaceList(families: Set<string>): Promise<FontFaceSpec[]> {
+  const specs: FontFaceSpec[] = [];
   await document.fonts.ready.catch(() => undefined);
   for (const family of families) {
     const clean = cleanFamily(family);
@@ -222,13 +414,31 @@ async function buildFontFaceStyles(families: Set<string>): Promise<string> {
           continue;
         }
       }
-      const format = face.format || parseFontUrl(face.src).format;
-      styles.push(
-        `@font-face{font-family:'${clean}';src:url(${dataUrl}) format('${format}');font-weight:${face.weight};font-style:${face.style};unicode-range:U+0-10FFFF;}`,
-      );
+      specs.push({
+        family: clean,
+        dataUrl,
+        format: face.format || parseFontUrl(face.src).format,
+        weight: face.weight,
+        style: face.style,
+      });
     }
   }
-  return Array.from(new Set(styles)).join('\n');
+  const dedup = new Set<string>();
+  return specs.filter((s) => {
+    const key = `${s.family}|${s.weight}|${s.style}|${s.dataUrl}`;
+    if (dedup.has(key)) return false;
+    dedup.add(key);
+    return true;
+  });
+}
+
+function fontFaceCss(specs: FontFaceSpec[]): string {
+  return specs
+    .map(
+      (s) =>
+        `@font-face{font-family:'${s.family}';src:url(${s.dataUrl}) format('${s.format}');font-weight:${s.weight};font-style:${s.style};unicode-range:U+0-10FFFF;}`,
+    )
+    .join('\n');
 }
 
 // Reads the resolved @font-face rules for `family` from every same-origin
