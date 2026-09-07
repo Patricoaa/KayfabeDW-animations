@@ -29,12 +29,11 @@ const GIF_MAX_W = 1080;
 const GIF_FPS = 12;
 
 // Serverless MP4 profile: on Hobby the function cap is 300s, so heavy renders
-// (more than ~6s of frames or 1000+ items) are reflowed to a capped viewport
-// at 24fps so the encode fits in the budget. Matches the client thresholds in
-// src/lib/render-export.ts.
+// (more than ~6s of frames or 1000+ items) keep the requested viewport (same
+// layout as the preview) and downscale only the encoded output via `scale`.
+// Matches the client thresholds in src/lib/render-export.ts.
 const RENDER_PROFILE_W = 1280;
 const RENDER_PROFILE_H = 720;
-const RENDER_PROFILE_FPS = 24;
 const RENDER_PROFILE_FRAMES = 180;
 const RENDER_PROFILE_MAX_ITEMS = 1000;
 
@@ -45,12 +44,6 @@ function countRenderItems(inputProps: Record<string, unknown> | null | undefined
   const wrapped = inputProps.props as {items?: unknown[]} | undefined;
   const items = Array.isArray(wrapped?.items) ? wrapped.items : (inputProps.items as unknown[] | undefined);
   return Array.isArray(items) ? items.length : 0;
-}
-
-function serverlessViewport(w: number, h: number): {width: number; height: number} {
-  const scale = Math.min(RENDER_PROFILE_W / w, RENDER_PROFILE_H / h);
-  if (scale >= 1) return {width: w, height: h};
-  return {width: Math.max(1, Math.round(w * scale)), height: Math.max(1, Math.round(h * scale))};
 }
 
 process.env.WEBPACK_CACHE_DIRECTORY = path.join(os.tmpdir(), 'webpack-cache');
@@ -176,32 +169,13 @@ export async function POST(req: Request) {
       composition.height = Math.round(body.height);
     }
 
-    // Serverless profile: heavy MP4 renders get reflowed to a capped viewport
-    // and 24fps so the encode finishes inside the 300s function budget. Frame
-    // count is rescaled along with fps so the output keeps the requested
-    // length (progress-based templates render identically).
+    // Serverless profile: heavy MP4 renders keep the requested layout (identical
+    // to the preview) and downscale only the encoded output so the encode fits
+    // inside the 300s function budget.
     const serverlessProfile =
       codec !== 'gif' &&
       (composition.durationInFrames > RENDER_PROFILE_FRAMES ||
         countRenderItems(body.inputProps) > RENDER_PROFILE_MAX_ITEMS);
-    if (serverlessProfile) {
-      const capped = serverlessViewport(composition.width, composition.height);
-      if (capped.width < composition.width || capped.height < composition.height) {
-        composition.width = capped.width;
-        composition.height = capped.height;
-      }
-      if (composition.fps > RENDER_PROFILE_FPS) {
-        const oldFps = composition.fps;
-        composition.fps = RENDER_PROFILE_FPS;
-        composition.durationInFrames = Math.max(
-          1,
-          Math.round(composition.durationInFrames * (RENDER_PROFILE_FPS / oldFps)),
-        );
-      }
-      console.log(
-        `[render] Serverless profile: ${composition.width}x${composition.height} @ ${composition.fps}fps, ${composition.durationInFrames} frames, ${countRenderItems(body.inputProps)} items`,
-      );
-    }
 
     // GIF: cap resolution and drop fps to avoid OOM in the render container.
     let everyNthFrame = 1;
@@ -212,6 +186,12 @@ export async function POST(req: Request) {
       const maxDim = Math.max(composition.width, composition.height);
       scale = maxDim > GIF_MAX_W ? GIF_MAX_W / maxDim : 1;
       console.log(`[render] GIF profile: everyNthFrame=${everyNthFrame} (→${(composition.fps / everyNthFrame).toFixed(1)}fps), scale=${scale.toFixed(3)}, ${Math.round(composition.width * scale)}x${Math.round(composition.height * scale)}`);
+    } else if (serverlessProfile) {
+      scale = Math.min(RENDER_PROFILE_W / composition.width, RENDER_PROFILE_H / composition.height);
+      if (scale >= 1) scale = 1;
+      console.log(
+        `[render] Serverless profile: layout ${composition.width}x${composition.height} → encode ${Math.round(composition.width * scale)}x${Math.round(composition.height * scale)} (${composition.durationInFrames} frames, ${countRenderItems(body.inputProps)} items)`,
+      );
     }
 
     const tmpFile = path.join(os.tmpdir(), `render-${Date.now()}.${ext}`);
@@ -226,7 +206,8 @@ export async function POST(req: Request) {
       inputProps: body.inputProps,
       browserExecutable: chromePath,
       concurrency: 1,
-      ...(codec === 'gif' ? {everyNthFrame, scale} : {}),
+      scale,
+      ...(codec === 'gif' ? {everyNthFrame} : {}),
       onProgress: ({progress: p}) => {
         send({type: 'phase', phase: 'Rendering video...', progress: 0.2 + p * 0.7});
       },

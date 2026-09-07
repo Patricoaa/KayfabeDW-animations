@@ -6,7 +6,7 @@ import {Minus, Plus, Maximize} from 'lucide-react';
 import {Player} from '@remotion/player';
 import type {ChartConfig} from '@/lib/chart-config';
 import {convertToRemotionProps} from '@/lib/viz-to-remotion';
-import {capRenderItems, getItems, parseRenderResponse, renderPhaseLabel} from '@/lib/render-export';
+import {getItems, parseRenderResponse, renderPhaseLabel} from '@/lib/render-export';
 import {TEMPLATES} from '@/remotion/generated/registry';
 import type {TemplateId} from '@/remotion/generated/registry';
 import {EXPORT_PRESETS} from '@/lib/export-presets';
@@ -160,17 +160,16 @@ export function AnimationPreview({
     if (!remotionProps) return;
     const controller = new AbortController();
     abortRef.current = controller;
-    const capped = capRenderItems(remotionProps);
-    const items = getItems(capped.props);
+    const items = getItems(remotionProps);
     const frames = duration * fps;
-    setRenderState({status: 'rendering', phase: renderPhaseLabel(frames, items, capped.truncated), progress: 0.05});
+    setRenderState({status: 'rendering', phase: renderPhaseLabel(frames, items), progress: 0.05});
     try {
       const res = await fetch('/api/render', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
           compositionId,
-          inputProps: capped.props,
+          inputProps: remotionProps,
           durationInFrames: frames,
           width: width ?? entry?.meta.width ?? 1920,
           height: height ?? entry?.meta.height ?? 1080,

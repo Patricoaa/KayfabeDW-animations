@@ -1,6 +1,6 @@
 // Shared helpers for the animated export flow (/api/render). Keeps both export
 // surfaces (preview button + export panel) consistent about serverless profile
-// decisions, input item caps and safe parsing of the render response.
+// decisions and safe parsing of the render response.
 //
 // On Hobby, Vercel functions have a hard 300s cap. Heavy renders (long
 // durations and/or thousands of items) risk a 504, which arrives as an HTML
@@ -29,34 +29,9 @@ export function usesServerlessProfile(durationInFrames: number, items: unknown[]
   return durationInFrames > RENDER_PROFILE_FRAMES || items.length > RENDER_PROFILE_MAX_ITEMS;
 }
 
-// Cap the input items sent to the render so the payload and per-frame DOM cost
-// stay within serverless budget. Returns a shallow copy; preserves shape.
-export function capRenderItems<T extends Record<string, unknown> | null | undefined>(
-  props: T,
-  maxItems = RENDER_PROFILE_MAX_ITEMS,
-): {props: T; truncated: boolean} {
-  if (!props) return {props, truncated: false};
-  const items = getItems(props);
-  if (items.length <= maxItems) return {props, truncated: false};
-
-  const wrapped = props.props as {items?: unknown[]} | undefined;
-  const next: Record<string, unknown> = Array.isArray(wrapped?.items)
-    ? {...props, props: {...wrapped, items: items.slice(0, maxItems)}}
-    : {...props, items: items.slice(0, maxItems)};
-
-  return {props: next as T, truncated: true};
-}
-
-export function renderPhaseLabel(
-  durationInFrames: number,
-  items: unknown[],
-  truncated: boolean,
-): string {
-  const notes: string[] = [];
-  if (usesServerlessProfile(durationInFrames, items)) notes.push('perfil 1280×720 @24fps');
-  if (truncated) notes.push(`datos a ${RENDER_PROFILE_MAX_ITEMS} items`);
-  return notes.length > 0
-    ? `Rendering video... (${notes.join(', ')})`
+export function renderPhaseLabel(durationInFrames: number, items: unknown[]): string {
+  return usesServerlessProfile(durationInFrames, items)
+    ? 'Rendering video... (perfil serverless — calidad reducida)'
     : 'Rendering video...';
 }
 

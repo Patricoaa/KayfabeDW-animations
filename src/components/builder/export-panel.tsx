@@ -10,7 +10,7 @@ import {TEMPLATES} from '@/remotion/generated/registry';
 import type {TemplateId} from '@/remotion/generated/registry';
 import {EXPORT_PRESETS, getExportPreset} from '@/lib/export-presets';
 import type {ExportPresetId} from '@/lib/export-presets';
-import {capRenderItems, getItems, parseRenderResponse, renderPhaseLabel} from '@/lib/render-export';
+import {getItems, parseRenderResponse, renderPhaseLabel} from '@/lib/render-export';
 
 type StaticFormat = 'png' | 'jpg' | 'svg';
 type AnimatedFormat = 'mp4' | 'gif';
@@ -111,17 +111,16 @@ export function ExportPanel({
     if (!remotionProps || !compositionId) return;
     const controller = new AbortController();
     abortRef.current = controller;
-    const capped = capRenderItems(remotionProps);
-    const items = getItems(capped.props);
+    const items = getItems(remotionProps);
     const frames = duration * fps;
-    setRenderState({status: 'rendering', phase: renderPhaseLabel(frames, items, capped.truncated), progress: 0.05});
+    setRenderState({status: 'rendering', phase: renderPhaseLabel(frames, items), progress: 0.05});
     try {
       const res = await fetch('/api/render', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
           compositionId,
-          inputProps: capped.props,
+          inputProps: remotionProps,
           durationInFrames: frames,
           format: animatedFormat,
           width: exportSize.width,
