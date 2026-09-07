@@ -463,41 +463,47 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
   };
 
   // ---- Global right-side frame ----
-  // The image swaps to a position the moment that position's "puesto" — the
-  // rank, first element from the left — finishes its entry trajectory, not when
-  // the whole row lands: the image cuts as the rank locks and the rest of the
-  // chase is still arriving, keeping the swap tied to the row's actual motion.
-  // Each image is therefore on screen for exactly one reveal window: it fades
-  // in as its rank locks, then its one-way pan (per-position direction) eases
-  // smoothly across the following reveal into the focus placement. The last
-  // revealed position spreads its pan across the final hold so the video ends
-  // settled at the focus crop.
-  const rankEntryDir = rowEntryMode === 'custom'
-    ? (rowEntryDirs?.rank ?? rowEntryDir ?? 'bottom')
+  // The image swaps to a position the moment that position's entity — the
+  // label, second element from the left — finishes its entry trajectory, not
+  // when the rank or the whole row lands: the image cuts as the entity locks
+  // and the datum is still chasing in, keeping the swap tied to the row's
+  // actual motion. Each image is therefore on screen for exactly one reveal
+  // window: it fades in as the entity locks, then its one-way pan (per-position
+  // direction) eases smoothly across the following reveal into the focus
+  // placement. The last revealed position spreads its pan across the final hold
+  // so the video ends settled at the focus crop.
+  const housingDir = rowEntryMode === 'custom'
+    ? (rowEntryDirs?.bar ?? rowEntryDir ?? 'bottom')
     : (rowEntryDir ?? 'bottom');
-  let rankLockFrac = 1; // right/vertical: the rank arrives last / with the row
-  if (rankEntryDir === 'left') {
+  let entityLockFrac = 1; // vertical: elements land together at the end
+  if (housingDir === 'left' || housingDir === 'right') {
     const sweepS = Math.max(rowsInnerW, 1);
     const sweepLead = sweepS + PAD_L + Math.max(RANK_W, GAP_H * 2, 96);
-    const segL: Record<RowEntryElement, number> = {
+    const segH: Record<RowEntryElement, number> = {
       rank: 0,
       avatar: showRank ? RANK_W + GAP_H : 0,
       bar: (showRank ? RANK_W + GAP_H : 0) + (avatarVisible ? AVATAR + GAP_H : 0),
       value: sweepS,
     };
-    const distL = (el: RowEntryElement) => sweepLead + segL[el];
-    const factor = (['rank', 'avatar', 'bar', 'value'] as RowEntryElement[]).reduce(
-      (s, el, i) => s + distL(el) / (sweepLead * Math.pow(1.5, i)),
-      0
-    );
-    rankLockFrac = 1 / factor;
+    const orderH: RowEntryElement[] = housingDir === 'left' ? ['rank', 'avatar', 'bar', 'value'] : ['value', 'bar', 'avatar', 'rank'];
+    const distH = (el: RowEntryElement) =>
+      housingDir === 'left' ? sweepLead + segH[el] : sweepS + sweepLead - segH[el];
+    const d0 = distH(orderH[0]);
+    const factor = orderH.reduce((s, el, i) => s + distH(el) / (d0 * Math.pow(1.5, i)), 0);
+    const firstDur = 1 / factor;
+    let cursor = 0;
+    for (let i = 0; i < orderH.length; i++) {
+      const dur = (firstDur * distH(orderH[i])) / d0 / Math.pow(1.5, i);
+      if (orderH[i] === 'bar') entityLockFrac = cursor + dur;
+      cursor += dur;
+    }
   }
   let activeLabel: string | undefined;
   let activeIndex = -1;
   let activeStart = -Infinity;
   if (HAS_FRAME) {
     ranked.forEach((r, i) => {
-      const st = EASE + (sequencePos(i) + rankLockFrac) * step;
+      const st = EASE + (sequencePos(i) + entityLockFrac) * step;
       if (st <= frame && st >= activeStart) {
         activeLabel = r.label;
         activeIndex = i;
