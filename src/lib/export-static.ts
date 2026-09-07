@@ -62,12 +62,14 @@ export async function chartToDataUrl(container: HTMLElement, scale = 2): Promise
   const url = URL.createObjectURL(new Blob([svgText], {type: 'image/svg+xml;charset=utf-8'}));
 
   try {
+    await document.fonts.ready.catch(() => undefined);
     const img = new Image();
     await new Promise<void>((resolve, reject) => {
       img.onload = () => resolve();
       img.onerror = () => reject(new Error('No se pudo cargar el SVG para PNG'));
       img.src = url;
     });
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
     const canvas = document.createElement('canvas');
     canvas.width = width * scale;
     canvas.height = height * scale;
@@ -91,12 +93,14 @@ async function chartToDataUrlJpg(container: HTMLElement, scale: number, quality:
   const url = URL.createObjectURL(new Blob([svgText], {type: 'image/svg+xml;charset=utf-8'}));
 
   try {
+    await document.fonts.ready.catch(() => undefined);
     const img = new Image();
     await new Promise<void>((resolve, reject) => {
       img.onload = () => resolve();
       img.onerror = () => reject(new Error('No se pudo cargar el SVG para JPG'));
       img.src = url;
     });
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
     const canvas = document.createElement('canvas');
     canvas.width = width * scale;
     canvas.height = height * scale;
@@ -159,10 +163,14 @@ function resolveFontFamily(attr: string, el: SVGGraphicsElement): string {
     const m = attr.match(/var\((--[\w-]+)/);
     if (m) {
       const v = getComputedStyle(document.documentElement).getPropertyValue(m[1]).trim();
-      if (v) return cleanFamily(v);
-      return '';
+      if (v) {
+        const clean = cleanFamily(v);
+        if (clean) return clean;
+      }
     }
-    return '';
+    // Var missing/empty (e.g. font not registered) -> whatever the live element
+    // actually resolves to.
+    return cleanFamily(getComputedStyle(el).fontFamily);
   }
   if (raw === '' || raw === 'inherit') {
     return cleanFamily(getComputedStyle(el).fontFamily);
@@ -181,41 +189,87 @@ async function buildFontFaceStyles(families: Set<string>): Promise<string> {
   for (const family of families) {
     const clean = cleanFamily(family);
     if (!clean) continue;
-    let faces: FontFace[] = [];
-    try {
-      faces = Array.from(document.fonts).filter((f) => cleanFamily(f.family) === clean);
-      if (faces.length === 0) {
-        await document.fonts.load(`16px ${clean}`).catch(() => undefined);
-        faces = Array.from(document.fonts).filter((f) => cleanFamily(f.family) === clean);
+
+    // 1) Preferred source: the actual @font-face rules in the document's
+    // stylesheets. They always expose the font src URL, unlike the FontFace
+    // API (Chromium returns an empty `src` for faces loaded from CSS), which
+    // is why inlining via document.fonts silently skipped every font.
+    const faces = collectSheetFontFaces(clean);
+    if (faces.length === 0) {
+      // 2) Fallback: font-API faces (author-created / browsers that expose src).
+      await document.fonts.load(`16px ${clean}`).catch(() => undefined);
+      for (const face of Array.from(document.fonts)) {
+        if (cleanFamily(face.family) !== clean) continue;
+        const {url, format} = parseFontUrl((face as unknown as {src?: string}).src ?? '');
+        if (url) faces.push({src: url, format, weight: String(face.weight), style: face.style});
       }
-    } catch {
-      faces = [];
     }
+
+    const seen = new Set<string>();
     for (const face of faces) {
-      const src = (face as unknown as {src?: string}).src ?? '';
-      const url = parseFontUrl(src);
-      if (!url) continue;
+      if (seen.has(face.src)) continue;
+      seen.add(face.src);
       let dataUrl: string;
-      try {
-        const res = await fetch(url, {mode: 'cors'});
-        const blob = await res.blob();
-        dataUrl = await blobToDataUrl(blob);
-      } catch {
-        continue;
+      if (face.src.startsWith('data:')) {
+        dataUrl = face.src;
+      } else {
+        try {
+          const res = await fetch(face.src, {mode: 'cors'});
+          const blob = await res.blob();
+          dataUrl = await blobToDataUrl(blob);
+        } catch {
+          continue;
+        }
       }
-      const ext = (url.split('?')[0].split('.')[1] ?? 'woff2').toLowerCase();
-      const format = ext === 'ttf' ? 'truetype' : ext === 'otf' ? 'opentype' : ext;
+      const format = face.format || parseFontUrl(face.src).format;
       styles.push(
-        `@font-face{font-family:'${clean}';src:url(${dataUrl}) format('${format}');font-weight:${face.weight};font-style:${face.style};unicode-range:${face.unicodeRange || 'U+0-10FFFF'};}`,
+        `@font-face{font-family:'${clean}';src:url(${dataUrl}) format('${format}');font-weight:${face.weight};font-style:${face.style};unicode-range:U+0-10FFFF;}`,
       );
     }
   }
-  return styles.join('\n');
+  return Array.from(new Set(styles)).join('\n');
 }
 
-function parseFontUrl(src: string): string | null {
-  const m = src.match(/url\(\s*(['"]?)([^)'"]+)\1\s*\)/);
-  return m ? m[2] : null;
+// Reads the resolved @font-face rules for `family` from every same-origin
+// stylesheet (cross-origin sheets throw and are skipped). Returns the rules'
+// src/format/weight/style so each face can be inlined as a data: URL.
+function collectSheetFontFaces(family: string): {src: string; format: string; weight: string; style: string}[] {
+  const out: {src: string; format: string; weight: string; style: string}[] = [];
+  for (const sheet of Array.from(document.styleSheets ?? [])) {
+    let rules: CSSRuleList | null = null;
+    try {
+      rules = sheet.cssRules;
+    } catch {
+      continue; // cross-origin stylesheet
+    }
+    if (!rules) continue;
+    for (const rule of Array.from(rules)) {
+      if (rule.type !== CSSRule.FONT_FACE_RULE) continue;
+      const style = (rule as CSSFontFaceRule).style;
+      const fam = (style.fontFamily || '').replace(/^['"]|['"]$/g, '').split(',')[0].trim();
+      if (fam !== family) continue;
+      const {url, format} = parseFontUrl(((style as CSSStyleDeclaration & {src?: string}).src ?? '') || '');
+      if (!url) continue;
+      out.push({
+        src: url,
+        format,
+        weight: style.fontWeight || '400',
+        style: style.fontStyle || 'normal',
+      });
+    }
+  }
+  return out;
+}
+
+function parseFontUrl(src: string): {url: string | null; format: string} {
+  const m = src.match(/url\(\s*(['"]?)([^)'"]+)\1\s*\)\s*format\(\s*['"]?([a-z0-9-]+)['"]?\s*\)/);
+  if (m) return {url: m[2], format: m[3]};
+  const m2 = src.match(/url\(\s*(['"]?)([^)'"]+)\1\s*\)/);
+  if (m2) {
+    const ext = (m2[2].split('?')[0].split('.')[1] ?? '').toLowerCase();
+    return {url: m2[2], format: ext === 'ttf' ? 'truetype' : ext === 'otf' ? 'opentype' : ext};
+  }
+  return {url: null, format: ''};
 }
 
 async function inlineImage(img: SVGGraphicsElement): Promise<void> {
