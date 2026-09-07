@@ -215,6 +215,7 @@ async function buildFontFaceStyles(families: Set<string>): Promise<string> {
       } else {
         try {
           const res = await fetch(face.src, {mode: 'cors'});
+          if (!res.ok) continue;
           const blob = await res.blob();
           dataUrl = await blobToDataUrl(blob);
         } catch {
@@ -251,7 +252,7 @@ function collectSheetFontFaces(family: string): {src: string; format: string; we
       const {url, format} = parseFontUrl(((style as CSSStyleDeclaration & {src?: string}).src ?? '') || '');
       if (!url) continue;
       out.push({
-        src: url,
+        src: resolveRelativeUrl(url, sheet.href),
         format,
         weight: style.fontWeight || '400',
         style: style.fontStyle || 'normal',
@@ -259,6 +260,18 @@ function collectSheetFontFaces(family: string): {src: string; format: string; we
     }
   }
   return out;
+}
+
+// Resolves a @font-face src against the stylesheet that declared it. Turbopack
+// (and webpack) emit font URLs relative to the chunk, e.g. url(../media/f.woff2);
+// fetching those as-is resolves against the document URL and 404s in production.
+function resolveRelativeUrl(url: string, base: string | null): string {
+  if (!base) return url;
+  try {
+    return new URL(url, base).href;
+  } catch {
+    return url;
+  }
 }
 
 function parseFontUrl(src: string): {url: string | null; format: string} {
@@ -276,7 +289,8 @@ async function inlineImage(img: SVGGraphicsElement): Promise<void> {
   const href = img.getAttribute('href') || (img as SVGElement).getAttributeNS('http://www.w3.org/1999/xlink', 'href');
   if (!href || href.startsWith('data:')) return;
   try {
-    const res = await fetch(href, {mode: 'cors'});
+    const target = /^(https?:|blob:)/.test(href) ? href : resolveRelativeUrl(href, document.baseURI);
+    const res = await fetch(target, {mode: 'cors'});
     const blob = await res.blob();
     const dataUrl = await blobToDataUrl(blob);
     img.setAttribute('href', dataUrl);
