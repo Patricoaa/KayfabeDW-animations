@@ -339,7 +339,7 @@ export type ChartConfig = {
   };
 
   // Horizontal reference / target lines drawn over the plot.
-  referenceLines?: {value: number; label?: string; color?: string; dash?: boolean}[];
+  referenceLines?: {value: number; label?: string; color?: string; dash?: boolean; width?: number}[];
 
   // Free-form overlays (images/text) drawn above the plot, reusable across all
   // chart types. Prepared with `newChartOverlay()` ids in the builder.

@@ -63,7 +63,7 @@ function referenceLinesSvg(
           if (x < marginAdj.left || x > widthOf(config)) return null;
           return (
             <g key={i}>
-              <line x1={x} y1={marginAdj.top} x2={x} y2={marginAdj.top + plotH} stroke={rl.color ?? '#f59e0b'} strokeWidth={1.2} strokeDasharray={rl.dash ? '5 4' : undefined} />
+              <line x1={x} y1={marginAdj.top} x2={x} y2={marginAdj.top + plotH} stroke={rl.color ?? '#f59e0b'} strokeWidth={rl.width ?? 1.2} strokeDasharray={rl.dash ? '5 4' : undefined} />
               {rl.label && (
                 <text x={x + 4} y={marginAdj.top + 10} fontSize={9} fill={rl.color ?? '#f59e0b'}>{rl.label}</text>
               )}
@@ -74,7 +74,7 @@ function referenceLinesSvg(
         if (y < marginAdj.top || y > marginAdj.top + plotH) return null;
         return (
           <g key={i}>
-            <line x1={marginAdj.left} y1={y} x2={marginAdj.left + plotW} y2={y} stroke={rl.color ?? '#f59e0b'} strokeWidth={1.2} strokeDasharray={rl.dash ? '5 4' : undefined} />
+            <line x1={marginAdj.left} y1={y} x2={marginAdj.left + plotW} y2={y} stroke={rl.color ?? '#f59e0b'} strokeWidth={rl.width ?? 1.2} strokeDasharray={rl.dash ? '5 4' : undefined} />
             {rl.label && (
               <text x={marginAdj.left + plotW - 4} y={y - 4} textAnchor="end" fontSize={9} fill={rl.color ?? '#f59e0b'}>{rl.label}</text>
             )}

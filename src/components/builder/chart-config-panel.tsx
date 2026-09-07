@@ -981,6 +981,21 @@ const setLegendTextOverride = (label: string, value?: string) => {
                   guión
                 </label>
                 <input
+                  type="number"
+                  min={0.5}
+                  max={8}
+                  step={0.1}
+                  value={rl.width ?? 1.2}
+                  onChange={(e) => {
+                    const next = [...(config.referenceLines ?? [])];
+                    const v = Number(e.target.value);
+                    next[i] = {...next[i], width: Number.isFinite(v) && v > 0 ? v : undefined};
+                    update({referenceLines: next});
+                  }}
+                  title="Grosor de la línea (px)"
+                  className="w-12 bg-elevated border border-border-default rounded-lg px-1.5 py-1 text-[10px] text-right font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+                />
+                <input
                   type="text"
                   value={rl.label ?? ''}
                   onChange={(e) => {
