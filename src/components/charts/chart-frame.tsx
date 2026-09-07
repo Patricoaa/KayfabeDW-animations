@@ -331,7 +331,7 @@ export function SvgLegend({
         {items.slice(0, 60).map((it) => {
           const el = (
             <g key={it.label} transform={`translate(${x}, ${y})`}>
-              <rect x={0} y={-sw / 2} width={sw} height={sw} rx={2} fill={it.color} />
+              <rect x={0} y={-sw / 2} width={sw} height={sw} fill={it.color} />
               <text x={sw + 6} y={0} fontSize={fs} fill={color} fontWeight={weight}>{labelOf(it.label, 15)}</text>
             </g>
           );
@@ -360,7 +360,7 @@ export function SvgLegend({
       {items2.map((it) => {
         const el = (
           <g key={it.label} transform={`translate(${x}, ${y})`}>
-            <rect x={0} y={-sw / 2} width={sw} height={sw} rx={2} fill={it.color} />
+            <rect x={0} y={-sw / 2} width={sw} height={sw} fill={it.color} />
             <text x={sw + 6} y={0} fontSize={fs} fill={color} fontWeight={weight}>{labelOf(it.label, 24)}</text>
           </g>
         );
