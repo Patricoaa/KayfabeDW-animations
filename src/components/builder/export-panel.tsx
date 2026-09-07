@@ -113,7 +113,7 @@ export function ExportPanel({
     abortRef.current = controller;
     const items = getItems(remotionProps);
     const frames = duration * fps;
-    setRenderState({status: 'rendering', phase: renderPhaseLabel(frames, items), progress: 0.05});
+    setRenderState({status: 'rendering', phase: renderPhaseLabel(frames, items, exportSize.height > exportSize.width), progress: 0.05});
     try {
       const res = await fetch('/api/render', {
         method: 'POST',

@@ -162,7 +162,9 @@ export function AnimationPreview({
     abortRef.current = controller;
     const items = getItems(remotionProps);
     const frames = duration * fps;
-    setRenderState({status: 'rendering', phase: renderPhaseLabel(frames, items), progress: 0.05});
+    const effW = width ?? entry?.meta.width ?? 1920;
+    const effH = height ?? entry?.meta.height ?? 1080;
+    setRenderState({status: 'rendering', phase: renderPhaseLabel(frames, items, effH > effW), progress: 0.05});
     try {
       const res = await fetch('/api/render', {
         method: 'POST',
@@ -171,8 +173,8 @@ export function AnimationPreview({
           compositionId,
           inputProps: remotionProps,
           durationInFrames: frames,
-          width: width ?? entry?.meta.width ?? 1920,
-          height: height ?? entry?.meta.height ?? 1080,
+          width: effW,
+          height: effH,
           fps,
         }),
         signal: controller.signal,

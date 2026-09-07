@@ -28,13 +28,12 @@ interface RenderBody {
 const GIF_MAX_W = 1080;
 const GIF_FPS = 12;
 
-// Serverless MP4 profile: on Hobby the function cap is 300s, so heavy renders
-// (more than ~6s of frames or 1000+ items) keep the requested viewport (same
-// layout as the preview) and downscale only the encoded output via `scale`.
-// Orientation-aware caps give square-ish quality: 1280x720 for landscape,
-// 720x1280 for portrait. Matches the client thresholds in src/lib/render-export.ts.
+// Serverless MP4 profile: on Hobby the function cap is 300s, so heavy LANDSCAPE
+// renders keep the requested viewport and downscale only the encoded output via
+// `scale` to fit the budget. Vertical/portrait renders export at full
+// resolution (the requested size, e.g. 1080x1920) — closer to the preview,
+// at the cost of a higher 504 risk on long/heavy videos.
 const RENDER_PROFILE_LANDSCAPE = {w: 1280, h: 720};
-const RENDER_PROFILE_PORTRAIT = {w: 720, h: 1280};
 const RENDER_PROFILE_FRAMES = 180;
 const RENDER_PROFILE_MAX_ITEMS = 1000;
 
@@ -188,10 +187,14 @@ export async function POST(req: Request) {
       scale = maxDim > GIF_MAX_W ? GIF_MAX_W / maxDim : 1;
       console.log(`[render] GIF profile: everyNthFrame=${everyNthFrame} (→${(composition.fps / everyNthFrame).toFixed(1)}fps), scale=${scale.toFixed(3)}, ${Math.round(composition.width * scale)}x${Math.round(composition.height * scale)}`);
     } else if (serverlessProfile) {
-      const isPortrait = composition.height > composition.width;
-      const profile = isPortrait ? RENDER_PROFILE_PORTRAIT : RENDER_PROFILE_LANDSCAPE;
-      scale = Math.min(profile.w / composition.width, profile.h / composition.height);
-      if (scale >= 1) scale = 1;
+      // Portrait/vertical outputs stay at full resolution (no downscale).
+      if (composition.height <= composition.width) {
+        scale = Math.min(
+          RENDER_PROFILE_LANDSCAPE.w / composition.width,
+          RENDER_PROFILE_LANDSCAPE.h / composition.height,
+        );
+        if (scale >= 1) scale = 1;
+      }
       console.log(
         `[render] Serverless profile: layout ${composition.width}x${composition.height} → encode ${Math.round(composition.width * scale)}x${Math.round(composition.height * scale)} (${composition.durationInFrames} frames, ${countRenderItems(body.inputProps)} items)`,
       );

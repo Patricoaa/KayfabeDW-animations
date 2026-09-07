@@ -29,7 +29,12 @@ export function usesServerlessProfile(durationInFrames: number, items: unknown[]
   return durationInFrames > RENDER_PROFILE_FRAMES || items.length > RENDER_PROFILE_MAX_ITEMS;
 }
 
-export function renderPhaseLabel(durationInFrames: number, items: unknown[]): string {
+export function renderPhaseLabel(
+  durationInFrames: number,
+  items: unknown[],
+  isPortrait: boolean,
+): string {
+  if (isPortrait) return 'Rendering video...';
   return usesServerlessProfile(durationInFrames, items)
     ? 'Rendering video... (perfil serverless — calidad reducida)'
     : 'Rendering video...';
