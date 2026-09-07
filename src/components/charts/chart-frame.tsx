@@ -42,22 +42,144 @@ export function nextSvgId(prefix: string): string {
   return `${prefix}-${frameNs++}`;
 }
 
-// Canvas: background and border as a full-canvas rect so exports include the
-// "frame" (shared by every chart type).
+// Canvas: background layer + border as the first painted elements of the SVG
+// (shared by every chart type). Background lives inside the SVG so exports
+// (SVG / PNG / JPG raster) inherit it exactly as the preview shows it.
 export function frameRect(config: ChartConfig) {
   const w = config.width ?? 600;
   const h = config.height ?? 380;
   return (
-    <rect
-      x={0}
-      y={0}
-      width={w}
-      height={h}
-      rx={config.canvasBorderRadius ?? 0}
-      fill="none"
-      stroke={(config.canvasBorderWidth ?? 0) > 0 ? (config.canvasBorderColor ?? '#333') : 'none'}
-      strokeWidth={config.canvasBorderWidth ?? 0}
-    />
+    <g>
+      <CanvasBackground config={config} w={w} h={h} />
+      <rect
+        x={0}
+        y={0}
+        width={w}
+        height={h}
+        rx={config.canvasBorderRadius ?? 0}
+        fill="none"
+        stroke={(config.canvasBorderWidth ?? 0) > 0 ? (config.canvasBorderColor ?? '#333') : 'none'}
+        strokeWidth={config.canvasBorderWidth ?? 0}
+      />
+    </g>
+  );
+}
+
+// Module-level counter keeps background gradient/pattern/filter ids unique
+// across charts on the same page (the SVG rasterizer needs local refs).
+let bgNs = 0;
+
+// Angle (deg, CSS `linear-gradient` convention) → gradient endpoint vector.
+// 90° = left→right, 180° = top→bottom, 135° = top-left→bottom-right.
+function gradientVec(angle: number): {x1: number; y1: number; x2: number; y2: number} {
+  const a = ((angle - 90) * Math.PI) / 180;
+  return {x1: 0.5 - Math.cos(a) * 0.5, y1: 0.5 - Math.sin(a) * 0.5, x2: 0.5 + Math.cos(a) * 0.5, y2: 0.5 + Math.sin(a) * 0.5};
+}
+
+// Full-canvas background drawn below everything: solid color, pattern preset,
+// gradient or loaded image. Painted with SVG primitives inside the SVG element
+// so the static export (which serializes/rasterizes that SVG) matches the
+// live preview pixel-for-pixel, including fonts and external images already
+// handled by export-static's font embedding + image inlining.
+export function CanvasBackground({config, w, h}: {config: ChartConfig; w: number; h: number}) {
+  const type = config.backgroundType ?? 'none';
+  if (type === 'none') return null;
+  const opacity = config.backgroundOpacity ?? 1;
+  const rx = config.canvasBorderRadius ?? 0;
+  const uid = `cbg-${bgNs++}`;
+
+  if (type === 'color') {
+    const fill = config.background ?? '#0a0a0a';
+    return <rect x={0} y={0} width={w} height={h} rx={rx} fill={fill} opacity={opacity} />;
+  }
+
+  if (type === 'gradient') {
+    const a = gradientVec(config.backgroundAngle ?? 135);
+    return (
+      <g opacity={opacity}>
+        <defs>
+          <linearGradient id={uid} x1={`${a.x1}`} y1={`${a.y1}`} x2={`${a.x2}`} y2={`${a.y2}`}>
+            <stop offset="0%" stopColor={config.background ?? '#0a0a0a'} />
+            <stop offset="100%" stopColor={config.backgroundSecondary ?? '#1f2937'} />
+          </linearGradient>
+        </defs>
+        <rect x={0} y={0} width={w} height={h} rx={rx} fill={`url(#${uid})`} />
+      </g>
+    );
+  }
+
+  if (type === 'image') {
+    const base = config.background ?? '#0a0a0a';
+    const fit = config.backgroundFit ?? 'cover';
+    // SVG preserveAspectRatio equivalents of the CSS background-size values.
+    const par =
+      fit === 'contain' ? 'xMidYMid meet' : fit === 'fill' ? 'none' : 'xMidYMid slice';
+    const blur = config.backgroundBlur ?? 0;
+    return (
+      <g opacity={opacity}>
+        <defs>
+          {blur > 0 && (
+            <filter id={`${uid}-blur`} x="-5%" y="-5%" width="110%" height="110%">
+              <feGaussianBlur stdDeviation={blur} />
+            </filter>
+          )}
+          {rx > 0 && (
+            <clipPath id={`${uid}-clip`}>
+              <rect x={0} y={0} width={w} height={h} rx={rx} />
+            </clipPath>
+          )}
+        </defs>
+        <rect x={0} y={0} width={w} height={h} fill={base} />
+        {config.backgroundImage && (
+          <image
+            href={config.backgroundImage}
+            x={0}
+            y={0}
+            width={w}
+            height={h}
+            preserveAspectRatio={par}
+            filter={blur > 0 ? `url(#${uid}-blur)` : undefined}
+            clipPath={rx > 0 ? `url(#${uid}-clip)` : undefined}
+          />
+        )}
+      </g>
+    );
+  }
+
+  // pattern
+  const fg = config.background ?? '#3b82f6';
+  const pattern = config.backgroundPattern ?? 'dots';
+  const angle = config.backgroundAngle ?? 45;
+  const size = 26;
+  const cx = size / 2;
+  const cy = size / 2;
+  return (
+    <g opacity={opacity}>
+      <defs>
+        <pattern id={uid} width={size} height={size} patternUnits="userSpaceOnUse">
+          <rect width={size} height={size} fill="#000" />
+          {pattern === 'dots' && <circle cx={cx} cy={cy} r={4} fill={fg} />}
+          {pattern === 'grid' && (
+            <>
+              <line x1={0} y1={0} x2={size} y2={0} stroke={fg} strokeWidth={1} />
+              <line x1={0} y1={0} x2={0} y2={size} stroke={fg} strokeWidth={1} />
+            </>
+          )}
+          {pattern === 'checkers' && (
+            <>
+              <rect x={0} y={0} width={cx} height={cx} fill={fg} />
+              <rect x={cx} y={cx} width={cx} height={cx} fill={fg} />
+            </>
+          )}
+          {pattern === 'stripes' && (
+            <g transform={`rotate(${angle} ${cx} ${cy})`}>
+              <rect x={-size} y={4} width={size * 3} height={10} fill={fg} />
+            </g>
+          )}
+        </pattern>
+      </defs>
+      <rect x={0} y={0} width={w} height={h} rx={rx} fill={`url(#${uid})`} />
+    </g>
   );
 }
 

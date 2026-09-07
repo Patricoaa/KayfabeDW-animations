@@ -1082,6 +1082,86 @@ const setLegendTextOverride = (label: string, value?: string) => {
       {/* ============ LIENZO ============ */}
       <Section title="Lienzo">
         <div>
+          <label className="text-sm font-medium mb-1 block">Fondo del lienzo</label>
+          <div className="flex gap-1 flex-wrap">
+            {((['none', 'color', 'pattern', 'gradient', 'image'] as const)).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => update({backgroundType: t})}
+                className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                  (config.backgroundType ?? 'none') === t
+                    ? 'bg-amber-500 text-black'
+                    : 'bg-elevated text-secondary hover:bg-card-hover'
+                }`}
+              >
+                {({none: 'Ninguno', color: 'Color', pattern: 'Patrón', gradient: 'Degradado', image: 'Imagen'} as Record<string, string>)[t]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {(config.backgroundType ?? 'none') === 'color' && (
+          <ColorInput label="Color de fondo" value={config.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
+        )}
+
+        {(config.backgroundType ?? 'none') === 'pattern' && (
+          <>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Patrón</label>
+              <select
+                value={config.backgroundPattern ?? 'dots'}
+                onChange={(e) => update({backgroundPattern: e.target.value as NonNullable<ChartConfig['backgroundPattern']>})}
+                className="w-full bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+              >
+                <option value="dots">Puntos</option>
+                <option value="stripes">Rayas</option>
+                <option value="grid">Cuadrícula</option>
+                <option value="checkers">Cuadros</option>
+              </select>
+            </div>
+            {config.backgroundPattern === 'stripes' && (
+              <SliderNumberInput label="Ángulo (grados)" value={config.backgroundAngle ?? 45} min={0} max={360} step={15} onChange={(v) => update({backgroundAngle: v || undefined})} />
+            )}
+            <ColorInput label="Color del patrón" value={config.background ?? '#3b82f6'} onChange={(v) => update({background: v || undefined})} />
+            <SliderNumberInput label="Opacidad (%)" value={Math.round((config.backgroundOpacity ?? 1) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundOpacity: v ? v / 100 : undefined})} />
+          </>
+        )}
+
+        {(config.backgroundType ?? 'none') === 'gradient' && (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <ColorInput label="Color inicial" value={config.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
+              <ColorInput label="Color final" value={config.backgroundSecondary ?? '#1f2937'} onChange={(v) => update({backgroundSecondary: v || undefined})} />
+            </div>
+            <SliderNumberInput label="Ángulo (grados)" value={config.backgroundAngle ?? 135} min={0} max={360} step={15} onChange={(v) => update({backgroundAngle: v || undefined})} />
+            <SliderNumberInput label="Opacidad (%)" value={Math.round((config.backgroundOpacity ?? 1) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundOpacity: v ? v / 100 : undefined})} />
+          </>
+        )}
+
+        {(config.backgroundType ?? 'none') === 'image' && (
+          <>
+            <FileUploadInput label="Imagen de fondo" value={config.backgroundImage} onLoad={(dataUrl) => update({backgroundImage: dataUrl})} onClear={() => update({backgroundImage: undefined})} />
+            <div>
+              <label className="text-sm font-medium mb-1 block">Ajuste</label>
+              <select
+                value={config.backgroundFit ?? 'cover'}
+                onChange={(e) => update({backgroundFit: e.target.value as NonNullable<ChartConfig['backgroundFit']>})}
+                className="w-full bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+              >
+                <option value="cover">Cubrir</option>
+                <option value="contain">Contener</option>
+                <option value="fill">Rellenar</option>
+              </select>
+            </div>
+            <ColorInput label="Color base (debajo)" value={config.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
+            <SliderNumberInput label="Opacidad (%)" value={Math.round((config.backgroundOpacity ?? 1) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundOpacity: v ? v / 100 : undefined})} />
+          </>
+        )}
+
+        <SliderNumberInput label="Desenfoque del fondo (blur px)" value={config.backgroundBlur ?? 0} min={0} max={30} step={1} onChange={(v) => update({backgroundBlur: v || undefined})} />
+
+        <div>
           <label className="text-sm font-medium mb-1 block">Tamaño del lienzo</label>
           <select
             value={presetKey()}
@@ -1403,6 +1483,39 @@ function NumberInput({label, value, min, max, step = 1, onChange}: {label: strin
         onChange={(e) => onChange(e.target.value ? Number(e.target.value) : undefined)}
         className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
       />
+    </div>
+  );
+}
+
+function FileUploadInput({label, value, onLoad, onClear}: {label: string; value?: string; onLoad: (dataUrl: string) => void; onClear: () => void}) {
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  return (
+    <div>
+      <label className="text-sm font-medium mb-1 block">{label}</label>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (typeof reader.result === 'string') onLoad(reader.result);
+          };
+          reader.readAsDataURL(file);
+          e.target.value = '';
+        }}
+        className="w-full text-sm text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-elevated file:px-3 file:py-2 file:text-sm file:font-medium"
+      />
+      {value && (
+        <div className="flex items-center gap-2 mt-1">
+          <img src={value} alt="fondo" className="h-10 w-16 object-cover rounded border border-border-default" />
+          <button type="button" onClick={() => {onClear(); if (inputRef.current) inputRef.current.value = '';}} className="text-[10px] text-muted hover:text-red-500">
+            Quitar imagen
+          </button>
+        </div>
+      )}
     </div>
   );
 }

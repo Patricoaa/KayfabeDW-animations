@@ -306,6 +306,21 @@ export type ChartConfig = {
   // single-series lines/areas.
   colorOverrides?: Record<string, string>;
 
+  // Canvas background (drawn inside the SVG so it survives export). Same
+  // model as the animations' CommonCanvasConfig: solid color, pattern preset,
+  // gradient or loaded image. `none` keeps the canvas transparent (legacy
+  // default). `background` is reused depending on type (solid / pattern
+  // foreground / gradient start / base color under an image).
+  backgroundType?: 'none' | 'color' | 'pattern' | 'gradient' | 'image';
+  background?: string;
+  backgroundSecondary?: string;
+  backgroundImage?: string;        // dataURL / remote URL (image type)
+  backgroundPattern?: 'dots' | 'stripes' | 'grid' | 'checkers';
+  backgroundAngle?: number;        // gradient/pattern angle (deg)
+  backgroundOpacity?: number;      // opacity of the background layer (0-1)
+  backgroundBlur?: number;         // blur (px) applied to the background
+  backgroundFit?: 'cover' | 'contain' | 'fill'; // how an image is fit
+
   // Canvas frame (drawn inside the SVG so it survives export).
   canvasBackground?: string;
   canvasBorderColor?: string;
@@ -375,6 +390,12 @@ export const DEFAULT_CHART_CONFIG: ChartConfig = {
   categoryLabelsVisible: true,
   canvasBorderRadius: 0,
   canvasBorderWidth: 0,
+  backgroundType: 'none',
+  backgroundOpacity: 1,
+  backgroundAngle: 135,
+  backgroundPattern: 'dots',
+  backgroundFit: 'cover',
+  backgroundBlur: 0,
   spacing: {
     headerPadding: 0,
     legendSpacing: 0,
@@ -419,6 +440,9 @@ export function applyChartDefaults(config: Partial<ChartConfig>): ChartConfig {
   //      was removed) and exports embed fonts + images losslessly. The
   //      `canvasBackground` field is kept so old saved configs load cleanly but
   //      is no longer rendered.
+  // V23: canvas background editable again via `backgroundType` (none/color/
+  //      pattern/gradient/image). Additive — old configs keep `none` (stay
+  //      transparent) and need no remap.
   const remapped = {...DEFAULT_CHART_CONFIG, ...clean};
   return remapped;
 }
