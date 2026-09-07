@@ -82,6 +82,8 @@ export type TimelineRaceProps = {
   backgroundOpacity?: number;
   backgroundBlur?: number;
   backgroundFit?: 'cover' | 'contain' | 'fill';
+  backgroundAnim?: 'none' | 'mirror';
+  backgroundAnimSpeed?: number;
   showYAxis?: boolean;
   yAxisColor?: string;
   yAxisWidth?: number;
@@ -150,6 +152,8 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   backgroundOpacity = 1,
   backgroundBlur = 0,
   backgroundFit = 'cover',
+  backgroundAnim = 'none',
+  backgroundAnimSpeed = 2,
   showYAxis = false,
   yAxisColor = '#334155',
   yAxisWidth = 2,
@@ -215,6 +219,8 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
       backgroundOpacity={backgroundOpacity}
       backgroundBlur={backgroundBlur}
       backgroundFit={backgroundFit}
+      backgroundAnim={backgroundAnim}
+      backgroundAnimSpeed={backgroundAnimSpeed}
     />
   );
 

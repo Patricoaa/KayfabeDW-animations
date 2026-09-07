@@ -214,6 +214,8 @@ function commonPropsOf(t: CommonAnimationConfig | undefined): Record<string, unk
     backgroundOpacity: t?.backgroundOpacity,
     backgroundBlur: t?.backgroundBlur,
     backgroundFit: t?.backgroundFit,
+    backgroundAnim: t?.backgroundAnim,
+    backgroundAnimSpeed: t?.backgroundAnimSpeed,
   };
 }
 

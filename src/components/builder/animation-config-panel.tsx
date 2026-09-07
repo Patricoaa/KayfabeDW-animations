@@ -207,6 +207,18 @@ function CanvasSection({value, update}: {value: CommonCanvasConfig; update: (pat
             ]}
             onChange={(v) => update({backgroundFit: v as CommonCanvasConfig['backgroundFit']})}
           />
+          <SelectControl
+            label="Animación"
+            value={value.backgroundAnim ?? 'none'}
+            options={[
+              {value: 'none', label: 'Sin animación'},
+              {value: 'mirror', label: 'Espejo (loop)'},
+            ]}
+            onChange={(v) => update({backgroundAnim: v as CommonCanvasConfig['backgroundAnim']})}
+          />
+          {(value.backgroundAnim ?? 'none') === 'mirror' && (
+            <SliderNumberInput label="Velocidad (seg/ciclo)" value={Math.round((value.backgroundAnimSpeed ?? 2) * 2) / 2} min={0.5} max={8} step={0.5} onChange={(v) => update({backgroundAnimSpeed: v || undefined})} />
+          )}
           <ColorInput label="Color base (debajo)" value={value.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
           <SliderNumberInput label="Opacidad (%)" value={Math.round((value.backgroundOpacity ?? 1) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundOpacity: v ? v / 100 : undefined})} />
         </>

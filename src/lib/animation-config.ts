@@ -73,6 +73,8 @@ export type CommonCanvasConfig = {
   backgroundOpacity?: number;     // opacity of the background layer (0-1)
   backgroundBlur?: number;        // blur (px) applied to the background
   backgroundFit?: 'cover' | 'contain' | 'fill'; // how an image is fit
+  backgroundAnim?: 'none' | 'mirror'; // image-only background animation
+  backgroundAnimSpeed?: number;       // mirror swing: seconds per full cycle
 };
 
 // Everything a template inherits from the shared config. Kept flat on purpose

@@ -98,6 +98,8 @@ export type RankingProps = {
   backgroundOpacity?: number;
   backgroundBlur?: number;
   backgroundFit?: 'cover' | 'contain' | 'fill';
+  backgroundAnim?: 'none' | 'mirror';
+  backgroundAnimSpeed?: number;
 };
 
 export const Ranking: React.FC<RankingProps> = ({
@@ -166,6 +168,8 @@ export const Ranking: React.FC<RankingProps> = ({
   backgroundOpacity = 1,
   backgroundBlur = 0,
   backgroundFit = 'cover',
+  backgroundAnim = 'none',
+  backgroundAnimSpeed = 2,
 }) => {
   const frame = useCurrentFrame();
   const {fps, durationInFrames, width: W, height: H} = useVideoConfig();
@@ -364,18 +368,14 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
     const hasAvatar = !!item.image;
     const laneLabel = `${rankPrefix}${index + 1}`;
 
-    // Table "chase" entry for horizontal directions: instead of sliding the whole
-    // row as a rigid block (which made the value peek in first — LCD-ticker
-    // look), each element launches from beyond the canvas edge and locks in
-    // order rank → avatar → label → value (left entry, mirrored for right).
-    // Each element is released the moment the previous one locks and travels at
-    // 1.5× the previous element's speed (V, 1.5V, 2.25V, 3.375V) — an
-    // accelerating catch-up cascade. Releasing all of them at once with scaled
-    // speeds would let the faster, farther elements overtake the first,
-    // inverting the order; the chained release keeps both the order and the
-    // speed-up. Speeds are derived so the last element locks exactly at the end
-    // of the row window. Waiting elements stay parked off-screen; each one
-    // brightens as it nears its lane so the chase reads as a clean burst.
+    // Table entry for horizontal directions, synchronized arrival: instead of
+    // sliding the whole row as a rigid block (which made the value peek in first
+    // — LCD-ticker look), every element launches from beyond the canvas edge and
+    // travels to its lane at a speed matched to its distance, so they ALL reach
+    // their destination in the same instant (rank → avatar → label → value land
+    // together, left entry, mirrored for right). The burst reads as a flock
+    // landing exactly at the end of the row window. Each element brightens over
+    // the final stretch so the synchronized arrival pops.
     const sweepS = Math.max(rowsInnerW, 1);
     const sweepLead = sweepS + PAD_L + Math.max(RANK_W, GAP_H * 2, 96);
     const sweepFog = 120;
@@ -385,24 +385,6 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
       bar: (showRank ? RANK_W + GAP_H : 0) + (avatarVisible && hasAvatar ? AVATAR + GAP_H : 0),
       value: sweepS,
     };
-    const cascade = (dir: 'left' | 'right') => {
-      const order: RowEntryElement[] = dir === 'left' ? ['rank', 'avatar', 'bar', 'value'] : ['value', 'bar', 'avatar', 'rank'];
-      const refPos = (el: RowEntryElement) => seg[el];
-      const dist = (el: RowEntryElement) => (dir === 'left' ? sweepLead + refPos(el) : sweepS + sweepLead - refPos(el));
-      const d0 = dist(order[0]);
-      const factor = order.reduce((s, el, i) => s + dist(el) / (d0 * Math.pow(1.5, i)), 0);
-      const firstDur = 1 / factor;
-      const start: Record<RowEntryElement, number> = {rank: 0, avatar: 0, bar: 0, value: 0};
-      const dur: Record<RowEntryElement, number> = {rank: firstDur, avatar: firstDur, bar: firstDur, value: firstDur};
-      let t = 0;
-      order.forEach((el, i) => {
-        start[el] = t;
-        dur[el] = (firstDur * dist(el)) / d0 / Math.pow(1.5, i);
-        t += dur[el];
-      });
-      return {start, dur};
-    };
-    const CAS = {left: cascade('left'), right: cascade('right')};
     const tableEntry = (element: RowEntryElement, frameProg: number) => {
       const custom = rowEntryMode === 'custom';
       const dir = custom ? (rowEntryDirs?.[element] ?? rowEntryDir ?? 'bottom') : (rowEntryDir ?? 'bottom');
@@ -411,10 +393,8 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
       const pp = delayFrac > 0 && delayFrac < 1 ? (frameProg - delayFrac) / (1 - delayFrac) : frameProg;
       const e = Math.max(0, Math.min(pp, 1));
       const refPos = seg[element];
-      const {start, dur} = CAS[dir];
-      const local = dur[element] > 0 ? Math.max(0, Math.min((e - start[element]) / dur[element], 1)) : 1;
       const X_OFF = dir === 'left' ? -sweepLead : sweepS + sweepLead;
-      const x = X_OFF + (refPos - X_OFF) * local;
+      const x = X_OFF + (refPos - X_OFF) * e;
       const t = x - refPos;
       const remaining = Math.abs(refPos - x);
       const opacity = Math.max(0.12, Math.min((sweepFog - remaining) / sweepFog, 1));
@@ -463,47 +443,20 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
   };
 
   // ---- Global right-side frame ----
-  // The image swaps to a position the moment that position's entity — the
-  // label, second element from the left — finishes its entry trajectory, not
-  // when the rank or the whole row lands: the image cuts as the entity locks
-  // and the datum is still chasing in, keeping the swap tied to the row's
-  // actual motion. Each image is therefore on screen for exactly one reveal
-  // window: it fades in as the entity locks, then its one-way pan (per-position
-  // direction) eases smoothly across the following reveal into the focus
-  // placement. The last revealed position spreads its pan across the final hold
-  // so the video ends settled at the focus crop.
-  const housingDir = rowEntryMode === 'custom'
-    ? (rowEntryDirs?.bar ?? rowEntryDir ?? 'bottom')
-    : (rowEntryDir ?? 'bottom');
-  let entityLockFrac = 1; // vertical: elements land together at the end
-  if (housingDir === 'left' || housingDir === 'right') {
-    const sweepS = Math.max(rowsInnerW, 1);
-    const sweepLead = sweepS + PAD_L + Math.max(RANK_W, GAP_H * 2, 96);
-    const segH: Record<RowEntryElement, number> = {
-      rank: 0,
-      avatar: showRank ? RANK_W + GAP_H : 0,
-      bar: (showRank ? RANK_W + GAP_H : 0) + (avatarVisible ? AVATAR + GAP_H : 0),
-      value: sweepS,
-    };
-    const orderH: RowEntryElement[] = housingDir === 'left' ? ['rank', 'avatar', 'bar', 'value'] : ['value', 'bar', 'avatar', 'rank'];
-    const distH = (el: RowEntryElement) =>
-      housingDir === 'left' ? sweepLead + segH[el] : sweepS + sweepLead - segH[el];
-    const d0 = distH(orderH[0]);
-    const factor = orderH.reduce((s, el, i) => s + distH(el) / (d0 * Math.pow(1.5, i)), 0);
-    const firstDur = 1 / factor;
-    let cursor = 0;
-    for (let i = 0; i < orderH.length; i++) {
-      const dur = (firstDur * distH(orderH[i])) / d0 / Math.pow(1.5, i);
-      if (orderH[i] === 'bar') entityLockFrac = cursor + dur;
-      cursor += dur;
-    }
-  }
+  // The image swaps to a position when that position's row finishes its entry
+  // trajectory — with the synchronized arrival every element (entity included)
+  // lands together exactly at the end of the reveal window, so the cut rides
+  // the actual landing moment. Each image is therefore on screen for exactly
+  // one reveal window: it fades in as its row lands, then its one-way pan
+  // (per-position direction) eases smoothly across the following reveal into
+  // the focus placement. The last revealed position spreads its pan across the
+  // final hold so the video ends settled at the focus crop.
   let activeLabel: string | undefined;
   let activeIndex = -1;
   let activeStart = -Infinity;
   if (HAS_FRAME) {
     ranked.forEach((r, i) => {
-      const st = EASE + (sequencePos(i) + entityLockFrac) * step;
+      const st = EASE + (sequencePos(i) + 1) * step;
       if (st <= frame && st >= activeStart) {
         activeLabel = r.label;
         activeIndex = i;
@@ -604,6 +557,8 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
         backgroundOpacity={backgroundOpacity}
         backgroundBlur={backgroundBlur}
         backgroundFit={backgroundFit}
+        backgroundAnim={backgroundAnim}
+        backgroundAnimSpeed={backgroundAnimSpeed}
       />
       <Header
         title={title}
