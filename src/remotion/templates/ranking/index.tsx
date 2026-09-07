@@ -443,20 +443,24 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
   };
 
   // ---- Global right-side frame ----
-  // The image swaps to a position when that position's row finishes its entry
-  // trajectory — with the synchronized arrival every element (entity included)
-  // lands together exactly at the end of the reveal window, so the cut rides
-  // the actual landing moment. Each image is therefore on screen for exactly
-  // one reveal window: it fades in as its row lands, then its one-way pan
-  // (per-position direction) eases smoothly across the following reveal into
-  // the focus placement. The last revealed position spreads its pan across the
-  // final hold so the video ends settled at the focus crop.
+  // The image swaps to a position when its row is halfway through its reveal
+  // trajectory (elements mid-flight to their seats), so the cut rides the row's
+  // motion instead of the landing. Each image is on screen for exactly one
+  // reveal window (swap→ next swap). The pan is anchored to a LONGER timeline
+  // than the visible window: it begins PAN_LEAD frames before the image
+  // appears and ends PAN_TAIL frames after it is replaced, so at every swap the
+  // outgoing pan is still underway and the incoming one is already moving —
+  // the viewer never catches the pan stopping. The last revealed position
+  // reaches the focus crop exactly on the final frame.
+  const PAN_LEAD = 6;
+  const PAN_TAIL = 6;
+  const swapOf = (i: number) => EASE + (sequencePos(i) + 0.5) * step;
   let activeLabel: string | undefined;
   let activeIndex = -1;
   let activeStart = -Infinity;
   if (HAS_FRAME) {
     ranked.forEach((r, i) => {
-      const st = EASE + (sequencePos(i) + 1) * step;
+      const st = swapOf(i);
       if (st <= frame && st >= activeStart) {
         activeLabel = r.label;
         activeIndex = i;
@@ -467,14 +471,22 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
   const activeItem = activeLabel !== undefined && activeIndex >= 0 ? ranked[activeIndex] : undefined;
   const lastRevealIndex = revealDirection === 'asc' ? n - 1 : 0;
   const isLastReveal = activeIndex === lastRevealIndex;
-  const panDenom = isLastReveal ? Math.max(step + holdFrames, 1) : Math.max(step, 1);
-  const rowProg =
-    activeLabel === undefined
-      ? 0
-      : Math.max(0, Math.min((frame - activeStart) / panDenom, 1));
-  const panEased = Easing.inOut(Easing.cubic)(rowProg);
-  const panProg = rowImagePanDirs?.[activeItem?.label ?? ''] === 'rtl' ? 1 - panEased : panEased;
-  const framePan = activeItem && rowImagePan !== false ? panProg : 0;
+  const nextIdx = isLastReveal ? activeIndex : Math.max(0, Math.min(n - 1, activeIndex + (revealDirection === 'asc' ? 1 : -1)));
+  const ps = swapOf(activeIndex) - PAN_LEAD;
+  const pe = isLastReveal
+    ? Math.max(durationInFrames, swapOf(activeIndex) + step)
+    : swapOf(nextIdx) + PAN_TAIL;
+  const raw01 = activeLabel === undefined ? 0 : Math.max(0, Math.min((frame - ps) / Math.max(pe - ps, 1), 1));
+  // Keep the visible window inside the steep middle of the in/out ease: raw is
+  // clamped into the central band [0.25, 0.75] so the eased value is never
+  // stuck on the flat tails — the pan is always moving across the swap.
+  const BAND_LO = 0.25;
+  const BAND_HI = 0.75;
+  const rawBand = BAND_LO + (BAND_HI - BAND_LO) * raw01;
+  const ease0 = Easing.inOut(Easing.cubic)(BAND_LO);
+  const panEased = (Easing.inOut(Easing.cubic)(Math.min(Math.max(rawBand, BAND_LO), BAND_HI)) - ease0) / (Easing.inOut(Easing.cubic)(BAND_HI) - ease0);
+  const panDir = rowImagePanDirs?.[activeItem?.label ?? ''] === 'rtl' ? 1 - panEased : panEased;
+  const framePan = activeItem && rowImagePan !== false ? panDir : 0;
 
   // Cover-crop geometry for the frame. The image always fills the frame box
   // (`objectFit: 'cover'`, so the browser auto-rescales to match width and
