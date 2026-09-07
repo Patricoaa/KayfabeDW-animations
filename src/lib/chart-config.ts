@@ -320,6 +320,8 @@ export type ChartConfig = {
   backgroundImage?: string;        // dataURL / remote URL (image type)
   backgroundPattern?: 'dots' | 'stripes' | 'grid' | 'checkers';
   backgroundAngle?: number;        // gradient/pattern angle (deg)
+  backgroundGradientDist?: number; // gradient: fraction of the path (0-1) that keeps
+                                   // the initial color before fading to the final
   backgroundOpacity?: number;      // opacity of the background layer (0-1)
   backgroundBlur?: number;         // blur (px) applied to the background
   backgroundFit?: 'cover' | 'contain' | 'fill'; // how an image is fit
@@ -351,7 +353,7 @@ export type ChartConfig = {
   configVersion?: number;
 };
 
-export const CHART_CONFIG_VERSION = 22;
+export const CHART_CONFIG_VERSION = 23;
 
 export const DEFAULT_CHART_CONFIG: ChartConfig = {
   type: 'bar',

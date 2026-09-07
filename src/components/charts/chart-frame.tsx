@@ -95,12 +95,19 @@ export function CanvasBackground({config, w, h}: {config: ChartConfig; w: number
 
   if (type === 'gradient') {
     const a = gradientVec(config.backgroundAngle ?? 135);
+    // Distribution: how much of the gradient path keeps the initial color
+    // before fading into the final one. 0 = single transition (legacy), up to
+    // ~1 = initial color rules almost the whole canvas.
+    const dist = Math.min(0.98, Math.max(0, config.backgroundGradientDist ?? 0));
+    const start = config.background ?? '#0a0a0a';
+    const end = config.backgroundSecondary ?? '#1f2937';
     return (
       <g opacity={opacity}>
         <defs>
           <linearGradient id={uid} x1={`${a.x1}`} y1={`${a.y1}`} x2={`${a.x2}`} y2={`${a.y2}`}>
-            <stop offset="0%" stopColor={config.background ?? '#0a0a0a'} />
-            <stop offset="100%" stopColor={config.backgroundSecondary ?? '#1f2937'} />
+            <stop offset="0%" stopColor={start} />
+            {dist > 0 && <stop offset={`${dist * 100}%`} stopColor={start} />}
+            <stop offset="100%" stopColor={end} />
           </linearGradient>
         </defs>
         <rect x={0} y={0} width={w} height={h} rx={rx} fill={`url(#${uid})`} />

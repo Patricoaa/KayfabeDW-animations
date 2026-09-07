@@ -9,6 +9,9 @@
  *  - Resolve every `font-family` (var(--font-*) / inherit) to the concrete family
  *    the live document is actually using, and embed those fonts as base64 @font-face
  *    rules so the downloaded SVG / rasterized PNG keep the exact same fonts.
+ *  - Copy the live computed `font-weight`, `font-style` and (when not already
+ *    an attribute) `font-size` onto every exported <text>, so typography set via
+ *    CSS or group inheritance survives the XML clone exactly.
  *  - Inline any external avatar <image> as a data: URI so images survive both the
  *    standalone SVG and the PNG rasterization.
  */
@@ -124,6 +127,16 @@ async function prepareSvgForExport(svg: SVGSVGElement): Promise<string> {
     const resolved = resolveFontFamily(originals[i].getAttribute('font-family') ?? '', originals[i]);
     clones[i]?.setAttribute('font-family', resolved || 'inherit');
     if (resolved) usedFamilies.add(resolved);
+
+    // Keep the exact typography the live preview renders. A detached XML clone
+    // drops weight/style computed from CSS or inherited from a <g>, so copy the
+    // computed values onto each exported <text>. font-size is normally already
+    // an attribute; only fill it in when it wasn't set explicitly.
+    const cs = getComputedStyle(originals[i]);
+    const weight = cs.fontWeight;
+    if (weight && weight !== '400' && weight !== 'normal') clones[i]?.setAttribute('font-weight', weight);
+    if (cs.fontStyle && cs.fontStyle !== 'normal') clones[i]?.setAttribute('font-style', cs.fontStyle);
+    if (!originals[i].hasAttribute('font-size') && cs.fontSize) clones[i]?.setAttribute('font-size', cs.fontSize);
   }
 
   const faces = await buildFontFaceStyles(usedFamilies);

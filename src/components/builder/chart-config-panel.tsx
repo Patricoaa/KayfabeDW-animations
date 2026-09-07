@@ -237,24 +237,6 @@ const setLegendTextOverride = (label: string, value?: string) => {
   const setDataLabelFont = (patch: Partial<SectionFont>) => update({dataLabelFont: {...(config.dataLabelFont ?? {}), ...patch}});
   const setCategoryDescriptionFont = (patch: Partial<SectionFont>) => update({categoryDescriptionFont: {...(config.categoryDescriptionFont ?? {}), ...patch}});
 
-  // RRSS-oriented canvas presets. Presets write width/height (and the preset
-  // key for record-keeping); "personalizado" leaves them as edited.
-  const CANVAS_PRESETS: Record<string, {width: number; height: number}> = {
-    '600x380': {width: 600, height: 380},
-    '1080x1080': {width: 1080, height: 1080},
-    '1080x1350': {width: 1080, height: 1350},
-    '1080x1440': {width: 1080, height: 1440},
-    '1080x1920': {width: 1080, height: 1920},
-    '1280x720': {width: 1280, height: 720},
-    '900x320': {width: 900, height: 320},
-  };
-  const canvasKey = `${config.width ?? 600}x${config.height ?? 380}`;
-  const presetKey = () => (CANVAS_PRESETS[canvasKey] ? canvasKey : 'custom');
-  const applyPreset = (key: string) => {
-    const p = CANVAS_PRESETS[key];
-    if (p) update({width: p.width, height: p.height, canvasPreset: key});
-  };
-
   // Fan-out detection: when aggregating a field from a shallower (non-leaf)
   // table with a plain count/sum/avg, the result reflects the deepest table's
   // granularity. Warn and point to count_distinct as the fix.
@@ -1156,6 +1138,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
               <ColorInput label="Color final" value={config.backgroundSecondary ?? '#1f2937'} onChange={(v) => update({backgroundSecondary: v || undefined})} />
             </div>
             <SliderNumberInput label="Ángulo (grados)" value={config.backgroundAngle ?? 135} min={0} max={360} step={15} onChange={(v) => update({backgroundAngle: v || undefined})} />
+            <SliderNumberInput label="Distribución inicio→fin (%)" value={Math.round((config.backgroundGradientDist ?? 0) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundGradientDist: v / 100})} />
             <SliderNumberInput label="Opacidad (%)" value={Math.round((config.backgroundOpacity ?? 1) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundOpacity: v ? v / 100 : undefined})} />
           </>
         )}
@@ -1182,27 +1165,6 @@ const setLegendTextOverride = (label: string, value?: string) => {
 
         <SliderNumberInput label="Desenfoque del fondo (blur px)" value={config.backgroundBlur ?? 0} min={0} max={30} step={1} onChange={(v) => update({backgroundBlur: v || undefined})} />
 
-        <div>
-          <label className="text-sm font-medium mb-1 block">Tamaño del lienzo</label>
-          <select
-            value={presetKey()}
-            onChange={(e) => applyPreset(e.target.value)}
-            className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-          >
-            <option value="600x380">Estándar (600×380)</option>
-            <option value="1080x1080">IG Cuadrado (1080×1080)</option>
-            <option value="1080x1350">Publicaciones 4:5 (1080×1350)</option>
-            <option value="1080x1440">Publicaciones (1080×1440)</option>
-            <option value="1080x1920">Shorts / Reels / TikTok (1080×1920)</option>
-            <option value="1280x720">YouTube 16:9 (1280×720)</option>
-            <option value="900x320">Panorámica (900×320)</option>
-            <option value="custom">Personalizado</option>
-          </select>
-          <div className="grid grid-cols-2 gap-2 mt-2">
-            <NumberInput label="Ancho" value={config.width} min={300} max={2400} step={20} onChange={(v) => update({width: v})} />
-            <NumberInput label="Alto" value={config.height} min={200} max={2400} step={20} onChange={(v) => update({height: v})} />
-          </div>
-        </div>
         <div className="pt-1 border-t border-border-subtle">
           <div className="grid grid-cols-2 gap-2 mt-2">
             <NumberInput label="Borde (grosor)" value={config.canvasBorderWidth} min={0} max={8} onChange={(v) => update({canvasBorderWidth: v})} />
