@@ -102,7 +102,7 @@ export function ScatterChart({data, config}: Props) {
     <div className="relative w-full">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
         {frameRect(config)}
-        {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
+        {(config.title || config.subtitle) && <SvgHeader config={config} st={st} width={width} />}
         {showLegend !== false && legendItems.length > 0 && <SvgLegend items={legendItems} position={config.legendPosition ?? 'bottom'} width={width} height={height} st={st} config={config} headerOffset={headerH} />}
       {config.showGrid !== false && yDom.ticks.map((v, i) => {
         const y = toY(v);
@@ -142,7 +142,7 @@ export function ScatterChart({data, config}: Props) {
 
       <text x={width / 2} y={height - 8} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{xLabel}</text>
       <text x={14} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 14, ${height / 2})`}>{yLabel}</text>
-      <ChartOverlays config={config} width={width} />
+      <ChartOverlays config={config} st={st} width={width} />
     </svg>
     </div>
   );

@@ -334,7 +334,7 @@ export function headerHeight(config: ChartConfig, st: ResolvedChartStyle, width 
 
 // Renders one title/subtitle block with optional Canva-style placement.
 function TitleBlock({
-  text, font, baseColor, defaultWeight, width, layout,
+  text, font, baseColor, defaultWeight, width, layout, defaultSize,
 }: {
   text: string;
   font: SectionFont | undefined;
@@ -342,8 +342,9 @@ function TitleBlock({
   defaultWeight: number;
   width: number;
   layout?: TextLayout;
+  defaultSize: number;
 }) {
-  const size = font?.size ?? 0;
+  const size = font?.size ?? defaultSize;
   const maxW = Math.max(120, width - 24);
   const lines = textLines(text, size, maxW, font?.overflow ?? 'none');
   const lineH = layout?.lineHeight ?? size + 2;
@@ -420,13 +421,24 @@ export function SvgHeader({config, st, width}: {config: ChartConfig; st: Resolve
   if ((config.titleLayout && (config.titleLayout.x != null || config.titleLayout.y != null))
       || (config.subtitleLayout && (config.subtitleLayout.x != null || config.subtitleLayout.y != null))) {
     // Free-form placement: render each block independently at its own position.
+    // When both blocks share the same anchor point (joint position control),
+    // the subtitle stacks below the title block instead of overlapping it.
+    const tl = config.titleLayout;
+    const sl = config.subtitleLayout;
+    const joint = !!(title && sub && tl && sl && tl.x === sl.x && tl.y === sl.y);
+    let subLayout = sl;
+    if (joint) {
+      const tLines = textLines(title, titleSize, Math.max(120, width - 24), config.headerFont?.overflow).length;
+      const tLineH = tl.lineHeight ?? titleSize + 2;
+      subLayout = {...sl, y: (tl.y ?? 0) + tLines * tLineH + 6};
+    }
     return (
       <g>
         {title && (
-          <TitleBlock text={title} font={config.headerFont} baseColor={titleColor} defaultWeight={700} width={width} layout={config.titleLayout} />
+          <TitleBlock text={title} font={config.headerFont} baseColor={titleColor} defaultWeight={700} width={width} layout={tl} defaultSize={titleSize} />
         )}
         {sub && (
-          <TitleBlock text={sub} font={{...(config.subtitleFont ?? {}), fontFamily: subFamily}} baseColor={subColor} defaultWeight={400} width={width} layout={config.subtitleLayout} />
+          <TitleBlock text={sub} font={{...(config.subtitleFont ?? {}), fontFamily: subFamily}} baseColor={subColor} defaultWeight={400} width={width} layout={subLayout} defaultSize={subSize} />
         )}
       </g>
     );
@@ -594,7 +606,7 @@ const overlayCharW = (s: string, fs: number) => s.length * fs * 0.55;
 // Coordinates are in viewBox units from the top-left corner; text geometry
 // reuses TextLayout so labels share the same anchor/rotation/background model
 // as the titles. Insert inside the chart's SVG right before `</svg>`.
-export function ChartOverlays({config, width}: {config: ChartConfig; width: number}) {
+export function ChartOverlays({config, width, st}: {config: ChartConfig; width: number; st: ResolvedChartStyle}) {
   const overlays = config.overlays ?? [];
   if (overlays.length === 0) return null;
   return (
@@ -603,10 +615,25 @@ export function ChartOverlays({config, width}: {config: ChartConfig; width: numb
         if (o.type === 'image') {
           const w = o.width ?? 0;
           const h = o.height ?? 0;
-          if (!o.src || w <= 0 || h <= 0) return null;
+          const rot = o.rotation ?? 0;
           const cx = (o.x ?? 0) + w / 2;
           const cy = (o.y ?? 0) + h / 2;
-          const rot = o.rotation ?? 0;
+          // Without a source yet, draw a dashed placeholder at the chosen
+          // position/size so positioning is visible; it disappears once the
+          // image URL is set. With no dimensions there is nothing to draw.
+          if (!o.src || w <= 0 || h <= 0) {
+            const x = o.x ?? 0;
+            const y = o.y ?? 0;
+            const rotate = rot ? `rotate(${rot} ${x} ${y})` : undefined;
+            return (
+              <g key={o.id} opacity={o.opacity ?? 1} transform={rotate}>
+                <rect x={x} y={y} width={w} height={h} fill="none" stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="6 4" rx={4} />
+                <text x={x + 6} y={y + h / 2} fontSize={11} fill="#f59e0b" dominantBaseline="central">
+                  {o.src ? 'Cargando…' : 'Sin imagen'}
+                </text>
+              </g>
+            );
+          }
           return (
             <g key={o.id} opacity={o.opacity ?? 1}>
               <image
@@ -628,7 +655,7 @@ export function ChartOverlays({config, width}: {config: ChartConfig; width: numb
         const size = o.font?.size ?? 14;
         const weight = o.font?.weight ?? 400;
         const family = o.font?.fontFamily;
-        const color = layout.color ?? o.font?.color ?? '#111827';
+        const color = layout.color ?? o.font?.color ?? st.textColor;
         const align = o.font?.align ?? layout.align ?? 'left';
         const anchor = layout.anchor ?? 'left';
         const lineH = Math.max(size + 2, layout.lineHeight ?? size + 2);

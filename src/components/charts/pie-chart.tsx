@@ -94,7 +94,7 @@ export function PieChart({data, config}: Props) {
     <div className="relative w-full">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
         {frameRect(config)}
-        {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
+        {(config.title || config.subtitle) && <SvgHeader config={config} st={st} width={width} />}
         {showLegend && legendItems.length > 0 && <SvgLegend items={legendItems} position={config.legendPosition ?? 'bottom'} width={width} height={height} st={st} config={config} headerOffset={headerH} />}
         {visible.map((s) => {
           const angle = (s.value / total) * 2 * Math.PI;
@@ -126,7 +126,7 @@ export function PieChart({data, config}: Props) {
             {formatValue(shownTotal, config.numberFormat ?? 'short')}
           </text>
         )}
-        <ChartOverlays config={config} width={width} />
+        <ChartOverlays config={config} st={st} width={width} />
       </svg>
     </div>
   );

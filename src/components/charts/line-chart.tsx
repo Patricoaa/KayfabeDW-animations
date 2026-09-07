@@ -71,7 +71,7 @@ function MultiLine({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
     <div className="relative w-full">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
         {frameRect(config)}
-        {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
+        {(config.title || config.subtitle) && <SvgHeader config={config} st={st} width={width} />}
         {showLegend && legendItems.length > 0 && <SvgLegend items={legendItems} position={legendPosition} width={width} height={height} st={st} config={config} headerOffset={headerH} />}
           {config.showGrid !== false && tickValues.map((v, i) => {
             const y = toY(v);
@@ -112,7 +112,7 @@ function MultiLine({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
               </text>
             );
           })}
-        <ChartOverlays config={config} width={width} />
+        <ChartOverlays config={config} st={st} width={width} />
         </svg>
     </div>
   );
@@ -163,7 +163,7 @@ function SingleLine({data, config}: Props) {
     <div className="relative w-full">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
         {frameRect(config)}
-        {headerHeight(config, st, config.width ?? 600) > 0 && <SvgHeader config={config} st={st} width={width} />}
+        {(config.title || config.subtitle) && <SvgHeader config={config} st={st} width={width} />}
       {config.showGrid !== false && tickValues.map((v, i) => {
         const y = toY(v);
         return (
@@ -196,7 +196,7 @@ function SingleLine({data, config}: Props) {
         </text>
       );
       })}
-      <ChartOverlays config={config} width={width} />
+      <ChartOverlays config={config} st={st} width={width} />
     </svg>
     </div>
   );

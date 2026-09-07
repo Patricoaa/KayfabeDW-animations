@@ -230,8 +230,6 @@ const setLegendTextOverride = (label: string, value?: string) => {
   };
   const setHeaderFont = (patch: Partial<SectionFont>) => update({headerFont: {...(config.headerFont ?? {}), ...patch}});
   const setSubtitleFont = (patch: Partial<SectionFont>) => update({subtitleFont: {...(config.subtitleFont ?? {}), ...patch}});
-  const setTitleLayout = (patch: Partial<TextLayout>) => update({titleLayout: {...(config.titleLayout ?? {}), ...patch}});
-  const setSubtitleLayout = (patch: Partial<TextLayout>) => update({subtitleLayout: {...(config.subtitleLayout ?? {}), ...patch}});
   const setLegendLayout = (patch: Partial<TextLayout>) => update({legendLayout: {...(config.legendLayout ?? {}), ...patch}});
   const setXLabelFont = (patch: Partial<SectionFont>) => update({xLabelFont: {...(config.xLabelFont ?? {}), ...patch}});
   const setYLabelFont = (patch: Partial<SectionFont>) => update({yLabelFont: {...(config.yLabelFont ?? {}), ...patch}});
@@ -486,8 +484,23 @@ const setLegendTextOverride = (label: string, value?: string) => {
               <TextControls value={config.subtitleFont} onChange={setSubtitleFont} />
             </div>
           </div>
-          <LayoutControls title="Posición del título" value={config.titleLayout} onChange={setTitleLayout} />
-          <LayoutControls title="Posición del subtítulo" value={config.subtitleLayout} onChange={setSubtitleLayout} />
+          <LayoutControls
+            title="Posición (título + subtítulo)"
+            value={{...(config.titleLayout ?? {}), ...(config.subtitleLayout ?? {})}}
+            onChange={(patch) => {
+              const t0 = config.titleLayout ?? {};
+              const s0 = config.subtitleLayout ?? {};
+              const t1 = {...t0, ...patch};
+              const s1 = {...s0, ...patch};
+              for (const k of ['x', 'y'] as const) {
+                if (patch[k] != null) {
+                  (t1 as Record<string, unknown>)[k] = patch[k] as number;
+                  (s1 as Record<string, unknown>)[k] = patch[k] as number;
+                }
+              }
+              update({titleLayout: t1, subtitleLayout: s1});
+            }}
+          />
         </Section>
       )}
 

@@ -406,7 +406,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
           {frameRect(config)}
           <Zone id="header">
-            {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
+            {(config.title || config.subtitle) && <SvgHeader config={config} st={st} width={width} />}
             {showLegend && legendItems.length > 0 && <SvgLegend items={legendItems} position={legendPosition} width={width} height={height} st={st} config={config} headerOffset={headerH} />}
           </Zone>
           <Zone id="footer">
@@ -600,7 +600,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                 );
               })}
           </Zone>
-          <ChartOverlays config={config} width={width} />
+          <ChartOverlays config={config} st={st} width={width} />
           </svg>
         </div>
     );
@@ -631,7 +631,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
         {frameRect(config)}
         <Zone id="header">
-          {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
+          {(config.title || config.subtitle) && <SvgHeader config={config} st={st} width={width} />}
           {showLegend && legendItems.length > 0 && <SvgLegend items={legendItems} position={legendPosition} width={width} height={height} st={st} config={config} headerOffset={headerH} />}
         </Zone>
         <Zone id="left-axis">
@@ -850,7 +850,7 @@ const fill = barFill(s.color, config, val < 0);
             );
           })}
         </Zone>
-        <ChartOverlays config={config} width={width} />
+        <ChartOverlays config={config} st={st} width={width} />
         </svg>
     </div>
   );
@@ -938,7 +938,7 @@ function SingleBar({data, config}: Props) {
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
           {frameRect(config)}
           <Zone id="header">
-            {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
+            {(config.title || config.subtitle) && <SvgHeader config={config} st={st} width={width} />}
           </Zone>
           <Zone id="footer">
             {config.showGrid !== false && tickValues.map((v, i) => {
@@ -1029,7 +1029,7 @@ function SingleBar({data, config}: Props) {
             );
           })}
           </Zone>
-          <ChartOverlays config={config} width={width} />
+          <ChartOverlays config={config} st={st} width={width} />
         </svg>
       </div>
     );
@@ -1045,7 +1045,7 @@ function SingleBar({data, config}: Props) {
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" style={{fontFamily: st.fontFamily}}>
         {frameRect(config)}
         <Zone id="header">
-          {headerH > 0 && <SvgHeader config={config} st={st} width={width} />}
+          {(config.title || config.subtitle) && <SvgHeader config={config} st={st} width={width} />}
         </Zone>
         <Zone id="left-axis">
           {config.showGrid !== false && tickValues.map((v, i) => {
@@ -1139,7 +1139,7 @@ function SingleBar({data, config}: Props) {
         <Zone id="footer">
           {config.xLabel && <XAxisTitle text={config.xLabel} width={width} height={height} color={xAxisColor} size={11} family={xAxisFamily} weight={config.xLabelFont?.weight ?? 400} align={config.xLabelFont?.align} />}
         </Zone>
-        <ChartOverlays config={config} width={width} />
+        <ChartOverlays config={config} st={st} width={width} />
       </svg>
     </div>
   );
