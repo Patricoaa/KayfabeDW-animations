@@ -25,8 +25,6 @@ export const Avatar: React.FC<{
         overflow: 'hidden',
         flexShrink: 0,
         backgroundColor: '#1f2937',
-        border: '2px solid #334155',
-        boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.2)',
         position: 'relative',
       }}
     >

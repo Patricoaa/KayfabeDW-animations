@@ -284,7 +284,6 @@ function Avatar({
   const vh = size * zoom;
   const imgX = cx - vw / 2 + fx * (vw - size) / 2;
   const imgY = cy - vh / 2 + fy * (vh - size) / 2;
-  const R = shape === 'circle' ? size / 2 : radius;
   return (
     <g>
       <defs>
@@ -305,13 +304,6 @@ function Avatar({
         preserveAspectRatio="xMidYMid meet"
         clipPath={`url(#${clipId})`}
       />
-      {/* Subtle outline of the clip shape so the chosen forma stays legible even
-          when the zoomed photo fills the frame. */}
-      {shape === 'circle' ? (
-        <circle cx={cx} cy={cy} r={size / 2} fill="none" stroke="rgba(0,0,0,0.22)" strokeWidth={1} />
-      ) : (
-        <rect x={cx - size / 2} y={cy - size / 2} width={size} height={size} rx={R} fill="none" stroke="rgba(0,0,0,0.22)" strokeWidth={1} />
-      )}
     </g>
   );
 }

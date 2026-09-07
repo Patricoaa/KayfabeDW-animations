@@ -778,10 +778,10 @@ const setLegendTextOverride = (label: string, value?: string) => {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <NumberInput label="Offset X" value={config.categoryLabelOffsetX ?? 0} min={-128} max={128} step={1} onChange={(v) => update({categoryLabelOffsetX: v})} />
+                  <NumberInput label="Offset X" value={config.categoryLabelOffsetX ?? 0} step={1} onChange={(v) => update({categoryLabelOffsetX: v})} />
                 </div>
                 <div>
-                  <NumberInput label="Offset Y" value={config.categoryLabelOffsetY ?? 0} min={-128} max={128} step={1} onChange={(v) => update({categoryLabelOffsetY: v})} />
+                  <NumberInput label="Offset Y" value={config.categoryLabelOffsetY ?? 0} step={1} onChange={(v) => update({categoryLabelOffsetY: v})} />
                 </div>
               </div>
             </div>
@@ -1187,8 +1187,8 @@ const setLegendTextOverride = (label: string, value?: string) => {
               <div>
                 <label className="text-sm font-medium mb-1 block">Posición (coordenadas, px)</label>
                 <div className="grid grid-cols-2 gap-2">
-                  <NumberInput label="Offset X" value={config.avatarOffsetX} min={-128} max={128} step={1} onChange={(v) => update({avatarOffsetX: v})} />
-                  <NumberInput label="Offset Y" value={config.avatarOffsetY} min={-128} max={128} step={1} onChange={(v) => update({avatarOffsetY: v})} />
+                  <NumberInput label="Offset X" value={config.avatarOffsetX} step={1} onChange={(v) => update({avatarOffsetX: v})} />
+                  <NumberInput label="Offset Y" value={config.avatarOffsetY} step={1} onChange={(v) => update({avatarOffsetY: v})} />
                 </div>
                 <p className="text-[10px] text-muted pt-1">Desplazamiento global en px desde un punto FIJO del área del gráfico (el borde izquierdo en cada fila en horizontal; el borde superior en cada columna en vertical). Desacoplado de la barra: el tamaño/posición del avatar no mueve las barras ni el plot, y el layout de barras no lo afecta.</p>
               </div>
@@ -1310,14 +1310,14 @@ function ColorInput({label, value, onChange}: {label: string; value?: string; on
   );
 }
 
-function NumberInput({label, value, min, max, step = 1, onChange}: {label: string; value?: number; min: number; max: number; step?: number; onChange: (v: number | undefined) => void}) {
+function NumberInput({label, value, min, max, step = 1, onChange}: {label: string; value?: number; min?: number; max?: number; step?: number; onChange: (v: number | undefined) => void}) {
   return (
     <div>
       <label className="text-sm font-medium mb-1 block">{label}</label>
       <input
         type="number"
-        min={min}
-        max={max}
+        {...(min !== undefined ? {min} : {})}
+        {...(max !== undefined ? {max} : {})}
         step={step}
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value ? Number(e.target.value) : undefined)}
@@ -1385,8 +1385,8 @@ function LayoutControls({title, value, onChange}: {title: string; value?: TextLa
             <option value="right">Derecha</option>
           </select>
         </div>
-        <NumberInput label="X (px)" value={value?.x} min={-600} max={600} onChange={(v) => set({x: v})} />
-        <NumberInput label="Y (px)" value={value?.y} min={-600} max={600} onChange={(v) => set({y: v})} />
+        <NumberInput label="X (px)" value={value?.x} onChange={(v) => set({x: v})} />
+        <NumberInput label="Y (px)" value={value?.y} onChange={(v) => set({y: v})} />
         <NumberInput label="Rotación (°)" value={value?.rotation} min={-180} max={180} onChange={(v) => set({rotation: v})} />
         <NumberInput label="Espaciado (px)" value={value?.letterSpacing} min={-4} max={20} step={0.5} onChange={(v) => set({letterSpacing: v})} />
         <NumberInput label="Opacidad" value={value?.opacity} min={0} max={1} step={0.05} onChange={(v) => set({opacity: v})} />

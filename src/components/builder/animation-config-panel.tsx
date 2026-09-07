@@ -110,8 +110,8 @@ function HeaderSection({value, update}: {value: CommonHeaderConfig; update: (pat
       <div className="pt-2 mt-1 border-t border-border-subtle">
         <p className="text-[10px] text-muted mb-1.5">Posición del título (offset en px desde su lugar por defecto).</p>
         <div className="grid grid-cols-2 gap-2">
-          <NumberInput label="X (px)" value={value.titleX} min={-400} max={400} step={4} onChange={(v) => update({titleX: v})} />
-          <NumberInput label="Y (px)" value={value.titleY} min={-400} max={400} step={4} onChange={(v) => update({titleY: v})} />
+          <NumberInput label="X (px)" value={value.titleX} step={4} onChange={(v) => update({titleX: v})} />
+          <NumberInput label="Y (px)" value={value.titleY} step={4} onChange={(v) => update({titleY: v})} />
         </div>
       </div>
       <div className="pt-2 mt-1 border-t border-border-subtle">
@@ -130,8 +130,8 @@ function HeaderSection({value, update}: {value: CommonHeaderConfig; update: (pat
       <div className="pt-2 mt-1 border-t border-border-subtle">
         <p className="text-[10px] text-muted mb-1.5">Posición del subtítulo (offset en px desde su lugar por defecto).</p>
         <div className="grid grid-cols-2 gap-2">
-          <NumberInput label="X (px)" value={value.subtitleX} min={-400} max={400} step={4} onChange={(v) => update({subtitleX: v})} />
-          <NumberInput label="Y (px)" value={value.subtitleY} min={-400} max={400} step={4} onChange={(v) => update({subtitleY: v})} />
+          <NumberInput label="X (px)" value={value.subtitleX} step={4} onChange={(v) => update({subtitleX: v})} />
+          <NumberInput label="Y (px)" value={value.subtitleY} step={4} onChange={(v) => update({subtitleY: v})} />
         </div>
       </div>
       <div className="pt-2 mt-1 border-t border-border-subtle">
@@ -524,8 +524,8 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
         <div className="pt-2 mt-1 border-t border-border-subtle">
           <p className="text-[10px] text-muted mb-1.5">Posición de la fecha (offset en px desde la esquina inferior derecha).</p>
           <div className="grid grid-cols-2 gap-2">
-            <NumberInput label="X (px)" value={value.dateX} min={-400} max={400} step={4} onChange={(v) => update({dateX: v})} />
-            <NumberInput label="Y (px)" value={value.dateY} min={-400} max={400} step={4} onChange={(v) => update({dateY: v})} />
+            <NumberInput label="X (px)" value={value.dateX} step={4} onChange={(v) => update({dateX: v})} />
+            <NumberInput label="Y (px)" value={value.dateY} step={4} onChange={(v) => update({dateY: v})} />
           </div>
         </div>
         <div className="pt-2 mt-1 border-t border-border-subtle">
@@ -591,8 +591,8 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
           <div className="pt-2 mt-1 border-t border-border-subtle">
             <p className="text-[10px] text-muted mb-1.5">Posición del grupo de filas y eje X (offset en px desde su lugar por defecto).</p>
             <div className="grid grid-cols-2 gap-2">
-              <NumberInput label="X (px)" value={value.barsX} min={-400} max={400} step={4} onChange={(v) => update({barsX: v})} />
-              <NumberInput label="Y (px)" value={value.barsY} min={-400} max={400} step={4} onChange={(v) => update({barsY: v})} />
+              <NumberInput label="X (px)" value={value.barsX} step={4} onChange={(v) => update({barsX: v})} />
+              <NumberInput label="Y (px)" value={value.barsY} step={4} onChange={(v) => update({barsY: v})} />
             </div>
           </div>
           <div className="flex items-center justify-between mb-0.5">
@@ -767,8 +767,8 @@ function RowImageSection({value, onChange, participants = []}: {
         />
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <NumberInput label="Offset X (px)" value={value.rowImageX} min={-1600} max={1600} step={8} onChange={(v) => onChange({rowImageX: v})} />
-        <NumberInput label="Offset Y (px)" value={value.rowImageY} min={-1600} max={1600} step={8} onChange={(v) => onChange({rowImageY: v})} />
+        <NumberInput label="Offset X (px)" value={value.rowImageX} step={8} onChange={(v) => onChange({rowImageX: v})} />
+        <NumberInput label="Offset Y (px)" value={value.rowImageY} step={8} onChange={(v) => onChange({rowImageY: v})} />
       </div>
       <Toggle label="Traslado al relevar" checked={value.rowImagePan ?? true} onChange={(v) => onChange({rowImagePan: v})} />
       <div className="mt-3">
@@ -796,8 +796,8 @@ function RowImageSection({value, onChange, participants = []}: {
       {value.rowImageLabel && (
         <>
           <div className="grid grid-cols-2 gap-2">
-            <NumberInput label="Offset X (px)" value={value.rowImageLabelX} min={-600} max={600} step={4} onChange={(v) => onChange({rowImageLabelX: v})} />
-            <NumberInput label="Offset Y (px)" value={value.rowImageLabelY} min={-600} max={600} step={4} onChange={(v) => onChange({rowImageLabelY: v})} />
+            <NumberInput label="Offset X (px)" value={value.rowImageLabelX} step={4} onChange={(v) => onChange({rowImageLabelX: v})} />
+            <NumberInput label="Offset Y (px)" value={value.rowImageLabelY} step={4} onChange={(v) => onChange({rowImageLabelY: v})} />
           </div>
           <RaceTextControls
             label="Texto del puesto"
@@ -1219,8 +1219,8 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
         <div className="pt-2 mt-1 border-t border-border-subtle">
           <p className="text-[10px] text-muted mb-1.5">Posición del grupo de filas (offset en px desde su lugar por defecto).</p>
           <div className="grid grid-cols-2 gap-2">
-            <NumberInput label="X (px)" value={value.rowsX} min={-400} max={400} step={4} onChange={(v) => update({rowsX: v})} />
-            <NumberInput label="Y (px)" value={value.rowsY} min={-400} max={400} step={4} onChange={(v) => update({rowsY: v})} />
+            <NumberInput label="X (px)" value={value.rowsX} step={4} onChange={(v) => update({rowsX: v})} />
+            <NumberInput label="Y (px)" value={value.rowsY} step={4} onChange={(v) => update({rowsY: v})} />
           </div>
         </div>
       </Section>
@@ -1377,14 +1377,14 @@ function FieldSelect({
   );
 }
 
-function NumberInput({label, value, min, max, step = 1, onChange}: {label: string; value?: number; min: number; max: number; step?: number; onChange: (v: number | undefined) => void}) {
+function NumberInput({label, value, min, max, step = 1, onChange}: {label: string; value?: number; min?: number; max?: number; step?: number; onChange: (v: number | undefined) => void}) {
   return (
     <div>
       <label className="text-sm font-medium mb-1 block">{label}</label>
       <input
         type="number"
-        min={min}
-        max={max}
+        {...(min !== undefined ? {min} : {})}
+        {...(max !== undefined ? {max} : {})}
         step={step}
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value ? Number(e.target.value) : undefined)}
