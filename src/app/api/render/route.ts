@@ -31,9 +31,10 @@ const GIF_FPS = 12;
 // Serverless MP4 profile: on Hobby the function cap is 300s, so heavy renders
 // (more than ~6s of frames or 1000+ items) keep the requested viewport (same
 // layout as the preview) and downscale only the encoded output via `scale`.
-// Matches the client thresholds in src/lib/render-export.ts.
-const RENDER_PROFILE_W = 1280;
-const RENDER_PROFILE_H = 720;
+// Orientation-aware caps give square-ish quality: 1280x720 for landscape,
+// 720x1280 for portrait. Matches the client thresholds in src/lib/render-export.ts.
+const RENDER_PROFILE_LANDSCAPE = {w: 1280, h: 720};
+const RENDER_PROFILE_PORTRAIT = {w: 720, h: 1280};
 const RENDER_PROFILE_FRAMES = 180;
 const RENDER_PROFILE_MAX_ITEMS = 1000;
 
@@ -187,7 +188,9 @@ export async function POST(req: Request) {
       scale = maxDim > GIF_MAX_W ? GIF_MAX_W / maxDim : 1;
       console.log(`[render] GIF profile: everyNthFrame=${everyNthFrame} (→${(composition.fps / everyNthFrame).toFixed(1)}fps), scale=${scale.toFixed(3)}, ${Math.round(composition.width * scale)}x${Math.round(composition.height * scale)}`);
     } else if (serverlessProfile) {
-      scale = Math.min(RENDER_PROFILE_W / composition.width, RENDER_PROFILE_H / composition.height);
+      const isPortrait = composition.height > composition.width;
+      const profile = isPortrait ? RENDER_PROFILE_PORTRAIT : RENDER_PROFILE_LANDSCAPE;
+      scale = Math.min(profile.w / composition.width, profile.h / composition.height);
       if (scale >= 1) scale = 1;
       console.log(
         `[render] Serverless profile: layout ${composition.width}x${composition.height} → encode ${Math.round(composition.width * scale)}x${Math.round(composition.height * scale)} (${composition.durationInFrames} frames, ${countRenderItems(body.inputProps)} items)`,
