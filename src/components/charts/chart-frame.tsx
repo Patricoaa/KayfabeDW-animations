@@ -114,21 +114,27 @@ function textLines(s: string | undefined, fs: number, maxW: number, overflow?: T
 // monospace-ish in the panel, so a 0.55·fontSize factor per char is enough.
 const textWidth = (s: string, fs: number) => Math.min(s.length, 24) * fs * 0.58;
 
-// SVG path that rounds only the requested corners — used for the "pill on the
-// outer end" bar look (barRadiusEndsOnly) instead of the all-corners `rx`.
+// Per-corner corner radius of a rounded rect (px).
+export type CornerRadii = {tl?: number; tr?: number; bl?: number; br?: number};
+
+// SVG path that rounds only the requested corners — used for the stacked "pill
+// on the outer end" bar look. `r` can be a single radius (all enabled corners)
+// or per-corner radii; a missing corner radius is treated as 0 (sharp).
 export function roundedRectPath(
   x: number,
   y: number,
   w: number,
   h: number,
-  r: number,
+  r: number | CornerRadii = 0,
   corners: {tl?: boolean; tr?: boolean; bl?: boolean; br?: boolean} = {tl: true, tr: true, bl: true, br: true},
 ): string {
-  const rad = Math.max(0, Math.min(r, Math.min(w, h) / 2));
-  const tl = corners.tl ? rad : 0;
-  const tr = corners.tr ? rad : 0;
-  const br = corners.br ? rad : 0;
-  const bl = corners.bl ? rad : 0;
+  const max = Math.max(0, Math.min(w, h) / 2);
+  const R: CornerRadii = typeof r === 'number' ? {tl: r, tr: r, bl: r, br: r} : r;
+  const rad = (v: number | undefined) => Math.max(0, Math.min(v ?? 0, max));
+  const tl = corners.tl ? rad(R.tl) : 0;
+  const tr = corners.tr ? rad(R.tr) : 0;
+  const br = corners.br ? rad(R.br) : 0;
+  const bl = corners.bl ? rad(R.bl) : 0;
   const parts = [
     `M ${x + tl} ${y}`,
     `H ${x + w - tr}`,
@@ -368,5 +374,106 @@ export function SvgLegend({
         return el;
       })}
     </g>
+  );
+}
+
+// Estimated width of one rendered overlay line (SVG units), used for wrapping
+// and the optional background box. 0.55·size per char matches the charts.
+const overlayCharW = (s: string, fs: number) => s.length * fs * 0.55;
+
+// Free-form overlays (text/image) drawn on top of the chart, above everything.
+// Coordinates are in viewBox units from the top-left corner; text geometry
+// reuses TextLayout so labels share the same anchor/rotation/background model
+// as the titles. Insert inside the chart's SVG right before `</svg>`.
+export function ChartOverlays({config, width}: {config: ChartConfig; width: number}) {
+  const overlays = config.overlays ?? [];
+  if (overlays.length === 0) return null;
+  return (
+    <>
+      {overlays.map((o) => {
+        if (o.type === 'image') {
+          const w = o.width ?? 0;
+          const h = o.height ?? 0;
+          if (!o.src || w <= 0 || h <= 0) return null;
+          const cx = (o.x ?? 0) + w / 2;
+          const cy = (o.y ?? 0) + h / 2;
+          const rot = o.rotation ?? 0;
+          return (
+            <g key={o.id} opacity={o.opacity ?? 1}>
+              <image
+                href={o.src}
+                x={o.x ?? 0}
+                y={o.y ?? 0}
+                width={w}
+                height={h}
+                preserveAspectRatio="xMidYMid meet"
+                transform={rot ? `rotate(${rot} ${cx} ${cy})` : undefined}
+              />
+            </g>
+          );
+        }
+
+        const text = o.text ?? '';
+        if (!text) return null;
+        const layout = o.layout ?? {};
+        const size = o.font?.size ?? 14;
+        const weight = o.font?.weight ?? 400;
+        const family = o.font?.fontFamily;
+        const color = layout.color ?? o.font?.color ?? '#111827';
+        const align = o.font?.align ?? layout.align ?? 'left';
+        const anchor = layout.anchor ?? 'left';
+        const lineH = Math.max(size + 2, layout.lineHeight ?? size + 2);
+        const maxW = o.maxWidth && o.maxWidth > 0 ? o.maxWidth : undefined;
+
+        const lines: string[] = [];
+        for (const raw of text.split('\n')) {
+          if (!maxW) {
+            lines.push(raw);
+            continue;
+          }
+          const words = raw.split(/\s+/).filter(Boolean);
+          let cur = '';
+          for (const w of words) {
+            const test = cur ? `${cur} ${w}` : w;
+            if (cur && overlayCharW(test, size) > maxW) {
+              lines.push(cur);
+              cur = w;
+            } else {
+              cur = test;
+            }
+          }
+          if (cur) lines.push(cur);
+        }
+        if (lines.length === 0) lines.push('');
+
+        const x = layout.x ?? 0;
+        const y = layout.y ?? 0;
+        const textAnchor = align === 'right' ? 'end' : align === 'center' ? 'middle' : 'start';
+        const xPos = anchor === 'right' ? width - x : anchor === 'center' ? width / 2 + x : x;
+
+        const lineW = Math.max(...lines.map((l) => overlayCharW(l, size)));
+        const pad = layout.bgPadding ?? 4;
+        const boxW = lineW + pad * 2;
+        const boxH = lines.length * lineH + pad * 2;
+        const boxX = textAnchor === 'end' ? xPos - boxW : textAnchor === 'middle' ? xPos - boxW / 2 : xPos;
+        const boxY = y - size - pad;
+
+        const rot = layout.rotation ?? 0;
+        const transform = rot ? `rotate(${rot} ${xPos} ${y})` : undefined;
+
+        return (
+          <g key={o.id} opacity={layout.opacity ?? 1} transform={transform} fontFamily={family}>
+            {layout.bgColor && (
+              <rect x={boxX} y={boxY} width={boxW} height={boxH} rx={layout.bgRadius ?? 4} fill={layout.bgColor} opacity={layout.bgOpacity ?? 1} />
+            )}
+            {lines.map((ln, i) => (
+              <text key={i} x={xPos} y={y + i * lineH} textAnchor={textAnchor} fontSize={size} fontWeight={weight} fill={color} letterSpacing={layout.letterSpacing}>
+                {ln}
+              </text>
+            ))}
+          </g>
+        );
+      })}
+    </>
   );
 }

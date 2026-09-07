@@ -2,7 +2,7 @@
 
 import type {ChartConfig} from '@/lib/chart-config';
 import {formatValue, resolveChartStyle, prepareSeries, colorFor} from '@/lib/chart-data';
-import {SvgHeader, SvgLegend, headerHeight, legendReserve, frameRect, legendItemsFrom, type LegendItem} from './chart-frame';
+import {SvgHeader, SvgLegend, ChartOverlays, headerHeight, legendReserve, frameRect, legendItemsFrom, type LegendItem} from './chart-frame';
 
 type Props = {
   data: Record<string, unknown>[];
@@ -126,6 +126,7 @@ export function PieChart({data, config}: Props) {
             {formatValue(shownTotal, config.numberFormat ?? 'short')}
           </text>
         )}
+        <ChartOverlays config={config} width={width} />
       </svg>
     </div>
   );

@@ -1,9 +1,9 @@
 'use client';
 
-import {useState, type ReactNode} from 'react';
+import type {ReactNode} from 'react';
 import type {ChartConfig, NumberFormat, TextOverflow, TextAlign, AvatarCrop} from '@/lib/chart-config';
 import {prepareSeries, prepareMultiSeries, formatValue, colorFor, resolvedCategoryLabel, resolvedCategorySub, resolveChartStyle, resolveYDomain, type PreparedMultiSeries} from '@/lib/chart-data';
-import {SvgHeader, SvgLegend, roundedRectPath, headerHeight, legendReserve, frameRect, Zone, legendItemsFrom, XAxisTitle, YAxisTitle, type LegendItem} from './chart-frame';
+import {SvgHeader, SvgLegend, ChartOverlays, roundedRectPath, headerHeight, legendReserve, frameRect, Zone, legendItemsFrom, XAxisTitle, YAxisTitle, type LegendItem, type CornerRadii} from './chart-frame';
 
 type Props = {
   data: Record<string, unknown>[];
@@ -23,51 +23,6 @@ export function BarChart({data, config}: Props) {
   return <SingleBar data={data} config={config} />;
 }
 
-// --- Shared tooltip state + hover UI (Flourish-like) ---
-type TooltipRow = {label: string; color: string; value: string};
-type TooltipState = {
-  x: number; // fractional position 0-1 within the SVG box
-  y: number;
-  title?: string;
-  img?: string | null;
-  rows: TooltipRow[];
-};
-
-function HoverTooltip({tip}: {tip: TooltipState | null}) {
-  if (!tip || tip.rows.length === 0) return null;
-  return (
-    <div
-      className="pointer-events-none absolute z-50 -translate-x-1/2 -translate-y-[110%] rounded-lg bg-black/90 border border-white/10 px-3 py-2 shadow-xl min-w-[9rem] backdrop-blur-sm"
-      style={{left: `${tip.x * 100}%`, top: `${tip.y * 100}%`}}
-    >
-      {tip.img && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={tip.img} alt="" className="w-6 h-6 rounded-full object-cover mx-auto mb-1" referrerPolicy="no-referrer" />
-      )}
-      {tip.title && (
-        <div className="text-[11px] font-semibold text-white mb-1 text-center">{tip.title}</div>
-      )}
-      <div className="space-y-0.5">
-        {tip.rows.map((r, i) => (
-          <div key={i} className="flex items-center justify-between gap-3 text-[11px]">
-            <span className="flex items-center gap-1.5 text-white/70">
-              <span className="w-2 h-2 rounded-sm shrink-0" style={{backgroundColor: r.color}} />
-              {r.label}
-            </span>
-            <span className="text-white font-mono">{r.value}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function hoverPos(e: React.MouseEvent<SVGElement>): {x: number; y: number} {
-  const r = (e.currentTarget.ownerSVGElement as SVGSVGElement | null)?.getBoundingClientRect();
-  if (!r) return {x: 0.5, y: 0.5};
-  return {x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height};
-}
-
 // Module-level counter keeps SVG filter ids unique across charts on a page.
 let svgNs = 0;
 
@@ -76,9 +31,18 @@ function barFill(color: string, config: ChartConfig, isNegative?: boolean): stri
   return color;
 }
 
+const BAR_RADIUS_MAP: Record<'tl' | 'tr' | 'bl' | 'br', keyof ChartConfig> = {tl: 'barRadiusTL', tr: 'barRadiusTR', bl: 'barRadiusBL', br: 'barRadiusBR'};
+
+// Radius for a single corner: per-corner override when set (stacked modes),
+// otherwise the general barRadius.
+function cornerRadius(config: ChartConfig, corner: 'tl' | 'tr' | 'bl' | 'br'): number {
+  return (config[BAR_RADIUS_MAP[corner]] as number | undefined) ?? config.barRadius ?? 2;
+}
+
 function referenceLinesSvg(
   multi: boolean,
   horizontal: boolean,
+  stackedPercent: boolean,
   domain: {yMin: number; yMax: number},
   yRange: number,
   marginAdj: {left: number; right: number; top: number; bottom: number},
@@ -91,8 +55,11 @@ function referenceLinesSvg(
   return (
     <>
       {(config.referenceLines).map((rl, i) => {
+        // Stacked-percent plots use a fractional 0..1 axis; the input value is
+        // written as a plain percentage (0-100), so scale it down here.
+        const value = stackedPercent ? rl.value / 100 : rl.value;
         if (horizontal) {
-          const x = marginAdj.left + ((rl.value - domain.yMin) / yRange) * plotW;
+          const x = marginAdj.left + ((value - domain.yMin) / yRange) * plotW;
           if (x < marginAdj.left || x > widthOf(config)) return null;
           return (
             <g key={i}>
@@ -103,7 +70,7 @@ function referenceLinesSvg(
             </g>
           );
         }
-        const y = marginAdj.top + plotH - ((rl.value - domain.yMin) / yRange) * plotH;
+        const y = marginAdj.top + plotH - ((value - domain.yMin) / yRange) * plotH;
         if (y < marginAdj.top || y > marginAdj.top + plotH) return null;
         return (
           <g key={i}>
@@ -386,15 +353,6 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const dlFamily = dlFont?.fontFamily ?? config.dataLabelFontFamily;
   const dlAlign = config.dataLabelFont?.align;
   const dlWeight = dlFont?.weight ?? 400;
-  const tooltipEnabled = config.tooltipEnabled ?? true;
-
-  const [tip, setTip] = useState<TooltipState | null>(null);
-  const catTip = (ci: number, cat: string, frac: {x: number; y: number}): TooltipState => ({
-    ...frac,
-    title: resolvedCategoryLabel(config, cat),
-    img: avatarActive ? (multi.categoryImages?.[ci] ?? null) : null,
-    rows: multi.series.map((s) => ({label: s.name, color: s.color, value: formatValue(s.values[ci] ?? 0, numFmt)})),
-  });
 
   const tickValues = domain.ticks;
 
@@ -473,19 +431,15 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
             )}
           </Zone>
           <Zone id="plot">
-            {referenceLinesSvg(true, true, domain, yRange, marginAdj, plotW, plotH, config)}
+            {referenceLinesSvg(true, true, stackedPercent, domain, yRange, marginAdj, plotW, plotH, config)}
 
               {multi.categories.map((cat, ci) => {
                 const bandY = marginAdj.top + ci * catBandH;
                 const cy = bandY + catBandH / 2;
                 const total = stacked || stackedPercent ? totalLabel(ci) : 0;
-                const leave = () => setTip(null);
                 return (
                   <g
                     key={ci}
-                    className={tooltipEnabled ? 'cursor-pointer' : undefined}
-                    onMouseMove={tooltipEnabled ? (e) => { const p = hoverPos(e); setTip(catTip(ci, cat, p)); } : undefined}
-                    onMouseLeave={tooltipEnabled ? leave : undefined}
                     fontFamily={dlFamily}
                     fontWeight={dlWeight}
                   >
@@ -522,28 +476,25 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                       }
                       const fill = barFill(s.color, config, val < 0);
                       const rectW = Math.max(w, 0);
-                      const rEnds = !!config.barRadiusEndsOnly;
                       const visibleIdx = stacked || stackedPercent
                         ? multi.series.reduce<number[]>((acc, s2, si2) => ((s2.values[ci] ?? 0) > 0 ? [...acc, si2] : acc), [])
                         : [];
                       const firstVis = visibleIdx[0] ?? -1;
                       const lastVis = visibleIdx[visibleIdx.length - 1] ?? -1;
-                      const corners = !rEnds || lastVis < 0
-                        ? undefined
-                        : !(stacked || stackedPercent)
-                          ? (val > 0 ? {tr: true, br: true} : {})
-                          : firstVis === lastVis
-                            ? {tl: true, tr: true, bl: true, br: true}
-                            : si === firstVis
-                              ? {tl: true, bl: true}
-                              : si === lastVis
-                                ? {tr: true, br: true}
-                                : {};
-                      const hasCorners = !!corners && !!(corners.tl || corners.tr || corners.bl || corners.br);
-                      return hasCorners ? (
+                      const radii: CornerRadii = stacked || stackedPercent
+                        ? firstVis === lastVis && lastVis >= 0
+                          ? {tl: cornerRadius(config, 'tl'), tr: cornerRadius(config, 'tr'), bl: cornerRadius(config, 'bl'), br: cornerRadius(config, 'br')}
+                          : si === firstVis
+                            ? {tl: cornerRadius(config, 'tl'), bl: cornerRadius(config, 'bl')}
+                            : si === lastVis
+                              ? {tr: cornerRadius(config, 'tr'), br: cornerRadius(config, 'br')}
+                              : {}
+                        : {tl: radius, tr: radius, bl: radius, br: radius};
+                      const hasRadius = !!(radii.tl || radii.tr || radii.bl || radii.br);
+                      return hasRadius ? (
                         <path
                           key={`${ci}-${si}`}
-                          d={roundedRectPath(x, y, rectW, hh, radius, corners)}
+                          d={roundedRectPath(x, y, rectW, hh, radii)}
                           fill={fill}
                           stroke={borderW > 0 ? borderColor : 'none'}
                           strokeWidth={borderW}
@@ -557,7 +508,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                           width={rectW}
                           height={hh}
                           fill={fill}
-                          rx={corners === undefined ? radius : 0}
+                          rx={0}
                           stroke={borderW > 0 ? borderColor : 'none'}
                           strokeWidth={borderW}
                           opacity={st.globalOpacity}
@@ -649,8 +600,8 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                 );
               })}
           </Zone>
+          <ChartOverlays config={config} width={width} />
           </svg>
-          {tooltipEnabled && <HoverTooltip tip={tip} />}
         </div>
     );
   }
@@ -700,17 +651,13 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
             )}
         </Zone>
         <Zone id="plot">
-            {referenceLinesSvg(true, false, domain, yRange, marginAdj, plotW, plotH, config)}
+            {referenceLinesSvg(true, false, stackedPercent, domain, yRange, marginAdj, plotW, plotH, config)}
             {multi.categories.map((cat, ci) => {
               const bandX = marginAdj.left + ci * catBand;
               const total = stacked || stackedPercent ? totalLabel(ci) : 0;
-              const leave = () => setTip(null);
               return (
 <g
                 key={ci}
-                className={tooltipEnabled ? 'cursor-pointer' : undefined}
-                onMouseMove={tooltipEnabled ? (e) => { const p = hoverPos(e); setTip(catTip(ci, cat, p)); } : undefined}
-                onMouseLeave={tooltipEnabled ? leave : undefined}
                 fontFamily={dlFamily}
                 fontWeight={dlWeight}
               >
@@ -746,28 +693,25 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
               }
 const fill = barFill(s.color, config, val < 0);
                 const rectH = Math.max(hh, 0);
-                const rEnds = !!config.barRadiusEndsOnly;
                 const visibleIdx = stacked || stackedPercent
                   ? multi.series.reduce<number[]>((acc, s2, si2) => ((s2.values[ci] ?? 0) > 0 ? [...acc, si2] : acc), [])
                   : [];
                 const firstVis = visibleIdx[0] ?? -1;
                 const lastVis = visibleIdx[visibleIdx.length - 1] ?? -1;
-                const corners = !rEnds || lastVis < 0
-                  ? undefined
-                  : !(stacked || stackedPercent)
-                    ? (val > 0 ? {tl: true, tr: true} : {})
-                    : firstVis === lastVis
-                      ? {tl: true, tr: true, bl: true, br: true}
-                      : si === firstVis
-                        ? (val < 0 ? {tl: true, tr: true} : {bl: true, br: true})
-                        : si === lastVis
-                          ? (val < 0 ? {bl: true, br: true} : {tl: true, tr: true})
-                          : {};
-                const hasCorners = !!corners && !!(corners.tl || corners.tr || corners.bl || corners.br);
-                return hasCorners ? (
+                const radii: CornerRadii = stacked || stackedPercent
+                  ? firstVis === lastVis && lastVis >= 0
+                    ? {tl: cornerRadius(config, 'tl'), tr: cornerRadius(config, 'tr'), bl: cornerRadius(config, 'bl'), br: cornerRadius(config, 'br')}
+                    : si === firstVis
+                      ? (val < 0 ? {tl: cornerRadius(config, 'tl'), tr: cornerRadius(config, 'tr')} : {bl: cornerRadius(config, 'bl'), br: cornerRadius(config, 'br')})
+                      : si === lastVis
+                        ? (val < 0 ? {bl: cornerRadius(config, 'bl'), br: cornerRadius(config, 'br')} : {tl: cornerRadius(config, 'tl'), tr: cornerRadius(config, 'tr')})
+                        : {}
+                  : {tl: radius, tr: radius, bl: radius, br: radius};
+                const hasRadius = !!(radii.tl || radii.tr || radii.bl || radii.br);
+                return hasRadius ? (
                   <path
                     key={`${ci}-${si}`}
-                    d={roundedRectPath(x, y, w, rectH, radius, corners)}
+                    d={roundedRectPath(x, y, w, rectH, radii)}
                     fill={fill}
                     stroke={borderW > 0 ? borderColor : 'none'}
                     strokeWidth={borderW}
@@ -781,7 +725,7 @@ const fill = barFill(s.color, config, val < 0);
                     width={Math.max(w, 0)}
                     height={rectH}
                     fill={fill}
-                    rx={corners === undefined ? radius : 0}
+                    rx={0}
                     stroke={borderW > 0 ? borderColor : 'none'}
                     strokeWidth={borderW}
                     opacity={st.globalOpacity}
@@ -906,8 +850,8 @@ const fill = barFill(s.color, config, val < 0);
             );
           })}
         </Zone>
+        <ChartOverlays config={config} width={width} />
         </svg>
-        {tooltipEnabled && <HoverTooltip tip={tip} />}
     </div>
   );
 }
@@ -959,7 +903,6 @@ function SingleBar({data, config}: Props) {
   const dlFamily = dlFont?.fontFamily ?? config.dataLabelFontFamily;
   const dlAlign = config.dataLabelFont?.align;
   const dlWeight = dlFont?.weight ?? 400;
-  const tooltipEnabled = config.tooltipEnabled ?? true;
   const labelAngle = config.labelAngle ?? (n > 8 ? -30 : 0);
   const yTickFamily = config.yLabelFont?.fontFamily;
   const yTickSize = config.yLabelFont?.size ?? 10;
@@ -978,20 +921,12 @@ function SingleBar({data, config}: Props) {
     weight: config.categoryDescriptionFont?.weight ?? 400,
   };
   const marginAdj = {...margin};
-  const [tip, setTip] = useState<TooltipState | null>(null);
   // Category labels / descriptions are placed by absolute coordinates and no
   // longer reserve margins, so label size/offset/overflow never move the plot.
   const plotW2 = width - marginAdj.left - marginAdj.right;
   const plotH2 = height - marginAdj.top - marginAdj.bottom;
 
   const avatarUrl = (raw?: Record<string, unknown>): string | null => avatarUrlOf(avatarField, raw);
-
-  const itemTip = (d: (typeof prepared.items)[number], frac: {x: number; y: number}): TooltipState => ({
-    ...frac,
-    title: resolvedCategoryLabel(config, d.label),
-    img: avatarActive ? avatarUrl(d.raw) : null,
-    rows: [{label: 'Valor', color: colorFor(config, d.label, prepared.items.indexOf(d)), value: formatValue(d.value, numFmt)}],
-  });
 
   if (horizontal) {
     const barH = Math.min(40, (plotH2 / n) * 0.7);
@@ -1023,7 +958,7 @@ function SingleBar({data, config}: Props) {
             {config.yLabel && <YAxisTitle text={config.yLabel} height={height} color={yAxisColor} size={11} family={yAxisFamily} weight={config.yLabelFont?.weight ?? 400} align={config.yLabelFont?.align} x={14} />}
           </Zone>
           <Zone id="plot">
-            {referenceLinesSvg(false, true, domain, yRange, marginAdj, plotW2, plotH2, config)}
+            {referenceLinesSvg(false, true, false, domain, yRange, marginAdj, plotW2, plotH2, config)}
 
           {prepared.items.map((d, i) => {
             const y = marginAdj.top + gap + i * (barH + gap);
@@ -1067,15 +1002,10 @@ function SingleBar({data, config}: Props) {
             return (
               <g
                 key={i}
-                className={tooltipEnabled ? 'cursor-pointer' : undefined}
-                onMouseMove={tooltipEnabled ? (e) => setTip(itemTip(d, hoverPos(e))) : undefined}
-                onMouseLeave={tooltipEnabled ? () => setTip(null) : undefined}
                 fontFamily={dlFamily}
                 fontWeight={dlWeight}
               >
-                {bw > 0 && (config.barRadiusEndsOnly ?? false) ? (
-                  <path d={roundedRectPath(marginAdj.left, y, bw, barH, radius, {tr: true, br: true})} fill={barFill(color, config, d.value < 0)} stroke={borderW > 0 ? borderColor : 'none'} strokeWidth={borderW} opacity={st.globalOpacity} />
-                ) : (
+                {bw > 0 && (
                   <rect x={marginAdj.left} y={y} width={bw} height={barH} fill={barFill(color, config, d.value < 0)} rx={radius} stroke={borderW > 0 ? borderColor : 'none'} strokeWidth={borderW} opacity={st.globalOpacity} />
                 )}
                 {config.showDataLabels !== false && dlPos === 'center' && (
@@ -1099,8 +1029,8 @@ function SingleBar({data, config}: Props) {
             );
           })}
           </Zone>
+          <ChartOverlays config={config} width={width} />
         </svg>
-        {tooltipEnabled && <HoverTooltip tip={tip} />}
       </div>
     );
   }
@@ -1132,7 +1062,7 @@ function SingleBar({data, config}: Props) {
           {config.yLabel && <YAxisTitle text={config.yLabel} height={height} color={yAxisColor} size={11} family={yAxisFamily} weight={config.yLabelFont?.weight ?? 400} align={config.yLabelFont?.align} x={16} />}
         </Zone>
         <Zone id="plot">
-          {referenceLinesSvg(false, false, domain, yRange, marginAdj, plotW2, plotH2, config)}
+          {referenceLinesSvg(false, false, false, domain, yRange, marginAdj, plotW2, plotH2, config)}
           {prepared.items.map((d, i) => {
           const x = marginAdj.left + gap + i * (barWidth + gap);
           const barH = ((d.value - domain.yMin) / yRange) * plotH2;
@@ -1179,15 +1109,10 @@ function SingleBar({data, config}: Props) {
           return (
 <g
             key={i}
-            className={tooltipEnabled ? 'cursor-pointer' : undefined}
-            onMouseMove={tooltipEnabled ? (e) => setTip(itemTip(d, hoverPos(e))) : undefined}
-            onMouseLeave={tooltipEnabled ? () => setTip(null) : undefined}
             fontFamily={dlFamily}
             fontWeight={dlWeight}
           >
-              {barH > 0 && (config.barRadiusEndsOnly ?? false) ? (
-                <path d={roundedRectPath(x, topY, barWidth, barH, radius, d.value < 0 ? {bl: true, br: true} : {tl: true, tr: true})} fill={barFill(color, config, d.value < 0)} stroke={borderW > 0 ? borderColor : 'none'} strokeWidth={borderW} opacity={st.globalOpacity} />
-              ) : (
+              {barH > 0 && (
                 <rect x={x} y={topY} width={barWidth} height={Math.max(barH, 0)} fill={barFill(color, config, d.value < 0)} rx={radius} stroke={borderW > 0 ? borderColor : 'none'} strokeWidth={borderW} opacity={st.globalOpacity} />
               )}
               {config.showDataLabels !== false && dlPos === 'center' && (
@@ -1214,8 +1139,8 @@ function SingleBar({data, config}: Props) {
         <Zone id="footer">
           {config.xLabel && <XAxisTitle text={config.xLabel} width={width} height={height} color={xAxisColor} size={11} family={xAxisFamily} weight={config.xLabelFont?.weight ?? 400} align={config.xLabelFont?.align} />}
         </Zone>
+        <ChartOverlays config={config} width={width} />
       </svg>
-      {tooltipEnabled && <HoverTooltip tip={tip} />}
     </div>
   );
 }

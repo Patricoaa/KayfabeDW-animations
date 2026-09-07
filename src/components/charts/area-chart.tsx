@@ -2,7 +2,7 @@
 
 import type {ChartConfig} from '@/lib/chart-config';
 import {prepareSeries, prepareMultiSeries, formatValue, resolvedCategoryLabel, resolveChartStyle, resolveYDomain, type PreparedMultiSeries} from '@/lib/chart-data';
-import {SvgHeader, SvgLegend, headerHeight, legendReserve, frameRect, legendItemsFrom, XAxisTitle, YAxisTitle, type LegendItem} from './chart-frame';
+import {SvgHeader, SvgLegend, ChartOverlays, headerHeight, legendReserve, frameRect, legendItemsFrom, XAxisTitle, YAxisTitle, type LegendItem} from './chart-frame';
 
 type Props = {
   data: Record<string, unknown>[];
@@ -110,6 +110,7 @@ function MultiArea({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
               </text>
             );
           })}
+        <ChartOverlays config={config} width={width} />
         </svg>
     </div>
   );
@@ -194,6 +195,7 @@ function SingleArea({data, config}: Props) {
         </text>
       );
       })}
+      <ChartOverlays config={config} width={width} />
     </svg>
     </div>
   );

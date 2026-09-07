@@ -2,7 +2,7 @@
 
 import React, {useEffect, useState} from 'react';
 import {BarChart3, PieChart, LineChart, AreaChart, ScatterChart, Table2, ChevronDown} from 'lucide-react';
-import type {ChartConfig, ChartType, NumberFormat, SortBy, ChartFilter, ChartFilterOp, LegendPosition, ChartStyle, AvatarShape, AvatarCrop, SectionFont, TextLayout} from '@/lib/chart-config';
+import type {ChartConfig, ChartType, ChartOverlay, NumberFormat, SortBy, ChartFilter, ChartFilterOp, LegendPosition, ChartStyle, AvatarShape, AvatarCrop, SectionFont, TextLayout} from '@/lib/chart-config';
 import {FONT_PRESETS, PALETTES} from '@/lib/chart-config';
 import {pickColor, colorFor} from '@/lib/chart-data';
 import {TextControls} from '@/components/builder/text-controls';
@@ -64,6 +64,12 @@ const FILTER_OPS: {value: ChartFilterOp; label: string}[] = [
   {value: 'is_not_empty', label: 'no vacío'},
 ];
 
+let overlaySeq = 0;
+function newOverlayId(): string {
+  overlaySeq += 1;
+  return `ov-${Date.now().toString(36)}-${overlaySeq}`;
+}
+
 // Collapsible accordion section (Flourish-style single-open panel). Each
 // section owns its own open state; "Datos" is open by default.
 function Section({title, defaultOpen = false, children}: {title: string; defaultOpen?: boolean; children: React.ReactNode}) {
@@ -87,6 +93,11 @@ function Section({title, defaultOpen = false, children}: {title: string; default
 
 export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, fanOutTables = [], fieldMeta = [], data}: ChartConfigPanelProps) {
   const update = (patch: Partial<ChartConfig>) => onChange({...config, ...patch});
+  const setOverlay = (index: number, patch: Partial<ChartOverlay>) => {
+    const next = [...(config.overlays ?? [])];
+    next[index] = {...next[index], ...patch};
+    update({overlays: next});
+  };
   const updateFilter = (index: number, patch: Partial<ChartFilter>) => {
     const next = [...(config.filters ?? [])];
     next[index] = {...next[index], ...patch};
@@ -596,7 +607,14 @@ const setLegendTextOverride = (label: string, value?: string) => {
             </div>
           </div>
           <NumberInput label="Radio de esquinas" value={config.barRadius} min={0} max={24} onChange={(v) => update({barRadius: v})} />
-          <Toggle label="Píldora (radio solo en extremo exterior)" checked={config.barRadiusEndsOnly ?? false} onChange={(v) => update({barRadiusEndsOnly: v})} />
+          {(config.groupMode === 'stacked' || config.groupMode === 'stacked-percent') && (
+            <div className="grid grid-cols-2 gap-2">
+              <NumberInput label="Radio sup. izq." value={config.barRadiusTL} min={0} max={24} onChange={(v) => update({barRadiusTL: v})} />
+              <NumberInput label="Radio sup. der." value={config.barRadiusTR} min={0} max={24} onChange={(v) => update({barRadiusTR: v})} />
+              <NumberInput label="Radio inf. izq." value={config.barRadiusBL} min={0} max={24} onChange={(v) => update({barRadiusBL: v})} />
+              <NumberInput label="Radio inf. der." value={config.barRadiusBR} min={0} max={24} onChange={(v) => update({barRadiusBR: v})} />
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2">
             <NumberInput label="Grosor de borde" value={config.barBorderWidth} min={0} max={6} onChange={(v) => update({barBorderWidth: v})} />
             {(config.barBorderWidth ?? 0) > 0 && (
@@ -921,7 +939,11 @@ const setLegendTextOverride = (label: string, value?: string) => {
               </button>
             </div>
             {(config.referenceLines ?? []).length === 0 && (
-              <p className="text-[10px] text-muted">Marcadores horizontales en un valor del eje Y (ej: promedio, objetivo).</p>
+              <p className="text-[10px] text-muted">
+                {isStackedPercent
+                  ? 'Marcadores en el eje Y (valor en %: 50 = 50%).'
+                  : 'Marcadores horizontales en un valor del eje Y (ej: promedio, objetivo).'}
+              </p>
             )}
             {(config.referenceLines ?? []).map((rl, i) => (
               <div key={i} className="flex items-center gap-1.5 mb-1.5">
@@ -1266,30 +1288,88 @@ const setLegendTextOverride = (label: string, value?: string) => {
         </Section>
       )}
 
-      {/* Tooltip */}
+      {/* ============ ADICIONALES ============ */}
       {config.type !== 'table' && (
-        <div className="flex justify-between items-center px-1">
-          <label className="text-sm text-secondary">Tooltip al pasar el cursor</label>
-          <input
-            type="checkbox"
-            role="switch"
-            checked={config.tooltipEnabled ?? true}
-            onChange={(e) => update({tooltipEnabled: e.target.checked})}
-            className="peer sr-only"
-          />
-          <span
-            aria-hidden="true"
-            className={`relative w-9 h-5 rounded-full transition-colors ${
-              config.tooltipEnabled ? 'bg-amber-500' : 'bg-border-default'
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
-                config.tooltipEnabled ? 'translate-x-4' : ''
-              }`}
-            />
-          </span>
-        </div>
+        <Section title="Adicionales">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => update({overlays: [...(config.overlays ?? []), {id: newOverlayId(), type: 'text', text: 'Texto', layout: {x: 20, y: 20}}]})}
+              className="flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors bg-elevated text-secondary hover:bg-card-hover"
+            >
+              + Texto
+            </button>
+            <button
+              type="button"
+              onClick={() => update({overlays: [...(config.overlays ?? []), {id: newOverlayId(), type: 'image', x: 20, y: 20, width: 80, height: 80}]})}
+              className="flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors bg-elevated text-secondary hover:bg-card-hover"
+            >
+              + Imagen
+            </button>
+          </div>
+          {(config.overlays ?? []).length === 0 && (
+            <p className="text-[10px] text-muted">Capas libres sobre el lienzo (imágenes o textos) que se superponen a cualquier gráfico y salen incluidas en los exports.</p>
+          )}
+          {(config.overlays ?? []).map((ov, i) => (
+            <div key={ov.id} className="rounded-lg border border-border-subtle p-2.5 space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-secondary uppercase tracking-widest font-display">
+                  {ov.type === 'image' ? 'Imagen' : 'Texto'} {i + 1}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = [...(config.overlays ?? [])];
+                    next.splice(i, 1);
+                    update({overlays: next});
+                  }}
+                  className="text-muted hover:text-red-500 text-xs"
+                  aria-label="Eliminar adicional"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {ov.type === 'text' ? (
+                <>
+                  <textarea
+                    value={ov.text ?? ''}
+                    onChange={(e) => setOverlay(i, {text: e.target.value})}
+                    rows={2}
+                    placeholder="Texto"
+                    className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <TextControls value={ov.font} onChange={(patch) => setOverlay(i, {font: {...(ov.font ?? {}), ...patch}})} />
+                    <div className="space-y-2">
+                      <LayoutControls title="Posición (px)" value={ov.layout} onChange={(patch) => setOverlay(i, {layout: {...(ov.layout ?? {}), ...patch}})} />
+                      <NumberInput label="Ancho máx. (px)" value={ov.maxWidth} min={0} max={2000} onChange={(v) => setOverlay(i, {maxWidth: v})} />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    value={ov.src ?? ''}
+                    onChange={(e) => setOverlay(i, {src: e.target.value})}
+                    placeholder="URL de la imagen"
+                    className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <NumberInput label="X (izq.)" value={ov.x} onChange={(v) => setOverlay(i, {x: v})} />
+                    <NumberInput label="Y (top)" value={ov.y} onChange={(v) => setOverlay(i, {y: v})} />
+                    <NumberInput label="Ancho" value={ov.width} min={0} max={600} onChange={(v) => setOverlay(i, {width: v})} />
+                    <NumberInput label="Alto" value={ov.height} min={0} max={600} onChange={(v) => setOverlay(i, {height: v})} />
+                    <NumberInput label="Opacidad (0-1)" value={ov.opacity} min={0} max={1} step={0.05} onChange={(v) => setOverlay(i, {opacity: v})} />
+                    <NumberInput label="Rotación (°)" value={ov.rotation} onChange={(v) => setOverlay(i, {rotation: v})} />
+                  </div>
+                </>
+              )}
+              <p className="text-[10px] text-muted">Las imágenes se muestran en el preview y en el SVG descargado; puede que no aparezcan al exportar a PNG.</p>
+            </div>
+          ))}
+        </Section>
       )}
     </div>
   );

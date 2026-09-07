@@ -2,7 +2,7 @@
 
 import type {ChartConfig} from '@/lib/chart-config';
 import {formatValue, resolveChartStyle, resolveYDomain, resolveXDomain, colorFor} from '@/lib/chart-data';
-import {SvgHeader, SvgLegend, headerHeight, legendReserve, frameRect, legendItemsFrom, type LegendItem} from './chart-frame';
+import {SvgHeader, SvgLegend, ChartOverlays, headerHeight, legendReserve, frameRect, legendItemsFrom, type LegendItem} from './chart-frame';
 
 type Props = {
   data: Record<string, unknown>[];
@@ -142,6 +142,7 @@ export function ScatterChart({data, config}: Props) {
 
       <text x={width / 2} y={height - 8} textAnchor="middle" fill={xAxisColor} fontSize={11} fontFamily={xAxisFamily} fontWeight={config.xLabelFont?.weight ?? 400}>{xLabel}</text>
       <text x={14} y={height / 2} textAnchor="middle" fill={yAxisColor} fontSize={11} fontFamily={yAxisFamily} fontWeight={config.yLabelFont?.weight ?? 400} transform={`rotate(-90, 14, ${height / 2})`}>{yLabel}</text>
+      <ChartOverlays config={config} width={width} />
     </svg>
     </div>
   );

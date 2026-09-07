@@ -75,6 +75,28 @@ export const FONT_WEIGHTS: {value: FontWeight; label: string}[] = [
   {value: 700, label: 'Negrita'},
 ];
 
+// Free-form overlay drawn inside the chart SVG, above every other element.
+// Reusable across all chart types; coordinates are in viewBox units from the
+// top-left corner (0,0). Only the fields relevant to `type` are used: text
+// overlays read `text`/`font`/`layout`/`maxWidth`, image ones read the rest.
+export type ChartOverlay = {
+  id: string;
+  type: 'text' | 'image';
+  // text
+  text?: string;
+  font?: SectionFont;     // family / color / size / weight / align
+  layout?: TextLayout;    // x/y/anchor/rotation/opacity/bg... (same as titles)
+  maxWidth?: number;      // px wrap width (optional; 0 = no wrap)
+  // image
+  src?: string;
+  x?: number;             // left edge
+  y?: number;             // top edge
+  width?: number;
+  height?: number;
+  opacity?: number;       // 0-1
+  rotation?: number;      // degrees clockwise around the center
+};
+
 export type ChartFilterOp = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'is_empty' | 'is_not_empty';
 
 export type ChartFilter = {
@@ -231,16 +253,19 @@ export type ChartConfig = {
   categoryDescriptionFont?: SectionFont;
 
   // F6: granular bar styling (Flourish-like editor).
-  barRadius?: number;              // corner radius of bars (px)
+  barRadius?: number;              // corner radius of bars (px), applied to all corners
+  // Per-corner radius overrides for stacked bars (stacked / stacked-percent):
+  // each stack's ONLY the outer ends get rounded — base/top of the stack use
+  // these values when set, falling back to `barRadius`. Ignored on grouped bars.
+  barRadiusTL?: number;
+  barRadiusTR?: number;
+  barRadiusBL?: number;
+  barRadiusBR?: number;
   barBorderColor?: string;         // stroke around each bar
   barBorderWidth?: number;         // stroke width (0 = off)
   barGap?: number;                 // px gap between bars in the same category
   barCategoryGap?: number;         // 0-0.5 fraction of the band used as side padding
   negativeColor?: string;          // color for negative-value bars (single/grouped)
-  // Pill-bar look: corner radius applies only to the outer end of each bar.
-  // Only available/functional for stacked bar modes (the Flourish "rounded
-  // stacked" treat); grouped/single bars always use the plain radius.
-  barRadiusEndsOnly?: boolean;
 
   // Data labels (independent of the series/axis text colors).
   dataLabelPosition?: 'auto' | 'inside' | 'outside' | 'center';
@@ -301,8 +326,9 @@ export type ChartConfig = {
   // Horizontal reference / target lines drawn over the plot.
   referenceLines?: {value: number; label?: string; color?: string; dash?: boolean}[];
 
-  // Hover tooltips.
-  tooltipEnabled?: boolean;
+  // Free-form overlays (images/text) drawn above the plot, reusable across all
+  // chart types. Prepared with `newChartOverlay()` ids in the builder.
+  overlays?: ChartOverlay[];
 
   configVersion?: number;
 };
@@ -347,7 +373,6 @@ export const DEFAULT_CHART_CONFIG: ChartConfig = {
   categoryLabelOffsetX: 0,
   categoryLabelOffsetY: 0,
   categoryLabelsVisible: true,
-  barRadiusEndsOnly: false,
   canvasBorderRadius: 0,
   canvasBorderWidth: 0,
   spacing: {
@@ -358,7 +383,6 @@ export const DEFAULT_CHART_CONFIG: ChartConfig = {
     plotMarginBottom: 66,
     plotMarginLeft: 66,
   },
-  tooltipEnabled: true,
   configVersion: CHART_CONFIG_VERSION,
 };
 
