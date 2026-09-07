@@ -62,7 +62,7 @@ export function PieChart({data, config}: Props) {
   // Header + legend reserves, then fit the pie in the remaining area.
   const legendItems: LegendItem[] = legendItemsFrom(visible, config, (s) => s.label, (s) => colorAt(s.label));
   const headerH = headerHeight(config, st, config.width ?? 600);
-  const legendR = legendReserve(config, legendItems);
+  const legendR = legendReserve(config, legendItems, width);
   const showLegend = config.showLegend ?? true;
   const sp = config.spacing ?? {};
   const padTop = sp.plotMarginTop ?? 24;

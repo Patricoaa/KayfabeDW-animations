@@ -239,6 +239,42 @@ function textLines(s: string | undefined, fs: number, maxW: number, overflow?: T
 // monospace-ish in the panel, so a 0.55·fontSize factor per char is enough.
 const textWidth = (s: string, fs: number) => Math.min(s.length, 24) * fs * 0.58;
 
+// Legend layout metrics. Item widths use the FULL visible label (no 24-char
+// cap) with a generous 0.62·fontSize factor so proportional fonts never let a
+// neighbor item underlap; pad/gap give each entry comfortable internal room.
+const LEGEND_PAD = 7;        // swatch → label
+const LEGEND_ITEM_GAP = 16;  // between items
+const LEGEND_CHAR_W = 0.62;  // average glyph width factor
+const legendTextW = (s: string, fs: number) => s.length * fs * LEGEND_CHAR_W;
+const legendItemW = (label: string, fs: number, sw: number) =>
+  sw + LEGEND_PAD + legendTextW(label, fs) + LEGEND_ITEM_GAP;
+
+// The label actually rendered for a legend entry (honors the font overflow:
+// 'none' draws it whole, otherwise it's truncated to `max` chars).
+const legendDisplay = (label: string, max: number, overflow?: TextOverflow) =>
+  overflow === 'none' ? label : truncate(label, max);
+
+// Greedy multi-row wrap so EVERY legend item with data stays visible. A solo
+// item wider than `avail` is kept alone on its row and gets truncated by the
+// renderer (legendDisplay max) so it cannot overlap its neighbors.
+function wrapLegendItems(items: LegendItem[], slot: (it: LegendItem) => number, avail: number): LegendItem[][] {
+  const rows: LegendItem[][] = [];
+  let current: LegendItem[] = [];
+  let used = 0;
+  for (const it of items) {
+    const w = slot(it);
+    if (current.length > 0 && used + w > avail) {
+      rows.push(current);
+      current = [];
+      used = 0;
+    }
+    current.push(it);
+    used += w;
+  }
+  if (current.length) rows.push(current);
+  return rows;
+}
+
 // Per-corner corner radius of a rounded rect (px).
 export type CornerRadii = {tl?: number; tr?: number; bl?: number; br?: number};
 
@@ -423,14 +459,22 @@ export function SvgHeader({config, st, width}: {config: ChartConfig; st: Resolve
 
 // Reserved margins (SVG units) for a rendered legend outside the plot area.
 // Free coordinates (legendLayout with explicit x/y) reserve nothing: the
-// legend is drawn over the canvas wherever the offsets point.
-export function legendReserve(config: ChartConfig, items: LegendItem[]): {top: number; right: number; bottom: number} {
+// legend is drawn over the canvas wherever the offsets point. Top/bottom
+// legends wrap to multiple rows and reserve one row of height per extra line,
+// keeping single-row layouts pixel-identical to before.
+export function legendReserve(config: ChartConfig, items: LegendItem[], width = 600): {top: number; right: number; bottom: number} {
   if (!(config.showLegend ?? true) || items.length === 0) return {top: 0, right: 0, bottom: 0};
   const l = config.legendLayout;
   if (l && (l.x != null || l.y != null)) return {top: 0, right: 0, bottom: 0};
   const pos = config.legendPosition ?? 'bottom';
   if (pos === 'right') return {top: 0, right: 118, bottom: 0};
-  return pos === 'top' ? {top: 20, right: 0, bottom: 0} : {top: 0, right: 0, bottom: 16};
+  const fs = config.legendFont?.size ?? 10;
+  const sw = Math.max(6, Math.round(fs));
+  const overflow = config.legendFont?.overflow;
+  const avail = Math.max(120, width - 24);
+  const rows = wrapLegendItems(items, (it) => legendItemW(legendDisplay(it.label, 24, overflow), fs, sw), avail);
+  const extra = (rows.length - 1) * (fs + 6);
+  return pos === 'top' ? {top: 20 + extra, right: 0, bottom: 0} : {top: 0, right: 0, bottom: 16 + extra};
 }
 
 // Legend rendered inside the SVG, adapting to top/right/bottom positions and
@@ -455,19 +499,22 @@ export function SvgLegend({
   if (items.length === 0) return null;
   const fs = config.legendFont?.size ?? 10;
   const sw = Math.max(6, Math.round(fs));
-  const gap = 14;
+  const rowH = fs + 6;
   const family = config.legendFont?.fontFamily ?? st.fontFamily;
   const color = config.legendFont?.color ?? st.textColor;
   const weight = config.legendFont?.weight ?? 500;
   const align = config.legendFont?.align ?? 'center';
-  const labelOf = (s: string, max: number) => (config.legendFont?.overflow === 'none' ? s : truncate(s, max));
+  const overflow = config.legendFont?.overflow;
+  const labelOf = (s: string, max: number) => legendDisplay(s, max, overflow);
+  const slotW = sw + LEGEND_PAD + LEGEND_ITEM_GAP;
+  const slotFor = (it: LegendItem) => legendItemW(legendDisplay(it.label, 24, overflow), fs, sw);
 
   const layout = config.legendLayout;
   if (layout && (layout.x != null || layout.y != null)) {
     // Free placement via canvas offset coordinates (anchor/align/rotation).
     const anchor = layout.anchor ?? 'center';
     const refX = anchor === 'left' ? (layout.x ?? 0) : anchor === 'right' ? width - (layout.x ?? 0) : width / 2 + (layout.x ?? 0);
-    const boxW = items.reduce((acc, it) => acc + sw + 6 + textWidth(it.label, fs) + gap, 0) - gap;
+    const boxW = items.reduce((acc, it) => acc + slotFor(it), 0) - LEGEND_ITEM_GAP;
     const lAlign = layout.align ?? 'center';
     const startX = lAlign === 'left' ? refX : lAlign === 'right' ? refX - boxW : refX - boxW / 2;
     const baseY = layout.y ?? 0;
@@ -479,11 +526,11 @@ export function SvgLegend({
         transform={layout.rotation ? `rotate(${layout.rotation}, ${refX}, ${baseY})` : undefined}
       >
         {items.map((it, i) => {
-          const x = startX + i * (sw + 6 + textWidth(it.label, fs) + gap);
+          const x = startX + i * slotFor(it);
           return (
             <g key={it.label} transform={`translate(${x}, ${baseY})`}>
               <rect x={0} y={-sw / 2} width={sw} height={sw} fill={it.color} />
-              <text x={sw + 6} y={0} fontSize={fs} fill={color} fontWeight={weight} letterSpacing={ls}>{labelOf(it.label, 24)}</text>
+              <text x={sw + LEGEND_PAD} y={0} dominantBaseline="central" fontSize={fs} fill={color} fontWeight={weight} letterSpacing={ls}>{labelOf(it.label, 24)}</text>
             </g>
           );
         })}
@@ -493,47 +540,47 @@ export function SvgLegend({
 
   if (position === 'right') {
     const x = width - 112;
-    let y = 10;
+    const maxRows = Math.max(1, Math.floor((height - headerOffset - 16) / rowH));
+    let y = headerOffset + 10;
     return (
       <g fontFamily={family}>
-        {items.slice(0, 60).map((it) => {
+        {items.slice(0, maxRows).map((it) => {
           const el = (
             <g key={it.label} transform={`translate(${x}, ${y})`}>
               <rect x={0} y={-sw / 2} width={sw} height={sw} fill={it.color} />
-              <text x={sw + 6} y={0} fontSize={fs} fill={color} fontWeight={weight}>{labelOf(it.label, 15)}</text>
+              <text x={sw + LEGEND_PAD} y={0} dominantBaseline="central" fontSize={fs} fill={color} fontWeight={weight}>{labelOf(it.label, 15)}</text>
             </g>
           );
-          y += 16;
+          y += rowH;
           return el;
         })}
       </g>
     );
   }
 
-  const avail = width - 24;
-  const items2: LegendItem[] = [];
-  let used = 0;
-  for (const it of items) {
-    const w = sw + 6 + textWidth(it.label, fs) + gap;
-    if (used + w > avail && items2.length > 0) break;
-    items2.push(it);
-    used += w;
-  }
-
-  const boxW = used;
-  let x = align === 'left' ? 12 : align === 'right' ? Math.max(0, width - 12 - boxW) : Math.max(0, (width - boxW) / 2);
-  const y = position === 'top' ? headerOffset + 13 : height - 8;
+  const avail = Math.max(120, width - 24);
+  const rows = wrapLegendItems(items, slotFor, avail);
+  const isTop = position === 'top';
   return (
     <g fontFamily={family}>
-      {items2.map((it) => {
-        const el = (
-          <g key={it.label} transform={`translate(${x}, ${y})`}>
-            <rect x={0} y={-sw / 2} width={sw} height={sw} fill={it.color} />
-            <text x={sw + 6} y={0} fontSize={fs} fill={color} fontWeight={weight}>{labelOf(it.label, 24)}</text>
+      {rows.map((row, ri) => {
+        const boxW = row.reduce((acc, it) => acc + slotFor(it), 0) - LEGEND_ITEM_GAP;
+        let x = align === 'left' ? 12 : align === 'right' ? Math.max(0, width - 12 - boxW) : Math.max(0, (width - boxW) / 2);
+        const y = isTop ? headerOffset + 13 + ri * rowH : height - 8 - (rows.length - 1 - ri) * rowH;
+        return (
+          <g key={ri}>
+            {row.map((it) => {
+              const el = (
+                <g key={it.label} transform={`translate(${x}, ${y})`}>
+                  <rect x={0} y={-sw / 2} width={sw} height={sw} fill={it.color} />
+                  <text x={sw + LEGEND_PAD} y={0} dominantBaseline="central" fontSize={fs} fill={color} fontWeight={weight}>{labelOf(it.label, 24)}</text>
+                </g>
+              );
+              x += slotFor(it);
+              return el;
+            })}
           </g>
         );
-        x += sw + 6 + textWidth(it.label, fs) + gap;
-        return el;
       })}
     </g>
   );

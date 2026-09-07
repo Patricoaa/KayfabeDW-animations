@@ -26,7 +26,7 @@ function MultiLine({multi, config}: {multi: PreparedMultiSeries; config: ChartCo
   const height = config.height ?? 380;
   const legendItems: LegendItem[] = legendItemsFrom(multi.series, config, (s) => s.name, (s) => s.color);
   const headerH = headerHeight(config, st, config.width ?? 600);
-  const legendR = legendReserve(config, legendItems);
+  const legendR = legendReserve(config, legendItems, width);
   const sp = config.spacing ?? {};
   const margin = {top: (sp.plotMarginTop ?? 24) + headerH + legendR.top + (sp.headerPadding ?? 0) + (sp.legendSpacing ?? 0), right: (sp.plotMarginRight ?? 40) + legendR.right + (sp.legendSpacing ?? 0), bottom: (sp.plotMarginBottom ?? 66) + legendR.bottom + (sp.legendSpacing ?? 0), left: (sp.plotMarginLeft ?? 84)};
   const plotW = width - margin.left - margin.right;
