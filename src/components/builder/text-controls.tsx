@@ -166,7 +166,7 @@ export function AlignControl({value, onChange}: {value?: TextAlign; onChange: (v
  * overflow and alignment. Mirror of the received `SectionFont`; every field
  * "inherits" from the general chart typography when left unset (Auto).
  */
-export function TextControls({value, onChange}: {value?: SectionFont; onChange: (patch: Partial<SectionFont>) => void}) {
+export function TextControls({value, onChange, hideColor = false}: {value?: SectionFont; onChange: (patch: Partial<SectionFont>) => void; hideColor?: boolean}) {
   return (
     <div className="space-y-2.5 rounded-lg border border-border-subtle p-2.5">
       <WeightControl value={value?.weight} onChange={(w) => onChange({weight: w})} />
@@ -176,7 +176,7 @@ export function TextControls({value, onChange}: {value?: SectionFont; onChange: 
       </div>
       <div className="grid grid-cols-2 gap-2">
         <NumberInput label="Tamaño" value={value?.size} min={6} max={40} onChange={(v) => onChange({size: v})} />
-        <ColorInput label="Color" value={value?.color} onChange={(v) => onChange({color: v || undefined})} />
+        {!hideColor && <ColorInput label="Color" value={value?.color} onChange={(v) => onChange({color: v || undefined})} />}
       </div>
       <OverflowControl value={value?.overflow} onChange={(v) => onChange({overflow: v})} />
       <AlignControl value={value?.align} onChange={(v) => onChange({align: v})} />

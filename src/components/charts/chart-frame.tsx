@@ -518,9 +518,9 @@ export function SvgLegend({
   const sw = Math.max(6, Math.round(fs));
   const rowH = fs + 6;
   const family = config.legendFont?.fontFamily ?? st.fontFamily;
-  // Label color: an explicit `legendFont.color` wins; otherwise (default/Auto)
-  // the label inherits the color of the category/series it represents.
-  const colorFor = (it: LegendItem) => config.legendFont?.color ?? it.color;
+  // Label color always inherits the category/series color; no override is
+  // possible (any stored legendFont.color is ignored).
+  const colorFor = (it: LegendItem) => it.color;
   const weight = config.legendFont?.weight ?? 500;
   const align = config.legendFont?.align ?? 'center';
   const overflow = config.legendFont?.overflow;

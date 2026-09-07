@@ -1035,7 +1035,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
           <div className="pt-1 border-t border-border-subtle">
             <label className="text-xs font-semibold text-muted uppercase tracking-widest font-display">Fuente de la leyenda</label>
             <div className="mt-2">
-              <TextControls value={config.legendFont} onChange={setLegendFont} />
+              <TextControls value={config.legendFont} onChange={setLegendFont} hideColor />
             </div>
           </div>
           {legendOverrideLabels.length > 0 && (
