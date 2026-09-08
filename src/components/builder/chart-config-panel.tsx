@@ -579,7 +579,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
       )}
 
       {/* ============ VISUALIZACIÓN (barras / iconos) ============ */}
-      {config.type === 'bar' && hasSeries && (
+      {config.type === 'bar' && (
         <Section title="Visualización">
           {/* Tipo: Barras / Iconos */}
           <div>
@@ -627,30 +627,32 @@ const setLegendTextOverride = (label: string, value?: string) => {
             </div>
           </div>
 
-          {/* Modo de agrupación — aplica a barras e iconos (iconos usan isStackedPercent) */}
-          <div>
-            <label className="text-sm font-medium mb-1 block">Modo</label>
-            <div className="flex gap-1">
-              {[
-                {value: 'grouped' as const, label: 'Agrupadas'},
-                {value: 'grouped-percent' as const, label: 'Agrupadas %'},
-                {value: 'stacked' as const, label: 'Apiladas'},
-                {value: 'stacked-percent' as const, label: 'Apiladas %'},
-              ].map((m) => (
-                <button
-                  key={m.value}
-                  onClick={() => update({groupMode: m.value})}
-                  className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
-                    (config.groupMode ?? 'grouped') === m.value
-                      ? 'bg-amber-500 text-black'
-                      : 'bg-elevated text-secondary hover:bg-card-hover'
-                  }`}
-                >
-                  {m.label}
-                </button>
-              ))}
+          {/* Modo de agrupación — solo cuando hay series */}
+          {hasSeries && (
+            <div>
+              <label className="text-sm font-medium mb-1 block">Modo</label>
+              <div className="flex gap-1">
+                {[
+                  {value: 'grouped' as const, label: 'Agrupadas'},
+                  {value: 'grouped-percent' as const, label: 'Agrupadas %'},
+                  {value: 'stacked' as const, label: 'Apiladas'},
+                  {value: 'stacked-percent' as const, label: 'Apiladas %'},
+                ].map((m) => (
+                  <button
+                    key={m.value}
+                    onClick={() => update({groupMode: m.value})}
+                    className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                      (config.groupMode ?? 'grouped') === m.value
+                        ? 'bg-amber-500 text-black'
+                        : 'bg-elevated text-secondary hover:bg-card-hover'
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </Section>
       )}
 
@@ -680,7 +682,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
       )}
 
       {/* ============ ICONOS (pictograma) ============ */}
-      {config.type === 'bar' && hasSeries && config.iconMode === 'icons' && (
+      {config.type === 'bar' && config.iconMode === 'icons' && (
         <Section title="Iconos">
           <div>
             <label className="text-sm font-medium mb-1 block">Icono base (SVG)</label>
