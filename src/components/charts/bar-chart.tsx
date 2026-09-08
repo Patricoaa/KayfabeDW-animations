@@ -16,10 +16,23 @@ type Props = {
 // Renders one lucide glyph path centered at (cx, cy) with the given
 // size and stroke color. Uses stroke-based rendering (lucide native style)
 // so ALL lucide glyphs work correctly (filled or line-based).
-function IconGlyph({cx, cy, size, d, stroke, strokeWidth = 2, opacity = 1}: {cx: number; cy: number; size: number; d: string; stroke: string; strokeWidth?: number; opacity?: number}) {
+function IconGlyph({cx, cy, size, d, image, stroke, strokeWidth = 2, opacity = 1}: {cx: number; cy: number; size: number; d?: string; image?: string; stroke: string; strokeWidth?: number; opacity?: number}) {
+  if (image) {
+    return (
+      <image
+        href={image}
+        x={cx - size / 2}
+        y={cy - size / 2}
+        width={size}
+        height={size}
+        preserveAspectRatio="xMidYMid meet"
+        opacity={opacity}
+      />
+    );
+  }
   return (
     <path
-      d={d}
+      d={d!}
       transform={`translate(${cx - size / 2} ${cy - size / 2}) scale(${size / 24})`}
       stroke={stroke}
       strokeWidth={strokeWidth}
@@ -407,35 +420,21 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const iconShowValue = config.showDataLabels !== false;
   const iconStep = iconSize + iconPadding;
 
-  // Decide how many full icons + partial fraction a bar renders. In absolute
-  // (grouped) mode each icon = `iconUnitsPerGlyph` units (auto-rescaled so icons
-  // always fit the slot when unset). In percent modes each icon = a fixed % of
-  // the category total (`iconPercentPerGlyph`).
-  const iconCountFor = (val: number, total: number, fit: number): {full: number; partial: number} => {
-    const v = Math.max(val, 0);
-    if (v === 0) return {full: 0, partial: 0};
-    let full: number;
-    let frac: number;
+  // Decide the RAW value represented by one single icon.
+  // In percent mode, the user sets `% por icono`. We convert that to raw value.
+  // In absolute mode, the user sets `iconUnitsPerGlyph` (auto-rescaled to fit max if unset).
+  const getIconPc = (fit: number, maxRaw: number, catTotal: number) => {
     if (percentMode) {
       const pc = Math.max(config.iconPercentPerGlyph ?? 10, 0.1);
-      const pct = total > 0 ? (v / total) * 100 : 0;
-      full = Math.floor(pct / pc);
-      frac = (pct / pc) - full;
-    } else {
-      let unit = config.iconUnitsPerGlyph;
-      if (!unit || unit <= 0) {
-        unit = Math.max(1, Math.ceil(v / fit));
-      }
-      full = Math.floor(v / unit);
-      frac = (v / unit) - full;
+      return catTotal * (pc / 100);
     }
-    return {full, partial: frac};
+    let unit = config.iconUnitsPerGlyph;
+    if (!unit || unit <= 0) {
+      unit = Math.max(1, Math.ceil(maxRaw / fit));
+    }
+    return unit;
   };
 
-  // Grid of glyph centers for `full` icons (+1 partial after them) starting from
-  // an origin where the icons grow (vertical: up from bottom; horizontal: right).
-  // `iconMaxPerRow` sets the wrap width (icons per straight segment) in both
-  // directions.
   const iconCell = (i: number, originX: number, originY: number, dir: 'up' | 'right'): {x: number; y: number} => {
     const col = i % iconMaxPerRow;
     const row = Math.floor(i / iconMaxPerRow);
@@ -449,14 +448,6 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
       x: originX + col * iconStep + iconSize / 2,
       y: originY + row * iconStep + iconSize / 2,
     };
-  };
-
-  const iconPositions = (full: number, originX: number, originY: number, dir: 'up' | 'right'): {x: number; y: number}[] => {
-    const pts: {x: number; y: number}[] = [];
-    for (let i = 0; i < full; i++) {
-      pts.push(iconCell(i, originX, originY, dir));
-    }
-    return pts;
   };
 
   // --- HORIZONTAL LAYOUT ---
@@ -532,38 +523,72 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                       let val = rawVal;
 
                       if (iconMode === 'icons') {
-                        // Pictogram: each series draws its own Row of icons in its
-                        // slot, growing left-to-right. Stack/percent modes still
-                        // render per-series (no visual stacking for icons).
-                        const offset = (catBandH - iconBarH * nS) / 2;
-                        const slotY = bandY + offset + si * (iconBarH + barGap);
-                        const fit = Math.max(1, Math.floor(plotW / iconStep));
+                        const isStacked = stacked || stackedPercent;
+                        const val = Math.max(rawVal, 0);
+                        if (val === 0) return null;
                         const catTotal = stackTotal![ci] || 1;
-                        const {full, partial} = iconCountFor(rawVal, catTotal, fit);
-                        const pts = iconPositions(full, marginAdj.left, slotY + iconBarH / 2, 'right');
+                        const base = isStacked ? stackXBase![ci][si] : 0;
+                        const activeNs = isStacked ? 1 : nS;
+                        const fit = Math.max(1, Math.floor(plotW / iconStep));
+                        
+                        // How much value 1 icon represents
+                        const maxRaw = isStacked ? catTotal : val;
+                        const pc = getIconPc(fit, maxRaw, catTotal);
+                        
+                        const startVal = base;
+                        const endVal = base + val;
+                        const startIcon = Math.floor(startVal / pc);
+                        const endIcon = Math.floor(endVal / pc);
+
+                        const iconBarH = Math.max(Math.min(catBandH * 0.7 / activeNs - barGap * 2, 30), 2);
+                        const offset = (catBandH - iconBarH * activeNs) / 2;
+                        const slotY = bandY + offset + (isStacked ? 0 : si) * (iconBarH + barGap);
+                        const originX = marginAdj.left;
+                        const originY = slotY + iconBarH / 2;
                         const fill = barFill(s.color, config, rawVal < 0);
-                        const glyph = iconGlyphD;
-                        // Position of the partial icon: the next grid cell after full.
-                        const partialPos = iconCell(full, marginAdj.left, slotY + iconBarH / 2, 'right');
+
+                        const icons = [];
+                        for (let i = startIcon; i <= endIcon; i++) {
+                          const iconStart = i * pc;
+                          const iconEnd = (i + 1) * pc;
+                          const intersectStart = Math.max(iconStart, startVal);
+                          const intersectEnd = Math.min(iconEnd, endVal);
+                          if (intersectStart >= intersectEnd) continue;
+
+                          const f0 = (intersectStart - iconStart) / pc;
+                          const f1 = (intersectEnd - iconStart) / pc;
+                          const pt = iconCell(i, originX, originY, 'right');
+                          const needsClip = f0 > 0 || f1 < 1;
+                          const clipId = needsClip ? `clip-h-${ci}-${si}-${i}-${Math.round(f0*100)}-${Math.round(f1*100)}` : undefined;
+
+                          icons.push(
+                            <g key={`i-${i}`}>
+                              {needsClip && (
+                                <defs>
+                                  <clipPath id={clipId}>
+                                    <rect x={pt.x - iconSize / 2 + f0 * iconSize} y={pt.y - iconSize / 2} width={(f1 - f0) * iconSize} height={iconSize} />
+                                  </clipPath>
+                                </defs>
+                              )}
+                              <g clipPath={needsClip ? `url(#${clipId})` : undefined}>
+                                <IconGlyph cx={pt.x} cy={pt.y} size={iconSize} d={iconGlyphD} image={config.iconImage} stroke={fill} />
+                              </g>
+                            </g>
+                          );
+                        }
+
                         return (
                           <g key={`${ci}-${si}`} opacity={st.globalOpacity}>
-                            {pts.map((p, pi) => (
-                              <IconGlyph key={pi} cx={p.x} cy={p.y} size={iconSize} d={glyph} stroke={fill} />
-                            ))}
-                            {partial > 0.02 && (
-                              <IconGlyph
-                                cx={partialPos.x}
-                                cy={partialPos.y}
-                                size={iconSize}
-                                d={glyph}
-                                stroke={fill}
-                                opacity={partial}
-                              />
-                            )}
-                            {iconShowValue && (
-                              <text x={marginAdj.left + 2} y={slotY + iconBarH / 2 + 3} fontSize={dlSize} fill={fill} textAnchor="start" pointerEvents="none">
-                                {formatValue(rawVal, numFmt)}
-                              </text>
+                            {icons}
+                            {iconShowValue && !isStacked && (
+                              (() => {
+                                const end = val / pc;
+                                const col = end % iconMaxPerRow;
+                                const row = Math.floor(end / iconMaxPerRow);
+                                const lx = originX + col * iconStep + iconSize / 2 + 4;
+                                const ly = originY + row * iconStep + 4;
+                                return <text x={lx} y={ly} fontSize={dlSize} fill={dlColor} textAnchor="start" pointerEvents="none">{formatValue(val, numFmt)}</text>;
+                              })()
                             )}
                           </g>
                         );
@@ -689,6 +714,24 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                         })
                       )
                     )}
+                    {iconMode === 'icons' && iconShowValue && (stacked || stackedPercent) && (
+                      (() => {
+                        const fit = Math.max(1, Math.floor(plotW / iconStep));
+                        const catTotal = stackTotal![ci] || 1;
+                        if (catTotal === 0) return null;
+                        const pc = getIconPc(fit, catTotal, catTotal);
+                        const end = catTotal / pc;
+                        const col = end % iconMaxPerRow;
+                        const row = Math.floor(end / iconMaxPerRow);
+                        const lx = marginAdj.left + col * iconStep + iconSize / 2 + 4;
+                        const ly = bandY + catBandH / 2 + row * iconStep + 4;
+                        return (
+                          <text x={lx} y={ly} fontSize={dlSize} fill={dlColor} textAnchor="start" pointerEvents="none">
+                            {formatValue(stackedPercent ? 100 : catTotal, numFmt)}{stackedPercent ? '%' : ''}
+                          </text>
+                        );
+                      })()
+                    )}
                   </g>
                 );
               })}
@@ -811,40 +854,72 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
               let val = rawVal;
 
               if (iconMode === 'icons') {
-                // Pictogram: each series draws a column of icons in its grouped
-                // slot, growing bottom-up. Stack/percent modes still render
-                // per-series (no visual stacking for icons).
-                const offset = (catBand - iconBarW * nS) / 2;
-                const slotX = bandX + offset + si * (iconBarW + barGap);
-                const slotCenterX = slotX + iconBarW / 2;
-                const baseY = marginAdj.top + plotH;
-                const fit = Math.max(1, Math.floor(plotH / iconStep));
+                const isStacked = stacked || stackedPercent;
+                const val = Math.max(rawVal, 0);
+                if (val === 0) return null;
                 const catTotal = stackTotal![ci] || 1;
-                const {full, partial} = iconCountFor(rawVal, catTotal, fit);
-                const pts = iconPositions(full, slotCenterX, baseY, 'up');
+                const base = isStacked ? stackBase![ci][si] : 0;
+                const activeNs = isStacked ? 1 : nS;
+                const fit = Math.max(1, Math.floor(plotH / iconStep));
+                
+                // How much value 1 icon represents
+                const maxRaw = isStacked ? catTotal : val;
+                const pc = getIconPc(fit, maxRaw, catTotal);
+                
+                const startVal = base;
+                const endVal = base + val;
+                const startIcon = Math.floor(startVal / pc);
+                const endIcon = Math.floor(endVal / pc);
+
+                const iconBarW = Math.max(Math.min(barBlockW / activeNs - barGap * 2, 46), 2);
+                const offset = (catBand - iconBarW * activeNs) / 2;
+                const slotX = bandX + offset + (isStacked ? 0 : si) * (iconBarW + barGap);
+                const originX = slotX + iconBarW / 2;
+                const originY = marginAdj.top + plotH;
                 const fill = barFill(s.color, config, rawVal < 0);
-                const glyph = iconGlyphD;
-                // Position of the partial icon: the next grid cell after full.
-                const partialPos = iconCell(full, slotCenterX, baseY, 'up');
+
+                const icons = [];
+                for (let i = startIcon; i <= endIcon; i++) {
+                  const iconStart = i * pc;
+                  const iconEnd = (i + 1) * pc;
+                  const intersectStart = Math.max(iconStart, startVal);
+                  const intersectEnd = Math.min(iconEnd, endVal);
+                  if (intersectStart >= intersectEnd) continue;
+
+                  const f0 = (intersectStart - iconStart) / pc;
+                  const f1 = (intersectEnd - iconStart) / pc;
+                  const pt = iconCell(i, originX, originY, 'up');
+                  const needsClip = f0 > 0 || f1 < 1;
+                  const clipId = needsClip ? `clip-v-${ci}-${si}-${i}-${Math.round(f0*100)}-${Math.round(f1*100)}` : undefined;
+
+                  icons.push(
+                    <g key={`i-${i}`}>
+                      {needsClip && (
+                        <defs>
+                          <clipPath id={clipId}>
+                            <rect x={pt.x - iconSize / 2} y={pt.y + iconSize / 2 - f1 * iconSize} width={iconSize} height={(f1 - f0) * iconSize} />
+                          </clipPath>
+                        </defs>
+                      )}
+                      <g clipPath={needsClip ? `url(#${clipId})` : undefined}>
+                        <IconGlyph cx={pt.x} cy={pt.y} size={iconSize} d={iconGlyphD} image={config.iconImage} stroke={fill} />
+                      </g>
+                    </g>
+                  );
+                }
+
                 return (
                   <g key={`${ci}-${si}`} opacity={st.globalOpacity}>
-                    {pts.map((p, pi) => (
-                      <IconGlyph key={pi} cx={p.x} cy={p.y} size={iconSize} d={glyph} stroke={fill} />
-                    ))}
-                    {partial > 0.02 && (
-                      <IconGlyph
-                        cx={partialPos.x}
-                        cy={partialPos.y}
-                        size={iconSize}
-                        d={glyph}
-                        stroke={fill}
-                        opacity={partial}
-                      />
-                    )}
-                    {iconShowValue && (
-                      <text x={slotCenterX} y={baseY - 4} fontSize={dlSize} fill={fill} textAnchor="middle" pointerEvents="none">
-                        {formatValue(rawVal, numFmt)}
-                      </text>
+                    {icons}
+                    {iconShowValue && !isStacked && (
+                      (() => {
+                        const end = val / pc;
+                        const col = end % iconMaxPerRow;
+                        const row = Math.floor(end / iconMaxPerRow);
+                        const lx = originX + col * iconStep;
+                        const ly = originY - row * iconStep - iconSize / 2 - 4;
+                        return <text x={lx} y={ly} fontSize={dlSize} fill={dlColor} textAnchor="middle" pointerEvents="none">{formatValue(val, numFmt)}</text>;
+                      })()
                     )}
                   </g>
                 );
@@ -976,6 +1051,32 @@ const fill = barFill(s.color, config, val < 0);
                     })
                   )
                 )}
+                {iconMode === 'icons' && iconShowValue && (stacked || stackedPercent) && (
+                  (() => {
+                    const fit = Math.max(1, Math.floor(plotH / iconStep));
+                    const catTotal = stackTotal![ci] || 1;
+                    if (catTotal === 0) return null;
+                    const pc = getIconPc(fit, catTotal, catTotal);
+                    const end = catTotal / pc;
+                    const col = end % iconMaxPerRow;
+                    const row = Math.floor(end / iconMaxPerRow);
+                    
+                    const activeNs = 1;
+                    const iconBarW = Math.max(Math.min(barBlockW / activeNs - barGap * 2, 46), 2);
+                    const offset = (catBand - iconBarW * activeNs) / 2;
+                    const slotX = bandX + offset;
+                    const originX = slotX + iconBarW / 2;
+                    const originY = marginAdj.top + plotH;
+
+                    const lx = originX + col * iconStep;
+                    const ly = originY - row * iconStep - iconSize / 2 - 4;
+                    return (
+                      <text x={lx} y={ly} fontSize={dlSize} fill={dlColor} textAnchor="middle" pointerEvents="none">
+                        {formatValue(stackedPercent ? 100 : catTotal, numFmt)}{stackedPercent ? '%' : ''}
+                      </text>
+                    );
+                  })()
+                )}
               </g>
               );
             })}
@@ -998,14 +1099,19 @@ const fill = barFill(s.color, config, val < 0);
             let barTop = marginAdj.top + plotH;
               if (hasImg) {
                 if (iconMode === 'icons') {
-                  // Anchor to the top of the tallest icon column in the category.
                   let maxRows = 0;
-                  for (const s of multi.series) {
-                    const raw = s.values[ci] ?? 0;
-                    const catTotal = stackTotal![ci] || 1;
-                    const fit = Math.max(1, Math.floor(plotH / iconStep));
-                    const {full} = iconCountFor(raw, catTotal, fit);
-                    maxRows = Math.max(maxRows, Math.ceil(full / iconMaxPerRow));
+                  const isStacked = stacked || stackedPercent;
+                  const catTotal = stackTotal![ci] || 1;
+                  const fit = Math.max(1, Math.floor(plotH / iconStep));
+                  if (isStacked) {
+                    const pc = getIconPc(fit, catTotal, catTotal);
+                    maxRows = Math.ceil((catTotal / pc) / iconMaxPerRow);
+                  } else {
+                    for (const s of multi.series) {
+                      const raw = Math.max(s.values[ci] ?? 0, 0);
+                      const pc = getIconPc(fit, raw, catTotal);
+                      maxRows = Math.max(maxRows, Math.ceil((raw / pc) / iconMaxPerRow));
+                    }
                   }
                   barTop = marginAdj.top + plotH - maxRows * iconStep;
                 } else if (stacked || stackedPercent) {
@@ -1035,12 +1141,18 @@ const fill = barFill(s.color, config, val < 0);
               let colTop: number;
               if (iconMode === 'icons') {
                 let maxRows = 0;
-                for (const s of multi.series) {
-                  const raw = s.values[ci] ?? 0;
-                  const catTotal = stackTotal![ci] || 1;
-                  const fit = Math.max(1, Math.floor(plotH / iconStep));
-                  const {full} = iconCountFor(raw, catTotal, fit);
-                  maxRows = Math.max(maxRows, Math.ceil(full / iconMaxPerRow));
+                const isStacked = stacked || stackedPercent;
+                const catTotal = stackTotal![ci] || 1;
+                const fit = Math.max(1, Math.floor(plotH / iconStep));
+                if (isStacked) {
+                  const pc = getIconPc(fit, catTotal, catTotal);
+                  maxRows = Math.ceil((catTotal / pc) / iconMaxPerRow);
+                } else {
+                  for (const s of multi.series) {
+                    const raw = Math.max(s.values[ci] ?? 0, 0);
+                    const pc = getIconPc(fit, raw, catTotal);
+                    maxRows = Math.max(maxRows, Math.ceil((raw / pc) / iconMaxPerRow));
+                  }
                 }
                 colTop = marginAdj.top + plotH - maxRows * iconStep;
               } else if (percentMode) {

@@ -278,6 +278,7 @@ export type ChartConfig = {
   // icon represents `iconPercentPerGlyph`% of the category total.
   iconMode?: 'bars' | 'icons';
   iconGlyph?: string;
+  iconImage?: string;
   iconUnitsPerGlyph?: number;
   iconPercentPerGlyph?: number;
   iconSize?: number;

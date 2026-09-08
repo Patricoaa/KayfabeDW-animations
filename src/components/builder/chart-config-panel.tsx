@@ -604,8 +604,28 @@ const setLegendTextOverride = (label: string, value?: string) => {
             </div>
           </div>
 
-          {/* Horizontal — aplica a barras e iconos */}
-          <Toggle label="Horizontal" checked={config.horizontal ?? false} onChange={(v) => update({horizontal: v})} />
+          {/* Orientación — aplica a barras e iconos */}
+          <div>
+            <label className="text-sm font-medium mb-1 block">Orientación</label>
+            <div className="flex gap-1">
+              {[
+                {value: false, label: 'Vertical'},
+                {value: true, label: 'Horizontal'},
+              ].map((m) => (
+                <button
+                  key={m.label}
+                  onClick={() => update({horizontal: m.value})}
+                  className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                    (config.horizontal ?? false) === m.value
+                      ? 'bg-amber-500 text-black'
+                      : 'bg-elevated text-secondary hover:bg-card-hover'
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Modo de agrupación — aplica a barras e iconos (iconos usan isStackedPercent) */}
           <div>
@@ -663,7 +683,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
       {config.type === 'bar' && hasSeries && config.iconMode === 'icons' && (
         <Section title="Iconos">
           <div>
-            <label className="text-sm font-medium mb-1 block">Icono</label>
+            <label className="text-sm font-medium mb-1 block">Icono base (SVG)</label>
             <div className="grid grid-cols-7 gap-1">
               {ICON_GLYPH_NAMES.map((name) => (
                 <button
@@ -671,7 +691,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
                   onClick={() => update({iconGlyph: name})}
                   title={name}
                   className={`p-1.5 rounded flex items-center justify-center transition-colors ${
-                    (config.iconGlyph ?? 'star') === name
+                    !config.iconImage && (config.iconGlyph ?? 'star') === name
                       ? 'bg-amber-500 text-black'
                       : 'bg-elevated text-secondary hover:bg-card-hover'
                   }`}
@@ -681,6 +701,25 @@ const setLegendTextOverride = (label: string, value?: string) => {
                   </svg>
                 </button>
               ))}
+            </div>
+          </div>
+          <div className="pt-1 border-t border-border-subtle mt-1">
+            <label className="text-sm font-medium mb-1 block">Icono personalizado (Imagen)</label>
+            <div className="flex gap-2 items-center">
+              {config.iconImage && (
+                <div className="relative w-8 h-8 rounded border border-border-default bg-elevated overflow-hidden shrink-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={config.iconImage} alt="Custom Icon" className="w-full h-full object-contain" />
+                  <button onClick={() => update({iconImage: undefined})} className="absolute top-0 right-0 bg-red-500 text-white text-[8px] px-1 rounded-bl">✕</button>
+                </div>
+              )}
+              <input type="file" accept="image/*" onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => update({iconImage: ev.target?.result as string});
+                reader.readAsDataURL(file);
+              }} className="text-xs w-full text-secondary file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-amber-500 file:text-black hover:file:bg-amber-400" />
             </div>
           </div>
           {isStackedPercent && (
