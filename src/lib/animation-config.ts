@@ -79,7 +79,9 @@ export type CommonCanvasConfig = {
 
 // Everything a template inherits from the shared config. Kept flat on purpose
 // so specs saved with older configs (flat fields) keep loading unchanged.
-export type CommonAnimationConfig = CommonHeaderConfig & CommonCanvasConfig;
+export type CommonAnimationConfig = CommonHeaderConfig & CommonCanvasConfig & {
+  overlays?: import('./chart-config').ChartOverlay[];
+};
 
 // Timeline Race: a date-driven ranked bar race. Each row is one entity /
 // event with an optional avatar image, a `dateField` that positions it on the

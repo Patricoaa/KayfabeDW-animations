@@ -693,9 +693,134 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
         </p>
       </Section>
 
+      {/* ============ ADICIONALES ============ */}
+      <OverlaysSection value={value} update={update} />
+
       {/* ============ CANVAS ============ */}
       <CanvasSection value={value} update={update} />
     </div>
+  );
+}
+
+let animOverlayIdCounter = 0;
+function newAnimOverlayId(): string {
+  return `ov-${Date.now()}-${++animOverlayIdCounter}`;
+}
+
+// Additional overlays (text/image elements superimposed over the canvas)
+function OverlaysSection<T extends {overlays?: import('@/lib/chart-config').ChartOverlay[]}>({
+  value,
+  update,
+}: {
+  value: T;
+  update: (patch: Partial<T>) => void;
+}) {
+  const overlays = value.overlays ?? [];
+  const setOverlay = (i: number, patch: Partial<import('@/lib/chart-config').ChartOverlay>) => {
+    const next = [...overlays];
+    next[i] = {...next[i], ...patch};
+    update({overlays: next} as unknown as Partial<T>);
+  };
+  return (
+    <Section title="Adicionales">
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() =>
+            update({
+              overlays: [...overlays, {id: newAnimOverlayId(), type: 'text', text: 'Texto', layout: {x: 20, y: 20}}],
+            } as unknown as Partial<T>)
+          }
+          className="flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors bg-elevated text-secondary hover:bg-card-hover"
+        >
+          + Texto
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            update({
+              overlays: [...overlays, {id: newAnimOverlayId(), type: 'image', x: 20, y: 20, width: 80, height: 80}],
+            } as unknown as Partial<T>)
+          }
+          className="flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors bg-elevated text-secondary hover:bg-card-hover"
+        >
+          + Imagen
+        </button>
+      </div>
+      {overlays.length === 0 && (
+        <p className="text-[10px] text-muted">
+          Capas libres sobre el lienzo (imágenes o textos) que se superponen a cualquier animación y salen incluidas en los exports.
+        </p>
+      )}
+      {overlays.map((ov, i) => (
+        <div key={ov.id} className="rounded-lg border border-border-subtle p-2.5 space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-secondary uppercase tracking-widest font-display">
+              {ov.type === 'image' ? 'Imagen' : 'Texto'} {i + 1}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                const next = [...overlays];
+                next.splice(i, 1);
+                update({overlays: next} as unknown as Partial<T>);
+              }}
+              className="text-muted hover:text-red-500 text-xs"
+              aria-label="Eliminar adicional"
+            >
+              ✕
+            </button>
+          </div>
+
+          {ov.type === 'text' ? (
+            <>
+              <textarea
+                value={ov.text ?? ''}
+                onChange={(e) => setOverlay(i, {text: e.target.value})}
+                rows={2}
+                placeholder="Texto"
+                className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <RaceTextControls
+                  label="Texto"
+                  value={ov.font as unknown as import('@/lib/animation-config').RaceTextStyle}
+                  onChange={(patch) => {
+                    const fontPatch: Partial<import('@/lib/chart-config').SectionFont> = {
+                      ...patch,
+                      weight: patch.weight as import('@/lib/chart-config').FontWeight | undefined,
+                    };
+                    setOverlay(i, {font: {...(ov.font ?? {}), ...fontPatch}});
+                  }}
+                />
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Posición (px)</p>
+                  <NumberInput label="X (px)" value={ov.layout?.x} onChange={(x) => setOverlay(i, {layout: {...(ov.layout ?? {}), x}})} />
+                  <NumberInput label="Y (px)" value={ov.layout?.y} onChange={(y) => setOverlay(i, {layout: {...(ov.layout ?? {}), y}})} />
+                  <NumberInput label="Rotación (°)" value={ov.layout?.rotation} onChange={(r) => setOverlay(i, {layout: {...(ov.layout ?? {}), rotation: r}})} />
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="space-y-2">
+              <FileUploadInput
+                label="Imagen de la capa"
+                value={ov.src}
+                onLoad={(dataUrl) => setOverlay(i, {src: dataUrl})}
+                onClear={() => setOverlay(i, {src: undefined})}
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <NumberInput label="X (px)" value={ov.x} onChange={(x) => setOverlay(i, {x})} />
+                <NumberInput label="Y (px)" value={ov.y} onChange={(y) => setOverlay(i, {y})} />
+                <NumberInput label="Ancho (px)" value={ov.width} onChange={(w) => setOverlay(i, {width: w})} />
+                <NumberInput label="Alto (px)" value={ov.height} onChange={(h) => setOverlay(i, {height: h})} />
+              </div>
+              <NumberInput label="Rotación (°)" value={ov.rotation} onChange={(r) => setOverlay(i, {rotation: r})} />
+            </div>
+          )}
+        </div>
+      ))}
+    </Section>
   );
 }
 
@@ -1245,6 +1370,9 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
           El valor numérico que viaja dentro de la barra.
         </p>
       </Section>
+
+      {/* ============ ADICIONALES ============ */}
+      <OverlaysSection value={value} update={update} />
 
       <CanvasSection value={value} update={update} />
     </div>
