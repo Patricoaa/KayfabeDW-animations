@@ -246,6 +246,9 @@ export type ChartConfig = {
   avatarShape?: AvatarShape;
   avatarRadius?: number;
   avatarSize?: number;
+  avatarBg?: string;
+  avatarBorderColor?: string;
+  avatarBorderWidth?: number;
   // V19: posición del avatar por coordenadas GLOBALES (px) respecto a la punta del
   // valor de cada barra (bar-end). `avatarOffsetX` va a lo largo del eje de valor
   // (positivo = más allá de la punta; negativo = hacia el eje). `avatarOffsetY` va

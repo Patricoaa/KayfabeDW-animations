@@ -266,11 +266,12 @@ function avatarCy(tipY: number, offsetY: number): number {
 }
 
 function Avatar({
-  href, cx, cy, clipId, shape, size, radius, crop,
+  href, cx, cy, clipId, shape, size, radius, crop, bg, borderColor, borderWidth,
 }: {
   href: string; cx: number; cy: number; clipId: string;
   shape: string | undefined; size: number; radius: number;
   crop?: AvatarCrop;
+  bg?: string; borderColor?: string; borderWidth?: number;
 }) {
   // Zoom can go below 1 (zoom-out: image renders smaller than the frame,
   // revealing the frame around it). Minimum floor avoids 0; panning (focus) is
@@ -282,6 +283,8 @@ function Avatar({
   const vh = size * zoom;
   const imgX = cx - vw / 2 + fx * (vw - size) / 2;
   const imgY = cy - vh / 2 + fy * (vh - size) / 2;
+  const bw = borderWidth ?? 0;
+  const bgFill = bg && bg !== 'transparent' ? bg : 'none';
   return (
     <g>
       <defs>
@@ -293,6 +296,11 @@ function Avatar({
           )}
         </clipPath>
       </defs>
+      {bgFill !== 'none' && (
+        shape === 'circle'
+          ? <circle cx={cx} cy={cy} r={size / 2} fill={bgFill} />
+          : <rect x={cx - size / 2} y={cy - size / 2} width={size} height={size} rx={radius} fill={bgFill} />
+      )}
       <image
         href={href}
         x={imgX}
@@ -302,6 +310,11 @@ function Avatar({
         preserveAspectRatio="xMidYMid meet"
         clipPath={`url(#${clipId})`}
       />
+      {bw > 0 && borderColor && (
+        shape === 'circle'
+          ? <circle cx={cx} cy={cy} r={size / 2} fill="none" stroke={borderColor} strokeWidth={bw} />
+          : <rect x={cx - size / 2} y={cy - size / 2} width={size} height={size} rx={radius} fill="none" stroke={borderColor} strokeWidth={bw} />
+      )}
     </g>
   );
 }
@@ -819,7 +832,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                 const ay = avatarCy(cy, avatarOffsetY);
                 return (
                   <g key={ci}>
-                    <Avatar href={img!} cx={ax} cy={ay} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} crop={crop} />
+                    <Avatar href={img!} cx={ax} cy={ay} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} crop={crop} bg={config.avatarBg} borderColor={config.avatarBorderColor} borderWidth={config.avatarBorderWidth} />
                     {showText && renderLabel(labelAt)}
                   </g>
                 );
@@ -1263,7 +1276,7 @@ const fill = barFill(s.color, config, val < 0);
             const avatarSlot = slotAlign(marginAdj.left + bandX, marginAdj.left + bandX + catBand, 'middle', config.xLabelFont?.align);
             return (
               <g key={ci}>
-                <Avatar href={img!} cx={cx} cy={cy} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} crop={crop} />
+                <Avatar href={img!} cx={cx} cy={cy} clipId={`mb-av-${ci}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} crop={crop} bg={config.avatarBg} borderColor={config.avatarBorderColor} borderWidth={config.avatarBorderWidth} />
                 {showText && renderLabel({x: avatarSlot.x + catLabelOffX, y: marginAdj.top + plotH + catLabelOffY, anchor: avatarSlot.anchor}, 12)}
               </g>
             );

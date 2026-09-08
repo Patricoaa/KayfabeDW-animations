@@ -169,6 +169,9 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
   avatarShape?: AvatarShape;
   avatarRadius?: number;
   avatarCrops?: Record<string, AvatarCrop>;
+  avatarBg?: string;
+  avatarBorderColor?: string;
+  avatarBorderWidth?: number;
 
   // Per-entity bar colors (label -> color), mirroring the static chart's
   // `colorOverrides`. Empty value = default color.
@@ -285,6 +288,9 @@ export type RankingConfig = CommonAnimationConfig & {
   avatarSize?: number;
   avatarShape?: AvatarShape;
   avatarRadius?: number;
+  avatarBg?: string;
+  avatarBorderColor?: string;
+  avatarBorderWidth?: number;
 
   // Per-entity row color overrides (label -> color).
   rowColors?: Record<string, string>;

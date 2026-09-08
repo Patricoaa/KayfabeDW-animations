@@ -47,6 +47,9 @@ export type RankingProps = {
   showAvatar?: boolean;
   rankPrefix?: string;
   avatarCrops?: Record<string, {zoom?: number; focusX?: number; focusY?: number}>;
+  avatarBg?: string;
+  avatarBorderColor?: string;
+  avatarBorderWidth?: number;
   avatarSize?: number;
   avatarShape?: 'circle' | 'rounded';
   avatarRadius?: number;
@@ -120,6 +123,9 @@ export const Ranking: React.FC<RankingProps> = ({
   avatarSize,
   avatarShape = 'circle',
   avatarRadius,
+  avatarBg,
+  avatarBorderColor,
+  avatarBorderWidth,
   rowColors,
   rowImages,
   rowImageCrops,
@@ -330,7 +336,7 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
         )}
         {avatarVisible && hasAvatar && (
           <div style={{flexShrink: 0, ...entryTransform('avatar', prog)}}>
-            <Avatar src={item.image!} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(item.label, item.image)} />
+            <Avatar src={item.image!} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(item.label, item.image)} bg={avatarBg} borderColor={avatarBorderColor} borderWidth={avatarBorderWidth} />
           </div>
         )}
         <div style={{flex: 1, minWidth: 0, height: BAR_H, position: 'relative', display: 'flex', alignItems: 'center', ...entryTransform('bar', prog)}}>
@@ -425,7 +431,7 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
         )}
         {avatarVisible && hasAvatar && (
           <div style={{flexShrink: 0, ...tableEntry('avatar', prog)}}>
-            <Avatar src={item.image!} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(item.label, item.image)} />
+            <Avatar src={item.image!} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(item.label, item.image)} bg={avatarBg} borderColor={avatarBorderColor} borderWidth={avatarBorderWidth} />
           </div>
         )}
         <div style={{flex: 1, minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', ...tableEntry('bar', prog), ...textStyle(labelText, {color: '#d4d4d8', size: Math.round(ROW_FONT * 0.92), weight: 700})}}>
