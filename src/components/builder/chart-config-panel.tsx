@@ -171,7 +171,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
   const hasSeries = !!config.seriesField && (config.type === 'bar' || config.type === 'line' || config.type === 'area');
   const legendItems = config.legendItems ?? [];
   const isCartesian = config.type === 'bar' || config.type === 'line' || config.type === 'area' || config.type === 'scatter';
-  const isStackedPercent = config.type === 'bar' && config.groupMode === 'stacked-percent';
+  const isStackedPercent = config.type === 'bar' && (config.groupMode === 'stacked-percent' || config.groupMode === 'grouped-percent');
 
   // Distinct category labels in the captured dataset, for the per-category
   // color overrides ("Colores por categoría"). Scatter colors come from its
@@ -586,6 +586,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
             <div className="flex gap-1">
               {[
                 {value: 'grouped' as const, label: 'Agrupadas'},
+                {value: 'grouped-percent' as const, label: 'Agrupadas %'},
                 {value: 'stacked' as const, label: 'Apiladas'},
                 {value: 'stacked-percent' as const, label: 'Apiladas %'},
               ].map((m) => (
@@ -726,7 +727,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
             <div className="pt-1 border-t border-border-subtle">
               <label className="text-sm font-medium mb-1 block">Formato de números</label>
               {isStackedPercent ? (
-                <p className="text-[10px] text-muted py-1">Forzado a porcentaje en apiladas %.</p>
+                <p className="text-[10px] text-muted py-1">Forzado a porcentaje en modo %.</p>
               ) : (
                 <select
                   value={config.numberFormat ?? 'short'}
@@ -896,7 +897,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
           </div>
 
           {isStackedPercent ? (
-            <p className="text-[10px] text-muted py-1">Eje Y fijo en 0%–100% (apiladas %).</p>
+            <p className="text-[10px] text-muted py-1">Eje Y fijo en 0%–100% (modo %).</p>
           ) : (
             <>
               {isSingleSeries && (

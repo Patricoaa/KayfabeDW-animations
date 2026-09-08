@@ -6,7 +6,7 @@ export type SortBy = 'none' | 'value-desc' | 'value-asc' | 'label';
 
 export type LegendPosition = 'top' | 'right' | 'bottom';
 
-export type GroupMode = 'grouped' | 'stacked' | 'stacked-percent';
+export type GroupMode = 'grouped' | 'grouped-percent' | 'stacked' | 'stacked-percent';
 
 export type AvatarShape = 'circle' | 'rounded';
 // Per-avatar frame adjustment: `zoom` scales the source image inside the fixed

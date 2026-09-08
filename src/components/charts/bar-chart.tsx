@@ -42,7 +42,7 @@ function cornerRadius(config: ChartConfig, corner: 'tl' | 'tr' | 'bl' | 'br'): n
 function referenceLinesSvg(
   multi: boolean,
   horizontal: boolean,
-  stackedPercent: boolean,
+  percentMode: boolean,
   domain: {yMin: number; yMax: number},
   yRange: number,
   marginAdj: {left: number; right: number; top: number; bottom: number},
@@ -55,9 +55,9 @@ function referenceLinesSvg(
   return (
     <>
       {(config.referenceLines).map((rl, i) => {
-        // Stacked-percent plots use a fractional 0..1 axis; the input value is
+        // Percent plots use a fractional 0..1 axis; the input value is
         // written as a plain percentage (0-100), so scale it down here.
-        const value = stackedPercent ? rl.value / 100 : rl.value;
+        const value = percentMode ? rl.value / 100 : rl.value;
         if (horizontal) {
           const x = marginAdj.left + ((value - domain.yMin) / yRange) * plotW;
           if (x < marginAdj.left || x > widthOf(config)) return null;
@@ -280,6 +280,8 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const horizontal = config.horizontal ?? false;
   const stacked = (config.groupMode ?? 'grouped') === 'stacked' || !!config.stacked;
   const stackedPercent = config.groupMode === 'stacked-percent';
+  const groupedPercent = config.groupMode === 'grouped-percent';
+  const percentMode = stackedPercent || groupedPercent;
   const showLegend = config.showLegend ?? true;
   const legendPosition = 'bottom';
   const labelAngle = config.labelAngle ?? (multi.categories.length > 8 ? -30 : 0);
@@ -302,11 +304,11 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const nCat = multi.categories.length;
   const nS = multi.series.length;
   const maxVal = Math.max(multi.max, 0) || 1;
-  const domain = stackedPercent
+  const domain = percentMode
     ? {yMin: 0, yMax: 1, ticks: [0, 0.25, 0.5, 0.75, 1]}
     : resolveYDomain(0, maxVal, config);
-  const yRange = stackedPercent ? 1 : Math.max(domain.yMax - domain.yMin, 0.001);
-  const numFmt: NumberFormat = stackedPercent ? 'percent' : (config.numberFormat ?? 'short');
+  const yRange = percentMode ? 1 : Math.max(domain.yMax - domain.yMin, 0.001);
+  const numFmt: NumberFormat = percentMode ? 'percent' : (config.numberFormat ?? 'short');
   const barGap = Math.max(config.barGap ?? 2, 0);
   const catGap = config.barCategoryGap ?? 0.15;
   const catColor = config.xLabelFont?.color ?? st.textColor;
@@ -371,7 +373,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
       })
     : null;
 
-  const stackTotal = stackBase && multi.categories.map((_, ci) =>
+  const stackTotal = multi.categories.map((_, ci) =>
     multi.series.reduce((a, s) => a + Math.max(s.values[ci] ?? 0, 0), 0),
   );
 
@@ -388,7 +390,6 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
     const barH = stacked || stackedPercent
       ? Math.max(catBandH * 0.7 - barGap * 2, 2)
       : Math.max(Math.min(catBandH * 0.7 / nS - barGap * 2, 30), 2);
-
     const stackXBase = stacked || stackedPercent
       ? multi.categories.map((_, ci) => {
           const base: number[] = [];
@@ -431,7 +432,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
             )}
           </Zone>
           <Zone id="plot">
-            {referenceLinesSvg(true, true, stackedPercent, domain, yRange, marginAdj, plotW, plotH, config)}
+            {referenceLinesSvg(true, true, percentMode, domain, yRange, marginAdj, plotW, plotH, config)}
 
               {multi.categories.map((cat, ci) => {
                 const bandY = marginAdj.top + ci * catBandH;
@@ -444,7 +445,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                     fontWeight={dlWeight}
                   >
                     {multi.series.map((s, si) => {
-                      const val = s.values[ci] ?? 0;
+                      let val = s.values[ci] ?? 0;
                       let x: number;
                       let y: number;
                       let w: number;
@@ -467,7 +468,14 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                         }
                         hh = barH;
                       } else {
-                        const bw = Math.max((Math.abs(val) / yRange) * plotW, 0);
+                        let bw: number;
+                        if (groupedPercent) {
+                          const segTotal = stackTotal![ci] || 1;
+                          val = Math.max(val, 0);
+                          bw = (val / segTotal) * plotW;
+                        } else {
+                          bw = Math.max((Math.abs(val) / yRange) * plotW, 0);
+                        }
                         const offset = (catBandH - barH * nS) / 2;
                         x = marginAdj.left;
                         y = bandY + offset + si * (barH + barGap);
@@ -536,14 +544,23 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                         </text>
                       ) : (
                         multi.series.map((s, si) => {
-                          const val = s.values[ci] ?? 0;
-                          const bw = Math.max((Math.abs(val) / yRange) * plotW, 0);
+                          const rawVal = s.values[ci] ?? 0;
+                          const val = groupedPercent ? Math.max(rawVal, 0) : rawVal;
+                          let labelVal = val;
+                          let bw: number;
+                          if (groupedPercent) {
+                            const segTotal = stackTotal![ci] || 1;
+                            bw = (val / segTotal) * plotW;
+                            labelVal = Math.round((val / segTotal) * 100 * 10) / 10 / 100;
+                          } else {
+                            bw = Math.max((Math.abs(val) / yRange) * plotW, 0);
+                          }
                           const offset = (catBandH - barH * nS) / 2;
                           const y = bandY + offset + si * (barH + barGap) + barH / 2 + 3;
                           const endX = marginAdj.left + bw;
                           return (
                             <text key={`dl-${ci}-${si}`} x={endX + 6} y={y} textAnchor={labelAnchor(dlAlign, 'start')} fontSize={dlSize} fill={dlColor} pointerEvents="none">
-                              {formatValue(val, numFmt)}
+                              {formatValue(labelVal, numFmt)}
                             </text>
                           );
                         })
@@ -565,7 +582,9 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                 const colStart = marginAdj.left;
                 const colEnd = stacked || stackedPercent
                   ? marginAdj.left + ((stackedPercent ? 1 : (stackTotal![ci] || 1)) / (stackedPercent ? 1 : yRange)) * plotW
-                  : marginAdj.left + (Math.max(...multi.series.map((s) => s.values[ci] ?? 0), 0) / yRange) * plotW;
+                  : groupedPercent
+                    ? marginAdj.left + plotW
+                    : marginAdj.left + (Math.max(...multi.series.map((s) => s.values[ci] ?? 0), 0) / yRange) * plotW;
                 const midX = (colStart + colEnd) / 2;
                 // Label anchored to a FIXED plot point at this category's slot:
                 // horizontal → the plot left edge at the row center. Global X/Y
@@ -651,7 +670,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
             )}
         </Zone>
         <Zone id="plot">
-            {referenceLinesSvg(true, false, stackedPercent, domain, yRange, marginAdj, plotW, plotH, config)}
+            {referenceLinesSvg(true, false, percentMode, domain, yRange, marginAdj, plotW, plotH, config)}
             {multi.categories.map((cat, ci) => {
               const bandX = marginAdj.left + ci * catBand;
               const total = stacked || stackedPercent ? totalLabel(ci) : 0;
@@ -662,7 +681,8 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                 fontWeight={dlWeight}
               >
                 {multi.series.map((s, si) => {
-              const val = s.values[ci] ?? 0;
+              const val0 = s.values[ci] ?? 0;
+              let val = val0;
               let x: number;
               let y: number;
               let w: number;
@@ -684,7 +704,14 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                 }
                 w = barBlockW;
               } else {
-                const h = Math.max((Math.abs(val) / yRange) * plotH, 0);
+                let h: number;
+                if (groupedPercent) {
+                  const segTotal = stackTotal![ci] || 1;
+                  val = Math.max(val, 0);
+                  h = (val / segTotal) * plotH;
+                } else {
+                  h = Math.max((Math.abs(val) / yRange) * plotH, 0);
+                }
                 const offset = (catBand - barW * nS) / 2;
                 x = bandX + offset + si * (barW + barGap);
                 y = marginAdj.top + plotH - h;
@@ -759,14 +786,24 @@ const fill = barFill(s.color, config, val < 0);
                     })()
                   ) : (
                     multi.series.map((s, si) => {
-                      const val = s.values[ci] ?? 0;
-                      const h = Math.max((Math.abs(val) / yRange) * plotH, 0);
+                      const rawVal = s.values[ci] ?? 0;
+                      const val = groupedPercent ? Math.max(rawVal, 0) : rawVal;
+                      let labelVal = val;
+                      let h: number;
+                      if (groupedPercent) {
+                        const segTotal = stackTotal![ci] || 1;
+                        h = (val / segTotal) * plotH;
+                        labelVal = Math.round((val / segTotal) * 100 * 10) / 10 / 100;
+                      } else {
+                        h = Math.max((Math.abs(val) / yRange) * plotH, 0);
+                      }
                       const offset = (catBand - barW * nS) / 2;
                       const bx = bandX + offset + si * (barW + barGap);
                       const ds = slotAlign(bx, bx + barW, 'middle', dlAlign);
+                      if (groupedPercent && (h < dlSize * 1.8 || val === 0)) return null;
                       return (
-                        <text key={`dl-${ci}-${si}`} x={ds.x} y={marginAdj.top + plotH - h - 5} textAnchor={ds.anchor} fontSize={dlSize} fill={dlColor} pointerEvents="none">
-                          {formatValue(val, numFmt)}
+                        <text key={`dl-${ci}-${si}`} x={ds.x} y={marginAdj.top + plotH - h - 5} textAnchor={ds.anchor} fontSize={dlSize} fill={groupedPercent ? '#fff' : dlColor} pointerEvents="none">
+                          {formatValue(labelVal, numFmt)}
                         </text>
                       );
                     })
@@ -792,17 +829,19 @@ const fill = barFill(s.color, config, val < 0);
             const desc = descOf(resolvedCategorySub(config, cat, multi.categoryDescriptions?.[ci]));
 
             let barTop = marginAdj.top + plotH;
-            if (hasImg) {
-              // Anchor is always the VALUE TIP of the tallest bar in the category.
-              if (stacked || stackedPercent) {
-                barTop = stackedPercent
-                  ? marginAdj.top
-                  : marginAdj.top + plotH - ((multi.series.reduce((a, s) => a + Math.max(s.values[ci] ?? 0, 0), 0)) / yRange) * plotH;
-              } else {
-                const maxInCat = Math.max(...multi.series.map((s) => s.values[ci] ?? 0), 0);
-                barTop = marginAdj.top + plotH - (maxInCat / yRange) * plotH;
+              if (hasImg) {
+                // Anchor is always the VALUE TIP of the tallest bar in the category.
+                if (stacked || stackedPercent) {
+                  barTop = stackedPercent
+                    ? marginAdj.top
+                    : marginAdj.top + plotH - ((multi.series.reduce((a, s) => a + Math.max(s.values[ci] ?? 0, 0), 0)) / yRange) * plotH;
+                } else {
+                  const maxInCat = Math.max(...multi.series.map((s) => s.values[ci] ?? 0), 0);
+                  barTop = groupedPercent
+                    ? marginAdj.top
+                    : marginAdj.top + plotH - (maxInCat / yRange) * plotH;
+                }
               }
-            }
 
             const renderLabel = (p: {x: number; y: number; anchor: 'start' | 'middle' | 'end'} | null, focusCap = 12) => {
               if (!p) return null;
@@ -816,7 +855,7 @@ const fill = barFill(s.color, config, val < 0);
 
             if (!hasImg) {
               const colBottom = marginAdj.top + plotH;
-              const colTop = stackedPercent
+              const colTop = percentMode
                 ? marginAdj.top
                 : stacked
                   ? marginAdj.top + plotH - ((multi.series.reduce((a, s) => a + Math.max(s.values[ci] ?? 0, 0), 0)) / yRange) * plotH
