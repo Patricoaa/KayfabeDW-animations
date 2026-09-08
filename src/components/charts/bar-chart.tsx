@@ -404,7 +404,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const iconSize = config.iconSize ?? 16;
   const iconPadding = Math.max(config.iconPadding ?? 2, 0);
   const iconMaxPerRow = Math.max(config.iconMaxPerRow ?? 10, 1);
-  const iconShowValue = config.iconShowValue ?? false;
+  const iconShowValue = config.showDataLabels !== false;
   const iconStep = iconSize + iconPadding;
 
   // Decide how many full icons + partial fraction a bar renders. In absolute
