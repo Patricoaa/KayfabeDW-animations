@@ -706,6 +706,21 @@ const setLegendTextOverride = (label: string, value?: string) => {
             </div>
           </div>
           <div className="pt-1 border-t border-border-subtle mt-1">
+            <label className="text-sm font-medium mb-1 block">Campo de icono del modelo</label>
+            <select
+              value={config.iconField ?? ''}
+              onChange={(e) => update({iconField: e.target.value || undefined})}
+              className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+            >
+              <option value="">Sin vincular (usar icono base o personalizado)</option>
+              {columns.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="pt-1 border-t border-border-subtle mt-1">
             <label className="text-sm font-medium mb-1 block">Icono personalizado (Imagen)</label>
             <div className="flex gap-2 items-center">
               {config.iconImage && (

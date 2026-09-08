@@ -544,6 +544,9 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                         const originY = slotY + iconBarH / 2;
                         const fill = barFill(s.color, config, rawVal < 0);
 
+                        const catCustomIcon = multi.categoryIcons?.[ci];
+                        const iconSrcImage = catCustomIcon ?? config.iconImage;
+
                         const icons = [];
                         for (let i = startIcon; i <= endIcon; i++) {
                           const iconStart = i * pc;
@@ -568,7 +571,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                                 </defs>
                               )}
                               <g clipPath={needsClip ? `url(#${clipId})` : undefined}>
-                                <IconGlyph cx={pt.x} cy={pt.y} size={iconSize} d={iconGlyphD} image={config.iconImage} stroke={fill} />
+                                <IconGlyph cx={pt.x} cy={pt.y} size={iconSize} d={iconGlyphD} image={iconSrcImage ?? undefined} stroke={fill} />
                               </g>
                             </g>
                           );
@@ -914,6 +917,9 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                 const originY = marginAdj.top + plotH;
                 const fill = barFill(s.color, config, rawVal < 0);
 
+                const catCustomIcon = multi.categoryIcons?.[ci];
+                const iconSrcImage = catCustomIcon ?? config.iconImage;
+
                 const icons = [];
                 for (let i = startIcon; i <= endIcon; i++) {
                   const iconStart = i * pc;
@@ -938,7 +944,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                         </defs>
                       )}
                       <g clipPath={needsClip ? `url(#${clipId})` : undefined}>
-                        <IconGlyph cx={pt.x} cy={pt.y} size={iconSize} d={iconGlyphD} image={config.iconImage} stroke={fill} />
+                        <IconGlyph cx={pt.x} cy={pt.y} size={iconSize} d={iconGlyphD} image={iconSrcImage ?? undefined} stroke={fill} />
                       </g>
                     </g>
                   );

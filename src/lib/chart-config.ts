@@ -279,6 +279,7 @@ export type ChartConfig = {
   iconMode?: 'bars' | 'icons';
   iconGlyph?: string;
   iconImage?: string;
+  iconField?: string;
   iconUnitsPerGlyph?: number;
   iconPercentPerGlyph?: number;
   iconSize?: number;
