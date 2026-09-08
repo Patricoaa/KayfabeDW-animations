@@ -5,6 +5,7 @@ import {BarChart3, PieChart, LineChart, AreaChart, ScatterChart, Table2, Chevron
 import type {ChartConfig, ChartType, ChartOverlay, NumberFormat, SortBy, ChartFilter, ChartFilterOp, ChartStyle, AvatarShape, AvatarCrop, SectionFont, TextLayout} from '@/lib/chart-config';
 import {FONT_PRESETS, PALETTES} from '@/lib/chart-config';
 import {pickColor, colorFor} from '@/lib/chart-data';
+import {ICON_GLYPHS, ICON_GLYPH_NAMES} from '@/lib/chart-icons';
 import {TextControls} from '@/components/builder/text-controls';
 
 // Metadata for a selected column available to the axis selectors: its alias
@@ -623,6 +624,85 @@ const setLegendTextOverride = (label: string, value?: string) => {
             <NumberInput label="Gap entre barras" value={config.barGap} min={0} max={20} onChange={(v) => update({barGap: v})} />
             <NumberInput label="Gap de categoría" value={config.barCategoryGap} min={0} max={0.4} step={0.01} onChange={(v) => update({barCategoryGap: v})} />
           </div>
+        </Section>
+      )}
+
+      {/* ============ ICONOS (pictograma) ============ */}
+      {config.type === 'bar' && hasSeries && (
+        <Section title="Iconos">
+          <div>
+            <label className="text-sm font-medium mb-1 block">Visualización</label>
+            <div className="flex gap-1">
+              {([
+                {value: 'bars' as const, label: 'Barras'},
+                {value: 'icons' as const, label: 'Iconos'},
+              ] as const).map((m) => (
+                <button
+                  key={m.value}
+                  onClick={() => update({iconMode: m.value})}
+                  className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                    (config.iconMode ?? 'bars') === m.value
+                      ? 'bg-amber-500 text-black'
+                      : 'bg-elevated text-secondary hover:bg-card-hover'
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {config.iconMode === 'icons' && (
+            <>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Icono</label>
+                <div className="grid grid-cols-7 gap-1">
+                  {ICON_GLYPH_NAMES.map((name) => (
+                    <button
+                      key={name}
+                      onClick={() => update({iconGlyph: name})}
+                      title={name}
+                      className={`p-1.5 rounded flex items-center justify-center transition-colors ${
+                        (config.iconGlyph ?? 'star') === name
+                          ? 'bg-amber-500 text-black'
+                          : 'bg-elevated text-secondary hover:bg-card-hover'
+                      }`}
+                    >
+                      <svg viewBox="0 0 24 24" width="18" height="18">
+                        <path d={ICON_GLYPHS[name]} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                      </svg>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {isStackedPercent && (
+                <NumberInput
+                  label="% por icono"
+                  value={config.iconPercentPerGlyph}
+                  min={0.1}
+                  max={100}
+                  step={1}
+                  onChange={(v) => update({iconPercentPerGlyph: v})}
+                />
+              )}
+              {!isStackedPercent && (
+                <NumberInput
+                  label="Valor por icono (vacío = auto)"
+                  value={config.iconUnitsPerGlyph}
+                  min={1}
+                  max={1e12}
+                  step={1}
+                  onChange={(v) => update({iconUnitsPerGlyph: v || undefined})}
+                />
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <NumberInput label="Tamaño" value={config.iconSize} min={6} max={48} onChange={(v) => update({iconSize: v})} />
+                <NumberInput label="Separación" value={config.iconPadding} min={0} max={20} onChange={(v) => update({iconPadding: v})} />
+              </div>
+              <NumberInput label="Máx. por fila" value={config.iconMaxPerRow} min={1} max={50} onChange={(v) => update({iconMaxPerRow: v})} />
+              <Toggle label="Mostrar valor numérico" checked={config.iconShowValue ?? false} onChange={(v) => update({iconShowValue: v})} />
+            </>
+          )}
         </Section>
       )}
 

@@ -270,6 +270,21 @@ export type ChartConfig = {
   barCategoryGap?: number;         // 0-0.5 fraction of the band used as side padding
   negativeColor?: string;          // color for negative-value bars (single/grouped)
 
+  // F8: pictogram/icon mode — replace the solid bar rect with a grid of icons
+  // (isotype chart). `iconMode` selects bars vs icons. Icon source is a curated
+  // lucide glyph (`iconGlyph`) chosen in the panel; same glyph for all bars.
+  // In absolute grouped mode each icon represents `iconUnitsPerGlyph` units
+  // (auto-rescaled when unset so icons fit the slot). In percent modes each
+  // icon represents `iconPercentPerGlyph`% of the category total.
+  iconMode?: 'bars' | 'icons';
+  iconGlyph?: string;
+  iconUnitsPerGlyph?: number;
+  iconPercentPerGlyph?: number;
+  iconSize?: number;
+  iconMaxPerRow?: number;
+  iconPadding?: number;
+  iconShowValue?: boolean;
+
   // Data labels (independent of the series/axis text colors).
   dataLabelPosition?: 'auto' | 'inside' | 'outside' | 'center';
   // V16: migrated to a SectionFont (`dataLabelFont`). The flat fields below
@@ -387,6 +402,13 @@ export const DEFAULT_CHART_CONFIG: ChartConfig = {
   barBorderWidth: 0,
   barGap: 2,
   barCategoryGap: 0.15,
+  iconMode: 'bars',
+  iconGlyph: 'star',
+  iconPercentPerGlyph: 10,
+  iconSize: 16,
+  iconMaxPerRow: 10,
+  iconPadding: 2,
+  iconShowValue: false,
   dataLabelPosition: 'auto',
   dataLabelFontSize: 10,
   dataLabelColor: '#cccccc',

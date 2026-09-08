@@ -3,12 +3,33 @@
 import type {ReactNode} from 'react';
 import type {ChartConfig, NumberFormat, TextOverflow, TextAlign, AvatarCrop} from '@/lib/chart-config';
 import {prepareSeries, prepareMultiSeries, formatValue, colorFor, resolvedCategoryLabel, resolvedCategorySub, resolveChartStyle, resolveYDomain, type PreparedMultiSeries} from '@/lib/chart-data';
+import {ICON_GLYPHS} from '@/lib/chart-icons';
 import {SvgHeader, SvgLegend, ChartOverlays, roundedRectPath, headerHeight, legendReserve, frameRect, Zone, legendItemsFrom, XAxisTitle, YAxisTitle, type LegendItem, type CornerRadii} from './chart-frame';
 
 type Props = {
   data: Record<string, unknown>[];
   config: ChartConfig;
 };
+
+// Curated one-layer lucide glyphs are defined in @/lib/chart-icons.
+
+// Renders one lucide glyph path centered at (cx, cy) with the given
+// size and stroke color. Uses stroke-based rendering (lucide native style)
+// so ALL lucide glyphs work correctly (filled or line-based).
+function IconGlyph({cx, cy, size, d, stroke, strokeWidth = 2, opacity = 1}: {cx: number; cy: number; size: number; d: string; stroke: string; strokeWidth?: number; opacity?: number}) {
+  return (
+    <path
+      d={d}
+      transform={`translate(${cx - size / 2} ${cy - size / 2}) scale(${size / 24})`}
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+      opacity={opacity}
+    />
+  );
+}
 
 export function BarChart({data, config}: Props) {
   // Multi-series (grouped/stacked) only when a series field is configured.
@@ -377,6 +398,67 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
     multi.series.reduce((a, s) => a + Math.max(s.values[ci] ?? 0, 0), 0),
   );
 
+  // ---- Icon (pictogram) mode ----
+  const iconMode = config.iconMode ?? 'bars';
+  const iconGlyphD = ICON_GLYPHS[config.iconGlyph ?? 'star'] ?? ICON_GLYPHS.star;
+  const iconSize = config.iconSize ?? 16;
+  const iconPadding = Math.max(config.iconPadding ?? 2, 0);
+  const iconMaxPerRow = Math.max(config.iconMaxPerRow ?? 10, 1);
+  const iconShowValue = config.iconShowValue ?? false;
+  const iconStep = iconSize + iconPadding;
+
+  // Decide how many full icons + partial fraction a bar renders. In absolute
+  // (grouped) mode each icon = `iconUnitsPerGlyph` units (auto-rescaled so icons
+  // always fit the slot when unset). In percent modes each icon = a fixed % of
+  // the category total (`iconPercentPerGlyph`).
+  const iconCountFor = (val: number, total: number, fit: number): {full: number; partial: number} => {
+    const v = Math.max(val, 0);
+    if (v === 0) return {full: 0, partial: 0};
+    let full: number;
+    let frac: number;
+    if (percentMode) {
+      const pc = Math.max(config.iconPercentPerGlyph ?? 10, 0.1);
+      const pct = total > 0 ? (v / total) * 100 : 0;
+      full = Math.floor(pct / pc);
+      frac = (pct / pc) - full;
+    } else {
+      let unit = config.iconUnitsPerGlyph;
+      if (!unit || unit <= 0) {
+        unit = Math.max(1, Math.ceil(v / fit));
+      }
+      full = Math.floor(v / unit);
+      frac = (v / unit) - full;
+    }
+    return {full, partial: frac};
+  };
+
+  // Grid of glyph centers for `full` icons (+1 partial after them) starting from
+  // an origin where the icons grow (vertical: up from bottom; horizontal: right).
+  // `iconMaxPerRow` sets the wrap width (icons per straight segment) in both
+  // directions.
+  const iconCell = (i: number, originX: number, originY: number, dir: 'up' | 'right'): {x: number; y: number} => {
+    const col = i % iconMaxPerRow;
+    const row = Math.floor(i / iconMaxPerRow);
+    if (dir === 'up') {
+      return {
+        x: originX + col * iconStep + iconSize / 2,
+        y: originY - row * iconStep - iconSize / 2,
+      };
+    }
+    return {
+      x: originX + col * iconStep + iconSize / 2,
+      y: originY + row * iconStep + iconSize / 2,
+    };
+  };
+
+  const iconPositions = (full: number, originX: number, originY: number, dir: 'up' | 'right'): {x: number; y: number}[] => {
+    const pts: {x: number; y: number}[] = [];
+    for (let i = 0; i < full; i++) {
+      pts.push(iconCell(i, originX, originY, dir));
+    }
+    return pts;
+  };
+
   // --- HORIZONTAL LAYOUT ---
   if (horizontal) {
     const marginAdj = {...margin};
@@ -390,6 +472,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
     const barH = stacked || stackedPercent
       ? Math.max(catBandH * 0.7 - barGap * 2, 2)
       : Math.max(Math.min(catBandH * 0.7 / nS - barGap * 2, 30), 2);
+    const iconBarH = Math.max(Math.min(catBandH * 0.7 / nS - barGap * 2, 30), 2);
     const stackXBase = stacked || stackedPercent
       ? multi.categories.map((_, ci) => {
           const base: number[] = [];
@@ -445,7 +528,47 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                     fontWeight={dlWeight}
                   >
                     {multi.series.map((s, si) => {
-                      let val = s.values[ci] ?? 0;
+                      const rawVal = s.values[ci] ?? 0;
+                      let val = rawVal;
+
+                      if (iconMode === 'icons') {
+                        // Pictogram: each series draws its own Row of icons in its
+                        // slot, growing left-to-right. Stack/percent modes still
+                        // render per-series (no visual stacking for icons).
+                        const offset = (catBandH - iconBarH * nS) / 2;
+                        const slotY = bandY + offset + si * (iconBarH + barGap);
+                        const fit = Math.max(1, Math.floor(plotW / iconStep));
+                        const catTotal = stackTotal![ci] || 1;
+                        const {full, partial} = iconCountFor(rawVal, catTotal, fit);
+                        const pts = iconPositions(full, marginAdj.left, slotY + iconBarH / 2, 'right');
+                        const fill = barFill(s.color, config, rawVal < 0);
+                        const glyph = iconGlyphD;
+                        // Position of the partial icon: the next grid cell after full.
+                        const partialPos = iconCell(full, marginAdj.left, slotY + iconBarH / 2, 'right');
+                        return (
+                          <g key={`${ci}-${si}`} opacity={st.globalOpacity}>
+                            {pts.map((p, pi) => (
+                              <IconGlyph key={pi} cx={p.x} cy={p.y} size={iconSize} d={glyph} stroke={fill} />
+                            ))}
+                            {partial > 0.02 && (
+                              <IconGlyph
+                                cx={partialPos.x}
+                                cy={partialPos.y}
+                                size={iconSize}
+                                d={glyph}
+                                stroke={fill}
+                                opacity={partial}
+                              />
+                            )}
+                            {iconShowValue && (
+                              <text x={marginAdj.left + 2} y={slotY + iconBarH / 2 + 3} fontSize={dlSize} fill={fill} textAnchor="start" pointerEvents="none">
+                                {formatValue(rawVal, numFmt)}
+                              </text>
+                            )}
+                          </g>
+                        );
+                      }
+
                       let x: number;
                       let y: number;
                       let w: number;
@@ -523,7 +646,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                         />
                       );
                     })}
-                    {config.showDataLabels !== false && stackedPercent && stackTotal && stackXBase && (
+                    {iconMode !== 'icons' && config.showDataLabels !== false && stackedPercent && stackTotal && stackXBase && (
                       multi.series.map((s, si) => {
                         const val = Math.max(s.values[ci] ?? 0, 0);
                         const segTotal = stackTotal[ci] || 1;
@@ -537,7 +660,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                         );
                       })
                     )}
-                    {config.showDataLabels !== false && !stackedPercent && (
+                    {iconMode !== 'icons' && config.showDataLabels !== false && !stackedPercent && (
                       stacked ? (
                         <text x={marginAdj.left + plotW - 4} y={cy + 3} textAnchor={labelAnchor(dlAlign, 'end')} fontSize={dlSize} fill={dlColor} pointerEvents="none">
                           {formatValue(total, numFmt)}
@@ -639,6 +762,9 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const barW = stacked || stackedPercent
     ? Math.max(barBlockW - barGap * 2, 2)
     : Math.max(Math.min(barBlockW / nS - barGap * 2, 46), 2);
+  // Icon mode always lays series out side-by-side (grouped slot) regardless of
+  // the stacked/percent stack config, so it needs the explicit grouped width.
+  const iconBarW = Math.max(Math.min(barBlockW / nS - barGap * 2, 46), 2);
 
   const stackH = (ci: number, si: number) => {
     const total = stackTotal![ci] || 1;
@@ -681,8 +807,49 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                 fontWeight={dlWeight}
               >
                 {multi.series.map((s, si) => {
-              const val0 = s.values[ci] ?? 0;
-              let val = val0;
+              const rawVal = s.values[ci] ?? 0;
+              let val = rawVal;
+
+              if (iconMode === 'icons') {
+                // Pictogram: each series draws a column of icons in its grouped
+                // slot, growing bottom-up. Stack/percent modes still render
+                // per-series (no visual stacking for icons).
+                const offset = (catBand - iconBarW * nS) / 2;
+                const slotX = bandX + offset + si * (iconBarW + barGap);
+                const slotCenterX = slotX + iconBarW / 2;
+                const baseY = marginAdj.top + plotH;
+                const fit = Math.max(1, Math.floor(plotH / iconStep));
+                const catTotal = stackTotal![ci] || 1;
+                const {full, partial} = iconCountFor(rawVal, catTotal, fit);
+                const pts = iconPositions(full, slotCenterX, baseY, 'up');
+                const fill = barFill(s.color, config, rawVal < 0);
+                const glyph = iconGlyphD;
+                // Position of the partial icon: the next grid cell after full.
+                const partialPos = iconCell(full, slotCenterX, baseY, 'up');
+                return (
+                  <g key={`${ci}-${si}`} opacity={st.globalOpacity}>
+                    {pts.map((p, pi) => (
+                      <IconGlyph key={pi} cx={p.x} cy={p.y} size={iconSize} d={glyph} stroke={fill} />
+                    ))}
+                    {partial > 0.02 && (
+                      <IconGlyph
+                        cx={partialPos.x}
+                        cy={partialPos.y}
+                        size={iconSize}
+                        d={glyph}
+                        stroke={fill}
+                        opacity={partial}
+                      />
+                    )}
+                    {iconShowValue && (
+                      <text x={slotCenterX} y={baseY - 4} fontSize={dlSize} fill={fill} textAnchor="middle" pointerEvents="none">
+                        {formatValue(rawVal, numFmt)}
+                      </text>
+                    )}
+                  </g>
+                );
+              }
+
               let x: number;
               let y: number;
               let w: number;
@@ -759,7 +926,7 @@ const fill = barFill(s.color, config, val < 0);
                   />
                 );
             })}
-                {config.showDataLabels !== false && stackedPercent && stackTotal && stackBase && (
+                {iconMode !== 'icons' && config.showDataLabels !== false && stackedPercent && stackTotal && stackBase && (
                   multi.series.map((s, si) => {
                     const val = Math.max(s.values[ci] ?? 0, 0);
                     const segTotal = stackTotal[ci] || 1;
@@ -774,7 +941,7 @@ const fill = barFill(s.color, config, val < 0);
                     );
                   })
                 )}
-                {config.showDataLabels !== false && !stackedPercent && (
+                {iconMode !== 'icons' && config.showDataLabels !== false && !stackedPercent && (
                   stacked ? (
                     (() => {
                       const ds = slotAlign(bandX + barBandX, bandX + barBandX + barBlockW, 'middle', dlAlign);
@@ -830,8 +997,18 @@ const fill = barFill(s.color, config, val < 0);
 
             let barTop = marginAdj.top + plotH;
               if (hasImg) {
-                // Anchor is always the VALUE TIP of the tallest bar in the category.
-                if (stacked || stackedPercent) {
+                if (iconMode === 'icons') {
+                  // Anchor to the top of the tallest icon column in the category.
+                  let maxRows = 0;
+                  for (const s of multi.series) {
+                    const raw = s.values[ci] ?? 0;
+                    const catTotal = stackTotal![ci] || 1;
+                    const fit = Math.max(1, Math.floor(plotH / iconStep));
+                    const {full} = iconCountFor(raw, catTotal, fit);
+                    maxRows = Math.max(maxRows, Math.ceil(full / iconMaxPerRow));
+                  }
+                  barTop = marginAdj.top + plotH - maxRows * iconStep;
+                } else if (stacked || stackedPercent) {
                   barTop = stackedPercent
                     ? marginAdj.top
                     : marginAdj.top + plotH - ((multi.series.reduce((a, s) => a + Math.max(s.values[ci] ?? 0, 0), 0)) / yRange) * plotH;
@@ -855,11 +1032,24 @@ const fill = barFill(s.color, config, val < 0);
 
             if (!hasImg) {
               const colBottom = marginAdj.top + plotH;
-              const colTop = percentMode
-                ? marginAdj.top
-                : stacked
+              let colTop: number;
+              if (iconMode === 'icons') {
+                let maxRows = 0;
+                for (const s of multi.series) {
+                  const raw = s.values[ci] ?? 0;
+                  const catTotal = stackTotal![ci] || 1;
+                  const fit = Math.max(1, Math.floor(plotH / iconStep));
+                  const {full} = iconCountFor(raw, catTotal, fit);
+                  maxRows = Math.max(maxRows, Math.ceil(full / iconMaxPerRow));
+                }
+                colTop = marginAdj.top + plotH - maxRows * iconStep;
+              } else if (percentMode) {
+                colTop = marginAdj.top;
+              } else {
+                colTop = stacked
                   ? marginAdj.top + plotH - ((multi.series.reduce((a, s) => a + Math.max(s.values[ci] ?? 0, 0), 0)) / yRange) * plotH
                   : marginAdj.top + plotH - (Math.max(...multi.series.map((s) => s.values[ci] ?? 0), 0) / yRange) * plotH;
+              }
               const midY = (colTop + colBottom) / 2;
               // Label anchored to a FIXED plot point at this category's slot:
               // vertical → the plot bottom edge at the band center. Global X/Y
