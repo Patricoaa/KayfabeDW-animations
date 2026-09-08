@@ -524,7 +524,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                         const val = Math.max(rawVal, 0);
                         if (val === 0) return null;
                         const catTotal = stackTotal![ci] || 1;
-                        const base = isStacked ? stackXBase![ci][si] : 0;
+                        const base = isStacked ? (stackXBase![ci][si] ?? 0) : 0;
                         const activeNs = isStacked ? 1 : nS;
                         const fit = Math.max(1, Math.floor(plotW / iconStep));
                         
@@ -577,12 +577,12 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                         return (
                           <g key={`${ci}-${si}`} opacity={st.globalOpacity}>
                             {icons}
-                            {iconShowValue && !isStacked && (
+                            {iconShowValue && !isStacked && !percentMode && (
                               (() => {
                                 const end = val / pc;
                                 const col = end % iconMaxPerRow;
                                 const row = Math.floor(end / iconMaxPerRow);
-                                const lx = originX + col * iconStep + iconSize / 2 + 4;
+                                const lx = originX + col * iconStep + iconSize / 2 + 6;
                                 const ly = originY + row * iconStep + 4;
                                 return <text x={lx} y={ly} fontSize={dlSize} fill={dlColor} textAnchor="start" pointerEvents="none">{formatValue(val, numFmt)}</text>;
                               })()
@@ -1095,10 +1095,11 @@ const fill = barFill(s.color, config, val < 0);
                     const isStacked = stacked || stackedPercent;
                     const maxRaw = isStacked ? catTotal : Math.max(...multi.series.map(s => Math.max(s.values[ci] ?? 0, 0)));
                     const pc = getIconPc(fit, maxRaw, catTotal);
-                    const end = catTotal / pc;
-                    const col = end % iconMaxPerRow;
-                    const row = Math.floor(end / iconMaxPerRow);
                     
+                    // Número total de iconos ocupados por la columna/pila
+                    const totalIconsCount = Math.ceil(catTotal / pc);
+                    const rowsCount = Math.ceil(totalIconsCount / iconMaxPerRow);
+
                     const activeNs = isStacked ? 1 : nS;
                     const iconBarW = Math.max(Math.min(barBlockW / activeNs - barGap * 2, 46), 2);
                     const offset = (catBand - iconBarW * activeNs) / 2;
@@ -1106,8 +1107,9 @@ const fill = barFill(s.color, config, val < 0);
                     const originX = slotX + iconBarW / 2;
                     const originY = marginAdj.top + plotH;
 
-                    const lx = originX + col * iconStep;
-                    const ly = originY - row * iconStep - iconSize / 2 - 4;
+                    const lx = originX;
+                    // Posicion de la etiqueta por encima de la fila mas alta de iconos con espacio adicional (offset 8px)
+                    const ly = originY - rowsCount * iconStep - 8;
 
                     if (stackedPercent || groupedPercent) {
                       return (
@@ -1119,7 +1121,7 @@ const fill = barFill(s.color, config, val < 0);
                             return (
                               <text
                                 key={si}
-                                x={lx + (si - (multi.series.length - 1) / 2) * 36}
+                                x={lx + (si - (multi.series.length - 1) / 2) * 38}
                                 y={ly}
                                 fontSize={dlSize}
                                 fontWeight="bold"
