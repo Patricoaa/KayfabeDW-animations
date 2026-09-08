@@ -16,7 +16,7 @@ type Props = {
 // Renders one lucide glyph path centered at (cx, cy) with the given
 // size and stroke color. Uses stroke-based rendering (lucide native style)
 // so ALL lucide glyphs work correctly (filled or line-based).
-function IconGlyph({cx, cy, size, d, image, stroke, strokeWidth = 2, opacity = 1}: {cx: number; cy: number; size: number; d?: string; image?: string; stroke: string; strokeWidth?: number; opacity?: number}) {
+function IconGlyph({cx, cy, size, d, image, stroke, strokeWidth = 1, opacity = 1}: {cx: number; cy: number; size: number; d?: string; image?: string; stroke: string; strokeWidth?: number; opacity?: number}) {
   if (image) {
     return (
       <image
@@ -34,11 +34,8 @@ function IconGlyph({cx, cy, size, d, image, stroke, strokeWidth = 2, opacity = 1
     <path
       d={d!}
       transform={`translate(${cx - size / 2} ${cy - size / 2}) scale(${size / 24})`}
-      stroke={stroke}
-      strokeWidth={strokeWidth}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      fill="none"
+      fill={stroke}
+      stroke="none"
       opacity={opacity}
     />
   );
@@ -714,22 +711,61 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                         })
                       )
                     )}
-                    {iconMode === 'icons' && iconShowValue && (stacked || stackedPercent) && (
+                    {iconMode === 'icons' && iconShowValue && (stacked || stackedPercent || groupedPercent) && (
                       (() => {
                         const fit = Math.max(1, Math.floor(plotW / iconStep));
                         const catTotal = stackTotal![ci] || 1;
                         if (catTotal === 0) return null;
-                        const pc = getIconPc(fit, catTotal, catTotal);
-                        const end = catTotal / pc;
-                        const col = end % iconMaxPerRow;
-                        const row = Math.floor(end / iconMaxPerRow);
-                        const lx = marginAdj.left + col * iconStep + iconSize / 2 + 4;
-                        const ly = bandY + catBandH / 2 + row * iconStep + 4;
-                        return (
-                          <text x={lx} y={ly} fontSize={dlSize} fill={dlColor} textAnchor="start" pointerEvents="none">
-                            {formatValue(stackedPercent ? 100 : catTotal, numFmt)}{stackedPercent ? '%' : ''}
-                          </text>
-                        );
+                        const isStacked = stacked || stackedPercent;
+                        const maxRaw = isStacked ? catTotal : Math.max(...multi.series.map(s => Math.max(s.values[ci] ?? 0, 0)));
+                        const pc = getIconPc(fit, maxRaw, catTotal);
+                        
+                        if (stackedPercent || groupedPercent) {
+                          // Mostrar % / % en los extremos con los colores de cada categoría
+                          const end = catTotal / pc;
+                          const col = end % iconMaxPerRow;
+                          const row = Math.floor(end / iconMaxPerRow);
+                          const lx = marginAdj.left + col * iconStep + iconSize / 2 + 6;
+                          const ly = bandY + catBandH / 2 + row * iconStep + 4;
+
+                          return (
+                            <g key={`pct-lbl-${ci}`}>
+                              {multi.series.map((s, si) => {
+                                const raw = Math.max(s.values[ci] ?? 0, 0);
+                                const pctVal = Math.round((raw / catTotal) * 100);
+                                const color = barFill(s.color, config, false);
+                                return (
+                                  <text
+                                    key={si}
+                                    x={lx + si * 42}
+                                    y={ly}
+                                    fontSize={dlSize}
+                                    fontWeight="bold"
+                                    fill={color}
+                                    textAnchor="start"
+                                    pointerEvents="none"
+                                  >
+                                    {pctVal}%{si < multi.series.length - 1 ? ' /' : ''}
+                                  </text>
+                                );
+                              })}
+                            </g>
+                          );
+                        }
+
+                        if (stacked) {
+                          const end = catTotal / pc;
+                          const col = end % iconMaxPerRow;
+                          const row = Math.floor(end / iconMaxPerRow);
+                          const lx = marginAdj.left + col * iconStep + iconSize / 2 + 4;
+                          const ly = bandY + catBandH / 2 + row * iconStep + 4;
+                          return (
+                            <text x={lx} y={ly} fontSize={dlSize} fill={dlColor} textAnchor="start" pointerEvents="none">
+                              {formatValue(catTotal, numFmt)}
+                            </text>
+                          );
+                        }
+                        return null;
                       })()
                     )}
                   </g>
@@ -1051,17 +1087,19 @@ const fill = barFill(s.color, config, val < 0);
                     })
                   )
                 )}
-                {iconMode === 'icons' && iconShowValue && (stacked || stackedPercent) && (
+                {iconMode === 'icons' && iconShowValue && (stacked || stackedPercent || groupedPercent) && (
                   (() => {
                     const fit = Math.max(1, Math.floor(plotH / iconStep));
                     const catTotal = stackTotal![ci] || 1;
                     if (catTotal === 0) return null;
-                    const pc = getIconPc(fit, catTotal, catTotal);
+                    const isStacked = stacked || stackedPercent;
+                    const maxRaw = isStacked ? catTotal : Math.max(...multi.series.map(s => Math.max(s.values[ci] ?? 0, 0)));
+                    const pc = getIconPc(fit, maxRaw, catTotal);
                     const end = catTotal / pc;
                     const col = end % iconMaxPerRow;
                     const row = Math.floor(end / iconMaxPerRow);
                     
-                    const activeNs = 1;
+                    const activeNs = isStacked ? 1 : nS;
                     const iconBarW = Math.max(Math.min(barBlockW / activeNs - barGap * 2, 46), 2);
                     const offset = (catBand - iconBarW * activeNs) / 2;
                     const slotX = bandX + offset;
@@ -1070,11 +1108,41 @@ const fill = barFill(s.color, config, val < 0);
 
                     const lx = originX + col * iconStep;
                     const ly = originY - row * iconStep - iconSize / 2 - 4;
-                    return (
-                      <text x={lx} y={ly} fontSize={dlSize} fill={dlColor} textAnchor="middle" pointerEvents="none">
-                        {formatValue(stackedPercent ? 100 : catTotal, numFmt)}{stackedPercent ? '%' : ''}
-                      </text>
-                    );
+
+                    if (stackedPercent || groupedPercent) {
+                      return (
+                        <g key={`pct-lbl-v-${ci}`}>
+                          {multi.series.map((s, si) => {
+                            const raw = Math.max(s.values[ci] ?? 0, 0);
+                            const pctVal = Math.round((raw / catTotal) * 100);
+                            const color = barFill(s.color, config, false);
+                            return (
+                              <text
+                                key={si}
+                                x={lx + (si - (multi.series.length - 1) / 2) * 36}
+                                y={ly}
+                                fontSize={dlSize}
+                                fontWeight="bold"
+                                fill={color}
+                                textAnchor="middle"
+                                pointerEvents="none"
+                              >
+                                {pctVal}%{si < multi.series.length - 1 ? ' /' : ''}
+                              </text>
+                            );
+                          })}
+                        </g>
+                      );
+                    }
+
+                    if (stacked) {
+                      return (
+                        <text x={lx} y={ly} fontSize={dlSize} fill={dlColor} textAnchor="middle" pointerEvents="none">
+                          {formatValue(catTotal, numFmt)}
+                        </text>
+                      );
+                    }
+                    return null;
                   })()
                 )}
               </g>
