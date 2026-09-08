@@ -320,29 +320,52 @@ function convertTimelineRace(
     return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   };
 
-  const byLabel = new Map<string, {image: string | null; steps: {period: number; value: number}[]}>();
+  const byLabel = new Map<string, {image: string | null; map: Map<number, {value: number; count: number; raws: number[]}>}>();
   for (const it of items) {
     if (it.date == null || it.label === '') continue;
     let entry = byLabel.get(it.label);
     if (!entry) {
-      entry = {image: it.image, steps: []};
+      entry = {image: it.image, map: new Map()};
       byLabel.set(it.label, entry);
     }
-    entry.steps.push({period: periodStart(it.date, fmt), value: it.value});
+    const p = periodStart(it.date, fmt);
+    let bucket = entry.map.get(p);
+    if (!bucket) {
+      bucket = {value: it.value, count: 1, raws: [it.value]};
+      entry.map.set(p, bucket);
+    } else {
+      bucket.count += 1;
+      bucket.raws.push(it.value);
+      bucket.value += it.value; // accumulated for sum/avg; overwritten below for last
+    }
   }
+
+  const agg = tc?.valueAgg ?? 'sum';
+  const accumulate = tc?.accumulateMode !== 'period'; // true = running total (default)
 
   const steps: {label: string; image: string | null; date: number; value: number}[] = [];
   for (const [label, entry] of byLabel) {
-    // Sum values within each period.
-    const summed = new Map<number, number>();
-    for (const s of entry.steps) {
-      summed.set(s.period, (summed.get(s.period) ?? 0) + s.value);
-    }
-    const ordered = Array.from(summed.entries()).sort((a, b) => a[0] - b[0]);
+    const ordered = Array.from(entry.map.entries()).sort((a, b) => a[0] - b[0]);
     let running = 0;
-    for (const [period, v] of ordered) {
-      running += v;
-      steps.push({label, image: entry.image, date: period, value: running});
+    for (const [period, bucket] of ordered) {
+      // Compute aggregated value for this period
+      let periodValue: number;
+      if (agg === 'count') {
+        periodValue = bucket.count;
+      } else if (agg === 'avg') {
+        periodValue = bucket.raws.reduce((s, v) => s + v, 0) / bucket.count;
+      } else if (agg === 'min') {
+        periodValue = Math.min(...bucket.raws);
+      } else if (agg === 'max') {
+        periodValue = Math.max(...bucket.raws);
+      } else if (agg === 'last') {
+        periodValue = bucket.raws[bucket.raws.length - 1];
+      } else {
+        // 'sum' (default)
+        periodValue = bucket.raws.reduce((s, v) => s + v, 0);
+      }
+      running += periodValue;
+      steps.push({label, image: entry.image, date: period, value: accumulate ? running : periodValue});
     }
   }
 

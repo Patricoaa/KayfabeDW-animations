@@ -433,6 +433,38 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
           role="numeric"
           onChange={(v) => update({valueField: v || undefined})}
         />
+        <div>
+          <label className="text-sm font-medium mb-1 block">Agregación por periodo</label>
+          <select
+            value={value.valueAgg ?? 'sum'}
+            onChange={(e) => update({valueAgg: e.target.value as TimelineRaceConfig['valueAgg']})}
+            className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+          >
+            <option value="sum">Suma</option>
+            <option value="count">Conteo</option>
+            <option value="avg">Promedio</option>
+            <option value="min">Mínimo</option>
+            <option value="max">Máximo</option>
+            <option value="last">Último valor</option>
+          </select>
+          <p className="text-[10px] text-muted mt-0.5">
+            Función aplicada cuando varios registros caen en el mismo periodo para la misma entidad.
+          </p>
+        </div>
+        <div>
+          <label className="text-sm font-medium mb-1 block">Modo de acumulación</label>
+          <select
+            value={value.accumulateMode ?? 'running'}
+            onChange={(e) => update({accumulateMode: e.target.value as TimelineRaceConfig['accumulateMode']})}
+            className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+          >
+            <option value="running">Acumulado corriente (clásico)</option>
+            <option value="period">Solo valor del periodo</option>
+          </select>
+          <p className="text-[10px] text-muted mt-0.5">
+            "Acumulado corriente": cada paso suma al total previo. "Solo periodo": cada paso muestra únicamente el valor de ese rango.
+          </p>
+        </div>
       </Section>
 
       <Section title="Eje X" defaultOpen>

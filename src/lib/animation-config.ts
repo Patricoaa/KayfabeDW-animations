@@ -105,6 +105,16 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
   dateFormat?: DateFormat;
   maxRows?: number;
 
+  // Aggregation applied when multiple rows fall in the same date period for
+  // the same entity. 'sum' (default) adds them up; 'count' counts rows;
+  // 'avg' averages; 'min'/'max' pick the extreme; 'last' takes the last value.
+  valueAgg?: 'sum' | 'count' | 'avg' | 'min' | 'max' | 'last';
+
+  // Controls how the period values are accumulated over time.
+  // 'running' (default): each step adds to a running total (classic bar race).
+  // 'period': each step shows only the value for that period (no cumulation).
+  accumulateMode?: 'running' | 'period';
+
   // Pause (seconds) that freezes the final result on-screen after the sweep
   // finishes and before the outro contracts the bars. 0 = no extra hold.
   holdFinalSeconds?: number;
