@@ -79,22 +79,31 @@ export const FONT_WEIGHTS: {value: FontWeight; label: string}[] = [
 // Reusable across all chart types; coordinates are in viewBox units from the
 // top-left corner (0,0). Only the fields relevant to `type` are used: text
 // overlays read `text`/`font`/`layout`/`maxWidth`, image ones read the rest.
+export type OverlayShapeType = 'rect' | 'circle' | 'line';
+
 export type ChartOverlay = {
   id: string;
-  type: 'text' | 'image';
+  type: 'text' | 'image' | 'shape';
   // text
   text?: string;
   font?: SectionFont;     // family / color / size / weight / align
   layout?: TextLayout;    // x/y/anchor/rotation/opacity/bg... (same as titles)
   maxWidth?: number;      // px wrap width (optional; 0 = no wrap)
-  // image
+  // image & shape
   src?: string;
+  shape?: OverlayShapeType;
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  radius?: number;        // corner radius for rect
   x?: number;             // left edge
   y?: number;             // top edge
   width?: number;
   height?: number;
   opacity?: number;       // 0-1
+  blur?: number;          // px blur filter
   rotation?: number;      // degrees clockwise around the center
+  zIndex?: 'front' | 'back'; // 'front' = over plot/chart, 'back' = behind plot/chart (under bars)
 };
 
 export type ChartFilterOp = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'is_empty' | 'is_not_empty';

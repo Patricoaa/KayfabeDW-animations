@@ -612,28 +612,64 @@ const overlayCharW = (s: string, fs: number) => s.length * fs * 0.55;
 // Free-form overlays (text/image) drawn on top of the chart, above everything.
 // Coordinates are in viewBox units from the top-left corner; text geometry
 // reuses TextLayout so labels share the same anchor/rotation/background model
-// as the titles. Insert inside the chart's SVG right before `</svg>`.
-export function ChartOverlays({config, width, st}: {config: ChartConfig; width: number; st: ResolvedChartStyle}) {
+// Renders free-form overlays (text, image, shape) inside the chart's SVG.
+export function ChartOverlays({config, width, st, zIndexFilter}: {config: ChartConfig; width: number; st: ResolvedChartStyle; zIndexFilter?: 'front' | 'back'}) {
   const overlays = config.overlays ?? [];
   if (overlays.length === 0) return null;
+
+  const filtered = zIndexFilter
+    ? overlays.filter((o) => (o.zIndex ?? 'front') === zIndexFilter)
+    : overlays;
+
+  if (filtered.length === 0) return null;
+
   return (
     <>
-      {overlays.map((o) => {
+      {filtered.map((o) => {
+        const filterStyle = o.blur && o.blur > 0 ? {filter: `blur(${o.blur}px)`} : undefined;
+
+        if (o.type === 'shape') {
+          const w = o.width ?? 60;
+          const h = o.height ?? 60;
+          const x = o.x ?? 0;
+          const y = o.y ?? 0;
+          const cx = x + w / 2;
+          const cy = y + h / 2;
+          const rot = o.rotation ?? 0;
+          const fill = o.fill ?? '#f59e0b';
+          const stroke = o.stroke ?? 'none';
+          const strokeWidth = o.strokeWidth ?? 0;
+          const opacity = o.opacity ?? 1;
+          const shapeType = o.shape ?? 'rect';
+          const transform = rot ? `rotate(${rot} ${cx} ${cy})` : undefined;
+
+          return (
+            <g key={o.id} opacity={opacity} transform={transform} style={filterStyle}>
+              {shapeType === 'circle' ? (
+                <ellipse cx={cx} cy={cy} rx={w / 2} ry={h / 2} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
+              ) : shapeType === 'line' ? (
+                <line x1={x} y1={y} x2={x + w} y2={y + h} stroke={fill} strokeWidth={strokeWidth || 2} />
+              ) : (
+                <rect x={x} y={y} width={w} height={h} rx={o.radius ?? 0} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
+              )}
+            </g>
+          );
+        }
+
         if (o.type === 'image') {
           const w = o.width ?? 0;
           const h = o.height ?? 0;
           const rot = o.rotation ?? 0;
           const cx = (o.x ?? 0) + w / 2;
           const cy = (o.y ?? 0) + h / 2;
-          // Without a source yet, draw a dashed placeholder at the chosen
-          // position/size so positioning is visible; it disappears once the
-          // image URL is set. With no dimensions there is nothing to draw.
+          const opacity = o.opacity ?? 1;
+
           if (!o.src || w <= 0 || h <= 0) {
             const x = o.x ?? 0;
             const y = o.y ?? 0;
             const rotate = rot ? `rotate(${rot} ${x} ${y})` : undefined;
             return (
-              <g key={o.id} opacity={o.opacity ?? 1} transform={rotate}>
+              <g key={o.id} opacity={opacity} transform={rotate} style={filterStyle}>
                 <rect x={x} y={y} width={w} height={h} fill="none" stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="6 4" rx={4} />
                 <text x={x + 6} y={y + h / 2} fontSize={11} fill="#f59e0b" dominantBaseline="central">
                   {o.src ? 'Cargando…' : 'Sin imagen'}
@@ -642,7 +678,7 @@ export function ChartOverlays({config, width, st}: {config: ChartConfig; width: 
             );
           }
           return (
-            <g key={o.id} opacity={o.opacity ?? 1}>
+            <g key={o.id} opacity={opacity} style={filterStyle}>
               <image
                 href={o.src}
                 x={o.x ?? 0}
@@ -703,9 +739,10 @@ export function ChartOverlays({config, width, st}: {config: ChartConfig; width: 
 
         const rot = layout.rotation ?? 0;
         const transform = rot ? `rotate(${rot} ${xPos} ${y})` : undefined;
+        const opacity = layout.opacity ?? o.opacity ?? 1;
 
         return (
-          <g key={o.id} opacity={layout.opacity ?? 1} transform={transform} fontFamily={family}>
+          <g key={o.id} opacity={opacity} transform={transform} fontFamily={family} style={filterStyle}>
             {layout.bgColor && (
               <rect x={boxX} y={boxY} width={boxW} height={boxH} rx={layout.bgRadius ?? 4} fill={layout.bgColor} opacity={layout.bgOpacity ?? 1} />
             )}

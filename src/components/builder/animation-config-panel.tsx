@@ -723,7 +723,7 @@ function OverlaysSection<T extends {overlays?: import('@/lib/chart-config').Char
   };
   return (
     <Section title="Adicionales">
-      <div className="flex gap-2">
+      <div className="grid grid-cols-3 gap-1.5">
         <button
           type="button"
           onClick={() =>
@@ -731,7 +731,7 @@ function OverlaysSection<T extends {overlays?: import('@/lib/chart-config').Char
               overlays: [...overlays, {id: newAnimOverlayId(), type: 'text', text: 'Texto', layout: {x: 20, y: 20}}],
             } as unknown as Partial<T>)
           }
-          className="flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors bg-elevated text-secondary hover:bg-card-hover"
+          className="px-2 py-1.5 rounded text-xs font-medium transition-colors bg-elevated text-secondary hover:bg-card-hover text-center"
         >
           + Texto
         </button>
@@ -742,21 +742,32 @@ function OverlaysSection<T extends {overlays?: import('@/lib/chart-config').Char
               overlays: [...overlays, {id: newAnimOverlayId(), type: 'image', x: 20, y: 20, width: 80, height: 80}],
             } as unknown as Partial<T>)
           }
-          className="flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors bg-elevated text-secondary hover:bg-card-hover"
+          className="px-2 py-1.5 rounded text-xs font-medium transition-colors bg-elevated text-secondary hover:bg-card-hover text-center"
         >
           + Imagen
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            update({
+              overlays: [...overlays, {id: newAnimOverlayId(), type: 'shape', shape: 'rect', fill: '#f59e0b', x: 20, y: 20, width: 80, height: 80}],
+            } as unknown as Partial<T>)
+          }
+          className="px-2 py-1.5 rounded text-xs font-medium transition-colors bg-elevated text-secondary hover:bg-card-hover text-center"
+        >
+          + Forma
         </button>
       </div>
       {overlays.length === 0 && (
         <p className="text-[10px] text-muted">
-          Capas libres sobre el lienzo (imágenes o textos) que se superponen a cualquier animación y salen incluidas en los exports.
+          Capas libres sobre el lienzo (formas, imágenes o textos) con control de opacidad, desenfoque y orden (frente/detrás).
         </p>
       )}
       {overlays.map((ov, i) => (
         <div key={ov.id} className="rounded-lg border border-border-subtle p-2.5 space-y-2.5">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold text-secondary uppercase tracking-widest font-display">
-              {ov.type === 'image' ? 'Imagen' : 'Texto'} {i + 1}
+              {ov.type === 'shape' ? `Forma (${ov.shape ?? 'rect'})` : ov.type === 'image' ? 'Imagen' : 'Texto'} {i + 1}
             </span>
             <button
               type="button"
@@ -770,6 +781,34 @@ function OverlaysSection<T extends {overlays?: import('@/lib/chart-config').Char
             >
               ✕
             </button>
+          </div>
+
+          {/* Controles comunes: Capa / Orden (Frente / Detrás), Opacidad y Blur */}
+          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border-subtle">
+            <div>
+              <label className="text-xs font-medium mb-1 block">Capa / Posición</label>
+              <div className="flex gap-1">
+                {[
+                  {value: 'front', label: 'Al frente'},
+                  {value: 'back', label: 'Detrás (Fondo)'},
+                ].map((z) => (
+                  <button
+                    key={z.value}
+                    type="button"
+                    onClick={() => setOverlay(i, {zIndex: z.value as 'front' | 'back'})}
+                    className={`flex-1 px-1.5 py-1 rounded text-[10px] font-medium transition-colors ${
+                      (ov.zIndex ?? 'front') === z.value ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover'
+                    }`}
+                  >
+                    {z.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-1">
+              <NumberInput label="Opacidad" value={ov.opacity ?? ov.layout?.opacity ?? 1} min={0} max={1} step={0.05} onChange={(v) => setOverlay(i, {opacity: v, layout: {...(ov.layout ?? {}), opacity: v}})} />
+              <NumberInput label="Blur (px)" value={ov.blur ?? 0} min={0} max={40} step={1} onChange={(v) => setOverlay(i, {blur: v})} />
+            </div>
           </div>
 
           {ov.type === 'text' ? (
@@ -801,6 +840,45 @@ function OverlaysSection<T extends {overlays?: import('@/lib/chart-config').Char
                 </div>
               </div>
             </>
+          ) : ov.type === 'shape' ? (
+            <>
+              <div>
+                <label className="text-xs font-medium mb-1 block">Tipo de Forma</label>
+                <div className="flex gap-1">
+                  {[
+                    {value: 'rect', label: 'Rectángulo'},
+                    {value: 'circle', label: 'Círculo / Óvalo'},
+                    {value: 'line', label: 'Línea'},
+                  ].map((s) => (
+                    <button
+                      key={s.value}
+                      type="button"
+                      onClick={() => setOverlay(i, {shape: s.value as import('@/lib/chart-config').OverlayShapeType})}
+                      className={`flex-1 px-1.5 py-1 rounded text-xs font-medium transition-colors ${
+                        (ov.shape ?? 'rect') === s.value ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover'
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <AutoColorInput label="Relleno / Color" value={ov.fill ?? '#f59e0b'} onChange={(v) => setOverlay(i, {fill: v || undefined})} />
+                <AutoColorInput label="Color de borde" value={ov.stroke ?? ''} onChange={(v) => setOverlay(i, {stroke: v || 'none'})} />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <NumberInput label="X (px)" value={ov.x} onChange={(x) => setOverlay(i, {x})} />
+                <NumberInput label="Y (px)" value={ov.y} onChange={(y) => setOverlay(i, {y})} />
+                <NumberInput label="Ancho (px)" value={ov.width} min={0} max={2000} onChange={(w) => setOverlay(i, {width: w})} />
+                <NumberInput label="Alto (px)" value={ov.height} min={0} max={2000} onChange={(h) => setOverlay(i, {height: h})} />
+                {ov.shape === 'rect' && (
+                  <NumberInput label="Radio esquinas" value={ov.radius} min={0} max={100} onChange={(r) => setOverlay(i, {radius: r})} />
+                )}
+                <NumberInput label="Grosor borde" value={ov.strokeWidth} min={0} max={20} onChange={(w) => setOverlay(i, {strokeWidth: w})} />
+                <NumberInput label="Rotación (°)" value={ov.rotation} onChange={(r) => setOverlay(i, {rotation: r})} />
+              </div>
+            </>
           ) : (
             <div className="space-y-2">
               <FileUploadInput
@@ -814,8 +892,8 @@ function OverlaysSection<T extends {overlays?: import('@/lib/chart-config').Char
                 <NumberInput label="Y (px)" value={ov.y} onChange={(y) => setOverlay(i, {y})} />
                 <NumberInput label="Ancho (px)" value={ov.width} onChange={(w) => setOverlay(i, {width: w})} />
                 <NumberInput label="Alto (px)" value={ov.height} onChange={(h) => setOverlay(i, {height: h})} />
+                <NumberInput label="Rotación (°)" value={ov.rotation} onChange={(r) => setOverlay(i, {rotation: r})} />
               </div>
-              <NumberInput label="Rotación (°)" value={ov.rotation} onChange={(r) => setOverlay(i, {rotation: r})} />
             </div>
           )}
         </div>
