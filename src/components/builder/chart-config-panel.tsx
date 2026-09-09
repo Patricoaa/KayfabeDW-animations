@@ -2049,22 +2049,3 @@ function TableControls({
     </div>
   );
 }
-
-        onChange={(e) => onChange(e.target.checked)}
-        className="peer sr-only"
-      />
-      <span
-        aria-hidden="true"
-        className={`relative w-9 h-5 rounded-full transition-colors ${
-          checked ? 'bg-amber-500' : 'bg-border-default'
-        }`}
-      >
-        <span
-          className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
-            checked ? 'translate-x-4' : ''
-          }`}
-        />
-      </span>
-    </label>
-  );
-}
