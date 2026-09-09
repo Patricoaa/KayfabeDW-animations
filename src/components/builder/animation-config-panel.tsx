@@ -234,19 +234,15 @@ function AvatarSection({value, onChange, participants = []}: {
   return (
     <Collapsible title="Avatar">
       <SwitchControl label="Mostrar avatares" checked={value.showAvatar ?? true} onChange={(v) => onChange({showAvatar: v})} />
-      <div>
-        <label className="text-sm font-medium mb-1 block">Tamaño</label>
-        <input
-          type="number"
+      <NumberControl
+          label="Tamaño"
+          value={value.avatarSize}
           min={16}
           max={160}
           step={2}
-          value={value.avatarSize ?? ''}
-          onChange={(e) => onChange({avatarSize: e.target.value ? Number(e.target.value) : undefined})}
-          className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+          onChange={(v) => onChange({avatarSize: v})}
+          description="Vacío = automático según el tamaño del lienzo."
         />
-        <p className="text-[10px] text-muted mt-0.5">Vacío = automático según el tamaño del lienzo.</p>
-      </div>
       <div>
         <label className="text-sm font-medium mb-1 block">Forma</label>
         <div className="grid grid-cols-2 gap-1">
