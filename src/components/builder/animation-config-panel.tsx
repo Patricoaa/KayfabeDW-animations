@@ -2,6 +2,7 @@
 
 import React, {useState} from 'react';
 import {ChevronDown} from 'lucide-react';
+import { SelectControl, NumberControl, ColorPickerControl, SwitchControl, Collapsible, Tabs } from '@/components/ui/controls';
 import type {ColumnMeta} from '@/components/builder/chart-config-panel';
 import type {TimelineRaceConfig, RankingConfig, DateFormat, AvatarShape, AvatarCrop, RaceTextStyle, ValueFormat, RowEntryElement, CommonHeaderConfig, CommonCanvasConfig} from '@/lib/animation-config';
 import {avatarCropRect} from '@/lib/animation-config';
@@ -39,7 +40,7 @@ type AnimationConfigPanelProps = {
 
 // Collapsible accordion section (Flourish-style), mirrors the static chart
 // config panel. "Datos" is open by default.
-function Section({title, defaultOpen = false, children}: {title: string; defaultOpen?: boolean; children: React.ReactNode}) {
+function OldSection({title, defaultOpen = false, children}: {title: string; defaultOpen?: boolean; children: React.ReactNode}) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="rounded-lg border border-border-subtle overflow-hidden">
@@ -93,7 +94,7 @@ function EntitySearch({value, onChange, shown, total}: {value: string; onChange:
 // so the header settings stay identical everywhere.
 function HeaderSection({value, update}: {value: CommonHeaderConfig; update: (patch: Partial<CommonHeaderConfig>) => void}) {
   return (
-    <Section title="Header" defaultOpen>
+    <Collapsible title="Header" defaultOpen>
       <div>
         <label className="text-sm font-medium mb-1 block">Título (multilínea)</label>
         <textarea
@@ -110,8 +111,8 @@ function HeaderSection({value, update}: {value: CommonHeaderConfig; update: (pat
       <div className="pt-2 mt-1 border-t border-border-subtle">
         <p className="text-[10px] text-muted mb-1.5">Posición del título (offset en px desde su lugar por defecto).</p>
         <div className="grid grid-cols-2 gap-2">
-          <NumberInput label="X (px)" value={value.titleX} step={4} onChange={(v) => update({titleX: v})} />
-          <NumberInput label="Y (px)" value={value.titleY} step={4} onChange={(v) => update({titleY: v})} />
+          <NumberControl label="X (px)" value={value.titleX} step={4} onChange={(v) => update({titleX: v})} />
+          <NumberControl label="Y (px)" value={value.titleY} step={4} onChange={(v) => update({titleY: v})} />
         </div>
       </div>
       <div className="pt-2 mt-1 border-t border-border-subtle">
@@ -130,14 +131,14 @@ function HeaderSection({value, update}: {value: CommonHeaderConfig; update: (pat
       <div className="pt-2 mt-1 border-t border-border-subtle">
         <p className="text-[10px] text-muted mb-1.5">Posición del subtítulo (offset en px desde su lugar por defecto).</p>
         <div className="grid grid-cols-2 gap-2">
-          <NumberInput label="X (px)" value={value.subtitleX} step={4} onChange={(v) => update({subtitleX: v})} />
-          <NumberInput label="Y (px)" value={value.subtitleY} step={4} onChange={(v) => update({subtitleY: v})} />
+          <NumberControl label="X (px)" value={value.subtitleX} step={4} onChange={(v) => update({subtitleX: v})} />
+          <NumberControl label="Y (px)" value={value.subtitleY} step={4} onChange={(v) => update({subtitleY: v})} />
         </div>
       </div>
       <div className="pt-2 mt-1 border-t border-border-subtle">
         <RaceTextControls label="Texto del subtítulo" value={value.subtitleText} onChange={(patch) => update({subtitleText: {...(value.subtitleText ?? {}), ...patch}})} />
       </div>
-    </Section>
+    </Collapsible>
   );
 }
 
@@ -145,7 +146,7 @@ function HeaderSection({value, update}: {value: CommonHeaderConfig; update: (pat
 // every template so the canvas settings stay identical everywhere.
 function CanvasSection({value, update}: {value: CommonCanvasConfig; update: (patch: Partial<CommonCanvasConfig>) => void}) {
   return (
-    <Section title="Canvas">
+    <Collapsible title="Canvas">
       <SelectControl
         label="Tipo de fondo"
         value={value.backgroundType ?? 'color'}
@@ -155,11 +156,11 @@ function CanvasSection({value, update}: {value: CommonCanvasConfig; update: (pat
           {value: 'gradient', label: 'Degradado'},
           {value: 'image', label: 'Imagen'},
         ]}
-        onChange={(v) => update({backgroundType: v as CommonCanvasConfig['backgroundType']})}
+        onChange={(e) => update({backgroundType: e.target.value as CommonCanvasConfig['backgroundType']})}
       />
 
       {(value.backgroundType ?? 'color') === 'color' && (
-        <ColorInput label="Color de fondo" value={value.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
+        <ColorPickerControl label="Color de fondo" value={value.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
       )}
 
       {(value.backgroundType ?? 'color') === 'pattern' && (
@@ -173,17 +174,17 @@ function CanvasSection({value, update}: {value: CommonCanvasConfig; update: (pat
               {value: 'grid', label: 'Cuadrícula'},
               {value: 'checkers', label: 'Cuadros'},
             ]}
-            onChange={(v) => update({backgroundPattern: v as CommonCanvasConfig['backgroundPattern']})}
+            onChange={(e) => update({backgroundPattern: e.target.value as CommonCanvasConfig['backgroundPattern']})}
           />
-          <ColorInput label="Color del patrón" value={value.background ?? '#3b82f6'} onChange={(v) => update({background: v || undefined})} />
+          <ColorPickerControl label="Color del patrón" value={value.background ?? '#3b82f6'} onChange={(v) => update({background: v || undefined})} />
           <SliderNumberInput label="Opacidad (%)" value={Math.round((value.backgroundOpacity ?? 1) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundOpacity: v ? v / 100 : undefined})} />
         </>
       )}
 
       {(value.backgroundType ?? 'color') === 'gradient' && (
         <>
-          <ColorInput label="Color inicial" value={value.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
-          <ColorInput label="Color final" value={value.backgroundSecondary ?? '#1f2937'} onChange={(v) => update({backgroundSecondary: v || undefined})} />
+          <ColorPickerControl label="Color inicial" value={value.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
+          <ColorPickerControl label="Color final" value={value.backgroundSecondary ?? '#1f2937'} onChange={(v) => update({backgroundSecondary: v || undefined})} />
           <SliderNumberInput label="Ángulo (grados)" value={value.backgroundAngle ?? 135} min={0} max={360} step={15} onChange={(v) => update({backgroundAngle: v || undefined})} />
           <SliderNumberInput label="Opacidad (%)" value={Math.round((value.backgroundOpacity ?? 1) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundOpacity: v ? v / 100 : undefined})} />
         </>
@@ -205,7 +206,7 @@ function CanvasSection({value, update}: {value: CommonCanvasConfig; update: (pat
               {value: 'contain', label: 'Contener'},
               {value: 'fill', label: 'Rellenar'},
             ]}
-            onChange={(v) => update({backgroundFit: v as CommonCanvasConfig['backgroundFit']})}
+            onChange={(e) => update({backgroundFit: e.target.value as CommonCanvasConfig['backgroundFit']})}
           />
           <SelectControl
             label="Animación"
@@ -214,18 +215,18 @@ function CanvasSection({value, update}: {value: CommonCanvasConfig; update: (pat
               {value: 'none', label: 'Sin animación'},
               {value: 'mirror', label: 'Espejo (loop)'},
             ]}
-            onChange={(v) => update({backgroundAnim: v as CommonCanvasConfig['backgroundAnim']})}
+            onChange={(e) => update({backgroundAnim: e.target.value as CommonCanvasConfig['backgroundAnim']})}
           />
           {(value.backgroundAnim ?? 'none') === 'mirror' && (
             <SliderNumberInput label="Flip cada (frames)" value={Math.round(value.backgroundAnimSpeed ?? 60)} min={10} max={300} step={10} onChange={(v) => update({backgroundAnimSpeed: v || undefined})} />
           )}
-          <ColorInput label="Color base (debajo)" value={value.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
+          <ColorPickerControl label="Color base (debajo)" value={value.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
           <SliderNumberInput label="Opacidad (%)" value={Math.round((value.backgroundOpacity ?? 1) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundOpacity: v ? v / 100 : undefined})} />
         </>
       )}
 
       <SliderNumberInput label="Desenfoque del fondo (blur px)" value={value.backgroundBlur ?? 0} min={0} max={30} step={1} onChange={(v) => update({backgroundBlur: v || undefined})} />
-    </Section>
+    </Collapsible>
   );
 }
 
@@ -260,8 +261,8 @@ function AvatarSection({value, onChange, participants = []}: {
     onChange({avatarCrops: next});
   };
   return (
-    <Section title="Avatar">
-      <Toggle label="Mostrar avatares" checked={value.showAvatar ?? true} onChange={(v) => onChange({showAvatar: v})} />
+    <Collapsible title="Avatar">
+      <SwitchControl label="Mostrar avatares" checked={value.showAvatar ?? true} onChange={(v) => onChange({showAvatar: v})} />
       <div>
         <label className="text-sm font-medium mb-1 block">Tamaño</label>
         <input
@@ -295,7 +296,7 @@ function AvatarSection({value, onChange, participants = []}: {
         </div>
       </div>
       {(value.avatarShape ?? 'circle') === 'rounded' && (
-        <NumberInput label="Radio de esquina (vacío = auto)" value={value.avatarRadius} min={0} max={60} step={1} onChange={(v) => onChange({avatarRadius: v})} />
+        <NumberControl label="Radio de esquina (vacío = auto)" value={value.avatarRadius} min={0} max={60} step={1} onChange={(v) => onChange({avatarRadius: v})} />
       )}
       <div>
         <label className="text-sm font-medium mb-1 block">Fondo del avatar</label>
@@ -396,9 +397,9 @@ function AvatarSection({value, onChange, participants = []}: {
                       )}
                     </div>
                     <div className="grid grid-cols-3 gap-2 flex-1">
-                      <NumberInput label="Zoom" value={cr?.zoom} min={0.1} max={3} step={0.05} onChange={(v) => setCrop(p.label, {...cr, zoom: v})} />
-                      <NumberInput label="Foco X" value={cr ? (cr.focusX ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setCrop(p.label, {...cr, focusX: (v ?? 0) / 100})} />
-                      <NumberInput label="Foco Y" value={cr ? (cr.focusY ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setCrop(p.label, {...cr, focusY: (v ?? 0) / 100})} />
+                      <NumberControl label="Zoom" value={cr?.zoom} min={0.1} max={3} step={0.05} onChange={(v) => setCrop(p.label, {...cr, zoom: v})} />
+                      <NumberControl label="Foco X" value={cr ? (cr.focusX ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setCrop(p.label, {...cr, focusX: (v ?? 0) / 100})} />
+                      <NumberControl label="Foco Y" value={cr ? (cr.focusY ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setCrop(p.label, {...cr, focusY: (v ?? 0) / 100})} />
                     </div>
                   </div>
                 </div>
@@ -407,7 +408,7 @@ function AvatarSection({value, onChange, participants = []}: {
           </div>
         </div>
       )}
-    </Section>
+    </Collapsible>
   );
 }
 
@@ -445,7 +446,7 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
     <div className="space-y-3">
       <HeaderSection value={value} update={update} />
 
-      <Section title="Datos" defaultOpen>
+      <Collapsible title="Datos" defaultOpen>
         <FieldSelect
           label="Entidad / etiqueta"
           value={value.labelField ?? ''}
@@ -480,7 +481,7 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
         />
         <div>
           <label className="text-sm font-medium mb-1 block">Agregación por periodo</label>
-          <select
+          <SelectControl
             value={value.valueAgg ?? 'sum'}
             onChange={(e) => update({valueAgg: e.target.value as TimelineRaceConfig['valueAgg']})}
             className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -491,31 +492,31 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
             <option value="min">Mínimo</option>
             <option value="max">Máximo</option>
             <option value="last">Último valor</option>
-          </select>
+          </SelectControl>
           <p className="text-[10px] text-muted mt-0.5">
             Función aplicada cuando varios registros caen en el mismo periodo para la misma entidad.
           </p>
         </div>
         <div>
           <label className="text-sm font-medium mb-1 block">Modo de acumulación</label>
-          <select
+          <SelectControl
             value={value.accumulateMode ?? 'running'}
             onChange={(e) => update({accumulateMode: e.target.value as TimelineRaceConfig['accumulateMode']})}
             className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
           >
             <option value="running">Acumulado corriente (clásico)</option>
             <option value="period">Solo valor del periodo</option>
-          </select>
+          </SelectControl>
           <p className="text-[10px] text-muted mt-0.5">
             "Acumulado corriente": cada paso suma al total previo. "Solo periodo": cada paso muestra únicamente el valor de ese rango.
           </p>
         </div>
-      </Section>
+      </Collapsible>
 
-      <Section title="Eje X" defaultOpen>
+      <Collapsible title="Eje X" defaultOpen>
         <div>
           <label className="text-sm font-medium mb-1 block">Formato de fecha</label>
-          <select
+          <SelectControl
             value={fmt}
             onChange={(e) => update({dateFormat: e.target.value as DateFormat})}
             className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -523,12 +524,12 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
             <option value="day">Día</option>
             <option value="month">Mes</option>
             <option value="year">Año</option>
-          </select>
+          </SelectControl>
           <p className="text-[10px] text-muted mt-0.5">
             Agrupa los datos por día, mes o año y re-agrega el valor acumulado en cada rango.
           </p>
         </div>
-        <Toggle
+        <SwitchControl
           label="Mostrar eje X"
           checked={value.showXAxis ?? true}
           onChange={(v) => update({showXAxis: v})}
@@ -562,7 +563,7 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
           label="Formato del valor acumulado"
           value={value.valueFormat ?? 'number'}
           options={VALUE_FORMATS}
-          onChange={(v) => update({valueFormat: v as ValueFormat})}
+          onChange={(e) => update({valueFormat: e.target.value as ValueFormat})}
         />
         {(value.valueFormat ?? 'number') === 'currency' && (
           <div>
@@ -577,23 +578,23 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
         <p className="text-[10px] text-muted">
           El eje X muestra el valor acumulado (mínimo 0 y máximo), no las fechas. La fecha en pantalla se muestra abajo a la derecha como texto e indica el momento del recorrido.
         </p>
-      </Section>
+      </Collapsible>
 
-      <Section title="Eje Y">
-        <Toggle
+      <Collapsible title="Eje Y">
+        <SwitchControl
           label="Eje vertical (Y)"
           checked={value.showYAxis ?? false}
           onChange={(v) => update({showYAxis: v || undefined})}
         />
-        <ColorInput label="Color del eje" value={value.yAxisColor ?? '#334155'} onChange={(v) => update({yAxisColor: v || undefined})} />
+        <ColorPickerControl label="Color del eje" value={value.yAxisColor ?? '#334155'} onChange={(v) => update({yAxisColor: v || undefined})} />
         <SliderNumberInput label="Grosor del eje (px)" value={value.yAxisWidth ?? 2} min={1} max={12} step={1} onChange={(v) => update({yAxisWidth: v || undefined})} />
         <p className="text-[10px] text-muted">
           Línea vertical en el origen (borde izquierdo) de las barras.
         </p>
-      </Section>
+      </Collapsible>
 
-      <Section title="Fecha">
-        <Toggle
+      <Collapsible title="Fecha">
+        <SwitchControl
           label="Mostrar fecha en pantalla"
           checked={value.showDateLabel ?? true}
           onChange={(v) => update({showDateLabel: v})}
@@ -601,16 +602,16 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
         <div className="pt-2 mt-1 border-t border-border-subtle">
           <p className="text-[10px] text-muted mb-1.5">Posición de la fecha (offset en px desde la esquina inferior derecha).</p>
           <div className="grid grid-cols-2 gap-2">
-            <NumberInput label="X (px)" value={value.dateX} step={4} onChange={(v) => update({dateX: v})} />
-            <NumberInput label="Y (px)" value={value.dateY} step={4} onChange={(v) => update({dateY: v})} />
+            <NumberControl label="X (px)" value={value.dateX} step={4} onChange={(v) => update({dateX: v})} />
+            <NumberControl label="Y (px)" value={value.dateY} step={4} onChange={(v) => update({dateY: v})} />
           </div>
         </div>
         <div className="pt-2 mt-1 border-t border-border-subtle">
           <RaceTextControls label="Texto de la fecha" value={value.dateText} onChange={(patch) => update({dateText: {...(value.dateText ?? {}), ...patch}})} />
         </div>
-      </Section>
+      </Collapsible>
 
-      <Section title="Ranking">
+      <Collapsible title="Ranking">
         <div>
           <label className="text-sm font-medium mb-1 block">Máximo de entidades</label>
           <input
@@ -636,7 +637,7 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
         <p className="text-[10px] text-muted mt-0.5">
           Tiempo del barrido de la carrera. 0 = automático (la carrera ocupa todo el tiempo disponible). Al fijarla, el tiempo sobrante queda congelado en el resultado final.
         </p>
-        <Toggle
+        <SwitchControl
           label="Efecto podio al final"
           checked={value.podiumEffect ?? true}
           onChange={(v) => update({podiumEffect: v})}
@@ -644,14 +645,14 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
         <p className="text-[10px] text-muted">
           Cuando se revela el ganador, lo agranda con brillo y atenúa a los que no quedaron primeros. Apagado = sin atenuación ni brillo.
         </p>
-      </Section>
+      </Collapsible>
 
       {/* ============ AVATAR (compartido) ============ */}
       <AvatarSection value={value} onChange={update} participants={participants} />
 
       {/* ============ BARRAS ============ */}
       {participants.length > 0 && (
-        <Section title="Barras">
+        <Collapsible title="Barras">
           <SliderNumberInput
             label="Ancho de las barras (%)"
             value={value.barWidth ? Math.round(value.barWidth * 100) : 75}
@@ -663,13 +664,13 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
           <p className="text-[10px] text-muted mb-1">
             Reduce el porcentaje para dar más espacio al valor y al avatar (útil cuando el valor se sale de pantalla).
           </p>
-          <NumberInput label="Radio de esquina de la barra (vacío = píldora)" value={value.barRadius} min={0} max={60} step={1} onChange={(v) => update({barRadius: v})} />
-          <NumberInput label="Grosor de la barra (px, vacío = automático)" value={value.barThickness} min={4} max={120} step={2} onChange={(v) => update({barThickness: v})} />
+          <NumberControl label="Radio de esquina de la barra (vacío = píldora)" value={value.barRadius} min={0} max={60} step={1} onChange={(v) => update({barRadius: v})} />
+          <NumberControl label="Grosor de la barra (px, vacío = automático)" value={value.barThickness} min={4} max={120} step={2} onChange={(v) => update({barThickness: v})} />
           <div className="pt-2 mt-1 border-t border-border-subtle">
             <p className="text-[10px] text-muted mb-1.5">Posición del grupo de filas y eje X (offset en px desde su lugar por defecto).</p>
             <div className="grid grid-cols-2 gap-2">
-              <NumberInput label="X (px)" value={value.barsX} step={4} onChange={(v) => update({barsX: v})} />
-              <NumberInput label="Y (px)" value={value.barsY} step={4} onChange={(v) => update({barsY: v})} />
+              <NumberControl label="X (px)" value={value.barsX} step={4} onChange={(v) => update({barsX: v})} />
+              <NumberControl label="Y (px)" value={value.barsY} step={4} onChange={(v) => update({barsY: v})} />
             </div>
           </div>
           <div className="flex items-center justify-between mb-0.5">
@@ -754,11 +755,11 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
               );
             })}
           </div>
-        </Section>
+        </Collapsible>
       )}
 
       {/* ============ ETIQUETA ============ */}
-      <Section title="Etiqueta">
+      <Collapsible title="Etiqueta">
         <RaceTextControls label="Texto de la etiqueta" value={value.labelText} onChange={(patch) => update({labelText: {...(value.labelText ?? {}), ...patch}})} />
         <p className="text-[10px] text-muted mt-0.5">
           El nombre de la entidad que se apoya sobre la barra en el outro final.
@@ -768,7 +769,7 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
         <p className="text-[10px] text-muted mt-0.5">
           El valor acumulado que viaja dentro de cada barra.
         </p>
-      </Section>
+      </Collapsible>
 
       {/* ============ ADICIONALES ============ */}
       <OverlaysSection value={value} update={update} />
@@ -799,7 +800,7 @@ function OverlaysSection<T extends {overlays?: import('@/lib/chart-config').Char
     update({overlays: next} as unknown as Partial<T>);
   };
   return (
-    <Section title="Adicionales">
+    <Collapsible title="Adicionales">
       <div className="grid grid-cols-3 gap-1.5">
         <button
           type="button"
@@ -883,8 +884,8 @@ function OverlaysSection<T extends {overlays?: import('@/lib/chart-config').Char
               </div>
             </div>
             <div className="grid grid-cols-2 gap-1">
-              <NumberInput label="Opacidad" value={ov.opacity ?? ov.layout?.opacity ?? 1} min={0} max={1} step={0.05} onChange={(v) => setOverlay(i, {opacity: v, layout: {...(ov.layout ?? {}), opacity: v}})} />
-              <NumberInput label="Blur (px)" value={ov.blur ?? 0} min={0} max={40} step={1} onChange={(v) => setOverlay(i, {blur: v})} />
+              <NumberControl label="Opacidad" value={ov.opacity ?? ov.layout?.opacity ?? 1} min={0} max={1} step={0.05} onChange={(v) => setOverlay(i, {opacity: v, layout: {...(ov.layout ?? {}), opacity: v}})} />
+              <NumberControl label="Blur (px)" value={ov.blur ?? 0} min={0} max={40} step={1} onChange={(v) => setOverlay(i, {blur: v})} />
             </div>
           </div>
 
@@ -911,9 +912,9 @@ function OverlaysSection<T extends {overlays?: import('@/lib/chart-config').Char
                 />
                 <div className="space-y-2">
                   <p className="text-sm font-medium">Posición (px)</p>
-                  <NumberInput label="X (px)" value={ov.layout?.x} onChange={(x) => setOverlay(i, {layout: {...(ov.layout ?? {}), x}})} />
-                  <NumberInput label="Y (px)" value={ov.layout?.y} onChange={(y) => setOverlay(i, {layout: {...(ov.layout ?? {}), y}})} />
-                  <NumberInput label="Rotación (°)" value={ov.layout?.rotation} onChange={(r) => setOverlay(i, {layout: {...(ov.layout ?? {}), rotation: r}})} />
+                  <NumberControl label="X (px)" value={ov.layout?.x} onChange={(x) => setOverlay(i, {layout: {...(ov.layout ?? {}), x}})} />
+                  <NumberControl label="Y (px)" value={ov.layout?.y} onChange={(y) => setOverlay(i, {layout: {...(ov.layout ?? {}), y}})} />
+                  <NumberControl label="Rotación (°)" value={ov.layout?.rotation} onChange={(r) => setOverlay(i, {layout: {...(ov.layout ?? {}), rotation: r}})} />
                 </div>
               </div>
             </>
@@ -945,15 +946,15 @@ function OverlaysSection<T extends {overlays?: import('@/lib/chart-config').Char
                 <AutoColorInput label="Color de borde" value={ov.stroke ?? ''} onChange={(v) => setOverlay(i, {stroke: v || 'none'})} />
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <NumberInput label="X (px)" value={ov.x} onChange={(x) => setOverlay(i, {x})} />
-                <NumberInput label="Y (px)" value={ov.y} onChange={(y) => setOverlay(i, {y})} />
-                <NumberInput label="Ancho (px)" value={ov.width} min={0} max={2000} onChange={(w) => setOverlay(i, {width: w})} />
-                <NumberInput label="Alto (px)" value={ov.height} min={0} max={2000} onChange={(h) => setOverlay(i, {height: h})} />
+                <NumberControl label="X (px)" value={ov.x} onChange={(x) => setOverlay(i, {x})} />
+                <NumberControl label="Y (px)" value={ov.y} onChange={(y) => setOverlay(i, {y})} />
+                <NumberControl label="Ancho (px)" value={ov.width} min={0} max={2000} onChange={(w) => setOverlay(i, {width: w})} />
+                <NumberControl label="Alto (px)" value={ov.height} min={0} max={2000} onChange={(h) => setOverlay(i, {height: h})} />
                 {ov.shape === 'rect' && (
-                  <NumberInput label="Radio esquinas" value={ov.radius} min={0} max={100} onChange={(r) => setOverlay(i, {radius: r})} />
+                  <NumberControl label="Radio esquinas" value={ov.radius} min={0} max={100} onChange={(r) => setOverlay(i, {radius: r})} />
                 )}
-                <NumberInput label="Grosor borde" value={ov.strokeWidth} min={0} max={20} onChange={(w) => setOverlay(i, {strokeWidth: w})} />
-                <NumberInput label="Rotación (°)" value={ov.rotation} onChange={(r) => setOverlay(i, {rotation: r})} />
+                <NumberControl label="Grosor borde" value={ov.strokeWidth} min={0} max={20} onChange={(w) => setOverlay(i, {strokeWidth: w})} />
+                <NumberControl label="Rotación (°)" value={ov.rotation} onChange={(r) => setOverlay(i, {rotation: r})} />
               </div>
             </>
           ) : (
@@ -965,17 +966,17 @@ function OverlaysSection<T extends {overlays?: import('@/lib/chart-config').Char
                 onClear={() => setOverlay(i, {src: undefined})}
               />
               <div className="grid grid-cols-2 gap-2">
-                <NumberInput label="X (px)" value={ov.x} onChange={(x) => setOverlay(i, {x})} />
-                <NumberInput label="Y (px)" value={ov.y} onChange={(y) => setOverlay(i, {y})} />
-                <NumberInput label="Ancho (px)" value={ov.width} onChange={(w) => setOverlay(i, {width: w})} />
-                <NumberInput label="Alto (px)" value={ov.height} onChange={(h) => setOverlay(i, {height: h})} />
-                <NumberInput label="Rotación (°)" value={ov.rotation} onChange={(r) => setOverlay(i, {rotation: r})} />
+                <NumberControl label="X (px)" value={ov.x} onChange={(x) => setOverlay(i, {x})} />
+                <NumberControl label="Y (px)" value={ov.y} onChange={(y) => setOverlay(i, {y})} />
+                <NumberControl label="Ancho (px)" value={ov.width} onChange={(w) => setOverlay(i, {width: w})} />
+                <NumberControl label="Alto (px)" value={ov.height} onChange={(h) => setOverlay(i, {height: h})} />
+                <NumberControl label="Rotación (°)" value={ov.rotation} onChange={(r) => setOverlay(i, {rotation: r})} />
               </div>
             </div>
           )}
         </div>
       ))}
-    </Section>
+    </Collapsible>
   );
 }
 
@@ -1015,7 +1016,7 @@ function RowImageSection({value, onChange, participants = []}: {
   };
   const imageRefs = React.useRef<Record<string, HTMLInputElement | null>>({});
   return (
-    <Section title="Imagen por puesto">
+    <Collapsible title="Imagen por puesto">
       <p className="text-[10px] text-muted">
         Marco global en el costado derecho del canvas: las filas se comprimen a la izquierda y el marco muestra la imagen del puesto que se está revelando, con corte directo (sin fundido) y un traslado lento (dirección configurable por imagen) hasta que entra el siguiente puesto. El zoom se aplica tal cual (valores menores a 1 alejan la imagen dentro del marco); si lo dejas en blanco, se usa un mínimo por defecto para que el foco y el traslado siempre tengan margen. El ancho no tiene tope: puede extenderse hasta todo el ancho del canvas (las filas se comprimen al mínimo).
       </p>
@@ -1047,10 +1048,10 @@ function RowImageSection({value, onChange, participants = []}: {
         />
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <NumberInput label="Offset X (px)" value={value.rowImageX} step={8} onChange={(v) => onChange({rowImageX: v})} />
-        <NumberInput label="Offset Y (px)" value={value.rowImageY} step={8} onChange={(v) => onChange({rowImageY: v})} />
+        <NumberControl label="Offset X (px)" value={value.rowImageX} step={8} onChange={(v) => onChange({rowImageX: v})} />
+        <NumberControl label="Offset Y (px)" value={value.rowImageY} step={8} onChange={(v) => onChange({rowImageY: v})} />
       </div>
-      <Toggle label="Traslado al relevar" checked={value.rowImagePan ?? true} onChange={(v) => onChange({rowImagePan: v})} />
+      <SwitchControl label="Traslado al relevar" checked={value.rowImagePan ?? true} onChange={(v) => onChange({rowImagePan: v})} />
       <div className="mt-3">
         <label className="text-sm font-medium mb-1 block">Fondo del marco</label>
         <div className="grid grid-cols-2 gap-1">
@@ -1072,12 +1073,12 @@ function RowImageSection({value, onChange, participants = []}: {
         </p>
       </div>
       <hr className="border-border-subtle my-2" />
-      <Toggle label="Mostrar el puesto en la imagen" checked={value.rowImageLabel ?? false} onChange={(v) => onChange({rowImageLabel: v})} />
+      <SwitchControl label="Mostrar el puesto en la imagen" checked={value.rowImageLabel ?? false} onChange={(v) => onChange({rowImageLabel: v})} />
       {value.rowImageLabel && (
         <>
           <div className="grid grid-cols-2 gap-2">
-            <NumberInput label="Offset X (px)" value={value.rowImageLabelX} step={4} onChange={(v) => onChange({rowImageLabelX: v})} />
-            <NumberInput label="Offset Y (px)" value={value.rowImageLabelY} step={4} onChange={(v) => onChange({rowImageLabelY: v})} />
+            <NumberControl label="Offset X (px)" value={value.rowImageLabelX} step={4} onChange={(v) => onChange({rowImageLabelX: v})} />
+            <NumberControl label="Offset Y (px)" value={value.rowImageLabelY} step={4} onChange={(v) => onChange({rowImageLabelY: v})} />
           </div>
           <RaceTextControls
             label="Texto del puesto"
@@ -1154,9 +1155,9 @@ function RowImageSection({value, onChange, participants = []}: {
                       )}
                     </div>
                     <div className="grid grid-cols-3 gap-2 flex-1">
-                      <NumberInput label="Zoom" value={cr?.zoom} min={0.1} max={3} step={0.05} onChange={(v) => setCrop(p.label, {...cr, zoom: v})} />
-                      <NumberInput label="Foco X" value={cr ? (cr.focusX ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setCrop(p.label, {...cr, focusX: (v ?? 0) / 100})} />
-                      <NumberInput label="Foco Y" value={cr ? (cr.focusY ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setCrop(p.label, {...cr, focusY: (v ?? 0) / 100})} />
+                      <NumberControl label="Zoom" value={cr?.zoom} min={0.1} max={3} step={0.05} onChange={(v) => setCrop(p.label, {...cr, zoom: v})} />
+                      <NumberControl label="Foco X" value={cr ? (cr.focusX ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setCrop(p.label, {...cr, focusX: (v ?? 0) / 100})} />
+                      <NumberControl label="Foco Y" value={cr ? (cr.focusY ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setCrop(p.label, {...cr, focusY: (v ?? 0) / 100})} />
                     </div>
                   </div>
                   <div className="mt-2">
@@ -1221,7 +1222,7 @@ function RowImageSection({value, onChange, participants = []}: {
           </div>
         </div>
       )}
-    </Section>
+    </Collapsible>
   );
 }
 
@@ -1238,7 +1239,7 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
     <div className="space-y-3">
       <HeaderSection value={value} update={update} />
 
-      <Section title="Datos" defaultOpen>
+      <Collapsible title="Datos" defaultOpen>
         <FieldSelect
           label="Entidad / etiqueta"
           value={value.labelField ?? ''}
@@ -1256,7 +1257,7 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
         />
         <div>
           <label className="text-sm font-medium mb-1 block">Cómo se agrega el valor</label>
-          <select
+          <SelectControl
             value={value.valueAgg ?? 'none'}
             onChange={(e) => update({valueAgg: e.target.value as RankingConfig['valueAgg']})}
             className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -1269,7 +1270,7 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
             <option value="weightedAvg">Promedio ponderado</option>
             <option value="min">Mínimo</option>
             <option value="max">Máximo</option>
-          </select>
+          </SelectControl>
           <p className="text-[10px] text-muted mt-0.5">
             Agrupa las filas por etiqueta y agrega sus valores. Elige "Cada fila aparte" para mantener una entrada por fila.
           </p>
@@ -1293,9 +1294,9 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
           optional
           onChange={(f) => update({imageField: f || undefined})}
         />
-      </Section>
+      </Collapsible>
 
-      <Section title="Ranking" defaultOpen>
+      <Collapsible title="Ranking" defaultOpen>
         <div>
           <label className="text-sm font-medium mb-1 block">Modo de ranking</label>
           <div className="grid grid-cols-2 gap-1">
@@ -1352,12 +1353,12 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
           />
           <p className="text-[10px] text-muted mt-0.5">0 = sin límite. Limita cuántas entidades participan (el top-N por valor).</p>
         </div>
-        <Toggle label="Contar cada dato hasta su valor" checked={value.countUp ?? true} onChange={(v) => update({countUp: v})} />
+        <SwitchControl label="Contar cada dato hasta su valor" checked={value.countUp ?? true} onChange={(v) => update({countUp: v})} />
         <p className="text-[10px] text-muted mt-0.5">
           El valor de cada fila cuenta desde 0 hasta su cifra real mientras la fila entra en pantalla. Apagado = el valor aparece ya resuelto.
         </p>
-        <Toggle label="Mostrar puesto (#1)" checked={value.showRank ?? true} onChange={(v) => update({showRank: v})} />
-        <Toggle label="Mostrar el dato" checked={value.showValue ?? true} onChange={(v) => update({showValue: v})} />
+        <SwitchControl label="Mostrar puesto (#1)" checked={value.showRank ?? true} onChange={(v) => update({showRank: v})} />
+        <SwitchControl label="Mostrar el dato" checked={value.showValue ?? true} onChange={(v) => update({showValue: v})} />
         <div>
           <label className="text-sm font-medium mb-1 block">Prefijo del puesto</label>
           <input
@@ -1367,9 +1368,9 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
           />
           <p className="text-[10px] text-muted mt-0.5">Vacío = sin prefijo (en vez de #1 muestra 1).</p>
         </div>
-      </Section>
+      </Collapsible>
 
-      <Section title="Filas">
+      <Collapsible title="Filas">
         <SliderNumberInput label="Separación vertical (px)" value={value.rowGap ?? 0} min={0} max={120} step={2} onChange={(v) => update({rowGap: v})} />
         <SliderNumberInput label="Separación horizontal (px)" value={value.rowGapH ?? 0} min={0} max={80} step={2} onChange={(v) => update({rowGapH: v})} />
         <p className="text-[10px] text-muted">
@@ -1379,7 +1380,7 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
           label="Formato del valor"
           value={value.valueFormat ?? 'number'}
           options={VALUE_FORMATS}
-          onChange={(v) => update({valueFormat: v as ValueFormat})}
+          onChange={(e) => update({valueFormat: e.target.value as ValueFormat})}
         />
         {(value.valueFormat ?? 'number') === 'currency' && (
           <div>
@@ -1475,7 +1476,7 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="flex-1">
-                      <NumberInput label="Retardo (frames)" value={delay} min={0} max={30} step={1} onChange={(v) => update({rowEntryDelays: {...(value.rowEntryDelays ?? {}), [id]: v ?? 0}})} />
+                      <NumberControl label="Retardo (frames)" value={delay} min={0} max={30} step={1} onChange={(v) => update({rowEntryDelays: {...(value.rowEntryDelays ?? {}), [id]: v ?? 0}})} />
                     </div>
                     {(dir !== undefined || delay > 0) && (
                       <button type="button" onClick={reset} className="text-[10px] text-muted hover:text-red-500 underline shrink-0 mt-4">
@@ -1493,23 +1494,23 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
           <div className="pt-2 mt-1 border-t border-border-subtle">
             <p className="text-[10px] text-muted mb-1.5">Separadores inferiores de la tabla.</p>
             <SliderNumberInput label="Grosor (px)" value={value.tableSepWidth ?? 1} min={0} max={8} step={1} onChange={(v) => update({tableSepWidth: v || undefined})} />
-            <ColorInput label="Color" value={value.tableSepColor} onChange={(v) => update({tableSepColor: v})} />
+            <ColorPickerControl label="Color" value={value.tableSepColor} onChange={(v) => update({tableSepColor: v})} />
           </div>
         )}
         <div className="pt-2 mt-1 border-t border-border-subtle">
           <p className="text-[10px] text-muted mb-1.5">Posición del grupo de filas (offset en px desde su lugar por defecto).</p>
           <div className="grid grid-cols-2 gap-2">
-            <NumberInput label="X (px)" value={value.rowsX} step={4} onChange={(v) => update({rowsX: v})} />
-            <NumberInput label="Y (px)" value={value.rowsY} step={4} onChange={(v) => update({rowsY: v})} />
+            <NumberControl label="X (px)" value={value.rowsX} step={4} onChange={(v) => update({rowsX: v})} />
+            <NumberControl label="Y (px)" value={value.rowsY} step={4} onChange={(v) => update({rowsY: v})} />
           </div>
         </div>
-      </Section>
+      </Collapsible>
 
       <AvatarSection value={value} onChange={update} participants={participants} />
 
       <RowImageSection value={value} onChange={update} participants={participants} />
 
-      <Section title="Etiqueta">
+      <Collapsible title="Etiqueta">
         <RaceTextControls label="Texto del puesto (#1)" value={value.rankText} onChange={(patch) => update({rankText: {...(value.rankText ?? {}), ...patch}})} />
         <p className="text-[10px] text-muted mt-0.5">
           El número de posición (#1, #2...) que aparece a la izquierda de cada fila.
@@ -1524,7 +1525,7 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
         <p className="text-[10px] text-muted mt-0.5">
           El valor numérico que viaja dentro de la barra.
         </p>
-      </Section>
+      </Collapsible>
 
       {/* ============ ADICIONALES ============ */}
       <OverlaysSection value={value} update={update} />
@@ -1540,25 +1541,6 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
   }
   if (templateId !== 'timeline-race') return null;
   return <TimelineRacePanel templateId={templateId} columns={columns} fieldMeta={fieldMeta} value={value as TimelineRaceConfig} onChange={onChange as (n: TimelineRaceConfig) => void} participants={participants} />;
-}
-
-function SelectControl({label, value, options, onChange}: {label: string; value: string; options: {value: string; label: string}[]; onChange: (v: string) => void}) {
-  return (
-    <div>
-      <label className="text-sm font-medium mb-1 block">{label}</label>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
 }
 
 function FileUploadInput({label, value, onLoad, onClear}: {label: string; value?: string; onLoad: (dataUrl: string) => void; onClear: () => void}) {
@@ -1594,7 +1576,7 @@ function FileUploadInput({label, value, onLoad, onClear}: {label: string; value?
   );
 }
 
-function Toggle({label, checked, onChange}: {label: string; checked: boolean; onChange: (v: boolean) => void}) {
+function OldToggle({label, checked, onChange}: {label: string; checked: boolean; onChange: (v: boolean) => void}) {
   return (
     <label className="flex items-center justify-between cursor-pointer">
       <span className="text-sm font-medium">{label}</span>
@@ -1641,7 +1623,7 @@ function FieldSelect({
   return (
     <div>
       <label className="text-sm font-medium mb-1 block">{label}</label>
-      <select
+      <SelectControl
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -1655,12 +1637,12 @@ function FieldSelect({
             </option>
           );
         })}
-      </select>
+      </SelectControl>
     </div>
   );
 }
 
-function NumberInput({label, value, min, max, step = 1, onChange}: {label: string; value?: number; min?: number; max?: number; step?: number; onChange: (v: number | undefined) => void}) {
+function OldNumberInput({label, value, min, max, step = 1, onChange}: {label: string; value?: number; min?: number; max?: number; step?: number; onChange: (v: number | undefined) => void}) {
   return (
     <div>
       <label className="text-sm font-medium mb-1 block">{label}</label>
@@ -1705,7 +1687,7 @@ function SliderNumberInput({label, value, min, max, step = 1, onChange}: {label:
   );
 }
 
-function ColorInput({label, value, onChange}: {label: string; value?: string; onChange: (v: string) => void}) {
+function OldColorInput({label, value, onChange}: {label: string; value?: string; onChange: (v: string) => void}) {
   return (
     <label className="flex items-center gap-2">
       <input
@@ -1770,7 +1752,7 @@ function RaceTextControls({label, value, onChange}: {label: string; value?: Race
       <p className="text-sm font-medium">{label}</p>
       <div>
         <label className="text-sm font-medium mb-1 block">Tipografía</label>
-        <select
+        <SelectControl
           value={v.fontFamily ?? ''}
           onChange={(e) => onChange({fontFamily: e.target.value || undefined})}
           className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -1779,17 +1761,17 @@ function RaceTextControls({label, value, onChange}: {label: string; value?: Race
           {FONT_PRESETS.map((f) => (
             <option key={f.name} value={f.family}>{f.name}</option>
           ))}
-        </select>
+        </SelectControl>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <NumberInput label="Tamaño (px)" value={v.size} min={6} max={160} step={1} onChange={(n) => onChange({size: n})} />
-        <NumberInput label="Grosor" value={v.weight} min={400} max={800} step={100} onChange={(n) => onChange({weight: n})} />
+        <NumberControl label="Tamaño (px)" value={v.size} min={6} max={160} step={1} onChange={(n) => onChange({size: n})} />
+        <NumberControl label="Grosor" value={v.weight} min={400} max={800} step={100} onChange={(n) => onChange({weight: n})} />
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <NumberInput label="Interletrado (px)" value={v.letterSpacing} min={-2} max={20} step={1} onChange={(n) => onChange({letterSpacing: n})} />
-        <NumberInput label="Alto de línea" value={v.lineHeight} min={0.8} max={2} step={0.1} onChange={(n) => onChange({lineHeight: n})} />
+        <NumberControl label="Interletrado (px)" value={v.letterSpacing} min={-2} max={20} step={1} onChange={(n) => onChange({letterSpacing: n})} />
+        <NumberControl label="Alto de línea" value={v.lineHeight} min={0.8} max={2} step={0.1} onChange={(n) => onChange({lineHeight: n})} />
       </div>
-      <ColorInput label="Color del texto" value={v.color} onChange={(c) => onChange({color: c || undefined})} />
+      <ColorPickerControl label="Color del texto" value={v.color} onChange={(c) => onChange({color: c || undefined})} />
       <div>
         <label className="text-sm font-medium mb-1 block">Mayúsculas / minúsculas</label>
         <div className="grid grid-cols-4 gap-1">
@@ -1847,7 +1829,7 @@ function RaceTextControls({label, value, onChange}: {label: string; value?: Race
           />
         )}
       </div>
-      <Toggle
+      <SwitchControl
         label="Subrayado"
         checked={!!v.underline}
         onChange={(b) => onChange({underline: b || undefined})}
