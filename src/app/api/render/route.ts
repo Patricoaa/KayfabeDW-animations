@@ -90,7 +90,7 @@ async function getBundleUrl(): Promise<string> {
 }
 
 async function ensureChrome(): Promise<string> {
-  if (cachedChromePath && fs.existsSync(cachedChromePath)) {
+  if (cachedChromePath && fs.existsSync(/*turbopackIgnore: true*/ cachedChromePath)) {
     console.log('[render] Using cached Chrome at', cachedChromePath);
     return cachedChromePath;
   }
