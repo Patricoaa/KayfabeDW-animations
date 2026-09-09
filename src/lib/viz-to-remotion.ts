@@ -466,6 +466,9 @@ function convertRaceScrolling(
     markerSize: t?.markerSize,
     markerText: t?.markerText,
     maxRows: t?.maxRows,
+    entitySelection: t?.entitySelection,
+    finalValueDirection: t?.finalValueDirection,
+    entityFilter: t?.entityFilter,
     holdFinalSeconds: t?.holdFinalSeconds,
     raceDurationSeconds: t?.raceDurationSeconds,
     podiumEffect: t?.podiumEffect,
@@ -671,15 +674,47 @@ function convertRaceScrolling(
 
   steps.sort((a, b) => a.label.localeCompare(b.label) || a.pos - b.pos);
 
+  // ---- Participant set: final-value top/bottom N, or an explicit filter ----
+  // Unlike the timeline-race (whose `maxRows` cap uses whoever happens to be
+  // leading mid-race), the race-scrolling cap is decided ONCE from the final
+  // accumulated value, so the entities that end up outside the top/bottom-N
+  // never change at random `maxRows` values (mirrors `resolveRanking`).
+  const manualMode = tc?.entitySelection === 'manual';
+  let keptSteps = steps;
+  let renderMaxRows = tc?.maxRows;
+  if (manualMode) {
+    const filter = tc?.entityFilter ?? [];
+    if (filter.length > 0) {
+      const wanted = new Set(filter);
+      keptSteps = steps.filter((s) => wanted.has(s.label));
+    }
+    renderMaxRows = undefined;
+  } else if (tc?.maxRows && tc.maxRows > 0) {
+    const finalOf = new Map<string, {pos: number; value: number}>();
+    for (const s of steps) {
+      const cur = finalOf.get(s.label);
+      if (!cur || s.pos > cur.pos) finalOf.set(s.label, {pos: s.pos, value: s.value});
+    }
+    const dir = tc?.finalValueDirection === 'bottom' ? 1 : -1;
+    const topN = [...finalOf.entries()]
+      .sort((a, b) => dir * (a[1].value - b[1].value))
+      .slice(0, tc.maxRows)
+      .map(([label]) => label);
+    const wanted = new Set(topN);
+    keptSteps = steps.filter((s) => wanted.has(s.label));
+  }
+  const selected = keptSteps === steps ? undefined : new Set(keptSteps.map((s) => s.label));
+
   return {
     title: (tc?.title || config.title) ?? '',
-    items: steps,
+    items: keptSteps,
     accentColor: config.colors?.[0] ?? '#FFD700',
     dateMode,
     axisUnit,
     dateFormat: dateMode ? fmt : undefined,
     domain: [sMin, sMax] as [number, number],
     ...presentationOf(tc),
+    ...(selected && renderMaxRows === undefined ? {maxRows: undefined} : {}),
   };
 }
 

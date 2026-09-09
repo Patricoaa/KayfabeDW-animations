@@ -746,6 +746,20 @@ type RaceScrollingPanelProps = Omit<AnimationConfigPanelProps, 'value' | 'onChan
 
 function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, participants = [], templateSelector}: RaceScrollingPanelProps) {
   const update = (patch: Partial<RaceScrollingConfig>) => onChange({...value, ...patch});
+  const [entityFilterQ, setEntityFilterQ] = useState('');
+  const filteredEntities = () =>
+    entityFilterQ.trim() === ''
+      ? participants
+      : participants.filter((p) => norm(p.label).includes(norm(entityFilterQ.trim())));
+  const toggleEntity = (label: string, on: boolean) => {
+    const cur = new Set(value.entityFilter ?? []);
+    if (on) cur.add(label);
+    else cur.delete(label);
+    update({entityFilter: cur.size > 0 ? Array.from(cur).sort() : undefined});
+  };
+  const setEntitySelection = (mode: Exclude<RaceScrollingConfig['entitySelection'], undefined>) => {
+    update({entitySelection: mode});
+  };
   const fmt = (value.dateFormat ?? 'day') as DateFormat;
   const setBarColor = (label: string, color?: string) => {
     const next = {...(value.barColors ?? {})};
@@ -883,6 +897,70 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
             0 = sin límite. Limita la cantidad de entidades visibles en la carrera.
           </p>
         </div>
+        <div>
+          <label className="text-sm font-medium mb-1 block">Selección de entidades</label>
+          <SelectControl
+            value={value.entitySelection ?? 'final-value'}
+            onChange={(e) => setEntitySelection(e.target.value as Exclude<RaceScrollingConfig['entitySelection'], undefined>)}
+            className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+          >
+            <option value="final-value">Mayor / menor valor final acumulado</option>
+            <option value="manual">Filtro manual (elijo las unidades)</option>
+          </SelectControl>
+          <p className="text-[10px] text-muted mt-0.5">
+            "Mayor / menor": el máximo se trunca según el valor acumulado al final de la línea de tiempo (no por el puesto durante la carrera). "Manual": corren solo las entidades que elijas.
+          </p>
+        </div>
+        {(value.entitySelection ?? 'final-value') === 'final-value' ? (
+          <div>
+            <label className="text-sm font-medium mb-1 block">Qué extremo conservar</label>
+            <SelectControl
+              value={value.finalValueDirection ?? 'top'}
+              onChange={(e) => update({finalValueDirection: e.target.value as RaceScrollingConfig['finalValueDirection']})}
+              className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+            >
+              <option value="top">Mayor acumulado final (top N)</option>
+              <option value="bottom">Menor acumulado final (bottom N)</option>
+            </SelectControl>
+            <p className="text-[10px] text-muted mt-0.5">
+              Se mantienen las N entidades con el valor más alto o más bajo al final, sin importar su posición durante la carrera.
+            </p>
+          </div>
+        ) : (
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-sm font-medium block">Unidades a mostrar</label>
+              {(value.entityFilter?.length ?? 0) > 0 && (
+                <button type="button" onClick={() => update({entityFilter: undefined})} className="text-[10px] text-muted hover:text-red-500">
+                  Limpiar ({value.entityFilter?.length})
+                </button>
+              )}
+            </div>
+            <EntitySearch value={entityFilterQ} onChange={setEntityFilterQ} shown={filteredEntities().length} total={participants.length} />
+            <div className="max-h-44 overflow-y-auto mt-1 border border-border-subtle rounded-lg p-1">
+              {filteredEntities().length === 0 && (
+                <p className="text-[10px] text-muted p-1.5">Sin coincidencias.</p>
+              )}
+              {filteredEntities().map((p) => {
+                const on = (value.entityFilter ?? []).includes(p.label);
+                return (
+                  <label key={p.label} className={`flex items-center gap-2 px-1.5 py-1 rounded cursor-pointer ${on ? 'bg-elevated' : ''}`}>
+                    <input
+                      type="checkbox"
+                      checked={on}
+                      onChange={(e) => toggleEntity(p.label, e.target.checked)}
+                      className="accent-amber-500"
+                    />
+                    <span className="text-xs text-secondary truncate" title={p.label}>{p.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-muted mt-0.5">
+              Solo estas entidades corren (ignora el máximo). Sin ninguna selección = todas.
+            </p>
+          </div>
+        )}
         <SliderNumberInput
           label="Duración de la carrera (s)"
           value={value.raceDurationSeconds ?? 0}

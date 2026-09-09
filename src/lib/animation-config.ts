@@ -283,6 +283,17 @@ export type RaceScrollingConfig = TimelineRaceConfig & {
   markerIcon?: string;
   markerSize?: number;
   markerText?: RaceTextStyle;
+
+  // Which participant set runs the race (alongside `maxRows`):
+  // - 'final-value' (default): keep exactly the `maxRows` entities with the
+  //   LARGEST ('top') or SMALLEST ('bottom') accumulated value at the END of
+  //   the timeline — unlike the timeline-race, the cap is decided by the final
+  //   result, not by who happens to be leading mid-race.
+  // - 'manual': race exactly the entities listed in `entityFilter`.
+  //   `maxRows` is ignored in manual mode (empty = every entity races).
+  entitySelection?: 'final-value' | 'manual';
+  finalValueDirection?: 'top' | 'bottom';
+  entityFilter?: string[];
 };
 
 // The movable elements of a ranking row. During entry each one travels along a

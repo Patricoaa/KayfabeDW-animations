@@ -172,3 +172,28 @@ Changed: `src/remotion/templates/race-scrolling/index.tsx`,
 `src/components/builder/animation-config-panel.tsx` ("Separación del grid (px)"
 in Eje; "Mostrar etiqueta de la entidad" in Etiquetas; fixed stale hint about
 the outro label), this plan. Gate `npx tsc --noEmit` clean.
+
+## Feedback round (2026-09-09) — máximo de entidades por valor final o filtro
+User feedback: "A diferencia de un timeline race el máximo de entidades debe
+truncar según último valor acumulado (control para definir si es el mayor o
+menor) o bien por filtro específico para seleccionar las unidades a mostrar."
+
+1. **Truncado por valor final acumulado** — new `entitySelection` default
+   `'final-value'`: when `maxRows` is set, the participant set is decided ONCE
+   by each entity's accumulated value at the END of the timeline (`finalValueDirection`
+   `'top'` keeps the largest N, `'bottom'` the smallest N), unlike the
+   timeline-race whose mid-race live rank decides the cap. Applied in
+   `convertRaceScrolling` from the pre-sort `steps` (final value = value of the
+   last period per label), keeping the full-timeline `domain`; the renderer's
+   live top-N slice over the trimmed universe is a no-op.
+2. **Filtro manual** — `entitySelection: 'manual'` races exactly the labels in
+   `entityFilter` (ignores `maxRows`, empty = all entities). Panel shows a
+   searchable checkbox list of every entity (`EntitySearch` + scroll list);
+   when set, `maxRows` is forced undefined for the renderer so the filter is
+   authoritative.
+
+Changed: `src/lib/animation-config.ts` (`entitySelection`/`finalValueDirection`/
+`entityFilter`), `src/lib/viz-to-remotion.ts` (selection + passthrough),
+`src/components/builder/animation-config-panel.tsx` (Ranking: "Selección de
+entidades" select, extremo conservar, listado manual), this plan. Gate
+`npx tsc --noEmit` clean.
