@@ -88,10 +88,11 @@ Espaciado → Avatar → Adicionales.**
     (320–640 px); mobile bottom-sheet layout untouched.
 - **Axis-title controls removed** (`chart-config-panel.tsx`): deleted the
   `Etiqueta eje X` input + `Fuente de etiquetas` (`xLabel` / `xLabelFont`) and
-  `Etiqueta eje Y` + `Fuente de etiquetas` (`yLabel` / `yLabelFont`). Fields
-  stay in `ChartConfig` (no migration): saved configs keep rendering their old
-  axis titles; category-label and Y-tick typography fall back to the global
-  style defaults. `setXLabelFont`/`setYLabelFont` removed.
+  `Etiqueta eje Y` + `Fuente de etiquetas` (`yLabel` / `yLabelFont`), plus the
+  `Ángulo de etiquetas` slider (`labelAngle`). Fields stay in `ChartConfig` (no
+  migration): saved configs keep rendering their old axis titles and label
+  angle; category-label and Y-tick typography fall back to the global style
+  defaults. `setXLabelFont`/`setYLabelFont` removed.
 - **Text angle**: `TextStyle` gains `angle?: number` (deg); `TextStyleControls`
   adds an "Ángulo (°)" `NumberControl` (−180…180, Auto reset). Rendered by the
   shared `textStyle()` remotion helper (both templates) and, for static SVG, on

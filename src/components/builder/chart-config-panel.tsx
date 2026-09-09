@@ -655,19 +655,6 @@ const setLegendTextOverride = (label: string, value?: string) => {
       {/* ============ EJE X / CATEGORÍA ============ */}
       <Collapsible title="Eje X / Categoría">
           <div>
-              <label className="text-sm font-medium mb-1 block">Ángulo de etiquetas</label>
-              <input
-                type="range"
-                min={-90}
-                max={90}
-                value={config.labelAngle ?? 0}
-                onChange={(e) => update({labelAngle: Number(e.target.value)})}
-                className="w-full accent-amber-500"
-              />
-              <p className="text-[10px] text-muted text-right">{config.labelAngle ?? 0}°</p>
-            </div>
-
-          <div>
               <label className="text-sm font-medium mb-1 block">Etiquetas de categoría</label>
               <p className="text-[10px] text-muted mb-2">Posición por coordenadas (px) desde un punto fijo del área del gráfico. En barras verticales el ancla es el borde inferior del centro de cada banda; en horizontales, el borde izquierdo del centro de cada fila.</p>
               <div className="flex items-center gap-2 mb-3">
