@@ -356,7 +356,9 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
     : 0;
   // Bars grow IN PLACE from this column, so only the track to its right scrolls.
   const BAR_MAX_W = Math.max((innerW - NAME_W - ROW_GAP_PX * 2) * BAR_RATIO, 1);
-  const AVATAR_W = Math.max(innerW - NAME_W - BAR_MAX_W - ROW_GAP_PX * 2, 0);
+  // Explicit `avatarSize` wins (mirrors the timeline-race); otherwise the avatar
+  // takes the leftover width after the name column and the bar track.
+  const AVATAR_W = avatarSize ?? Math.max(innerW - NAME_W - BAR_MAX_W - ROW_GAP_PX * 2, 0);
   const BAR_TRACK_X = PAD_L + NAME_W + ROW_GAP_PX;
   const EASE = 26;
   const OUTRO = Math.min(45, Math.max(0, Math.floor(durationInFrames * 0.12)));
