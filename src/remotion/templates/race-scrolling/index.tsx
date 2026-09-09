@@ -58,20 +58,16 @@ export type RaceScrollingProps = {
   barsY?: number;
   showDateLabel?: boolean;
   showXAxis?: boolean;
-  axisPosition?: 'top' | 'bottom';
   // Axis sweep direction: 'asc' (Menor→Mayor) or 'desc' (Mayor→Menor). Only
   // the value→position mapping reverses; camera and ranking are unchanged.
   axisDirection?: 'asc' | 'desc';
-  // Second grid band: a live cardinality scale (0 → current max) on the
-  // traveling plane, independent of the positional band.
-  showValueAxis?: boolean;
-  valueAxisPosition?: 'top' | 'bottom';
   // Camera anchor: % of the track width where the "now" line stays fixed
   // (5-95, default 35). The plane scrolls so this point always matches `now`.
   anchorX?: number;
-  // Ticks on the CARDINALITY (value) band (2-24, default 8). The positional
-  // band ignores this: it draws one tick/gridline per real data date, thinned
-  // by `gridSpacing` (min px between consecutive gridlines, default 90).
+  // Ticks on the PERMANENT value (Y) axis (2-24, default 8): a cardinality
+  // scale 0 → current max drawn statically on the right edge of the plot. The
+  // positional band draws one tick/gridline per real data date, thinned by
+  // `gridSpacing` (min px between consecutive gridlines, default 90).
   axisTicks?: number;
   // Min horizontal distance (px, 20-320, default 90) between consecutive
   // positional gridlines/labels on the plane. Dates closer than this are
@@ -86,7 +82,6 @@ export type RaceScrollingProps = {
   markerIcon?: string;
   markerSize?: number;
   markerText?: RaceTextStyle;
-  rowOrder?: ('bar' | 'avatar')[];
   rowGapH?: number;
   rowGap?: number;
   barWidth?: number;
@@ -129,7 +124,6 @@ export type RaceScrollingProps = {
   backgroundFit?: 'cover' | 'contain' | 'fill';
   backgroundAnim?: 'none' | 'mirror';
   backgroundAnimSpeed?: number;
-  showYAxis?: boolean;
   yAxisColor?: string;
   yAxisWidth?: number;
   titleText?: RaceTextStyle;
@@ -165,10 +159,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   barsY,
   showDateLabel = true,
   showXAxis = true,
-  axisPosition = 'bottom',
   axisDirection = 'asc',
-  showValueAxis = false,
-  valueAxisPosition = 'bottom',
   anchorX = 35,
   axisTicks = 8,
   gridSpacing,
@@ -178,7 +169,6 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   markerIcon = 'star',
   markerSize,
   markerText,
-  rowOrder,
   rowGapH,
   rowGap,
   barWidth,
@@ -221,7 +211,6 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   backgroundFit = 'cover',
   backgroundAnim = 'none',
   backgroundAnimSpeed = 60,
-  showYAxis = false,
   yAxisColor = '#334155',
   yAxisWidth = 2,
   titleText,
@@ -232,12 +221,9 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const frame = useCurrentFrame();
   const {fps, durationInFrames, width: W, height: H} = useVideoConfig();
 
-  const order = (() => {
-    const segs: ('bar' | 'avatar')[] = ['bar', 'avatar'];
-    if (!rowOrder) return segs;
-    const clean = Array.from(new Set(rowOrder.filter((s) => s === 'bar' || s === 'avatar'))) as ('bar' | 'avatar')[];
-    return clean.length === 2 ? clean : segs;
-  })();
+  // Row segments are FIXED: the avatar always comes first, then the bar. This
+  // template has no per-row ordering control.
+  const SEG_ORDER: ('avatar' | 'bar')[] = ['avatar', 'bar'];
 
   // ---- Responsive geometry ----
   const isPortrait = H > W;
@@ -318,7 +304,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
             const barFill = barColors?.[item.label] ?? (isLeader ? accentColor : '#475569');
             return (
               <div key={`${item.label}-${index}`} style={{opacity: rowOpacity, transform: `translateX(${labelX}px) scale(${isLeader ? winnerScale : 1})`, display: 'flex', alignItems: 'center', gap: isPortrait ? 12 : 18}}>
-                {order[0] === 'avatar' && <div style={{flexShrink: 0}}>{showAvatar && item.image && <Avatar src={item.image} size={COMPAT_AVATAR} shape={avatarShape} radius={avatarRadius} bg={avatarBg} borderColor={avatarBorderColor} borderWidth={avatarBorderWidth} />}</div>}
+                <div style={{flexShrink: 0}}>{showAvatar && item.image && <Avatar src={item.image} size={COMPAT_AVATAR} shape={avatarShape} radius={avatarRadius} bg={avatarBg} borderColor={avatarBorderColor} borderWidth={avatarBorderWidth} />}</div>
                 <div style={{flex: 1, height: ROW_H * 0.5, backgroundColor: showRail !== false ? '#1a1a1a' : 'transparent', borderRadius: 999, overflow: 'hidden', display: 'flex'}}>
                   <div style={{width: Math.max(0, barWidthPx), height: '100%', backgroundColor: barFill, borderRadius: barRadius ?? 999}} />
                 </div>
@@ -533,24 +519,13 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // ---- Grid bands + markers: the part that scrolls (the "plane") ----
   const MARKER_SIZE = markerSize ?? (isPortrait ? Math.round(W * 0.055) : 26);
   const AXIS_FONT = isPortrait ? Math.round(W * 0.026) : 13;
-  const BAND_H = Math.max(40, MARKER_SIZE + 20);
-  const BAND_GAP = 12;
 
-  // Each of the two configurable bands occupies a slot on its side: the
-  // positional (date/number) band always sits next to the rows and the
-  // cardinality band stacks outside it when both share a side.
-  const posTop = showXAxis && axisPosition === 'top';
-  const posBottom = showXAxis && axisPosition === 'bottom';
-  const valTop = showValueAxis && valueAxisPosition === 'top';
-  const valBottom = showValueAxis && valueAxisPosition === 'bottom';
-  const topBands = (posTop ? 1 : 0) + (valTop ? 1 : 0);
-  const bottomBands = (posBottom ? 1 : 0) + (valBottom ? 1 : 0);
-  const topPx = topBands * (BAND_H + BAND_GAP);
-  const rowsTopY = topPx + 18;
-  const bottomEnd = bottomBands > 0 ? rowsHeight + 18 + (bottomBands - 1) * (BAND_H + BAND_GAP) + BAND_H : rowsHeight;
-  const bandYFor = (slot: number, side: 'top' | 'bottom') =>
-    side === 'top' ? -(slot + 1) * (BAND_H + BAND_GAP) : rowsHeight + 18 + slot * (BAND_H + BAND_GAP);
-  const valSlotFor = (side: 'top' | 'bottom') => (showXAxis && axisPosition === side ? 1 : 0);
+  // Date labels live in a reserved strip DIRECTLY ABOVE each date gridline and
+  // scroll with it. The value scale is the PERMANENT static Y axis at the right
+  // edge of the plot (see below), so there are no extra traveling bands.
+  const DATE_LABEL_H = 26;
+  const rowsTopY = 18 + DATE_LABEL_H;
+  const bottomEnd = rowsHeight;
 
   const tickLabels = (t: number) => (axisUnit === 'date' ? fmtDate(t, dateFormat) : fmtValue(t, valueFormat, currencySymbol));
   // Positional band: ONE tick/gridline per distinct real position (date bucket /
@@ -572,15 +547,30 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
     return out;
   })();
 
-  // Cardinality band: live scale of the accumulated value (0 → current max),
-  // painted on the plane so it travels left→right like the positional band.
-  const valueTicks = (() => {
-    if (!showValueAxis) return [];
-    const n = Math.min(Math.max(Math.round(axisTicks ?? 8), 2), 24);
+  // Overlap guard for the DATE labels: even after the `gridSpacing` thinning, a
+  // label whose estimated width would collide with the previously kept label is
+  // dropped so they never bunch up on top of each other.
+  const dateLabels = (() => {
     const out: {label: string; x: number}[] = [];
+    let lastRight = Number.NEGATIVE_INFINITY;
+    for (const t of ticks) {
+      const w = t.label.length * 7 + 12;
+      if (t.x - lastRight < 4) continue;
+      out.push(t);
+      lastRight = t.x + w;
+    }
+    return out;
+  })();
+
+  // Permanent Y axis: cardinality scale of the accumulated value (0 → current
+  // max) drawn STATICALLY on the axis at the right edge of the plot, marking
+  // where the scrolling date tape is cut off.
+  const valueTicks = (() => {
+    const n = Math.min(Math.max(Math.round(axisTicks ?? 8), 2), 24);
+    const out: {label: string; frac: number}[] = [];
     for (let i = 0; i < n; i++) {
       const frac = i / (n - 1);
-      out.push({label: fmtValue(Math.round(currentMax * frac), valueFormat, currencySymbol), x: frac * BAR_MAX_W});
+      out.push({label: fmtValue(Math.round(currentMax * frac), valueFormat, currencySymbol), frac});
     }
     return out;
   })();
@@ -699,7 +689,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
             <span style={{whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', ...textStyle(labelText, {color: '#e4e4e7', size: LABEL_FONT, weight: 700}), opacity: pop}}>{p.label}</span>
           </div>
         )}
-        {order.map((seg) => segments[seg])}
+        {SEG_ORDER.map((seg) => segments[seg])}
       </div>
     );
   };
@@ -740,46 +730,50 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
           + optional cardinality) scroll; the now-guide and header stay fixed. */}
       <div style={{flex: 1, position: 'relative', marginTop: isPortrait ? H * 0.03 : 36, overflow: 'hidden'}}>
         {/* Now-guide line */}
-        <div style={{position: 'absolute', left: anchorXPx, top: topBands > 0 ? rowsTopY - topPx - 26 : rowsTopY - 8, height: (topBands > 0 ? topPx + 10 : 0) + rowsHeight + 16 + (bottomBands > 0 ? bottomEnd - rowsHeight : 0), width: 2, borderRadius: 1, backgroundColor: accentColor, opacity: 0.45, zIndex: 1, boxShadow: `0 0 10px ${accentColor}66`}} />
+        <div style={{position: 'absolute', left: anchorXPx, top: rowsTopY - 8, height: rowsHeight + 16, width: 2, borderRadius: 1, backgroundColor: accentColor, opacity: 0.45, zIndex: 1, boxShadow: `0 0 10px ${accentColor}66`}} />
 
         {/* Rows container — static, aligned to the left of the plane */}
         <div style={{position: 'absolute', left: PAD_L, top: rowsTopY, width: innerW, height: Math.max(rowsHeight, 1), zIndex: 2}}>
           {renderPool.map((p) => renderRow(p))}
         </div>
 
-        {/* Y axis: static at the bars' origin (right of the entity axis) */}
-        {showYAxis && (
-          <div style={{position: 'absolute', left: BAR_TRACK_X, top: rowsTop, height: rowsHeight, width: yAxisWidth ?? 2, borderRadius: 1, backgroundColor: yAxisColor ?? '#334155'}} />
+        {/* Permanent Y axis: static cardinality scale (0 → current max), STRUCK
+            at the RIGHT edge of the plot. Its thickness/color frame the region
+            where the scrolling date tape is visible on screen. */}
+        <div style={{position: 'absolute', left: BAR_TRACK_X + BAR_MAX_W, top: rowsTop, height: rowsHeight, zIndex: 3}}>
+          <div style={{position: 'absolute', left: -(yAxisWidth ?? 2) / 2, top: 0, bottom: 0, width: yAxisWidth ?? 2, borderRadius: 1, backgroundColor: yAxisColor ?? '#334155'}} />
+          {valueTicks.map((tick, i) => {
+            const y = rowsHeight * (1 - tick.frac);
+            return (
+              <div key={i} style={{position: 'absolute', left: 0, top: y, transform: 'translateY(-50%)', display: 'flex', alignItems: 'center'}}>
+                <div style={{position: 'absolute', width: 5, height: 1, backgroundColor: yAxisColor ?? '#334155', transform: 'translateX(-100%)'}} />
+                <div style={{marginLeft: 8, whiteSpace: 'nowrap', fontSize: AXIS_FONT, color: '#94a3b8', fontVariantNumeric: 'tabular-nums', textShadow: '0 1px 3px rgba(0,0,0,0.5)'}}>{tick.label}</div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Date labels: one DIRECTLY ABOVE each date gridline, in a strip that
+            scrolls with the tape. Labels that would overlap the previous one
+            are skipped (see `dateLabels`), so they never bunch together. */}
+        {showXAxis && (
+          <div style={{position: 'absolute', left: BAR_TRACK_X, top: rowsTopY - DATE_LABEL_H - 8, width: BAR_MAX_W + 160, height: DATE_LABEL_H + 12, transform: `translateX(${scrollX}px)`, overflow: 'hidden', zIndex: 3}}>
+            {dateLabels.map((tick, i) => (
+              <span key={i} style={{position: 'absolute', top: 4, left: tick.x, transform: 'translateX(-50%)', whiteSpace: 'nowrap', fontSize: AXIS_FONT, color: '#e2e8f0', fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.7)', fontVariantNumeric: 'tabular-nums'}}>{tick.label}</span>
+            ))}
+          </div>
         )}
 
-        {/* Plot box — fixed clip viewport over the bar track. The scrolling tape
-            (gridlines + bands) lives INSIDE it, so everything slides out and
-            disappears when it crosses the plot limits ("cinta que se desplaza"). */}
-        <div style={{position: 'absolute', left: BAR_TRACK_X, top: rowsTopY - topPx, width: BAR_MAX_W, height: topPx + bottomEnd, overflow: 'hidden', zIndex: 1}}>
-          <div style={{position: 'absolute', left: 0, top: topPx, width: BAR_MAX_W, height: bottomEnd, transform: `translateX(${scrollX}px)`}}>
+        {/* Plot box — fixed clip viewport over the bar track. The scrolling
+            tape (date gridlines) lives INSIDE it, so dates slide out and
+            disappear when they cross the plot limits ("cinta que se desplaza"). */}
+        <div style={{position: 'absolute', left: BAR_TRACK_X, top: rowsTopY, width: BAR_MAX_W, height: bottomEnd, overflow: 'hidden', zIndex: 1}}>
+          <div style={{position: 'absolute', left: 0, top: 0, width: BAR_MAX_W, height: bottomEnd, transform: `translateX(${scrollX}px)`}}>
             {/* Vertical gridlines: one per real date/value, over the rows area */}
             {showXAxis && (
               <div style={{position: 'absolute', left: 0, top: 0, width: BAR_MAX_W, height: rowsHeight}}>
                 {ticks.map((tick, i) => (
                   <div key={i} style={{position: 'absolute', left: tick.x, top: 0, bottom: 0, width: 1, backgroundColor: 'rgba(51, 65, 85, 0.35)'}} />
-                ))}
-              </div>
-            )}
-            {showXAxis && (
-              <div style={{position: 'absolute', left: 0, top: bandYFor(0, axisPosition), width: BAR_MAX_W, height: BAND_H, borderTop: axisPosition === 'bottom' ? '1px solid #1f2937' : 'none', borderBottom: axisPosition === 'top' ? '1px solid #1f2937' : 'none', fontSize: AXIS_FONT, color: '#64748b', fontVariantNumeric: 'tabular-nums'}}>
-                {ticks.map((tick, i) => (
-                  <div key={i} style={{position: 'absolute', top: 6, transform: 'translateX(-50%)', whiteSpace: 'nowrap'}}>
-                    <span>{tick.label}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {showValueAxis && (
-              <div style={{position: 'absolute', left: 0, top: bandYFor(valSlotFor(valueAxisPosition), valueAxisPosition), width: BAR_MAX_W, height: BAND_H, borderTop: valueAxisPosition === 'bottom' ? '1px solid #1f2937' : 'none', borderBottom: valueAxisPosition === 'top' ? '1px solid #1f2937' : 'none', fontSize: AXIS_FONT, color: '#64748b', fontVariantNumeric: 'tabular-nums'}}>
-                {valueTicks.map((tick, i) => (
-                  <div key={i} style={{position: 'absolute', top: 6, transform: 'translateX(-50%)', whiteSpace: 'nowrap'}}>
-                    <span>{tick.label}</span>
-                  </div>
                 ))}
               </div>
             )}

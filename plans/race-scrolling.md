@@ -214,3 +214,32 @@ palette stays lane-consistent. Bars still grow in place.
 
 Changed: `src/remotion/templates/race-scrolling/index.tsx`, this plan. Gate
 `npx tsc --noEmit` clean.
+
+## Feedback round (2026-09-09) — sin orden de fila, eje Y permanente, etiquetas arriba
+User feedback: "<El control> 'Orden de la fila (izq → der)' no tiene sentido en
+este render, remueve su funcionalidad completamente: siempre va primero avatar.
+El plot con eje Y debe mostrarse de manera permanente (la cardinalidad 0) y con
+grosor y color configurables, para definir mejor hasta dónde se visualiza el
+scrolling de los ejes de fecha. Los ejes con fecha deben visualizarse arriba de
+cada grid de fecha (hoy están solapadas, todas juntas)."
+
+1. **Fila sin orden** — `SEG_ORDER` fijo `['avatar', 'bar']`; se elimina el
+   control "Orden de la fila (izq → der)" y el `setRowOrder` de `RaceScrollingPanel`.
+   `rowOrder`/`axisPosition` siguen en el esquema compartido pero se ignoran en
+   `presentationOf` de race-scrolling.
+2. **Eje Y permanente** — la escala de cardinalidad (0 → máximo acumulado) ya no
+   viaja como banda; es un eje vertical ESTÁTICO en el borde derecho del plot
+   (`BAR_TRACK_X + BAR_MAX_W`), siempre visible, con grosor `yAxisWidth` y color
+   `yAxisColor` configurables. Marca hasta dónde se recorta la cinta de fechas.
+   Se eliminan los controles "Eje de cardinalidad (valores)"/"Posición del eje"
+   y el toggle "Eje vertical (Y)" del panel (el eje ya es permanente).
+3. **Etiquetas de fecha arriba de cada grid** — cada fecha real dibuja su
+   gridline vertical y su etiqueta DIRECTAMENTE ARRIBA, en una franja propia
+   (`DATE_LABEL_H`) que se desplaza con la cinta; la etiqueta va centrada en su
+   línea. Guard anti-solapamiento (`dateLabels`): tras el adelgazado por
+   `gridSpacing`, se descarta toda etiqueta cuya anchura estimada collisionaría
+   con la anterior, así nunca se amontonan.
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`,
+`src/components/builder/animation-config-panel.tsx`, `src/lib/viz-to-remotion.ts`,
+`src/lib/animation-config.ts`, this plan. Gate `npx tsc --noEmit` clean.

@@ -767,7 +767,6 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
     else delete next[label];
     update({barColors: next});
   };
-  const setRowOrder = (order: ('bar' | 'avatar')[]) => update({rowOrder: order});
 
   const [colorQ, setColorQ] = useState('');
   const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -1102,7 +1101,7 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           onChange={(v) => update({axisTicks: v})}
         />
         <p className="text-[10px] text-muted mb-1">
-          Solo aplica a la banda de cardinalidad. El eje posicional dibuja una marca y gridline por cada fecha real de los datos.
+          Aplica al eje Y permanente (la escala de valores). El eje posicional dibuja una marca y gridline por cada fecha real de los datos.
         </p>
         <SliderNumberInput
           label="Separación del grid (px)"
@@ -1116,64 +1115,13 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           Distancia mínima entre gridlines del eje posicional: las fechas más juntas se omiten y el resto van apareciendo con el scroll.
         </p>
         <SwitchControl
-          label="Mostrar eje (banda desplazable)"
+          label="Mostrar gridlines de fechas"
           checked={value.showXAxis ?? true}
           onChange={(v) => update({showXAxis: v})}
         />
-        <div>
-          <label className="text-sm font-medium mb-1 block">Posición del eje</label>
-          <div className="grid grid-cols-2 gap-1">
-            {(['bottom', 'top'] as const).map((pos) => (
-              <button
-                key={pos}
-                type="button"
-                onClick={() => update({axisPosition: pos})}
-                className={`px-2 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  (value.axisPosition ?? 'bottom') === pos
-                    ? 'bg-amber-500 text-black'
-                    : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
-                }`}
-              >
-                {pos === 'bottom' ? 'Abajo' : 'Arriba'}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="border-t border-border-subtle pt-2 mt-1">
-          <SwitchControl
-            label="Eje de cardinalidad (valores)"
-            checked={value.showValueAxis ?? false}
-            onChange={(v) => update({showValueAxis: v})}
-          />
-          <p className="text-[10px] text-muted mt-0.5">
-            Segunda banda en el grid: la escala numérica viva de la cardinalidad (0 → máximo acumulado) que viaja con el plano, además del eje posicional.
-          </p>
-          {value.showValueAxis && (
-            <div className="mt-2">
-              <label className="text-sm font-medium mb-1 block">Posición del eje de valores</label>
-              <div className="grid grid-cols-2 gap-1">
-                {(['bottom', 'top'] as const).map((pos) => (
-                  <button
-                    key={pos}
-                    type="button"
-                    onClick={() => update({valueAxisPosition: pos})}
-                    className={`px-2 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                      (value.valueAxisPosition ?? 'bottom') === pos
-                        ? 'bg-amber-500 text-black'
-                        : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
-                    }`}
-                  >
-                    {pos === 'bottom' ? 'Abajo' : 'Arriba'}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-        <div>
-          <label className="text-sm font-medium mb-2 block">Orden de la fila (izq → der)</label>
-          <RowOrderControl value={value.rowOrder ?? ['bar', 'avatar']} onChange={setRowOrder} />
-        </div>
+        <p className="text-[10px] text-muted mt-0.5">
+          Cada fecha real dibuja una gridline vertical con su etiqueta justo encima (colisión-safe: las etiquetas que se juntarían se omiten). Solo el eje de fechas se desplaza; la escala de valores es el eje Y permanente al borde derecho del plot.
+        </p>
         <SliderNumberInput label="Separación vertical entre filas (px)" value={value.rowGap ?? 0} min={0} max={120} step={2} onChange={(v) => update({rowGap: v || undefined})} />
         <SliderNumberInput label="Separación horizontal (px)" value={value.rowGapH ?? 0} min={0} max={80} step={2} onChange={(v) => update({rowGapH: v || undefined})} />
         <SelectControl
@@ -1193,7 +1141,7 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           </div>
         )}
         <p className="text-[10px] text-muted">
-          El plot es la caja que delimita los ejes: el eje posicional lleva una gridline + etiqueta por cada fecha real de "campo fecha" (o por cada valor del eje numérico) y, si está activo, una banda de valores (0 → máximo). Todo viaja como una cinta dentro del plot y se recorta al cruzar sus límites; las marcas por entidad también desaparecen al sobrepasarlos. La fecha en pantalla se muestra abajo a la derecha.
+          El plot es la caja que delimita los ejes: cada fecha real de "campo fecha" (o valor del eje numérico) dibuja una gridline con su etiqueta justo encima; la cinta se desliza y se recorta al cruzar los límites del plot. El eje Y es permanente (escala 0 → máximo acumulado) en el borde derecho, marcando hasta dónde se ve el scroll de las fechas. Las marcas por entidad desaparecen al sobrepasar los límites. La fecha en pantalla se muestra abajo a la derecha.
         </p>
       </Collapsible>
 
@@ -1260,15 +1208,10 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
 
       {/* ============ EJE Y ============ */}
       <Collapsible title="Eje Y">
-        <SwitchControl
-          label="Eje vertical (Y)"
-          checked={value.showYAxis ?? false}
-          onChange={(v) => update({showYAxis: v || undefined})}
-        />
         <ColorPickerControl label="Color del eje" value={value.yAxisColor ?? '#334155'} onChange={(v) => update({yAxisColor: v || undefined})} />
         <SliderNumberInput label="Grosor del eje (px)" value={value.yAxisWidth ?? 2} min={1} max={12} step={1} onChange={(v) => update({yAxisWidth: v || undefined})} />
         <p className="text-[10px] text-muted">
-          Línea vertical en el origen (mínimo del eje) de las barras. Se desplaza con el plano.
+          Eje Y permanente en el borde derecho del plot: escala de cardinalidad de 0 (abajo) al máximo acumulado (arriba). Su grosor y color definen hasta dónde se ve el scrolling de las fechas.
         </p>
       </Collapsible>
 

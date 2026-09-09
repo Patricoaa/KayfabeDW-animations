@@ -226,15 +226,21 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
 // parallel-bar mode so older data keeps rendering.
 //
 // The bar geometry, entry/pop, ranking swaps, winner reveal and outro mirror
-// the timeline race. `anchorX` (5-95%) places the fixed "now" line on the
-// track, `axisTicks` controls the tick count of the CARDINALITY band (the
-// positional band uses `gridSpacing` px), and
-// `showMarkers`/`markerMode` draw one marker per active entity IN ITS OWN ROW
-// at its current step on the plane showing the accumulated value as a number,
-// an icon (from ICON_GLYPHS) or a reference image (the entity's avatar URL).
-// `barColors`, `barPalette` and the row/avatar controls are shared with the
-// timeline race.
-export type RaceScrollingConfig = TimelineRaceConfig & {
+  // the timeline race. `anchorX` (5-95%) places the fixed "now" line on the
+  // track, `axisTicks` controls the tick count of the PERMANENT value axis
+  // (the cardinality scale 0 → current max drawn statically at the right edge
+  // of the plot), and
+  // `showMarkers`/`markerMode` draw one marker per active entity IN ITS OWN ROW
+  // at its current step on the plane showing the accumulated value as a number,
+  // an icon (from ICON_GLYPHS) or a reference image (the entity's avatar URL).
+  // `barColors`, `barPalette` and the row/avatar controls are shared with the
+  // timeline race.
+  //
+  // NOTE: `showValueAxis`/`valueAxisPosition`/`axisPosition`/`rowOrder` still
+  // exist on the shared schema for older saved projects but are IGNORED here:
+  // the value scale is the permanent static Y axis (thickness/color from
+  // `yAxisWidth`/`yAxisColor`) and row segments are fixed (avatar first).
+  export type RaceScrollingConfig = TimelineRaceConfig & {
   // Cardinality axis column: dates OR plain numbers (years, rounds, days...).
   // The unit is auto-detected from the actual values; this is what the "Eje de
   // la carrera" field in the Datos tab writes. Legacy `dateField` is still
@@ -246,9 +252,8 @@ export type RaceScrollingConfig = TimelineRaceConfig & {
   // anchor, ranking and entry/exit animation keep their behavior.
   axisDirection?: 'asc' | 'desc';
 
-  // Second, independent grid band: a "cardinality" axis showing the live
-  // numeric scale of the accumulated value (0 → current max) painted on the
-  // traveling plane, next to the positional (date/number) band.
+  // (Legacy, ignored in the renderer: the value scale is now the permanent
+  // static Y axis at the right edge of the plot.)
   showValueAxis?: boolean;
   valueAxisPosition?: 'top' | 'bottom';
 
@@ -257,9 +262,10 @@ export type RaceScrollingConfig = TimelineRaceConfig & {
   // the current playback position.
   anchorX?: number;
 
-  // Number of ticks drawn on the CARDINALITY (value) band (2-24, default 8).
-  // The positional band ignores this: its tick density comes from
-  // `gridSpacing` (min px between consecutive gridlines/labels, default 90).
+  // Number of ticks drawn on the PERMANENT value (Y) axis, a cardinality scale
+  // 0 → current max (2-24, default 8). The positional band ignores this: its
+  // tick density comes from `gridSpacing` (min px between consecutive
+  // gridlines/labels, default 90).
   axisTicks?: number;
 
   // Min horizontal distance (px, 20-320, default 90) between consecutive
