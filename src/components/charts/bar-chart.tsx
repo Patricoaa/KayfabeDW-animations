@@ -1424,7 +1424,7 @@ function SingleBar({data, config}: Props) {
             if (img) {
               // Anchor DECOUPLED from the bar: the plot's left edge at the row
               // center. offsetX along the value axis (+ right), offsetY down (+).
-              avatarNode = <Avatar href={img} cx={avatarCx(marginAdj.left, avatarOffsetX)} cy={avatarCy(labelY, avatarOffsetY)} clipId={`bh-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} crop={crop} />;
+              avatarNode = <Avatar href={img} cx={avatarCx(marginAdj.left, avatarOffsetX)} cy={avatarCy(labelY, avatarOffsetY)} clipId={`bh-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} crop={crop} bg={config.avatarBg} borderColor={config.avatarBorderColor} borderWidth={config.avatarBorderWidth} />;
             }
 
             let catTextNode: ReactNode = null;
@@ -1532,7 +1532,7 @@ function SingleBar({data, config}: Props) {
             // Anchor DECOUPLED from the bar: the plot area's TOP edge at the
             // column center. offsetX perpendicular, offsetY down along the value
             // axis (SVG +). Bar height never affects it.
-            avatarNode = <Avatar href={img} cx={avatarCx(centerX, avatarOffsetX)} cy={avatarCy(marginAdj.top, avatarOffsetY)} clipId={`bv-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} crop={crop} />;
+            avatarNode = <Avatar href={img} cx={avatarCx(centerX, avatarOffsetX)} cy={avatarCy(marginAdj.top, avatarOffsetY)} clipId={`bv-av-${i}`} shape={avatarShape} size={avatarSize} radius={avatarRadius} crop={crop} bg={config.avatarBg} borderColor={config.avatarBorderColor} borderWidth={config.avatarBorderWidth} />;
           }
 
           let catTextNode: ReactNode = null;
