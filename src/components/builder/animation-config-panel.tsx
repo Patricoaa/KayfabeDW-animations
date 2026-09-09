@@ -443,10 +443,17 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
   const setBarPalette = (colors?: string[]) => update({barPalette: colors});
 
   return (
-    <div className="space-y-3">
-      <HeaderSection value={value} update={update} />
+    <Tabs
+      tabs={[{ id: 'data', label: 'Datos' }, { id: 'design', label: 'Diseño' }]}
+      className="h-full"
+    >
+      {(activeTab) => (
+        <div className="space-y-4 pb-12">
+          {activeTab === 'data' && (
+            <>
+              <HeaderSection value={value} update={update} />
 
-      <Collapsible title="Datos" defaultOpen>
+              <Collapsible title="Datos" defaultOpen>
         <FieldSelect
           label="Entidad / etiqueta"
           value={value.labelField ?? ''}
@@ -647,6 +654,10 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
         </p>
       </Collapsible>
 
+            </>
+          )}
+          {activeTab === 'design' && (
+            <>
       {/* ============ AVATAR (compartido) ============ */}
       <AvatarSection value={value} onChange={update} participants={participants} />
 
@@ -776,7 +787,11 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
 
       {/* ============ CANVAS ============ */}
       <CanvasSection value={value} update={update} />
-    </div>
+            </>
+          )}
+        </div>
+      )}
+    </Tabs>
   );
 }
 
@@ -1236,10 +1251,17 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
   const update = (patch: Partial<RankingConfig>) => onChange({...value, ...patch});
 
   return (
-    <div className="space-y-3">
-      <HeaderSection value={value} update={update} />
+    <Tabs
+      tabs={[{ id: 'data', label: 'Datos' }, { id: 'design', label: 'Diseño' }]}
+      className="h-full"
+    >
+      {(activeTab) => (
+        <div className="space-y-4 pb-12">
+          {activeTab === 'data' && (
+            <>
+              <HeaderSection value={value} update={update} />
 
-      <Collapsible title="Datos" defaultOpen>
+              <Collapsible title="Datos" defaultOpen>
         <FieldSelect
           label="Entidad / etiqueta"
           value={value.labelField ?? ''}
@@ -1506,6 +1528,10 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
         </div>
       </Collapsible>
 
+            </>
+          )}
+          {activeTab === 'design' && (
+            <>
       <AvatarSection value={value} onChange={update} participants={participants} />
 
       <RowImageSection value={value} onChange={update} participants={participants} />
@@ -1531,7 +1557,11 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
       <OverlaysSection value={value} update={update} />
 
       <CanvasSection value={value} update={update} />
-    </div>
+            </>
+          )}
+        </div>
+      )}
+    </Tabs>
   );
 }
 

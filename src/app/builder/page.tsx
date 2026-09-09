@@ -842,31 +842,36 @@ function BuilderContent() {
               />
             )}
             {outputMode === 'animated' && (
-              <>
-                <TemplatePicker
-                  data={filteredData}
-                  config={chartConfig}
-                  selectedTemplate={activeTemplate}
-                  onSelect={(id) => {
-                    templateDeselectRef.current = false;
-                    setSelectedTemplate(id);
-                  }}
-                />
+              <div className="flex flex-col flex-1 min-h-0">
+                <div className="shrink-0">
+                  <TemplatePicker
+                    data={filteredData}
+                    config={chartConfig}
+                    selectedTemplate={activeTemplate}
+                    onSelect={(id) => {
+                      templateDeselectRef.current = false;
+                      setSelectedTemplate(id);
+                    }}
+                  />
+                </div>
 
                 {activeTemplate && (
-                  <AnimationConfigPanel
-                    templateId={activeTemplate}
-                    columns={columns}
-                    fieldMeta={fieldMeta}
-                    value={templateConfig[activeTemplate as keyof AnimationTemplateConfig] ?? {}}
-                    onChange={(tc) =>
-                      setTemplateConfig((prev) => ({...prev, [activeTemplate]: tc}))
-                    }
-                    participants={timelineParticipants}
-                  />
+                  <div className="flex-1 flex flex-col min-h-0">
+                    <AnimationConfigPanel
+                      templateId={activeTemplate}
+                      columns={columns}
+                      fieldMeta={fieldMeta}
+                      value={templateConfig[activeTemplate as keyof AnimationTemplateConfig] ?? {}}
+                      onChange={(tc) =>
+                        setTemplateConfig((prev) => ({...prev, [activeTemplate]: tc}))
+                      }
+                      participants={timelineParticipants}
+                    />
+                  </div>
                 )}
-              </>
+              </div>
             )}
+
           </div>
         </aside>
         )}
