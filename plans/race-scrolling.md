@@ -197,3 +197,20 @@ Changed: `src/lib/animation-config.ts` (`entitySelection`/`finalValueDirection`/
 `src/components/builder/animation-config-panel.tsx` (Ranking: "Selección de
 entidades" select, extremo conservar, listado manual), this plan. Gate
 `npx tsc --noEmit` clean.
+
+## Feedback round (2026-09-09) — filas fijas (sin reordenar en vivo)
+User feedback: "El race scrolling se caracteriza por mostrar de manera fija las
+entidades. No requiere que se reordene de manera constante de mayor a menor en
+cada fecha que pasa. Basta con fijar las posiciones iniciales y se mantienen los
+puestos de manera permanente (el ordenamiento puede ser en orden alfabético)."
+
+Rows are now STATIC: `buildSnap` assigns each lane ONCE from `staticOrder`
+(alphabetical by label) and never re-sorts by the live value, so the swap /
+entry-exit machinery becomes inert (unlike a timeline-race whose rows swap every
+sweep). Inactive entities keep their fixed row (empty rail, label visible); the
+leader for the podium effect is the active entity with the highest current value
+(`leaderOf` reduce), and `entityOrder` follows the static lanes so the bar
+palette stays lane-consistent. Bars still grow in place.
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`, this plan. Gate
+`npx tsc --noEmit` clean.

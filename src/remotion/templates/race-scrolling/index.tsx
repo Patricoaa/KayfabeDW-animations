@@ -389,6 +389,11 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   }
   for (const e of byLabel.values()) e.steps.sort((a, b) => a.x - b.x);
 
+  // Race-Scrolling keeps STATIC rows: the lane order is fixed ONCE (alphabetical
+  // by label) and never re-sorted by the live value as the axis sweeps — unlike
+  // a timeline-race, whose rows swap every sweep. Only the bars grow in place.
+  const staticOrder = [...byLabel.keys()].sort((a, b) => a.localeCompare(b));
+
   // ---- Live ranking snapshots, shared per sweep position (see timeline-race) ----
   type Participant = {label: string; image?: string | null; active: boolean; firstX: number; curX: number; current: number};
   type RankSnap = {
@@ -403,7 +408,8 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
 
   const buildSnap = (t: number): RankSnap => {
     const list: Participant[] = [];
-    for (const [label, e] of byLabel.entries()) {
+    for (const label of staticOrder) {
+      const e = byLabel.get(label)!;
       const steps = e.steps;
       let i = -1;
       for (let k = 0; k < steps.length; k++) {
@@ -427,13 +433,10 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
       }
       list.push({label, image: e.image, active, firstX: steps[0]?.x ?? 1, curX, current});
     }
-    const activeList = list.filter((p) => p.active).sort((a, b) => b.current - a.current);
-    const inactiveList = list.filter((p) => !p.active).sort((a, b) => b.current - a.current);
-    const full = [...activeList, ...inactiveList];
+    const full = list; // fixed alphabetical order — lanes are assigned once and never swap
     const all = maxRows && maxRows > 0 ? full.slice(0, maxRows) : full;
-    const showInactive = !(maxRows && maxRows > 0 && all.length >= maxRows);
     const visActive = all.filter((p) => p.active);
-    const visInactive = showInactive ? all.filter((p) => !p.active) : [];
+    const visInactive = all.filter((p) => !p.active);
     const window = new Set<string>();
     const listIndex = new Map<string, number>();
     const fullIndex = new Map<string, number>();
@@ -511,7 +514,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
     return {zoom: c?.zoom ?? 1, focusX: c?.focusX ?? 0, focusY: c?.focusY ?? 0};
   };
 
-  const entityOrder = [...byLabel.keys()];
+  const entityOrder = staticOrder;
   const palColor = (label: string): string | undefined => {
     if (!barPalette || barPalette.length === 0) return undefined;
     return barPalette[Math.max(0, entityOrder.indexOf(label)) % barPalette.length];
@@ -521,8 +524,8 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
     return index * (ROW_H + ROW_GAP);
   }
 
-  const best = (p: Participant) => visibleActive[0] && p.current === visibleActive[0].current && visibleActive[0].current > 0;
-  const isLeader = (p: Participant) => best(p);
+  const leaderOf = visibleActive.reduce<Participant | null>((m, p) => (m === null || p.current > m.current ? p : m), null);
+  const isLeader = (p: Participant) => leaderOf !== null && p.current === leaderOf.current && p.current > 0;
 
   // Fixed "now" line on screen, over the bar track (right of the entity axis).
   const anchorXPx = BAR_TRACK_X + anchorWorld;
@@ -612,15 +615,16 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
     barColors?.[p.label] ?? (p.image ? barColors?.[p.image] : undefined) ?? palColor(p.label) ?? (isLeader(p) ? accentColor : '#3f3f46');
 
   const renderRow = (p: Participant) => {
-    if (!p.active) return null;
     const display = p.current;
     const rawW = Math.max(0, (display / currentMax) * BAR_MAX_W);
-    const pop = spring({
-      fps,
-      frame: p.active ? frame - Math.max(0, Math.floor((p.firstX / 1.001) * sweepFrames)) : frame,
-      config: {damping: 22, stiffness: 110},
-      durationInFrames: 28,
-    });
+    const pop = p.active
+      ? spring({
+          fps,
+          frame: frame - Math.max(0, Math.floor((p.firstX / 1.001) * sweepFrames)),
+          config: {damping: 22, stiffness: 110},
+          durationInFrames: 28,
+        })
+      : 1;
     const w = rawW * pop;
     const scale = isLeader(p) ? winnerScale : 1;
     const dim = isLeader(p) ? 1 : dimOthers;
