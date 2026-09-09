@@ -1,6 +1,7 @@
 'use client';
 
 import type {ChartConfig, TextOverflow, SectionFont, TextLayout, TextAlign} from '@/lib/chart-config';
+import {resolveGradient} from '@/lib/chart-config';
 import type {ResolvedChartStyle} from '@/lib/chart-data';
 import type {ReactNode} from 'react';
 
@@ -94,22 +95,37 @@ export function CanvasBackground({config, w, h}: {config: ChartConfig; w: number
   }
 
   if (type === 'gradient') {
-    const a = gradientVec(config.backgroundAngle ?? 135);
-    // Distribution: how much of the gradient path keeps the initial color
-    // before fading into the final one. 0 = single transition (legacy), up to
-    // ~1 = initial color rules almost the whole canvas.
-    const dist = Math.min(0.98, Math.max(0, config.backgroundGradientDist ?? 0));
-    const start = config.background ?? '#0a0a0a';
-    const end = config.backgroundSecondary ?? '#1f2937';
+    const {start, end, dist, fadeEnd} = resolveGradient(config);
+    const shape = config.backgroundGradientShape ?? 'linear';
+    const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+    const stops = (
+      <>
+        <stop offset="0%" stopColor={start} />
+        <stop offset={`${dist * 100}%`} stopColor={start} />
+        <stop offset={`${fadeEnd * 100}%`} stopColor={end} />
+      </>
+    );
+    let def: ReactNode;
+    if (shape === 'radial') {
+      const cx = (clamp(config.backgroundGradientCenterX ?? 50, 0, 100) / 100) * w;
+      const cy = (clamp(config.backgroundGradientCenterY ?? 50, 0, 100) / 100) * h;
+      const rPx = (clamp(config.backgroundGradientRadius ?? 100, 0, 200) / 100) * Math.min(w, h);
+      def = (
+        <radialGradient id={uid} gradientUnits="userSpaceOnUse" cx={cx} cy={cy} r={rPx}>
+          {stops}
+        </radialGradient>
+      );
+    } else {
+      const a = gradientVec(config.backgroundAngle ?? 135);
+      def = (
+        <linearGradient id={uid} x1={`${a.x1}`} y1={`${a.y1}`} x2={`${a.x2}`} y2={`${a.y2}`}>
+          {stops}
+        </linearGradient>
+      );
+    }
     return (
       <g opacity={opacity}>
-        <defs>
-          <linearGradient id={uid} x1={`${a.x1}`} y1={`${a.y1}`} x2={`${a.x2}`} y2={`${a.y2}`}>
-            <stop offset="0%" stopColor={start} />
-            {dist > 0 && <stop offset={`${dist * 100}%`} stopColor={start} />}
-            <stop offset="100%" stopColor={end} />
-          </linearGradient>
-        </defs>
+        <defs>{def}</defs>
         <rect x={0} y={0} width={w} height={h} rx={rx} fill={`url(#${uid})`} />
       </g>
     );

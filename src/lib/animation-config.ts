@@ -67,6 +67,13 @@ export type CommonCanvasConfig = {
   backgroundImage?: string;       // dataURL / remote URL (image type)
   backgroundPattern?: 'dots' | 'stripes' | 'grid' | 'checkers';
   backgroundAngle?: number;       // gradient/pattern angle (deg)
+  backgroundGradientShape?: 'linear' | 'radial'; // gradient geometry
+  backgroundGradientCenterX?: number; // radial center X (% of canvas width)
+  backgroundGradientCenterY?: number; // radial center Y (% of canvas height)
+  backgroundGradientRadius?: number;  // radial reach (% of the shorter side)
+  backgroundGradientBlend?: number;   // gradient intensity (0-1): how much the final
+                                      // color dominates (0 = blended toward the initial)
+  backgroundGradientSmooth?: number;  // transition softness (0-1): width of the fade
   backgroundOpacity?: number;     // opacity of the background layer (0-1)
   backgroundBlur?: number;        // blur (px) applied to the background
   backgroundFit?: 'cover' | 'contain' | 'fill'; // how an image is fit

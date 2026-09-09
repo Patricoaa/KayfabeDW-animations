@@ -82,6 +82,12 @@ export type TimelineRaceProps = {
   backgroundImage?: string;
   backgroundPattern?: 'dots' | 'stripes' | 'grid' | 'checkers';
   backgroundAngle?: number;
+  backgroundGradientShape?: 'linear' | 'radial';
+  backgroundGradientCenterX?: number;
+  backgroundGradientCenterY?: number;
+  backgroundGradientRadius?: number;
+  backgroundGradientBlend?: number;
+  backgroundGradientSmooth?: number;
   backgroundOpacity?: number;
   backgroundBlur?: number;
   backgroundFit?: 'cover' | 'contain' | 'fill';
@@ -155,6 +161,12 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   backgroundImage,
   backgroundPattern = 'dots',
   backgroundAngle = 135,
+  backgroundGradientShape,
+  backgroundGradientCenterX,
+  backgroundGradientCenterY,
+  backgroundGradientRadius,
+  backgroundGradientBlend,
+  backgroundGradientSmooth,
   backgroundOpacity = 1,
   backgroundBlur = 0,
   backgroundFit = 'cover',
@@ -222,6 +234,12 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
       backgroundImage={backgroundImage}
       backgroundPattern={backgroundPattern}
       backgroundAngle={backgroundAngle}
+      backgroundGradientShape={backgroundGradientShape}
+      backgroundGradientCenterX={backgroundGradientCenterX}
+      backgroundGradientCenterY={backgroundGradientCenterY}
+      backgroundGradientRadius={backgroundGradientRadius}
+      backgroundGradientBlend={backgroundGradientBlend}
+      backgroundGradientSmooth={backgroundGradientSmooth}
       backgroundOpacity={backgroundOpacity}
       backgroundBlur={backgroundBlur}
       backgroundFit={backgroundFit}

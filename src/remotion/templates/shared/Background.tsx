@@ -1,6 +1,7 @@
 import React from 'react';
 import {useCurrentFrame} from 'remotion';
 import type {CommonCanvasConfig} from '../../../lib/animation-config';
+import {resolveGradient} from '../../../lib/chart-config';
 
 // Full-bleed canvas background layer (solid / pattern / gradient / image),
 // rendered below everything else. Matches the timeline-race background logic
@@ -15,6 +16,12 @@ export const BackgroundLayer: React.FC<CommonCanvasConfig> = ({
   backgroundImage,
   backgroundPattern = 'dots',
   backgroundAngle = 135,
+  backgroundGradientShape = 'linear',
+  backgroundGradientCenterX = 50,
+  backgroundGradientCenterY = 50,
+  backgroundGradientRadius = 100,
+  backgroundGradientBlend,
+  backgroundGradientSmooth,
   backgroundOpacity = 1,
   backgroundBlur = 0,
   backgroundFit = 'cover',
@@ -47,8 +54,23 @@ export const BackgroundLayer: React.FC<CommonCanvasConfig> = ({
       };
     }
     if (backgroundType === 'gradient') {
+      const {start, end, dist, fadeEnd} = resolveGradient({
+        background,
+        backgroundSecondary,
+        backgroundGradientBlend,
+        backgroundGradientSmooth,
+      });
+      const stops = `${start} ${dist * 100}%, ${end} ${fadeEnd * 100}%`;
+      if (backgroundGradientShape === 'radial') {
+        const cx = Math.min(100, Math.max(0, backgroundGradientCenterX));
+        const cy = Math.min(100, Math.max(0, backgroundGradientCenterY));
+        const rad = Math.min(200, Math.max(0, backgroundGradientRadius));
+        return {
+          background: `radial-gradient(ellipse ${rad}% ${rad}% at ${cx}% ${cy}%, ${start} 0%, ${stops})`,
+        };
+      }
       return {
-        background: `linear-gradient(${backgroundAngle ?? 135}deg, ${background}, ${backgroundSecondary ?? '#1f2937'})`,
+        background: `linear-gradient(${backgroundAngle ?? 135}deg, ${start} 0%, ${stops})`,
       };
     }
     // pattern

@@ -17,6 +17,48 @@ export const NUMBER_FORMATS: {value: NumberFormat; label: string}[] = [
 
 export type SortBy = 'none' | 'value-desc' | 'value-asc' | 'label';
 
+// Linear interpolation between two hex colors (#rgb / #rrggbb). `t` clamps to
+// 0..1 (0 = all `a`, 1 = all `b`). Unparseable values fall back to `a`.
+export function mixHex(a: string, b: string, t: number): string {
+  const norm = (h: string): string | null => {
+    let s = h.trim().replace(/^#/, '');
+    if (/^[0-9a-fA-F]{3}$/.test(s)) s = s.split('').map((c) => c + c).join('');
+    if (!/^[0-9a-fA-F]{6}$/.test(s)) return null;
+    return s;
+  };
+  const ca = norm(a);
+  const cb = norm(b);
+  if (!ca) return a;
+  if (!cb) return a;
+  const k = Math.min(1, Math.max(0, t));
+  const mix = (x: number, y: number) => Math.round(x + (y - x) * k);
+  const r = mix(parseInt(ca.slice(0, 2), 16), parseInt(cb.slice(0, 2), 16));
+  const g = mix(parseInt(ca.slice(2, 4), 16), parseInt(cb.slice(2, 4), 16));
+  const bl = mix(parseInt(ca.slice(4, 6), 16), parseInt(cb.slice(4, 6), 16));
+  return `#${[r, g, bl].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+}
+
+// Shared gradient resolution used by the static SVG background and the
+// animation CSS backgrounds: returns the two colors plus the stop positions
+// (plateau end / full-fade end). All fields optional; defaults reproduce the
+// legacy single linear fade.
+export function resolveGradient(
+  cfg: {
+    background?: string;
+    backgroundSecondary?: string;
+    backgroundGradientDist?: number;
+    backgroundGradientSmooth?: number;
+    backgroundGradientBlend?: number;
+  },
+): {start: string; end: string; dist: number; fadeEnd: number} {
+  const start = cfg.background ?? '#0a0a0a';
+  const endRaw = cfg.backgroundSecondary ?? '#1f2937';
+  const blend = Math.min(1, Math.max(0, cfg.backgroundGradientBlend ?? 1));
+  const dist = Math.min(0.98, Math.max(0, cfg.backgroundGradientDist ?? 0));
+  const smooth = Math.min(1, Math.max(0, cfg.backgroundGradientSmooth ?? 1));
+  return {start, end: mixHex(endRaw, start, 1 - blend), dist, fadeEnd: dist + (1 - dist) * smooth};
+}
+
 export type LegendPosition = 'top' | 'right' | 'bottom';
 
 export type GroupMode = 'grouped' | 'grouped-percent' | 'stacked' | 'stacked-percent';
@@ -388,6 +430,14 @@ export type ChartConfig = {
   backgroundAngle?: number;        // gradient/pattern angle (deg)
   backgroundGradientDist?: number; // gradient: fraction of the path (0-1) that keeps
                                    // the initial color before fading to the final
+  backgroundGradientShape?: 'linear' | 'radial'; // gradient geometry
+  backgroundGradientCenterX?: number; // radial center X (% of canvas width)
+  backgroundGradientCenterY?: number; // radial center Y (% of canvas height)
+  backgroundGradientRadius?: number;  // radial reach (% of the shorter side)
+  backgroundGradientBlend?: number;   // gradient intensity (0-1): how much the final
+                                      // color dominates (0 = blended toward the initial)
+  backgroundGradientSmooth?: number;  // transition softness (0-1): width of the fade
+                                      // over the remaining path after the plateau
   backgroundOpacity?: number;      // opacity of the background layer (0-1)
   backgroundBlur?: number;         // blur (px) applied to the background
   backgroundFit?: 'cover' | 'contain' | 'fill'; // how an image is fit
