@@ -53,7 +53,8 @@ export function TemplatePicker({data, config, selectedTemplate, onSelect}: Templ
             <button
               key={t.templateId}
               onClick={() => onSelect(t.templateId)}
-              className={`flex flex-col items-center gap-0.5 p-2 rounded text-xs transition-colors ${
+              aria-pressed={isSelected}
+              className={`cursor-pointer flex flex-col items-center gap-0.5 p-2 rounded text-xs transition-colors ${
                 isSelected
                   ? 'bg-amber-500 text-black'
                   : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'

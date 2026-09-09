@@ -56,8 +56,8 @@ export function ToastProvider({children}: {children: React.ReactNode}) {
           <span key={t.id}>{t.message}</span>
         ))}
       </div>
-      {/* Toast container */}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm" role="status" aria-live="polite">
+      {/* Toast container — no aria-live here; the sr-only region above announces to AT */}
+      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm">
         {toasts.map((t) => (
           <div
             key={t.id}
@@ -73,7 +73,7 @@ export function ToastProvider({children}: {children: React.ReactNode}) {
             <span className="flex-1">{t.message}</span>
             <button
               onClick={() => removeToast(t.id)}
-              className="text-muted hover:text-primary ml-1 rounded p-0.5"
+              className="cursor-pointer text-muted hover:text-primary ml-1 rounded p-0.5"
               aria-label="Cerrar notificación"
             >
               <X size={14} />

@@ -37,7 +37,7 @@ export function BuilderNav() {
         <form action={logout}>
           <button
             type="submit"
-            className="inline-flex items-center gap-1 px-2 py-1 rounded text-muted hover:text-red-500 hover:bg-card-hover transition-colors"
+            className="cursor-pointer inline-flex items-center gap-1 px-2 py-1 rounded text-muted hover:text-red-500 hover:bg-card-hover transition-colors"
             aria-label="Cerrar sesión"
           >
             <LogOut size={14} />
@@ -45,7 +45,7 @@ export function BuilderNav() {
         </form>
         <button
           onClick={toggleTheme}
-          className="ml-1 px-2 py-1 rounded text-muted hover:text-primary hover:bg-card-hover transition-colors"
+          className="cursor-pointer ml-1 px-2 py-1 rounded text-muted hover:text-primary hover:bg-card-hover transition-colors"
           aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
         >
           {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}

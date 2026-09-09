@@ -803,14 +803,14 @@ function BuilderContent() {
               <label className="text-micro font-semibold text-muted uppercase tracking-widest mb-2 block font-display">
                 Modo de salida
               </label>
-              <div className="grid grid-cols-2 gap-1">
+              <div role="group" aria-label="Modo de salida" className="grid grid-cols-2 gap-1">
                 <button
                   onClick={() => {
                     templateDeselectRef.current = true;
                     setOutputMode('static');
                   }}
                   aria-pressed={outputMode === 'static'}
-                  className={`px-3 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                  className={`cursor-pointer px-3 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
                     outputMode === 'static'
                       ? 'bg-amber-500 text-black'
                       : 'bg-elevated text-secondary hover:bg-card-hover'
@@ -822,7 +822,7 @@ function BuilderContent() {
                 <button
                   onClick={() => setOutputMode('animated')}
                   aria-pressed={outputMode === 'animated'}
-                  className={`px-3 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                  className={`cursor-pointer px-3 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
                     outputMode === 'animated'
                       ? 'bg-amber-500 text-black'
                       : 'bg-elevated text-secondary hover:bg-card-hover'
@@ -919,7 +919,7 @@ function BuilderContent() {
         <button
           onClick={() => setView('data')}
           aria-pressed={view === 'data'}
-          className={`flex-1 py-3 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+          className={`cursor-pointer flex-1 min-h-[44px] py-3 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
             view === 'data' ? 'text-amber-500' : 'text-muted'
           }`}
         >
@@ -928,7 +928,7 @@ function BuilderContent() {
         <button
           onClick={() => goResult(2)}
           aria-pressed={view === 'result'}
-          className={`flex-1 py-3 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+          className={`cursor-pointer flex-1 min-h-[44px] py-3 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
             view === 'result' ? 'text-amber-500' : 'text-muted'
           }`}
         >

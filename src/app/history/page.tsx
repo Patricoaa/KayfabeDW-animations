@@ -4,7 +4,8 @@ import {useCallback, useEffect, useMemo, useState} from 'react';
 import Link from 'next/link';
 import {useRouter} from 'next/navigation';
 import {useToast} from '@/components/ui/toast';
-import {BarChart3, TrendingUp, TrendingDown, PieChart, Zap, Table, Search, ArrowUpDown, Copy, Trash2, Folder, ArrowLeft, Plus, X, Film} from 'lucide-react';
+import {ConfirmDialog} from '@/components/ui/confirm-dialog';
+import {BarChart3, TrendingUp, TrendingDown, PieChart, Zap, Table, Search, ArrowUpDown, Copy, Trash2, Folder, ArrowLeft, Plus, Film, CheckCircle2, XCircle, Clock} from 'lucide-react';
 
 const CHART_ICONS: Record<string, React.ComponentType<{size?: number; className?: string}>> = {
   bar: BarChart3,
@@ -75,8 +76,8 @@ export default function HistoryPage() {
   const [specs, setSpecs] = useState<VizSpec[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [duplicating, setDuplicating] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Sort & filter state (absorbed from gallery)
   const [sortBy, setSortBy] = useState<SortKey>('newest');
@@ -142,20 +143,19 @@ export default function HistoryPage() {
   }, [specs]);
 
   const handleDelete = useCallback(async (id: string) => {
-    if (!confirm('¿Eliminar esta visualización?')) return;
     setDeleting(id);
-    setDeleteError(null);
+    setConfirmDeleteId(null);
     try {
       const res = await fetch(`/api/viz-specs/${id}`, {method: 'DELETE'});
       if (!res.ok) throw new Error('Error al eliminar');
       setSpecs((prev) => prev.filter((s) => s.id !== id));
       addToast('Visualización eliminada', 'success');
     } catch (e) {
-      setDeleteError(e instanceof Error ? e.message : 'Error al eliminar');
+      addToast(e instanceof Error ? e.message : 'Error al eliminar', 'error');
     } finally {
       setDeleting(null);
     }
-  }, []);
+  }, [addToast]);
 
   const handleDuplicate = useCallback(async (spec: VizSpec) => {
     setDuplicating(spec.id);
@@ -177,11 +177,11 @@ export default function HistoryPage() {
         router.push(`/builder?edit=${created.id}`);
       }
     } catch (e) {
-      setDeleteError(e instanceof Error ? e.message : 'Error al duplicar');
+      addToast(e instanceof Error ? e.message : 'Error al duplicar', 'error');
     } finally {
       setDuplicating(null);
     }
-  }, [router]);
+  }, [router, addToast]);
 
   const getSummary = (spec: VizSpec) => {
     const table = spec.query_spec?.table ?? '?';
@@ -261,9 +261,9 @@ export default function HistoryPage() {
               {duplicating === spec.id ? '...' : <Copy size={14} />}
             </button>
             <button
-              onClick={() => handleDelete(spec.id)}
+              onClick={() => setConfirmDeleteId(spec.id)}
               disabled={deleting === spec.id}
-              className="px-3 py-1.5 text-muted hover:text-red-500 hover:bg-card-hover rounded text-xs transition-colors"
+              className="cursor-pointer px-3 py-1.5 text-muted hover:text-red-500 hover:bg-card-hover rounded text-xs transition-colors"
             >
               {deleting === spec.id ? '...' : <Trash2 size={14} />}
             </button>
@@ -314,7 +314,7 @@ export default function HistoryPage() {
           Renders recientes
         </h2>
         {loading ? (
-          <div className="space-y-2">
+          <div aria-busy="true" aria-label="Cargando renders..." className="space-y-2">
             {[1, 2].map((i) => <div key={i} className="h-14 bg-elevated rounded-lg animate-pulse" />)}
           </div>
         ) : renders.length === 0 ? (
@@ -347,7 +347,7 @@ export default function HistoryPage() {
                       </span>
                     </span>
                     <span
-                      className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                      className={`shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
                         status === 'done'
                           ? 'bg-emerald-500/10 text-emerald-400'
                           : status === 'error'
@@ -355,6 +355,13 @@ export default function HistoryPage() {
                             : 'bg-slate-500/10 text-muted'
                       }`}
                     >
+                      {status === 'done' ? (
+                        <CheckCircle2 size={11} aria-hidden />
+                      ) : status === 'error' ? (
+                        <XCircle size={11} aria-hidden />
+                      ) : (
+                        <Clock size={11} aria-hidden />
+                      )}
                       {label}
                     </span>
                   </Link>
@@ -435,7 +442,7 @@ export default function HistoryPage() {
         )}
 
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div aria-busy="true" aria-label="Cargando visualizaciones..." className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
               <div key={i} className="h-48 bg-elevated rounded-lg animate-pulse" />
             ))}
@@ -483,14 +490,15 @@ export default function HistoryPage() {
         )}
       </section>
 
-      {deleteError && (
-        <div className="fixed bottom-4 right-4 p-3 bg-red-500/15 border border-red-500/40 rounded-lg text-red-500 text-sm max-w-sm flex items-center gap-2">
-          <span className="flex-1">{deleteError}</span>
-          <button onClick={() => setDeleteError(null)} className="text-red-500 hover:text-red-400 rounded p-0.5" aria-label="Cerrar error">
-            <X size={14} />
-          </button>
-        </div>
-      )}
+      <ConfirmDialog
+        isOpen={!!confirmDeleteId}
+        title="¿Eliminar visualización?"
+        description="Esta acción no se puede deshacer y borrará la configuración y el historial asociado."
+        onConfirm={() => confirmDeleteId && handleDelete(confirmDeleteId)}
+        onCancel={() => setConfirmDeleteId(null)}
+        confirmText="Eliminar"
+        isDestructive
+      />
     </div>
   );
 }
