@@ -5,24 +5,24 @@ import Link from 'next/link';
 import {useRouter} from 'next/navigation';
 import {useToast} from '@/components/ui/toast';
 import {ConfirmDialog} from '@/components/ui/confirm-dialog';
-import {BarChart3, TrendingUp, TrendingDown, PieChart, Zap, Table, Search, ArrowUpDown, Copy, Trash2, Folder, ArrowLeft, Plus, Film, CheckCircle2, XCircle, Clock} from 'lucide-react';
+import {BarChart3, Search, ArrowUpDown, Copy, Trash2, Folder, ArrowLeft, Plus, Film, CheckCircle2, XCircle, Clock} from 'lucide-react';
 
 const CHART_ICONS: Record<string, React.ComponentType<{size?: number; className?: string}>> = {
   bar: BarChart3,
-  line: TrendingUp,
-  area: TrendingDown,
-  pie: PieChart,
-  scatter: Zap,
-  table: Table,
+  line: BarChart3,
+  area: BarChart3,
+  pie: BarChart3,
+  scatter: BarChart3,
+  table: BarChart3,
 };
 
 const CHART_COLORS: Record<string, string> = {
   bar: '#f59e0b',
-  line: '#3b82f6',
-  area: '#22c55e',
-  pie: '#a855f7',
-  scatter: '#f97316',
-  table: '#94a3b8',
+  line: '#f59e0b',
+  area: '#f59e0b',
+  pie: '#f59e0b',
+  scatter: '#f59e0b',
+  table: '#f59e0b',
 };
 
 const STATUS_LABEL: Record<string, string> = {

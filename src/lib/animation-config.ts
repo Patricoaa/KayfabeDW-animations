@@ -1,5 +1,7 @@
 // Per-template column mapping for animated templates.
 
+import type {TextStyle} from './chart-config';
+
 export type DateFormat = 'day' | 'month' | 'year';
 
 export type AvatarShape = 'circle' | 'rounded';
@@ -12,26 +14,21 @@ export type RowSegment = 'bar' | 'avatar';
 // Empty = plain locale number (current behavior).
 export type ValueFormat = 'number' | 'short' | 'decimal' | 'percent' | 'currency' | 'hhmmss';
 
-// Typography overrides for the title and the on-screen date. Empty = the
-// template's default (font family/color/size/weight). `multiline` is only
-// used for the title (wrapping of line breaks).
-export type RaceTextStyle = {
-  fontFamily?: string;
-  color?: string;
-  size?: number;
-  weight?: number;
-  textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
-  letterSpacing?: number;
-  lineHeight?: number;
-  align?: 'left' | 'center' | 'right';
+// Unified number-format list for the animated templates (canonical labels,
+// mirrored with the static chart's NUMBER_FORMATS in chart-config.ts).
+export const VALUE_FORMATS: {value: ValueFormat; label: string}[] = [
+  {value: 'number', label: 'Número (1.234)'},
+  {value: 'short', label: 'Compacto (1,2k)'},
+  {value: 'decimal', label: 'Decimal (1,23)'},
+  {value: 'percent', label: 'Porcentaje (%)'},
+  {value: 'currency', label: 'Moneda ($1.234)'},
+  {value: 'hhmmss', label: 'Duración (hh:mm:ss)'},
+];
 
-  // Highlight box behind the text. `highlightColor` enables it (background);
-  // `highlightRadius` (px) rounds its corners (0 = square). `underline` adds
-  // an underline to the text.
-  highlightColor?: string;
-  highlightRadius?: number;
-  underline?: boolean;
-};
+// Typography overrides for the title, date, row labels, etc. Empty = the
+// template's default (font family/color/size/weight). `multiline` is only
+// used for the title (wrapping of line breaks). Alias of the shared TextStyle.
+export type RaceTextStyle = TextStyle;
 
 // Shared crop math: how a zoomed (and focus-shifted) image is placed inside a
 // square frame of `size` px. Used by BOTH the config-panel sidebar preview and

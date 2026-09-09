@@ -1,6 +1,19 @@
-export type ChartType = 'bar' | 'pie' | 'line' | 'area' | 'scatter' | 'table';
+// Static charts are bar charts only (pie/line/area/scatter/table were removed).
+export type ChartType = 'bar';
 
 export type NumberFormat = 'none' | 'short' | 'percent' | 'currency' | 'decimal' | 'duration';
+
+// Unified number-format list (canonical labels, shared by the static chart and
+// the animated templates). The animation side maps 'none'→'number' and
+// 'duration'→'hhmmss' via its own VALUE_FORMATS in animation-config.ts.
+export const NUMBER_FORMATS: {value: NumberFormat; label: string}[] = [
+  {value: 'none', label: 'Número (1.234)'},
+  {value: 'short', label: 'Compacto (1,2k)'},
+  {value: 'decimal', label: 'Decimal (1,23)'},
+  {value: 'percent', label: 'Porcentaje (%)'},
+  {value: 'currency', label: 'Moneda ($1.234)'},
+  {value: 'duration', label: 'Duración (hh:mm:ss)'},
+];
 
 export type SortBy = 'none' | 'value-desc' | 'value-asc' | 'label';
 
@@ -16,6 +29,16 @@ export type AvatarCrop = {zoom?: number; focusX?: number; focusY?: number};
 
 export type FontWeight = 400 | 500 | 600 | 700;
 
+// Metadata for a selected column available to the axis/field selectors: its
+// alias (the value used as a row key), its origin table, the bare column name,
+// and whether it is numeric (used to filter "value" roles to numerics only).
+export type ColumnMeta = {
+  alias: string;
+  table: string;
+  name: string;
+  isNumeric: boolean;
+};
+
 // How text that exceeds its box/limit is treated per section.
 export type TextOverflow = 'truncate' | 'wrap' | 'none';
 export const TEXT_OVERFLOWS: {value: TextOverflow; label: string}[] = [
@@ -29,16 +52,29 @@ export const TEXT_OVERFLOWS: {value: TextOverflow; label: string}[] = [
 // the bar body. 'axis' (default) keeps labels on the axis line.
 export type CategoryLabelPosition = 'hide' | 'axis' | 'start-out' | 'center-out' | 'end-out' | 'start-in' | 'center-in' | 'end-in';
 
-// Per-section text style. Every field is optional: empty sections "inherit"
-// from the general chart typography (style.fontFamily / textColor / labelFontSize).
-export type SectionFont = {
+// Unified, shared text style for the static chart (SectionFont), overlay text
+// and the animated templates (RaceTextStyle). Every field is optional: empty
+// sections "inherit" from the general typography (chart theme / template
+// defaults). `RaceTextStyle` and `SectionFont` are aliases of this type, so
+// both configs share a single control and no data migration is required.
+export type TextStyle = {
   fontFamily?: string;
   color?: string;
   size?: number;
-  weight?: FontWeight;
+  weight?: number;
   overflow?: TextOverflow;
   align?: TextAlign;
+  textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
+  letterSpacing?: number;
+  lineHeight?: number;
+  highlightColor?: string;
+  highlightRadius?: number;
+  underline?: boolean;
 };
+
+// Per-section text style. Every field is optional: empty sections "inherit"
+// from the general chart typography (style.fontFamily / textColor / labelFontSize).
+export type SectionFont = TextStyle;
 
 export type TextAlign = 'left' | 'center' | 'right';
 

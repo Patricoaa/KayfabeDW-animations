@@ -1,23 +1,18 @@
 'use client';
 
 import React, {useEffect, useState} from 'react';
-import {BarChart3, PieChart, LineChart, AreaChart, ScatterChart, Table2, ChevronDown} from 'lucide-react';
-import type {ChartConfig, ChartType, ChartOverlay, OverlayShapeType, NumberFormat, SortBy, ChartFilter, ChartFilterOp, ChartStyle, AvatarShape, AvatarCrop, SectionFont, TextLayout} from '@/lib/chart-config';
-import {FONT_PRESETS, PALETTES} from '@/lib/chart-config';
+import {BarChart3} from 'lucide-react';
+import type {ChartConfig, ChartOverlay, OverlayShapeType, NumberFormat, SortBy, ChartFilter, ChartFilterOp, ChartStyle, AvatarShape, AvatarCrop, SectionFont, TextLayout} from '@/lib/chart-config';
+import {FONT_PRESETS, NUMBER_FORMATS} from '@/lib/chart-config';
 import {pickColor, colorFor} from '@/lib/chart-data';
 import {ICON_GLYPHS, ICON_GLYPH_NAMES} from '@/lib/chart-icons';
-import {TextControls} from '@/components/builder/text-controls';
-import { Tabs, SelectControl, NumberControl, ColorPickerControl, SwitchControl, Collapsible } from '@/components/ui/controls';
+import { Tabs, SelectControl, NumberControl, ColorPickerControl, SwitchControl, Collapsible, TextStyleControls, SliderNumberInput, FileUploadInput, FieldSelect, PalettePicker } from '@/components/ui/controls';
+import type {ColumnMeta} from '@/lib/chart-config';
+export type {ColumnMeta};
 
 // Metadata for a selected column available to the axis selectors: its alias
 // (the value used as a row key), its origin table, the bare column name, and
 // whether it is numeric (used to filter "value" roles to numerics only).
-export type ColumnMeta = {
-  alias: string;
-  table: string;
-  name: string;
-  isNumeric: boolean;
-};
 
 type ChartConfigPanelProps = {
   config: ChartConfig;
@@ -28,24 +23,6 @@ type ChartConfigPanelProps = {
   fieldMeta?: ColumnMeta[];
   data?: Record<string, unknown>[];
 };
-
-const CHART_TYPES: {type: ChartType; label: string; Icon: typeof BarChart3}[] = [
-  {type: 'bar', label: 'Barras', Icon: BarChart3},
-  {type: 'pie', label: 'Pie', Icon: PieChart},
-  {type: 'line', label: 'Líneas', Icon: LineChart},
-  {type: 'area', label: 'Área', Icon: AreaChart},
-  {type: 'scatter', label: 'Dispersión', Icon: ScatterChart},
-  {type: 'table', label: 'Tabla', Icon: Table2},
-];
-
-const NUMBER_FORMATS: {value: NumberFormat; label: string}[] = [
-  {value: 'short', label: 'Compacto (12k)'},
-  {value: 'none', label: 'Entero (12000)'},
-  {value: 'decimal', label: 'Decimal (12,55)'},
-  {value: 'percent', label: 'Porcentaje'},
-  {value: 'currency', label: 'Moneda'},
-  {value: 'duration', label: 'Duración (hh:mm)'},
-];
 
 const SORTS: {value: SortBy; label: string}[] = [
   {value: 'none', label: 'Orden de consulta'},
@@ -70,27 +47,6 @@ let overlaySeq = 0;
 function newOverlayId(): string {
   overlaySeq += 1;
   return `ov-${Date.now().toString(36)}-${overlaySeq}`;
-}
-
-// Collapsible accordion section (Flourish-style single-open panel). Each
-// section owns its own open state; "Datos" is open by default.
-function Section({title, defaultOpen = false, children}: {title: string; defaultOpen?: boolean; children: React.ReactNode}) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div className="rounded-lg border border-border-subtle overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium font-display transition-colors ${
-          open ? 'bg-amber-500/10 text-amber-500' : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
-        }`}
-      >
-        {title}
-        <ChevronDown size={14} className={`transition-transform shrink-0 ${open ? 'rotate-180' : ''}`} />
-      </button>
-      {open && <div className="p-3 space-y-3">{children}</div>}
-    </div>
-  );
 }
 
 export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, fanOutTables = [], fieldMeta = [], data}: ChartConfigPanelProps) {
@@ -169,16 +125,13 @@ const setLegendTextOverride = (label: string, value?: string) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.seriesField, config.colors, config.legendItems, data]);
 
-  const isSingleSeries = config.type === 'bar' || config.type === 'line' || config.type === 'area' || config.type === 'pie';
-  const hasSeries = !!config.seriesField && (config.type === 'bar' || config.type === 'line' || config.type === 'area');
+  const hasSeries = !!config.seriesField;
   const legendItems = config.legendItems ?? [];
-  const isCartesian = config.type === 'bar' || config.type === 'line' || config.type === 'area' || config.type === 'scatter';
-  const isStackedPercent = config.type === 'bar' && (config.groupMode === 'stacked-percent' || config.groupMode === 'grouped-percent');
+  const isStackedPercent = config.groupMode === 'stacked-percent' || config.groupMode === 'grouped-percent';
 
   // Distinct category labels in the captured dataset, for the per-category
-  // color overrides ("Colores por categoría"). Scatter colors come from its
-  // colorField (falling back to the X axis); everything else uses xField.
-  const catCol = config.type === 'scatter' ? (config.colorField ?? config.xField) : config.xField;
+  // color overrides ("Colores por categoría").
+  const catCol = config.xField;
   const catLabels: string[] = [];
   if (catCol) {
     for (const row of data ?? []) {
@@ -259,96 +212,44 @@ const setLegendTextOverride = (label: string, value?: string) => {
         <div className="space-y-4 pb-12">
           {activeTab === 'data' && (
             <>
-              {/* Chart type selector */}
-      <div>
-        <label className="text-sm font-medium mb-1 block font-display">Tipo de gráfico</label>
-        <div className="grid grid-cols-3 gap-1">
-          {CHART_TYPES.map((ct) => (
-            <button
-              key={ct.type}
-              onClick={() => update({type: ct.type})}
-              className={`flex flex-col items-center gap-0.5 p-2 rounded text-xs transition-colors ${
-                config.type === ct.type
-                  ? 'bg-amber-500 text-black'
-                  : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
-              }`}
-            >
-              <ct.Icon size={16} />
-              {ct.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* ============ DATOS ============ */}
       <Collapsible title="Datos" defaultOpen>
-        {/* Field mappings — vary by chart type */}
-        {config.type === 'pie' ? (
-          <>
-            <FieldSelect label="Etiqueta" value={config.xField ?? ''} options={fieldMeta} fallback={columns} onChange={(v) => update({xField: v})} />
-            <FieldSelect label="Valor" value={config.yField ?? ''} options={fieldMeta} fallback={columns} role="numeric" onChange={(v) => update({yField: v})} />
-          </>
-        ) : config.type === 'scatter' ? (
-          <>
-            <FieldSelect label="Eje X" value={config.xField ?? ''} options={fieldMeta} fallback={columns} role="numeric" onChange={(v) => update({xField: v})} />
-            <FieldSelect label="Eje Y" value={config.yField ?? ''} options={fieldMeta} fallback={columns} role="numeric" onChange={(v) => update({yField: v})} />
-            <FieldSelect label="Color (categoría)" value={config.colorField ?? ''} options={fieldMeta} fallback={columns} onChange={(v) => update({colorField: v})} optional />
-          </>
-        ) : (
-          <>
-            {config.type !== 'table' && (
-              <>
-                <FieldSelect label="Eje X / Categoría" value={config.xField ?? ''} options={fieldMeta} fallback={columns} onChange={(v) => update({xField: v})} />
-                {(config.type === 'bar' || config.type === 'line' || config.type === 'area') && (
-                  <FieldSelect
-                    label="Descripción (opcional)"
-                    value={config.categoryDescriptionField ?? ''}
-                    options={fieldMeta}
-                    fallback={columns}
-                    onChange={(v) => update({categoryDescriptionField: v || undefined})}
-                    optional
-                  />
-                )}
-                <FieldSelect label="Eje Y / Valor" value={config.yField ?? ''} options={fieldMeta} fallback={columns} role="numeric" onChange={(v) => update({yField: v})} />
-                <FieldSelect
-                  label="Serie (opcional)"
-                  value={config.seriesField ?? ''}
-                  options={fieldMeta}
-                  fallback={columns}
-                  onChange={(v) => update({seriesField: v || undefined})}
-                  optional
-                />
-              </>
-            )}
-            {config.type === 'table' && (
-              <TableControls
-                columns={columns}
-                config={config}
-                onUpdate={update}
-              />
-            )}
-            {config.type !== 'table' && (
-              <FieldSelect label="Agregación" value={config.aggregate ?? ''} onChange={(v) => update({aggregate: (v || undefined) as ChartConfig['aggregate']})} optional custom>
-                <option value="">Ninguna</option>
-                <option value="sum">Suma</option>
-                <option value="avg">Promedio</option>
-                <option value="count">Conteo</option>
-                <option value="count_distinct">Conteo distintivo</option>
-                <option value="min">Mínimo</option>
-                <option value="max">Máximo</option>
-              </FieldSelect>
-            )}
-            {showFanOutWarning && (
+        {/* Field mappings — bar chart */}
+        <FieldSelect label="Eje X / Categoría" value={config.xField ?? ''} options={fieldMeta} fallback={columns} onChange={(v) => update({xField: v})} />
+        <FieldSelect
+          label="Descripción (opcional)"
+          value={config.categoryDescriptionField ?? ''}
+          options={fieldMeta}
+          fallback={columns}
+          onChange={(v) => update({categoryDescriptionField: v || undefined})}
+          optional
+        />
+        <FieldSelect label="Eje Y / Valor" value={config.yField ?? ''} options={fieldMeta} fallback={columns} role="numeric" onChange={(v) => update({yField: v})} />
+        <FieldSelect
+          label="Serie (opcional)"
+          value={config.seriesField ?? ''}
+          options={fieldMeta}
+          fallback={columns}
+          onChange={(v) => update({seriesField: v || undefined})}
+          optional
+        />
+        <FieldSelect label="Agregación" value={config.aggregate ?? ''} onChange={(v) => update({aggregate: (v || undefined) as ChartConfig['aggregate']})} optional custom>
+          <option value="">Ninguna</option>
+          <option value="sum">Suma</option>
+          <option value="avg">Promedio</option>
+          <option value="count">Conteo</option>
+          <option value="count_distinct">Conteo distintivo</option>
+          <option value="min">Mínimo</option>
+          <option value="max">Máximo</option>
+        </FieldSelect>
+        {showFanOutWarning && (
               <div className="p-2 bg-amber-500/10 border border-amber-500/30 rounded text-[11px] text-amber-600 leading-snug">
                 Hay un fan-out en el JOIN: el campo «{config.yField}» pertenece a «{yTable}», que se repite por cada fila de la tabla más profunda. Con «{config.aggregate}» cada fila se cuenta una vez por repetición. Usá <span className="font-semibold">Conteo distintivo</span> para contar entidades reales de «{yTable}».
               </div>
             )}
-          </>
-        )}
 
         {/* Post-capture row filters (applied on the fetched dataset, not SQL) */}
-        {config.type !== 'table' && (
-          <div>
+        <div>
             <div className="flex items-center justify-between mb-1">
               <label className="text-sm font-medium block">Filtrar filas</label>
               <button
@@ -390,6 +291,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
                     value={f.value ?? ''}
                     onChange={(e) => updateFilter(i, {value: e.target.value})}
                     placeholder="valor"
+                    aria-label="Valor del filtro"
                     className="w-24 bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
                   />
                 )}
@@ -403,11 +305,9 @@ const setLegendTextOverride = (label: string, value?: string) => {
               </div>
             ))}
           </div>
-        )}
 
         {/* Row limit */}
-        {isSingleSeries && (
-          <div>
+        <div>
             <label className="text-sm font-medium mb-1 block">Filas del gráfico</label>
             <input
               type="number"
@@ -420,7 +320,6 @@ const setLegendTextOverride = (label: string, value?: string) => {
             />
             <p className="text-[10px] text-muted mt-0.5">Límite de presentación en el gráfico; no altera los datos capturados.</p>
           </div>
-        )}
       </Collapsible>
 
             </>
@@ -429,8 +328,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
           {activeTab === 'design' && (
             <>
       {/* ============ FUENTE ============ */}
-      {config.type !== 'table' && (
-        <Collapsible title="Fuente">
+      <Collapsible title="Fuente">
           <div>
             <label className="text-sm font-medium mb-1 block">Fuente raíz del gráfico</label>
             <SelectControl
@@ -446,11 +344,9 @@ const setLegendTextOverride = (label: string, value?: string) => {
           </div>
           <ColorPickerControl label="Color de la fuente general" value={config.style?.textColor} onChange={(v) => updateStyle({textColor: v || undefined})} />
         </Collapsible>
-      )}
 
       {/* ============ HEADER ============ */}
-      {config.type !== 'table' && (
-        <Collapsible title="Header">
+      <Collapsible title="Header">
           <div>
             <label className="text-sm font-medium mb-1 block">Título</label>
             <textarea
@@ -474,13 +370,13 @@ const setLegendTextOverride = (label: string, value?: string) => {
           <div className="pt-1 border-t border-border-subtle">
             <label className="text-xs font-semibold text-muted uppercase tracking-widest font-display">Fuente del título</label>
             <div className="mt-2">
-              <TextControls value={config.headerFont} onChange={setHeaderFont} />
+              <TextStyleControls value={config.headerFont} onChange={setHeaderFont} showOverflow />
             </div>
           </div>
           <div className="pt-1 border-t border-border-subtle">
             <label className="text-xs font-semibold text-muted uppercase tracking-widest font-display">Fuente del subtítulo</label>
             <div className="mt-2">
-              <TextControls value={config.subtitleFont} onChange={setSubtitleFont} />
+              <TextStyleControls value={config.subtitleFont} onChange={setSubtitleFont} showOverflow />
             </div>
           </div>
           <LayoutControls
@@ -501,33 +397,13 @@ const setLegendTextOverride = (label: string, value?: string) => {
             }}
           />
         </Collapsible>
-      )}
 
       {/* ============ COLORES ============ */}
-      {config.type !== 'table' && (
-        <Collapsible title="Colores">
+      <Collapsible title="Colores">
           {/* Palettes */}
           <div>
             <label className="text-sm font-medium mb-1 block">Paleta de colores</label>
-            <div className="space-y-2">
-              {PALETTES.map((p) => (
-                <button
-                  key={p.name}
-                  onClick={() => applyPalette(p.colors)}
-                  className="w-full text-left rounded-lg border border-border-subtle p-1.5 hover:border-amber-500/40 transition-colors"
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] text-secondary">{p.name}</span>
-                    <span className="text-[10px] text-muted">Aplicar</span>
-                  </div>
-                  <div className="flex gap-0.5">
-                    {p.colors.slice(0, 8).map((c, i) => (
-                      <div key={i} className="flex-1 h-3 rounded-sm" style={{backgroundColor: c}} />
-                    ))}
-                  </div>
-                </button>
-              ))}
-            </div>
+            <PalettePicker onSelect={applyPalette} />
           </div>
 
           {/* Per-series color pickers (multi-series charts) */}
@@ -588,15 +464,11 @@ const setLegendTextOverride = (label: string, value?: string) => {
             </div>
           )}
 
-          {config.type === 'bar' && (
-            <ColorPickerControl label="Color de valores negativos" value={config.negativeColor} onChange={(v) => update({negativeColor: v || undefined})} />
-          )}
+          <ColorPickerControl label="Color de valores negativos" value={config.negativeColor} onChange={(v) => update({negativeColor: v || undefined})} />
         </Collapsible>
-      )}
 
       {/* ============ VISUALIZACIÓN (barras / iconos) ============ */}
-      {config.type === 'bar' && (
-        <Collapsible title="Visualización">
+      <Collapsible title="Visualización">
           {/* Tipo: Barras / Iconos */}
           <div>
             <label className="text-sm font-medium mb-1 block">Tipo</label>
@@ -670,10 +542,9 @@ const setLegendTextOverride = (label: string, value?: string) => {
             </div>
           )}
         </Collapsible>
-      )}
 
       {/* ============ BARRAS — estilo (solo en modo barras) ============ */}
-      {config.type === 'bar' && (config.iconMode ?? 'bars') !== 'icons' && (
+      {(config.iconMode ?? 'bars') !== 'icons' && (
         <Collapsible title="Barras">
           <NumberControl label="Radio de esquinas" value={config.barRadius} min={0} max={24} onChange={(v) => update({barRadius: v})} />
           {(config.groupMode === 'stacked' || config.groupMode === 'stacked-percent') && (
@@ -695,10 +566,10 @@ const setLegendTextOverride = (label: string, value?: string) => {
             <NumberControl label="Gap de categoría" value={config.barCategoryGap} min={0} max={0.4} step={0.01} onChange={(v) => update({barCategoryGap: v})} />
           </div>
         </Collapsible>
-      )}
+        )}
 
       {/* ============ ICONOS (pictograma) ============ */}
-      {config.type === 'bar' && config.iconMode === 'icons' && (
+      {config.iconMode === 'icons' && (
         <Collapsible title="Iconos">
           <div>
             <label className="text-sm font-medium mb-1 block">Icono base (SVG)</label>
@@ -746,7 +617,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
                   <button onClick={() => update({iconImage: undefined})} className="absolute top-0 right-0 bg-red-500 text-white text-[8px] px-1 rounded-bl">✕</button>
                 </div>
               )}
-              <input type="file" accept="image/*" onChange={(e) => {
+              <input type="file" accept="image/*" aria-label="Icono personalizado" onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
                 const reader = new FileReader();
@@ -783,127 +654,8 @@ const setLegendTextOverride = (label: string, value?: string) => {
         </Collapsible>
       )}
 
-      {/* ============ LÍNEAS Y PUNTOS ============ */}
-      {(config.type === 'line' || config.type === 'area' || config.type === 'scatter') && (
-        <Collapsible title="Líneas y puntos">
-          {(config.type === 'line' || config.type === 'area') && (
-            <>
-              <SwitchControl label="Horizontal" checked={config.horizontal ?? false} onChange={(v) => update({horizontal: v})} />
-              <SwitchControl label="Curva suavizada" checked={config.lineSmooth ?? false} onChange={(v) => update({lineSmooth: v})} />
-              <SwitchControl label="Línea discontinua" checked={config.lineDash ?? false} onChange={(v) => update({lineDash: v})} />
-            </>
-          )}
-          {(config.type === 'line' || config.type === 'area') && (
-            <>
-              <NumberControl label="Grosor de línea" value={config.style?.lineWidth} min={1} max={8} step={0.5} onChange={(v) => updateStyle({lineWidth: v})} />
-              <SwitchControl label="Mostrar puntos" checked={config.showMarkers ?? true} onChange={(v) => update({showMarkers: v})} />
-              {(config.showMarkers ?? true) && (
-                <div className="grid grid-cols-2 gap-2">
-                  <NumberControl label="Tamaño de punto" value={config.style?.pointSize} min={1} max={12} onChange={(v) => updateStyle({pointSize: v})} />
-                  <NumberControl label="Opacidad de punto" value={config.style?.pointOpacity} min={0.1} max={1} step={0.05} onChange={(v) => updateStyle({pointOpacity: v})} />
-                </div>
-              )}
-            </>
-          )}
-          {config.type === 'scatter' && (
-            <>
-              <div className="grid grid-cols-2 gap-2">
-                <NumberControl label="Tamaño de punto" value={config.style?.pointSize} min={1} max={12} onChange={(v) => updateStyle({pointSize: v})} />
-                <NumberControl label="Opacidad de punto" value={config.style?.pointOpacity} min={0.1} max={1} step={0.05} onChange={(v) => updateStyle({pointOpacity: v})} />
-              </div>
-              <SwitchControl label="Línea de tendencia" checked={config.trendline ?? false} onChange={(v) => update({trendline: v})} />
-            </>
-          )}
-        </Collapsible>
-      )}
-
-      {/* ============ SEGMENTOS (PIE) ============ */}
-      {config.type === 'pie' && (
-        <Collapsible title="Segmentos">
-          <SwitchControl label="Donut" checked={(config.innerRadius ?? 0) > 0} onChange={(v) => update({innerRadius: v ? 66 : 0})} />
-          {(config.innerRadius ?? 0) > 0 && (
-            <div>
-              <label className="text-sm font-medium mb-1 block">Grosor del anillo</label>
-              <input
-                type="range"
-                min={25}
-                max={85}
-                value={config.innerRadius ?? 66}
-                onChange={(e) => update({innerRadius: Number(e.target.value)})}
-                className="w-full accent-amber-500"
-              />
-            </div>
-          )}
-          <div>
-            <label className="text-sm font-medium mb-1 block">Etiquetas de segmento</label>
-            <SelectControl
-              value={config.pieLabel ?? 'percent'}
-              onChange={(e) => update({pieLabel: e.target.value as 'none' | 'value' | 'percent' | 'both'})}
-              className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-            >
-              <option value="percent">Porcentaje</option>
-              <option value="value">Valor</option>
-              <option value="both">Valor y porcentaje</option>
-              <option value="none">Ninguna</option>
-            </SelectControl>
-          </div>
-          <NumberControl label="Máx. segmentos" value={config.sliceLimit} min={1} max={50} onChange={(v) => update({sliceLimit: v})} />
-        </Collapsible>
-      )}
-
-      {/* ============ ETIQUETAS ============ */}
-      {config.type !== 'table' && (
-        <Collapsible title="Etiquetas">
-          <SwitchControl label="Mostrar etiquetas de datos" checked={config.showDataLabels ?? true} onChange={(v) => update({showDataLabels: v})} />
-          {(config.showDataLabels ?? true) && (
-            <>
-              {config.type === 'bar' && config.iconMode !== 'icons' && (
-                <div>
-                  <label className="text-sm font-medium mb-1 block">Posición</label>
-                  <SelectControl
-                    value={config.dataLabelPosition ?? 'auto'}
-                    onChange={(e) => update({dataLabelPosition: e.target.value as 'auto' | 'inside' | 'outside' | 'center'})}
-                    className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-                  >
-                    <option value="auto">Automática</option>
-                    <option value="outside">Fuera de la barra</option>
-                    <option value="center">Centro</option>
-                    <option value="inside">Dentro</option>
-                  </SelectControl>
-                </div>
-              )}
-              <div>
-                <label className="text-xs font-semibold text-muted uppercase tracking-widest font-display">Tipografía de etiquetas</label>
-                <div className="mt-1.5">
-                  <TextControls value={config.dataLabelFont} onChange={setDataLabelFont} />
-                </div>
-              </div>
-            </>
-          )}
-          {isSingleSeries && (
-            <div className="pt-1 border-t border-border-subtle">
-              <label className="text-sm font-medium mb-1 block">Formato de números</label>
-              {isStackedPercent ? (
-                <p className="text-[10px] text-muted py-1">Forzado a porcentaje en modo %.</p>
-              ) : (
-                <SelectControl
-                  value={config.numberFormat ?? 'short'}
-                  onChange={(e) => update({numberFormat: e.target.value as NumberFormat})}
-                  className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-                >
-                  {NUMBER_FORMATS.map((nf) => (
-                    <option key={nf.value} value={nf.value}>{nf.label}</option>
-                  ))}
-                </SelectControl>
-              )}
-            </div>
-          )}
-        </Collapsible>
-      )}
-
       {/* ============ EJE X / CATEGORÍA ============ */}
-      {isCartesian && (
-        <Collapsible title="Eje X / Categoría">
+      <Collapsible title="Eje X / Categoría">
           <div>
             <label className="text-sm font-medium mb-1 block">Etiqueta eje X</label>
             <input
@@ -917,12 +669,11 @@ const setLegendTextOverride = (label: string, value?: string) => {
           <div className="pt-1 border-t border-border-subtle">
             <label className="text-xs font-semibold text-muted uppercase tracking-widest font-display">Fuente de etiquetas</label>
             <div className="mt-2">
-              <TextControls value={config.xLabelFont} onChange={setXLabelFont} />
+              <TextStyleControls value={config.xLabelFont} onChange={setXLabelFont} showOverflow />
             </div>
           </div>
 
-          {(config.type === 'bar' || config.type === 'line' || config.type === 'area') && (
-            <div>
+          <div>
               <label className="text-sm font-medium mb-1 block">Ángulo de etiquetas</label>
               <input
                 type="range"
@@ -934,10 +685,8 @@ const setLegendTextOverride = (label: string, value?: string) => {
               />
               <p className="text-[10px] text-muted text-right">{config.labelAngle ?? 0}°</p>
             </div>
-          )}
 
-          {config.type === 'bar' && (
-            <div>
+          <div>
               <label className="text-sm font-medium mb-1 block">Etiquetas de categoría</label>
               <p className="text-[10px] text-muted mb-2">Posición por coordenadas (px) desde un punto fijo del área del gráfico. En barras verticales el ancla es el borde inferior del centro de cada banda; en horizontales, el borde izquierdo del centro de cada fila.</p>
               <div className="flex items-center gap-2 mb-3">
@@ -958,16 +707,8 @@ const setLegendTextOverride = (label: string, value?: string) => {
                 </div>
               </div>
             </div>
-          )}
 
-          {config.type === 'scatter' && (
-            <div className="grid grid-cols-2 gap-2">
-              <NumberControl label="X mín." value={config.xMin} min={-1e9} max={1e9} onChange={(v) => update({xMin: v})} />
-              <NumberControl label="X máx." value={config.xMax} min={-1e9} max={1e9} onChange={(v) => update({xMax: v})} />
-            </div>
-          )}
-
-          {(config.type === 'bar' || config.type === 'line' || config.type === 'area') && catLabels.length > 0 && (
+          {catLabels.length > 0 && (
             <div className="pt-1 border-t border-border-subtle">
               <div className="flex items-center justify-between mb-0.5">
                 <label className="text-sm font-medium block">Etiquetas personalizadas</label>
@@ -1022,20 +763,18 @@ const setLegendTextOverride = (label: string, value?: string) => {
             </div>
           )}
 
-          {(config.type === 'bar' || config.type === 'line' || config.type === 'area') && config.categoryDescriptionField && (
+          {config.categoryDescriptionField && (
             <div className="pt-1 border-t border-border-subtle">
               <label className="text-xs font-semibold text-muted uppercase tracking-widest font-display">Fuente de la descripción</label>
               <div className="mt-2">
-                <TextControls value={config.categoryDescriptionFont} onChange={setCategoryDescriptionFont} />
+                <TextStyleControls value={config.categoryDescriptionFont} onChange={setCategoryDescriptionFont} showOverflow />
               </div>
             </div>
           )}
         </Collapsible>
-      )}
 
       {/* ============ EJE Y / DATOS ============ */}
-      {isCartesian && (
-        <Collapsible title="Eje Y / Datos">
+      <Collapsible title="Eje Y / Valor">
           <div>
             <label className="text-sm font-medium mb-1 block">Etiqueta eje Y</label>
             <input
@@ -1049,7 +788,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
           <div className="pt-1 border-t border-border-subtle">
             <label className="text-xs font-semibold text-muted uppercase tracking-widest font-display">Fuente de etiquetas</label>
             <div className="mt-2">
-              <TextControls value={config.yLabelFont} onChange={setYLabelFont} />
+              <TextStyleControls value={config.yLabelFont} onChange={setYLabelFont} showOverflow />
             </div>
           </div>
 
@@ -1057,8 +796,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
             <p className="text-[10px] text-muted py-1">Eje Y fijo en 0%–100% (modo %).</p>
           ) : (
             <>
-              {isSingleSeries && (
-                <div>
+              <div>
                   <label className="text-sm font-medium mb-1 block">Ordenar por</label>
                   <SelectControl
                     value={config.sortBy ?? 'none'}
@@ -1070,7 +808,6 @@ const setLegendTextOverride = (label: string, value?: string) => {
                     ))}
                   </SelectControl>
                 </div>
-              )}
               <SwitchControl label="Empezar en cero" checked={config.startAtZero ?? true} onChange={(v) => update({startAtZero: v})} />
               <NumberControl label="Cantidad de divisiones (Y)" value={config.tickCount} min={2} max={12} onChange={(v) => update({tickCount: v})} />
               <div className="grid grid-cols-2 gap-2">
@@ -1176,24 +913,65 @@ const setLegendTextOverride = (label: string, value?: string) => {
             ))}
           </div>
         </Collapsible>
-      )}
+
+      {/* ============ ETIQUETAS ============ */}
+      <Collapsible title="Etiquetas">
+          <SwitchControl label="Mostrar etiquetas de datos" checked={config.showDataLabels ?? true} onChange={(v) => update({showDataLabels: v})} />
+          {(config.showDataLabels ?? true) && (
+            <>
+              {config.iconMode !== 'icons' && (
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Posición</label>
+                  <SelectControl
+                    value={config.dataLabelPosition ?? 'auto'}
+                    onChange={(e) => update({dataLabelPosition: e.target.value as 'auto' | 'inside' | 'outside' | 'center'})}
+                    className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  >
+                    <option value="auto">Automática</option>
+                    <option value="outside">Fuera de la barra</option>
+                    <option value="center">Centro</option>
+                    <option value="inside">Dentro</option>
+                  </SelectControl>
+                </div>
+              )}
+              <div>
+                <label className="text-xs font-semibold text-muted uppercase tracking-widest font-display">Tipografía de etiquetas</label>
+                <div className="mt-1.5">
+                  <TextStyleControls value={config.dataLabelFont} onChange={setDataLabelFont} showOverflow />
+                </div>
+              </div>
+            </>
+          )}
+          <div className="pt-1 border-t border-border-subtle">
+              <label className="text-sm font-medium mb-1 block">Formato de números</label>
+              {isStackedPercent ? (
+                <p className="text-[10px] text-muted py-1">Forzado a porcentaje en modo %.</p>
+              ) : (
+                <SelectControl
+                  value={config.numberFormat ?? 'short'}
+                  onChange={(e) => update({numberFormat: e.target.value as NumberFormat})}
+                  className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+                >
+                  {NUMBER_FORMATS.map((nf) => (
+                    <option key={nf.value} value={nf.value}>{nf.label}</option>
+                  ))}
+                </SelectControl>
+              )}
+            </div>
+        </Collapsible>
 
       {/* ============ LEYENDAS ============ */}
-      {(config.type === 'bar' || config.type === 'line' || config.type === 'area' || config.type === 'scatter' || config.type === 'pie') && (
-        <Collapsible title="Leyendas">
+      <Collapsible title="Leyendas">
           <SwitchControl label="Mostrar leyenda" checked={config.showLegend ?? true} onChange={(v) => update({showLegend: v})} />
           {(config.showLegend ?? true) && (
             <>
               <LayoutControls title="Coordenadas libres (offset, px)" value={config.legendLayout} onChange={setLegendLayout} />
             </>
           )}
-          {(config.type === 'line' || config.type === 'area') && (
-            <SwitchControl label="Mostrar puntos" checked={config.showMarkers ?? true} onChange={(v) => update({showMarkers: v})} />
-          )}
           <div className="pt-1 border-t border-border-subtle">
             <label className="text-xs font-semibold text-muted uppercase tracking-widest font-display">Fuente de la leyenda</label>
             <div className="mt-2">
-              <TextControls value={config.legendFont} onChange={setLegendFont} hideColor />
+              <TextStyleControls value={config.legendFont} onChange={setLegendFont} hideColor showOverflow />
             </div>
           </div>
           {legendOverrideLabels.length > 0 && (
@@ -1238,7 +1016,6 @@ const setLegendTextOverride = (label: string, value?: string) => {
             </div>
           )}
         </Collapsible>
-      )}
 
       {/* ============ LIENZO ============ */}
       <Collapsible title="Lienzo">
@@ -1383,8 +1160,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
       </Collapsible>
 
       {/* ============ AVATAR ============ */}
-      {config.type === 'bar' && (
-        <Collapsible title="Avatar">
+      <Collapsible title="Avatar">
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium block">Avatares (imágenes)</label>
             {config.avatarField && (
@@ -1550,11 +1326,9 @@ const setLegendTextOverride = (label: string, value?: string) => {
             </>
           )}
         </Collapsible>
-      )}
 
       {/* ============ ADICIONALES ============ */}
-      {config.type !== 'table' && (
-        <Collapsible title="Adicionales">
+      <Collapsible title="Adicionales">
           <div className="grid grid-cols-3 gap-1.5">
             <button
               type="button"
@@ -1639,7 +1413,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
                     className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
                   />
                   <div className="grid grid-cols-2 gap-2">
-                    <TextControls value={ov.font} onChange={(patch) => setOverlay(i, {font: {...(ov.font ?? {}), ...patch}})} />
+                    <TextStyleControls value={ov.font} onChange={(patch) => setOverlay(i, {font: {...(ov.font ?? {}), ...patch}})} showOverflow />
                     <div className="space-y-2">
                       <LayoutControls title="Posición (px)" value={ov.layout} onChange={(patch) => setOverlay(i, {layout: {...(ov.layout ?? {}), ...patch}})} />
                       <NumberControl label="Ancho máx. (px)" value={ov.maxWidth} min={0} max={2000} onChange={(v) => setOverlay(i, {maxWidth: v})} />
@@ -1706,73 +1480,11 @@ const setLegendTextOverride = (label: string, value?: string) => {
             </div>
           ))}
         </Collapsible>
-      )}
             </>
           )}
         </div>
       )}
     </Tabs>
-  );
-}
-
-function FileUploadInput({label, value, onLoad, onClear}: {label: string; value?: string; onLoad: (dataUrl: string) => void; onClear: () => void}) {
-  const inputRef = React.useRef<HTMLInputElement>(null);
-  return (
-    <div>
-      <label className="text-sm font-medium mb-1 block">{label}</label>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (!file) return;
-          const reader = new FileReader();
-          reader.onload = () => {
-            if (typeof reader.result === 'string') onLoad(reader.result);
-          };
-          reader.readAsDataURL(file);
-          e.target.value = '';
-        }}
-        className="w-full text-sm text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-elevated file:px-3 file:py-2 file:text-sm file:font-medium"
-      />
-      {value && (
-        <div className="flex items-center gap-2 mt-1">
-          <img src={value} alt="fondo" className="h-10 w-16 object-cover rounded border border-border-default" />
-          <button type="button" onClick={() => {onClear(); if (inputRef.current) inputRef.current.value = '';}} className="text-[10px] text-muted hover:text-red-500">
-            Quitar imagen
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function SliderNumberInput({label, value, min, max, step = 1, onChange}: {label: string; value: number; min: number; max: number; step?: number; onChange: (v: number) => void}) {
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1">
-        <label className="text-sm font-medium">{label}</label>
-        <input
-          type="number"
-          min={min}
-          max={max}
-          step={step}
-          value={value}
-          onChange={(e) => onChange(Number(e.target.value) || 0)}
-          className="w-16 bg-elevated border border-border-default rounded px-2 py-1 text-xs text-right font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-        />
-      </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full h-1.5 bg-border-subtle rounded-lg appearance-none cursor-pointer accent-amber-500"
-      />
-    </div>
   );
 }
 
@@ -1825,226 +1537,6 @@ function LayoutControls({title, value, onChange}: {title: string; value?: TextLa
         <NumberControl label="Padding caja" value={value?.bgPadding} min={0} max={40} onChange={(v) => set({bgPadding: v})} />
         <NumberControl label="Radio caja" value={value?.bgRadius} min={0} max={40} onChange={(v) => set({bgRadius: v})} />
         <NumberControl label="Opac. caja" value={value?.bgOpacity} min={0} max={1} step={0.05} onChange={(v) => set({bgOpacity: v})} />
-      </div>
-    </div>
-  );
-}
-
-function FieldSelect({
-  label,
-  value,
-  options = [],
-  fallback = [],
-  role = 'any',
-  onChange,
-  optional = false,
-  custom = false,
-  children,
-}: {
-  label: string;
-  value: string;
-  options?: ColumnMeta[];
-  fallback?: string[];
-  role?: 'any' | 'numeric';
-  onChange: (v: string) => void;
-  optional?: boolean;
-  custom?: boolean;
-  children?: React.ReactNode;
-}) {
-  if (custom) {
-    return (
-      <div>
-        <label className="text-sm font-medium mb-1 block">{label}</label>
-        <SelectControl
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-        >
-          {children}
-        </SelectControl>
-      </div>
-    );
-  }
-
-  // When we have rich metadata, filter numeric-only roles and label options
-  // with their table when multiple tables are present. Always keep the
-  // currently selected value visible even if it no longer matches the type
-  // filter, so a previous selection isn't silently hidden.
-  const useMeta = options.length > 0;
-  const showTable = useMeta && new Set(options.map((o) => o.table)).size > 1;
-  const numericList = options.filter((o) => o.isNumeric);
-
-  return (
-    <div>
-      <label className="text-sm font-medium mb-1 block">{label}</label>
-      <SelectControl
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-      >
-        {optional && <option value="">Ninguno</option>}
-        {!useMeta &&
-          fallback.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        {useMeta &&
-          (role === 'numeric' ? numericList : options).map((o) => (
-            <option key={o.alias} value={o.alias}>
-              {showTable ? `${o.table}.${o.name}` : o.alias}
-            </option>
-          ))}
-        {useMeta && value && role === 'numeric' && !numericList.some((o) => o.alias === value) && (
-          <option value={value} disabled>
-            {showTable ? value : value} (no disponible para este eje)
-          </option>
-        )}
-      </SelectControl>
-    </div>
-  );
-}
-
-function TableControls({
-  columns,
-  config,
-  onUpdate,
-}: {
-  columns: string[];
-  config: ChartConfig;
-  onUpdate: (patch: Partial<ChartConfig>) => void;
-}) {
-  const shown = config.tableColumns ?? [];
-  const toggleCol = (col: string) => {
-    const next = shown.includes(col) ? shown.filter((c) => c !== col) : [...shown, col];
-    onUpdate({tableColumns: next});
-  };
-
-  return (
-    <div className="space-y-3">
-      {/* Column selection */}
-      <div>
-        <div className="flex items-center justify-between mb-1">
-          <label className="text-sm font-medium block">Columnas a mostrar</label>
-          <div className="flex gap-2">
-            <button
-              onClick={() => onUpdate({tableColumns: []})}
-              className="text-[10px] text-amber-500 hover:text-amber-400 font-medium"
-            >
-              Todas
-            </button>
-            <button
-              onClick={() => onUpdate({tableColumns: columns})}
-              className="text-[10px] text-muted hover:text-primary font-medium"
-            >
-              Ninguna
-            </button>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-1">
-          {columns.length === 0 ? (
-            <p className="text-[10px] text-muted">Sin columnas</p>
-          ) : columns.map((c) => {
-            const active = shown.length === 0 || shown.includes(c);
-            return (
-              <button
-                key={c}
-                onClick={() => toggleCol(c)}
-                className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors border ${
-                  active
-                    ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
-                    : 'bg-elevated text-muted border-border-subtle'
-                }`}
-              >
-                {c}
-              </button>
-            );
-          })}
-        </div>
-        <p className="text-[10px] text-muted mt-1">Vacío = mostrar todas las columnas.</p>
-      </div>
-
-      {/* Row limit */}
-      <div>
-        <label className="text-sm font-medium mb-1 block">Máx. filas a mostrar</label>
-        <input
-          type="number"
-          min={1}
-          max={5000}
-          value={config.tableLimit ?? ''}
-          onChange={(e) => onUpdate({tableLimit: e.target.value ? Number(e.target.value) : undefined})}
-          placeholder="500"
-          className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-        />
-      </div>
-
-      {/* Search filter */}
-      <div>
-        <label className="text-sm font-medium mb-1 block">Buscar en filas</label>
-        <input
-          type="text"
-          value={config.tableSearch ?? ''}
-          onChange={(e) => onUpdate({tableSearch: e.target.value})}
-          placeholder="Filtra por cualquier columna"
-          className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-        />
-      </div>
-
-      {/* Sticky header */}
-      <label className="flex items-center justify-between cursor-pointer select-none">
-        <span className="text-sm text-secondary">Encabezado fijo</span>
-        <input
-          type="checkbox"
-          role="switch"
-          checked={config.stickyHeader ?? false}
-          onChange={(e) => onUpdate({stickyHeader: e.target.checked})}
-          className="peer sr-only"
-        />
-        <span
-          aria-hidden="true"
-          className={`relative w-9 h-5 rounded-full transition-colors ${
-            config.stickyHeader ? 'bg-amber-500' : 'bg-border-default'
-          }`}
-        >
-          <span
-            className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
-              config.stickyHeader ? 'translate-x-4' : ''
-            }`}
-          />
-        </span>
-      </label>
-
-      {/* Sort by column */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium block">Ordenar por</label>
-        <div className="flex gap-2">
-          <SelectControl
-            value={config.tableSort?.column ?? ''}
-            onChange={(e) =>
-              onUpdate({
-                tableSort: e.target.value
-                  ? {column: e.target.value, direction: config.tableSort?.direction ?? 'asc'}
-                  : undefined,
-              })
-            }
-            className="flex-1 bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-          >
-            <option value="">Sin orden</option>
-            {columns.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </SelectControl>
-          {config.tableSort?.column && (
-            <SelectControl
-              value={config.tableSort.direction}
-              onChange={(e) =>
-                onUpdate({tableSort: {column: config.tableSort!.column, direction: e.target.value as 'asc' | 'desc'}})
-              }
-              className="bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-            >
-              <option value="asc">Asc</option>
-              <option value="desc">Desc</option>
-            </SelectControl>
-          )}
-        </div>
       </div>
     </div>
   );

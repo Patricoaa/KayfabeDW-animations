@@ -1,22 +1,10 @@
 'use client';
 
 import React, {useState} from 'react';
-import {ChevronDown} from 'lucide-react';
-import { SelectControl, NumberControl, ColorPickerControl, SwitchControl, Collapsible, Tabs } from '@/components/ui/controls';
+import { SelectControl, NumberControl, ColorPickerControl, SwitchControl, Collapsible, Tabs, TextStyleControls, SliderNumberInput, FileUploadInput, FieldSelect, EntitySearch, AutoColorInput, PalettePicker } from '@/components/ui/controls';
 import type {ColumnMeta} from '@/components/builder/chart-config-panel';
 import type {TimelineRaceConfig, RankingConfig, DateFormat, AvatarShape, AvatarCrop, RaceTextStyle, ValueFormat, RowEntryElement, CommonHeaderConfig, CommonCanvasConfig} from '@/lib/animation-config';
-import {avatarCropRect} from '@/lib/animation-config';
-import {FONT_PRESETS, PALETTES} from '@/lib/chart-config';
-import {ColorInput as AutoColorInput} from './text-controls';
-
-const VALUE_FORMATS: {value: ValueFormat; label: string}[] = [
-  {value: 'number', label: 'Número (1.234)'},
-  {value: 'short', label: 'Compacto (1,2k)'},
-  {value: 'decimal', label: 'Decimal (1,23)'},
-  {value: 'percent', label: 'Porcentaje (%)'},
-  {value: 'currency', label: 'Moneda ($1.234)'},
-  {value: 'hhmmss', label: 'Duración (hh:mm:ss)'},
-];
+import {avatarCropRect, VALUE_FORMATS} from '@/lib/animation-config';
 
 type Participant = {label: string; image?: string | null};
 
@@ -39,57 +27,6 @@ type AnimationConfigPanelProps = {
   templateSelector?: React.ReactNode;
 };
 
-// Collapsible accordion section (Flourish-style), mirrors the static chart
-// config panel. "Datos" is open by default.
-function OldSection({title, defaultOpen = false, children}: {title: string; defaultOpen?: boolean; children: React.ReactNode}) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div className="rounded-lg border border-border-subtle overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium font-display transition-colors ${
-          open ? 'bg-amber-500/10 text-amber-500' : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
-        }`}
-      >
-        {title}
-        <ChevronDown size={14} className={`transition-transform shrink-0 ${open ? 'rotate-180' : ''}`} />
-      </button>
-      {open && <div className="p-3 space-y-3">{children}</div>}
-    </div>
-  );
-}
-
-// Search box that filters a per-entity list by label, plus an "N de M" counter
-// so it's obvious a filter is active (and how many rows matched).
-function EntitySearch({value, onChange, shown, total}: {value: string; onChange: (v: string) => void; shown: number; total: number}) {
-  const active = value.trim() !== '';
-  return (
-    <div>
-      <div className="relative">
-        <input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="Buscar entidad…"
-          className="w-full bg-elevated border border-border-default rounded-lg pl-8 pr-3 py-1.5 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-        />
-        <svg
-          className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted"
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <circle cx="11" cy="11" r="7" />
-          <path d="m21 21-4.3-4.3" />
-        </svg>
-      </div>
-      {active && <p className="text-[10px] text-muted mt-1">{shown} de {total} entidades</p>}
-    </div>
-  );
-}
 
 // Title + subtitle, position offsets and typography. Reused by every template
 // so the header settings stay identical everywhere.
@@ -117,7 +54,7 @@ function HeaderSection({value, update}: {value: CommonHeaderConfig; update: (pat
         </div>
       </div>
       <div className="pt-2 mt-1 border-t border-border-subtle">
-        <RaceTextControls label="Texto del título" value={value.titleText} onChange={(patch) => update({titleText: {...(value.titleText ?? {}), ...patch}})} />
+        <TextStyleControls label="Texto del título" value={value.titleText} onChange={(patch) => update({titleText: {...(value.titleText ?? {}), ...patch}})}  showTextTransform showSpacing showHighlight showUnderline maxSize={160}/>
       </div>
       <div className="pt-2 mt-1 border-t border-border-subtle">
         <label className="text-sm font-medium mb-1 block">Subtítulo</label>
@@ -137,7 +74,7 @@ function HeaderSection({value, update}: {value: CommonHeaderConfig; update: (pat
         </div>
       </div>
       <div className="pt-2 mt-1 border-t border-border-subtle">
-        <RaceTextControls label="Texto del subtítulo" value={value.subtitleText} onChange={(patch) => update({subtitleText: {...(value.subtitleText ?? {}), ...patch}})} />
+        <TextStyleControls label="Texto del subtítulo" value={value.subtitleText} onChange={(patch) => update({subtitleText: {...(value.subtitleText ?? {}), ...patch}})}  showTextTransform showSpacing showHighlight showUnderline maxSize={160}/>
       </div>
     </Collapsible>
   );
@@ -147,7 +84,7 @@ function HeaderSection({value, update}: {value: CommonHeaderConfig; update: (pat
 // every template so the canvas settings stay identical everywhere.
 function CanvasSection({value, update}: {value: CommonCanvasConfig; update: (patch: Partial<CommonCanvasConfig>) => void}) {
   return (
-    <Collapsible title="Canvas">
+    <Collapsible title="Lienzo">
       <SelectControl
         label="Tipo de fondo"
         value={value.backgroundType ?? 'color'}
@@ -453,7 +390,6 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
           {activeTab === 'data' && (
             <>
               {templateSelector}
-              <HeaderSection value={value} update={update} />
 
               <Collapsible title="Datos" defaultOpen>
         <FieldSelect
@@ -522,6 +458,126 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
         </div>
       </Collapsible>
 
+      <Collapsible title="Ranking">
+        <div>
+          <label className="text-sm font-medium mb-1 block">Máximo de entidades</label>
+          <input
+            type="number"
+            min={0}
+            max={50}
+            value={value.maxRows ?? 0}
+            onChange={(e) => update({maxRows: Number(e.target.value) || undefined})}
+            className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+          />
+          <p className="text-[10px] text-muted mt-0.5">
+            0 = sin límite. Limita la cantidad de entidades visibles en la carrera.
+          </p>
+        </div>
+        <SliderNumberInput
+          label="Duración de la carrera (s)"
+          value={value.raceDurationSeconds ?? 0}
+          min={0}
+          max={60}
+          step={1}
+          onChange={(v) => update({raceDurationSeconds: v > 0 ? v : undefined})}
+        />
+        <p className="text-[10px] text-muted mt-0.5">
+          Tiempo del barrido de la carrera. 0 = automático (la carrera ocupa todo el tiempo disponible). Al fijarla, el tiempo sobrante queda congelado en el resultado final.
+        </p>
+        <SwitchControl
+          label="Efecto podio al final"
+          checked={value.podiumEffect ?? true}
+          onChange={(v) => update({podiumEffect: v})}
+        />
+        <p className="text-[10px] text-muted">
+          Cuando se revela el ganador, lo agranda con brillo y atenúa a los que no quedaron primeros. Apagado = sin atenuación ni brillo.
+        </p>
+      </Collapsible>
+            </>
+          )}
+          {activeTab === 'design' && (
+            <>
+      {/* ============ HEADER ============ */}
+      <HeaderSection value={value} update={update} />
+
+      {/* ============ COLORES ============ */}
+      {participants.length > 0 && (
+        <Collapsible title="Colores">
+          <div className="flex items-center justify-between mb-0.5">
+            <label className="text-sm font-medium block">Colores por entidad</label>
+            {Object.keys(value.barColors ?? {}).length > 0 && (
+              <button type="button" onClick={() => update({barColors: undefined})} className="text-[10px] text-muted hover:text-red-500">
+                Limpiar todos
+              </button>
+            )}
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Paleta de colores</label>
+            <PalettePicker selected={barPalette} onSelect={setBarPalette} onClear={() => setBarPalette(undefined)} />
+          </div>
+          <p className="text-[10px] text-muted">
+            La paleta colorea cada entidad cíclicamente; un color manual por entidad tiene prioridad sobre ella.
+          </p>
+          <EntitySearch value={colorQ} onChange={setColorQ} shown={filteredColors.length} total={participants.length} />
+          <div className="space-y-1.5">
+            {filteredColors.map((p) => {
+              const paletteColor = barPalette.length ? barPalette[(palIndex.get(p.label) ?? 0) % barPalette.length] : undefined;
+              const color = value.barColors?.[p.label] ?? paletteColor ?? '#3f3f46';
+              return (
+                <div key={p.label} className="flex items-center gap-2">
+                  <span className="w-12 h-8 shrink-0 rounded border border-border-default" style={{backgroundColor: paletteColor ?? 'transparent', boxShadow: value.barColors?.[p.label] ? `inset 0 0 0 2px ${color}` : 'none'}} />
+                  <span className="sr-only">{paletteColor ? 'Color de paleta' : 'Color manual'}</span>
+                  <input
+                    type="color"
+                    value={color}
+                    onChange={(e) => setBarColor(p.label, e.target.value)}
+                    className="w-8 h-8 rounded cursor-pointer border border-border-default bg-transparent"
+                    aria-label={`Color de ${p.label}`}
+                  />
+                  <span className="text-xs text-secondary truncate flex-1">{p.label}</span>
+                  {value.barColors?.[p.label] && (
+                    <button
+                      onClick={() => setBarColor(p.label)}
+                      className="text-muted hover:text-red-500 px-1 text-xs"
+                      aria-label={`Restablecer color de ${p.label}`}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </Collapsible>
+      )}
+
+      {/* ============ BARRAS ============ */}
+      {participants.length > 0 && (
+        <Collapsible title="Barras">
+          <SliderNumberInput
+            label="Ancho de las barras (%)"
+            value={value.barWidth ? Math.round(value.barWidth * 100) : 75}
+            min={40}
+            max={95}
+            step={5}
+            onChange={(v) => update({barWidth: v ? v / 100 : undefined})}
+          />
+          <p className="text-[10px] text-muted mb-1">
+            Reduce el porcentaje para dar más espacio al valor y al avatar (útil cuando el valor se sale de pantalla).
+          </p>
+          <NumberControl label="Radio de esquina de la barra (vacío = píldora)" value={value.barRadius} min={0} max={60} step={1} onChange={(v) => update({barRadius: v})} />
+          <NumberControl label="Grosor de la barra (px, vacío = automático)" value={value.barThickness} min={4} max={120} step={2} onChange={(v) => update({barThickness: v})} />
+          <div className="pt-2 mt-1 border-t border-border-subtle">
+            <p className="text-[10px] text-muted mb-1.5">Posición del grupo de filas y eje X (offset en px desde su lugar por defecto).</p>
+            <div className="grid grid-cols-2 gap-2">
+              <NumberControl label="X (px)" value={value.barsX} step={4} onChange={(v) => update({barsX: v})} />
+              <NumberControl label="Y (px)" value={value.barsY} step={4} onChange={(v) => update({barsY: v})} />
+            </div>
+          </div>
+        </Collapsible>
+      )}
+
+      {/* ============ EJE X ============ */}
       <Collapsible title="Eje X" defaultOpen>
         <div>
           <label className="text-sm font-medium mb-1 block">Formato de fecha</label>
@@ -589,6 +645,7 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
         </p>
       </Collapsible>
 
+      {/* ============ EJE Y ============ */}
       <Collapsible title="Eje Y">
         <SwitchControl
           label="Eje vertical (Y)"
@@ -602,6 +659,7 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
         </p>
       </Collapsible>
 
+      {/* ============ FECHA ============ */}
       <Collapsible title="Fecha">
         <SwitchControl
           label="Mostrar fecha en pantalla"
@@ -616,179 +674,31 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
           </div>
         </div>
         <div className="pt-2 mt-1 border-t border-border-subtle">
-          <RaceTextControls label="Texto de la fecha" value={value.dateText} onChange={(patch) => update({dateText: {...(value.dateText ?? {}), ...patch}})} />
+          <TextStyleControls label="Texto de la fecha" value={value.dateText} onChange={(patch) => update({dateText: {...(value.dateText ?? {}), ...patch}})}  showTextTransform showSpacing showHighlight showUnderline maxSize={160}/>
         </div>
       </Collapsible>
 
-      <Collapsible title="Ranking">
-        <div>
-          <label className="text-sm font-medium mb-1 block">Máximo de entidades</label>
-          <input
-            type="number"
-            min={0}
-            max={50}
-            value={value.maxRows ?? 0}
-            onChange={(e) => update({maxRows: Number(e.target.value) || undefined})}
-            className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-          />
-          <p className="text-[10px] text-muted mt-0.5">
-            0 = sin límite. Limita la cantidad de entidades visibles en la carrera.
-          </p>
-        </div>
-        <SliderNumberInput
-          label="Duración de la carrera (s)"
-          value={value.raceDurationSeconds ?? 0}
-          min={0}
-          max={60}
-          step={1}
-          onChange={(v) => update({raceDurationSeconds: v > 0 ? v : undefined})}
-        />
-        <p className="text-[10px] text-muted mt-0.5">
-          Tiempo del barrido de la carrera. 0 = automático (la carrera ocupa todo el tiempo disponible). Al fijarla, el tiempo sobrante queda congelado en el resultado final.
-        </p>
-        <SwitchControl
-          label="Efecto podio al final"
-          checked={value.podiumEffect ?? true}
-          onChange={(v) => update({podiumEffect: v})}
-        />
-        <p className="text-[10px] text-muted">
-          Cuando se revela el ganador, lo agranda con brillo y atenúa a los que no quedaron primeros. Apagado = sin atenuación ni brillo.
-        </p>
-      </Collapsible>
-
-            </>
-          )}
-          {activeTab === 'design' && (
-            <>
-      {/* ============ AVATAR (compartido) ============ */}
-      <AvatarSection value={value} onChange={update} participants={participants} />
-
-      {/* ============ BARRAS ============ */}
-      {participants.length > 0 && (
-        <Collapsible title="Barras">
-          <SliderNumberInput
-            label="Ancho de las barras (%)"
-            value={value.barWidth ? Math.round(value.barWidth * 100) : 75}
-            min={40}
-            max={95}
-            step={5}
-            onChange={(v) => update({barWidth: v ? v / 100 : undefined})}
-          />
-          <p className="text-[10px] text-muted mb-1">
-            Reduce el porcentaje para dar más espacio al valor y al avatar (útil cuando el valor se sale de pantalla).
-          </p>
-          <NumberControl label="Radio de esquina de la barra (vacío = píldora)" value={value.barRadius} min={0} max={60} step={1} onChange={(v) => update({barRadius: v})} />
-          <NumberControl label="Grosor de la barra (px, vacío = automático)" value={value.barThickness} min={4} max={120} step={2} onChange={(v) => update({barThickness: v})} />
-          <div className="pt-2 mt-1 border-t border-border-subtle">
-            <p className="text-[10px] text-muted mb-1.5">Posición del grupo de filas y eje X (offset en px desde su lugar por defecto).</p>
-            <div className="grid grid-cols-2 gap-2">
-              <NumberControl label="X (px)" value={value.barsX} step={4} onChange={(v) => update({barsX: v})} />
-              <NumberControl label="Y (px)" value={value.barsY} step={4} onChange={(v) => update({barsY: v})} />
-            </div>
-          </div>
-          <div className="flex items-center justify-between mb-0.5">
-            <label className="text-sm font-medium block">Colores por entidad</label>
-            {Object.keys(value.barColors ?? {}).length > 0 && (
-              <button type="button" onClick={() => update({barColors: undefined})} className="text-[10px] text-muted hover:text-red-500">
-                Limpiar todos
-              </button>
-            )}
-          </div>
-          <div>
-            <label className="text-sm font-medium mb-1 block">Paleta de colores</label>
-            <div className="space-y-2">
-              {PALETTES.map((p) => (
-                <button
-                  key={p.name}
-                  type="button"
-                  onClick={() => setBarPalette(p.colors)}
-                  className={`w-full text-left rounded-lg border p-1.5 transition-colors ${
-                    JSON.stringify(barPalette) === JSON.stringify(p.colors)
-                      ? 'border-amber-500/60'
-                      : 'border-border-subtle hover:border-amber-500/40'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] text-secondary">{p.name}</span>
-                    <span className="text-[10px] text-muted">Aplicar</span>
-                  </div>
-                  <div className="flex gap-0.5">
-                    {p.colors.slice(0, 8).map((c, i) => (
-                      <div key={i} className="flex-1 h-3 rounded-sm" style={{backgroundColor: c}} />
-                    ))}
-                  </div>
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => setBarPalette(undefined)}
-                className="w-full text-left rounded-lg border border-border-subtle p-1.5 hover:border-amber-500/40 transition-colors"
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] text-secondary">Ninguna (por defecto)</span>
-                  <span className="text-[10px] text-muted">Quitar</span>
-                </div>
-                <div className="flex gap-0.5">
-                  <div className="flex-1 h-3 rounded-sm" style={{backgroundColor: '#FFD700'}} />
-                  <div className="flex-1 h-3 rounded-sm" style={{backgroundColor: '#3f3f46'}} />
-                </div>
-              </button>
-            </div>
-          </div>
-          <p className="text-[10px] text-muted">
-            La paleta colorea cada entidad cíclicamente; un color manual por entidad tiene prioridad sobre ella.
-          </p>
-          <EntitySearch value={colorQ} onChange={setColorQ} shown={filteredColors.length} total={participants.length} />
-          <div className="space-y-1.5">
-            {filteredColors.map((p) => {
-              const paletteColor = barPalette.length ? barPalette[(palIndex.get(p.label) ?? 0) % barPalette.length] : undefined;
-              const color = value.barColors?.[p.label] ?? paletteColor ?? '#3f3f46';
-              return (
-                <div key={p.label} className="flex items-center gap-2">
-                  <span className="w-12 h-8 shrink-0 rounded border border-border-default" style={{backgroundColor: paletteColor ?? 'transparent', boxShadow: value.barColors?.[p.label] ? `inset 0 0 0 2px ${color}` : 'none'}} />
-                  <span className="sr-only">{paletteColor ? 'Color de paleta' : 'Color manual'}</span>
-                  <input
-                    type="color"
-                    value={color}
-                    onChange={(e) => setBarColor(p.label, e.target.value)}
-                    className="w-8 h-8 rounded cursor-pointer border border-border-default bg-transparent"
-                    aria-label={`Color de ${p.label}`}
-                  />
-                  <span className="text-xs text-secondary truncate flex-1">{p.label}</span>
-                  {value.barColors?.[p.label] && (
-                    <button
-                      onClick={() => setBarColor(p.label)}
-                      className="text-muted hover:text-red-500 px-1 text-xs"
-                      aria-label={`Restablecer color de ${p.label}`}
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </Collapsible>
-      )}
-
-      {/* ============ ETIQUETA ============ */}
-      <Collapsible title="Etiqueta">
-        <RaceTextControls label="Texto de la etiqueta" value={value.labelText} onChange={(patch) => update({labelText: {...(value.labelText ?? {}), ...patch}})} />
+      {/* ============ ETIQUETAS ============ */}
+      <Collapsible title="Etiquetas">
+        <TextStyleControls label="Texto de la etiqueta" value={value.labelText} onChange={(patch) => update({labelText: {...(value.labelText ?? {}), ...patch}})}  showTextTransform showSpacing showHighlight showUnderline maxSize={160}/>
         <p className="text-[10px] text-muted mt-0.5">
           El nombre de la entidad que se apoya sobre la barra en el outro final.
         </p>
         <div className="h-px bg-border-default my-3" />
-        <RaceTextControls label="Texto del dato (dentro de la barra)" value={value.valueText} onChange={(patch) => update({valueText: {...(value.valueText ?? {}), ...patch}})} />
+        <TextStyleControls label="Texto del dato (dentro de la barra)" value={value.valueText} onChange={(patch) => update({valueText: {...(value.valueText ?? {}), ...patch}})}  showTextTransform showSpacing showHighlight showUnderline maxSize={160}/>
         <p className="text-[10px] text-muted mt-0.5">
           El valor acumulado que viaja dentro de cada barra.
         </p>
       </Collapsible>
 
+      {/* ============ LIENZO ============ */}
+      <CanvasSection value={value} update={update} />
+
+      {/* ============ AVATAR ============ */}
+      <AvatarSection value={value} onChange={update} participants={participants} />
+
       {/* ============ ADICIONALES ============ */}
       <OverlaysSection value={value} update={update} />
-
-      {/* ============ CANVAS ============ */}
-      <CanvasSection value={value} update={update} />
             </>
           )}
         </div>
@@ -916,7 +826,7 @@ function OverlaysSection<T extends {overlays?: import('@/lib/chart-config').Char
                 className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
               />
               <div className="grid grid-cols-2 gap-2">
-                <RaceTextControls
+                <TextStyleControls
                   label="Texto"
                   value={ov.font as unknown as import('@/lib/animation-config').RaceTextStyle}
                   onChange={(patch) => {
@@ -926,7 +836,7 @@ function OverlaysSection<T extends {overlays?: import('@/lib/chart-config').Char
                     };
                     setOverlay(i, {font: {...(ov.font ?? {}), ...fontPatch}});
                   }}
-                />
+                 showTextTransform showSpacing showHighlight showUnderline maxSize={160}/>
                 <div className="space-y-2">
                   <p className="text-sm font-medium">Posición (px)</p>
                   <NumberControl label="X (px)" value={ov.layout?.x} onChange={(x) => setOverlay(i, {layout: {...(ov.layout ?? {}), x}})} />
@@ -1097,11 +1007,11 @@ function RowImageSection({value, onChange, participants = []}: {
             <NumberControl label="Offset X (px)" value={value.rowImageLabelX} step={4} onChange={(v) => onChange({rowImageLabelX: v})} />
             <NumberControl label="Offset Y (px)" value={value.rowImageLabelY} step={4} onChange={(v) => onChange({rowImageLabelY: v})} />
           </div>
-          <RaceTextControls
+          <TextStyleControls
             label="Texto del puesto"
             value={value.rowImageLabelText}
             onChange={(patch) => onChange({rowImageLabelText: {...(value.rowImageLabelText ?? {}), ...patch}})}
-          />
+           showTextTransform showSpacing showHighlight showUnderline maxSize={160}/>
         </>
       )}
       {(participants.length > 0) && (
@@ -1263,7 +1173,6 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = [], t
           {activeTab === 'data' && (
             <>
               {templateSelector}
-              <HeaderSection value={value} update={update} />
 
               <Collapsible title="Datos" defaultOpen>
         <FieldSelect
@@ -1395,7 +1304,14 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = [], t
           <p className="text-[10px] text-muted mt-0.5">Vacío = sin prefijo (en vez de #1 muestra 1).</p>
         </div>
       </Collapsible>
+            </>
+          )}
+          {activeTab === 'design' && (
+            <>
+      {/* ============ HEADER ============ */}
+      <HeaderSection value={value} update={update} />
 
+      {/* ============ FILAS ============ */}
       <Collapsible title="Filas">
         <SliderNumberInput label="Separación vertical (px)" value={value.rowGap ?? 0} min={0} max={120} step={2} onChange={(v) => update({rowGap: v})} />
         <SliderNumberInput label="Separación horizontal (px)" value={value.rowGapH ?? 0} min={0} max={80} step={2} onChange={(v) => update({rowGapH: v})} />
@@ -1532,35 +1448,35 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = [], t
         </div>
       </Collapsible>
 
-            </>
-          )}
-          {activeTab === 'design' && (
-            <>
-      <AvatarSection value={value} onChange={update} participants={participants} />
-
-      <RowImageSection value={value} onChange={update} participants={participants} />
-
-      <Collapsible title="Etiqueta">
-        <RaceTextControls label="Texto del puesto (#1)" value={value.rankText} onChange={(patch) => update({rankText: {...(value.rankText ?? {}), ...patch}})} />
+      {/* ============ ETIQUETAS ============ */}
+      <Collapsible title="Etiquetas">
+        <TextStyleControls label="Texto del puesto (#1)" value={value.rankText} onChange={(patch) => update({rankText: {...(value.rankText ?? {}), ...patch}})}  showTextTransform showSpacing showHighlight showUnderline maxSize={160}/>
         <p className="text-[10px] text-muted mt-0.5">
           El número de posición (#1, #2...) que aparece a la izquierda de cada fila.
         </p>
         <div className="h-px bg-border-default my-3" />
-        <RaceTextControls label="Texto de la etiqueta" value={value.labelText} onChange={(patch) => update({labelText: {...(value.labelText ?? {}), ...patch}})} />
+        <TextStyleControls label="Texto de la etiqueta" value={value.labelText} onChange={(patch) => update({labelText: {...(value.labelText ?? {}), ...patch}})}  showTextTransform showSpacing showHighlight showUnderline maxSize={160}/>
         <p className="text-[10px] text-muted mt-0.5">
           El nombre de la entidad dentro de la barra.
         </p>
         <div className="h-px bg-border-default my-3" />
-        <RaceTextControls label="Texto del dato" value={value.valueText} onChange={(patch) => update({valueText: {...(value.valueText ?? {}), ...patch}})} />
+        <TextStyleControls label="Texto del dato" value={value.valueText} onChange={(patch) => update({valueText: {...(value.valueText ?? {}), ...patch}})}  showTextTransform showSpacing showHighlight showUnderline maxSize={160}/>
         <p className="text-[10px] text-muted mt-0.5">
           El valor numérico que viaja dentro de la barra.
         </p>
       </Collapsible>
 
+      {/* ============ LIENZO ============ */}
+      <CanvasSection value={value} update={update} />
+
+      {/* ============ AVATAR ============ */}
+      <AvatarSection value={value} onChange={update} participants={participants} />
+
+      {/* ============ IMAGEN POR PUESTO ============ */}
+      <RowImageSection value={value} onChange={update} participants={participants} />
+
       {/* ============ ADICIONALES ============ */}
       <OverlaysSection value={value} update={update} />
-
-      <CanvasSection value={value} update={update} />
             </>
           )}
         </div>
@@ -1577,164 +1493,6 @@ export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onC
   return <TimelineRacePanel templateId={templateId} columns={columns} fieldMeta={fieldMeta} value={value as TimelineRaceConfig} onChange={onChange as (n: TimelineRaceConfig) => void} participants={participants} templateSelector={templateSelector} />;
 }
 
-function FileUploadInput({label, value, onLoad, onClear}: {label: string; value?: string; onLoad: (dataUrl: string) => void; onClear: () => void}) {
-  const inputRef = React.useRef<HTMLInputElement>(null);
-  return (
-    <div>
-      <label className="text-sm font-medium mb-1 block">{label}</label>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (!file) return;
-          const reader = new FileReader();
-          reader.onload = () => {
-            if (typeof reader.result === 'string') onLoad(reader.result);
-          };
-          reader.readAsDataURL(file);
-          e.target.value = '';
-        }}
-        className="w-full text-sm text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-elevated file:px-3 file:py-2 file:text-sm file:font-medium"
-      />
-      {value && (
-        <div className="flex items-center gap-2 mt-1">
-          <img src={value} alt="fondo" className="h-10 w-16 object-cover rounded border border-border-default" />
-          <button type="button" onClick={() => {onClear(); if (inputRef.current) inputRef.current.value = '';}} className="text-[10px] text-muted hover:text-red-500">
-            Quitar imagen
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function OldToggle({label, checked, onChange}: {label: string; checked: boolean; onChange: (v: boolean) => void}) {
-  return (
-    <label className="flex items-center justify-between cursor-pointer">
-      <span className="text-sm font-medium">{label}</span>
-      <div className="relative">
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={(e) => onChange(e.target.checked)}
-          className="sr-only peer"
-        />
-        <div className="w-9 h-5 rounded-full bg-elevated border border-border-default peer-checked:bg-amber-500 transition-colors" />
-        <div className="absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
-      </div>
-    </label>
-  );
-}
-
-function FieldSelect({
-  label,
-  value,
-  options = [],
-  fallback = [],
-  role = 'any',
-  onChange,
-  optional = false,
-}: {
-  label: string;
-  value: string;
-  options?: ColumnMeta[];
-  fallback?: string[];
-  role?: 'any' | 'numeric' | 'date';
-  onChange: (v: string) => void;
-  optional?: boolean;
-}) {
-  const useMeta = options.length > 0;
-  const numericList = options.filter((o) => o.isNumeric);
-
-  const pickList = useMeta
-    ? role === 'numeric'
-      ? numericList
-      : options
-    : fallback;
-
-  return (
-    <div>
-      <label className="text-sm font-medium mb-1 block">{label}</label>
-      <SelectControl
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-      >
-        {optional && <option value="">Ninguno</option>}
-        {pickList.map((c) => {
-          const alias = typeof c === 'string' ? c : c.alias;
-          return (
-            <option key={alias} value={alias}>
-              {alias}
-            </option>
-          );
-        })}
-      </SelectControl>
-    </div>
-  );
-}
-
-function OldNumberInput({label, value, min, max, step = 1, onChange}: {label: string; value?: number; min?: number; max?: number; step?: number; onChange: (v: number | undefined) => void}) {
-  return (
-    <div>
-      <label className="text-sm font-medium mb-1 block">{label}</label>
-      <input
-        type="number"
-        {...(min !== undefined ? {min} : {})}
-        {...(max !== undefined ? {max} : {})}
-        step={step}
-        value={value ?? ''}
-        onChange={(e) => onChange(e.target.value ? Number(e.target.value) : undefined)}
-        className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-      />
-    </div>
-  );
-}
-
-function SliderNumberInput({label, value, min, max, step = 1, onChange}: {label: string; value: number; min: number; max: number; step?: number; onChange: (v: number) => void}) {
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1">
-        <label className="text-sm font-medium">{label}</label>
-        <input
-          type="number"
-          min={min}
-          max={max}
-          step={step}
-          value={value}
-          onChange={(e) => onChange(Number(e.target.value) || 0)}
-          className="w-16 bg-elevated border border-border-default rounded px-2 py-1 text-xs text-right font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-        />
-      </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full h-1.5 bg-border-subtle rounded-lg appearance-none cursor-pointer accent-amber-500"
-      />
-    </div>
-  );
-}
-
-function OldColorInput({label, value, onChange}: {label: string; value?: string; onChange: (v: string) => void}) {
-  return (
-    <label className="flex items-center gap-2">
-      <input
-        type="color"
-        value={value ?? '#888888'}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-8 h-8 rounded cursor-pointer border border-border-default bg-transparent"
-        aria-label={label}
-      />
-      <span className="text-xs text-secondary">{label}</span>
-    </label>
-  );
-}
 
 function RowOrderControl({value, onChange}: {value: ('bar' | 'avatar')[]; onChange: (order: ('bar' | 'avatar')[]) => void}) {
   const rows = Array.from(new Set(value.filter((s) => s === 'bar' || s === 'avatar'))) as ('bar' | 'avatar')[];
@@ -1775,99 +1533,6 @@ function RowOrderControl({value, onChange}: {value: ('bar' | 'avatar')[]; onChan
         ))}
       </div>
       <p className="text-[10px] text-muted mt-0.5">Usa ◀ ▶ para reordenar los elementos de cada fila. El dato siempre va al extremo derecho de la barra.</p>
-    </div>
-  );
-}
-
-function RaceTextControls({label, value, onChange}: {label: string; value?: RaceTextStyle; onChange: (patch: Partial<RaceTextStyle>) => void}) {
-  const v = value ?? {};
-  return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium">{label}</p>
-      <div>
-        <label className="text-sm font-medium mb-1 block">Tipografía</label>
-        <SelectControl
-          value={v.fontFamily ?? ''}
-          onChange={(e) => onChange({fontFamily: e.target.value || undefined})}
-          className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-        >
-          <option value="">Por defecto</option>
-          {FONT_PRESETS.map((f) => (
-            <option key={f.name} value={f.family}>{f.name}</option>
-          ))}
-        </SelectControl>
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <NumberControl label="Tamaño (px)" value={v.size} min={6} max={160} step={1} onChange={(n) => onChange({size: n})} />
-        <NumberControl label="Grosor" value={v.weight} min={400} max={800} step={100} onChange={(n) => onChange({weight: n})} />
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <NumberControl label="Interletrado (px)" value={v.letterSpacing} min={-2} max={20} step={1} onChange={(n) => onChange({letterSpacing: n})} />
-        <NumberControl label="Alto de línea" value={v.lineHeight} min={0.8} max={2} step={0.1} onChange={(n) => onChange({lineHeight: n})} />
-      </div>
-      <ColorPickerControl label="Color del texto" value={v.color} onChange={(c) => onChange({color: c || undefined})} />
-      <div>
-        <label className="text-sm font-medium mb-1 block">Mayúsculas / minúsculas</label>
-        <div className="grid grid-cols-4 gap-1">
-          {([
-            ['none', 'Normal'],
-            ['uppercase', 'MAY'],
-            ['lowercase', 'min'],
-            ['capitalize', 'Cap'],
-          ] as const).map(([val, lab]) => (
-            <button
-              key={val}
-              type="button"
-              onClick={() => onChange({textTransform: val === 'none' ? undefined : val})}
-              className={`px-2 py-1.5 rounded-md text-sm font-medium transition-colors ${(v.textTransform ?? 'none') === val ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'}`}
-            >
-              {lab}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div>
-        <label className="text-sm font-medium mb-1 block">Alineación</label>
-        <div className="grid grid-cols-3 gap-1">
-          {([
-            ['left', 'Izq'],
-            ['center', 'Centro'],
-            ['right', 'Der'],
-          ] as const).map(([val, lab]) => (
-            <button
-              key={val}
-              type="button"
-              onClick={() => onChange({align: (v.align ?? 'left') === val ? undefined : val})}
-              className={`px-2 py-1.5 rounded-md text-sm font-medium transition-colors ${(v.align ?? 'left') === val ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'}`}
-            >
-              {lab}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="rounded-lg border border-border-subtle p-2.5 space-y-2">
-        <p className="text-sm font-medium">Resaltado</p>
-        <AutoColorInput
-          label="Color de fondo"
-          value={v.highlightColor}
-          onChange={(c) => onChange({highlightColor: c || undefined})}
-        />
-        {v.highlightColor && (
-          <SliderNumberInput
-            label="Radio de esquinas (px)"
-            value={v.highlightRadius ?? 0}
-            min={0}
-            max={48}
-            step={1}
-            onChange={(n) => onChange({highlightRadius: n || undefined})}
-          />
-        )}
-      </div>
-      <SwitchControl
-        label="Subrayado"
-        checked={!!v.underline}
-        onChange={(b) => onChange({underline: b || undefined})}
-      />
     </div>
   );
 }

@@ -22,7 +22,7 @@ export function NumberControl({
   className = '', 
   ...props 
 }: NumberControlProps) {
-  
+  const id = React.useId();
   const handleIncrement = () => {
     const current = value ?? 0;
     const next = current + step;
@@ -50,7 +50,7 @@ export function NumberControl({
 
   return (
     <div className={`w-full ${className}`}>
-      <label className="text-sm font-medium mb-1 block font-display text-secondary">{label}</label>
+      <label htmlFor={id} className="text-sm font-medium mb-1 block font-display text-secondary">{label}</label>
       <div className="flex items-center gap-1">
         <button
           type="button"
@@ -62,6 +62,7 @@ export function NumberControl({
           <Minus size={14} />
         </button>
         <input
+          id={id}
           type="number"
           value={value ?? ''}
           onChange={handleChange}
