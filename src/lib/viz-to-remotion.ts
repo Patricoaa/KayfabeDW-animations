@@ -435,11 +435,12 @@ export function getTimelineRaceParticipants(
 //
 // Like the timeline race, but the whole plane (bars + axis band) SCROLLS so
 // the current time stays pinned under a fixed "now" line. The axis quantity is
-// auto-detected: dates (`dateField`, bucketed by `dateFormat`) win, else a
-// numeric axis column (`axisField`, or a time-ish fully-numeric column: years,
-// rounds, days...) runs the same scrolling race with `axisUnit: 'number'`.
-// With neither a usable date nor a numeric axis column the template falls back
-// to the parallel-bar compat mode so older datasets keep rendering.
+// auto-detected: dates (a `dateField`/`axisField` column bucketed by
+// `dateFormat`) win, else an all-numeric axis column (`axisField`, or a
+// time-ish fully-numeric column: years, rounds, days...) runs the same
+// scrolling race with `axisUnit: 'number'`. With neither a usable date nor a
+// numeric axis column the template falls back to the parallel-bar compat mode
+// so older datasets keep rendering.
 function convertRaceScrolling(
   data: Record<string, unknown>[],
   config: ChartConfig,
@@ -452,6 +453,9 @@ function convertRaceScrolling(
     showDateLabel: t?.showDateLabel,
     showXAxis: t?.showXAxis,
     axisPosition: t?.axisPosition,
+    axisDirection: t?.axisDirection,
+    showValueAxis: t?.showValueAxis,
+    valueAxisPosition: t?.valueAxisPosition,
     anchorX: t?.anchorX,
     axisTicks: t?.axisTicks,
     showMarkers: t?.showMarkers,
@@ -502,8 +506,12 @@ function convertRaceScrolling(
   const labelField = resolveLabelField(rows, config, tc);
   const valueField = tc?.valueField ?? config.yField;
   const imageField = tc?.imageField;
+  // The cardinality axis column: explicit `axisField` first, then legacy
+  // `dateField`, then an auto-detected date-ish column by name.
+  const explicitAxis = tc?.axisField ? resolveKey(rows, tc.axisField) : '';
   const startField =
-    tc?.dateField ??
+    explicitAxis ||
+    tc?.dateField ||
     Object.keys(rows[0]).find((k) =>
       k.toLowerCase().includes('date') || k.toLowerCase().includes('fecha') ||
       k.toLowerCase().includes('inicio') || k.toLowerCase().includes('start'));
@@ -518,9 +526,24 @@ function convertRaceScrolling(
     }))
     .filter((it) => !isNaN(it.value));
 
-  // dateMode only when we actually parsed dates for at least two rows.
+  // dateMode only when we actually parsed dates for at least two rows. A fully
+  // plain-numeric axis column (years, rounds, days...) must NEVER become a date
+  // axis even though `parseDateValue` would coerce small numbers to a 1970
+  // timestamp — that is the numeric-cardinality mode instead.
   const dates = items.map((i) => i.date).filter((d): d is number => d != null);
-  const dateMode = dates.length >= 2;
+  const axisPlainNumeric =
+    !!startField &&
+    rows.length > 0 &&
+    rows.every((r) => {
+      const v = r[startField];
+      if (typeof v === 'number') return v < 1e10;
+      if (typeof v === 'string' && v.trim() !== '') {
+        const cleaned = v.trim().replace(/[%\s]/g, '').replace(/,/g, '.');
+        return !isNaN(Number(cleaned)) && Number(cleaned) < 1e10;
+      }
+      return false;
+    });
+  const dateMode = !axisPlainNumeric && dates.length >= 2;
 
   // Numeric axis fallback: a fully-numeric column (prefer an explicit
   // `axisField`, else a time-ish named column) drives the same scrolling race
@@ -538,9 +561,12 @@ function convertRaceScrolling(
     const numericCols = Object.keys(rows[0] ?? {}).filter(
       (f) => f !== valueField && f !== labelField && !/imagen|image|url|avatar|icono/i.test(f) && rows.every((r) => isStrictNumeric(r[f])),
     );
-    const explicit = tc?.axisField ? resolveKey(rows, tc.axisField) : '';
-    if (explicit && numericCols.includes(explicit)) numericAxisField = explicit;
-    else if (numericCols.length > 0) {
+    if (explicitAxis) {
+      // An explicit axis column is authoritative: never silently swap it for
+      // another numeric column. If it is not strictly numeric here, we fall
+      // through to compat mode below.
+      if (numericCols.includes(explicitAxis)) numericAxisField = explicitAxis;
+    } else if (numericCols.length > 0) {
       const timeish = numericCols.find((f) => /round|ronda|season|temporada|fecha|d[ií]a|a[ñn]o|year|day|week|semana|edici[óo]n|jornada|mes|month/i.test(f));
       numericAxisField = timeish ?? numericCols[0];
     }

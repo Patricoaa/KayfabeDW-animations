@@ -212,30 +212,44 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
   valueText?: RaceTextStyle;
 };
 
-// Race Scrolling: a ranked bar race on a plane that SCROLLS horizontally as a
-// whole (bars + axis band travel together, "camera following the leader")
-// instead of a fixed guide sweeping over static bars. Each entity's bar is
-// stuck by its TIP to its current position on the passing axis and its length
-// is proportional to the accumulated value; the current time always sits under
-// a fixed "now" line. The axis supports dates (`dateField` → timestamps,
-// `dateFormat` day/month/year) or plain numbers (`axisField` → years, rounds,
-// days). When neither a usable date column nor a numeric axis column exists,
-// the template falls back to Timeline Race's parallel-bar mode so older data
-// keeps rendering.
+// Race Scrolling: a ranked bar race with a STATIC entity axis — each row is a
+// fixed lane whose bar grows IN PLACE with the accumulated value while a
+// horizontal "plane" scrolls the current moment under a fixed "now" line. The
+// grid bands on that plane are configurable: the positional band (dates
+// `dateField`/`axisField` → timestamps bucketed by `dateFormat`, or plain
+// numbers → years, rounds, days) and an optional cardinality band showing the
+// live value scale (0 → current max). Each band can sit at the top or the
+// bottom of the rows. `axisDirection` flips the sweep (Menor→Mayor default, or
+// Mayor→Menor: only the mapping of value→position is reversed, the camera and
+// ranking keep working the same). When neither a usable date column nor a
+// numeric axis column exists, the template falls back to Timeline Race's
+// parallel-bar mode so older data keeps rendering.
 //
 // The bar geometry, entry/pop, ranking swaps, winner reveal and outro mirror
-// the timeline race. What's new is the scrolling world: `anchorX` (5-95%)
-// places the fixed "now" line on the track, `axisTicks` controls the tick
-// density on the traveling band, and `showMarkers`/`markerMode` draw one
-// marker per active entity on the band at its current step showing the
-// accumulated value as a number, an icon (from ICON_GLYPHS) or a reference
-// image (the entity's avatar URL). `barColors`, `barPalette` and the row/avatar
-// controls are shared with the timeline race.
+// the timeline race. `anchorX` (5-95%) places the fixed "now" line on the
+// track, `axisTicks` controls the tick density on both traveling bands, and
+// `showMarkers`/`markerMode` draw one marker per active entity IN ITS OWN ROW
+// at its current step on the plane showing the accumulated value as a number,
+// an icon (from ICON_GLYPHS) or a reference image (the entity's avatar URL).
+// `barColors`, `barPalette` and the row/avatar controls are shared with the
+// timeline race.
 export type RaceScrollingConfig = TimelineRaceConfig & {
-  // Optional axis column for the numeric axis mode. When set and the dataset
-  // has no usable date column, rows are positioned on the axis using this
-  // column's numbers instead (years, rounds, days...). Mirrors `dateField`.
+  // Cardinality axis column: dates OR plain numbers (years, rounds, days...).
+  // The unit is auto-detected from the actual values; this is what the "Eje de
+  // la carrera" field in the Datos tab writes. Legacy `dateField` is still
+  // honored as a fallback for older saved projects.
   axisField?: string;
+
+  // Axis sweep direction: 'asc' runs Menor→Mayor (default), 'desc' runs
+  // Mayor→Menor. Only the value→position mapping is reversed; the camera
+  // anchor, ranking and entry/exit animation keep their behavior.
+  axisDirection?: 'asc' | 'desc';
+
+  // Second, independent grid band: a "cardinality" axis showing the live
+  // numeric scale of the accumulated value (0 → current max) painted on the
+  // traveling plane, next to the positional (date/number) band.
+  showValueAxis?: boolean;
+  valueAxisPosition?: 'top' | 'bottom';
 
   // Camera anchor: % of the track width where the fixed "now" line sits
   // (5-95, default 35). The whole plane scrolls so this point always matches

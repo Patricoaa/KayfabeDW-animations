@@ -798,25 +798,38 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           onChange={(v) => update({imageField: v || undefined})}
         />
         <FieldSelect
-          label="Campo de fecha"
-          value={value.dateField ?? ''}
+          label="Eje de la carrera (cardinalidad)"
+          value={value.axisField ?? value.dateField ?? ''}
           options={fieldMeta}
           fallback={columns}
-          role="date"
-          onChange={(v) => update({dateField: v || undefined})}
-        />
-        <FieldSelect
-          label="Campo del eje numérico (opcional)"
-          value={value.axisField ?? ''}
-          options={fieldMeta}
-          fallback={columns}
-          role="numeric"
-          optional
+          role="any"
           onChange={(v) => update({axisField: v || undefined})}
         />
         <p className="text-[10px] text-muted -mt-1">
-          Si el dataset no tiene una columna de fechas usable, el plano se desplaza por los números de esta columna (años, rondas, días...). El tipo de eje se detecta automáticamente.
+          Columna que recorre la carrera: puede ser de fechas o de números (años, rondas, días...). El tipo de eje se detecta automáticamente. Si no hay columna usable, se muestra el modo paralelo.
         </p>
+        <div>
+          <label className="text-sm font-medium mb-1 block">Presentación del eje</label>
+          <div className="grid grid-cols-2 gap-1">
+            {(['asc', 'desc'] as const).map((dir) => (
+              <button
+                key={dir}
+                type="button"
+                onClick={() => update({axisDirection: dir})}
+                className={`px-2 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  (value.axisDirection ?? 'asc') === dir
+                    ? 'bg-amber-500 text-black'
+                    : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
+                }`}
+              >
+                {dir === 'asc' ? 'Menor → Mayor' : 'Mayor → Menor'}
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-muted mt-0.5">
+            Invierte el sentido del recorrido: la carrera avanza de mayor a menor, o de menor a mayor.
+          </p>
+        </div>
         <FieldSelect
           label="Campo de valor acumulado"
           value={value.valueField ?? ''}
@@ -1038,6 +1051,37 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
             ))}
           </div>
         </div>
+        <div className="border-t border-border-subtle pt-2 mt-1">
+          <SwitchControl
+            label="Eje de cardinalidad (valores)"
+            checked={value.showValueAxis ?? false}
+            onChange={(v) => update({showValueAxis: v})}
+          />
+          <p className="text-[10px] text-muted mt-0.5">
+            Segunda banda en el grid: la escala numérica viva de la cardinalidad (0 → máximo acumulado) que viaja con el plano, además del eje posicional.
+          </p>
+          {value.showValueAxis && (
+            <div className="mt-2">
+              <label className="text-sm font-medium mb-1 block">Posición del eje de valores</label>
+              <div className="grid grid-cols-2 gap-1">
+                {(['bottom', 'top'] as const).map((pos) => (
+                  <button
+                    key={pos}
+                    type="button"
+                    onClick={() => update({valueAxisPosition: pos})}
+                    className={`px-2 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                      (value.valueAxisPosition ?? 'bottom') === pos
+                        ? 'bg-amber-500 text-black'
+                        : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
+                    }`}
+                  >
+                    {pos === 'bottom' ? 'Abajo' : 'Arriba'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
         <div>
           <label className="text-sm font-medium mb-2 block">Orden de la fila (izq → der)</label>
           <RowOrderControl value={value.rowOrder ?? ['bar', 'avatar']} onChange={setRowOrder} />
@@ -1061,7 +1105,7 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           </div>
         )}
         <p className="text-[10px] text-muted">
-          El eje muestra fechas (o números, con el campo del eje numérico) y viaja con el plano. La fecha en pantalla se muestra abajo a la derecha e indica el momento del recorrido.
+          El grid muestra la banda posicional (fechas, o números con el eje de cardinalidad) y, si está activo, la banda de valores; ambas viajan con el plano y pueden ir arriba o abajo. La fecha en pantalla se muestra abajo a la derecha e indica el momento del recorrido.
         </p>
       </Collapsible>
 
@@ -1073,7 +1117,7 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           onChange={(v) => update({showMarkers: v})}
         />
         <p className="text-[10px] text-muted mt-0.5">
-          Cada entidad activa deja un marcador en la banda del eje en su paso actual, mostrando el valor acumulado.
+          Cada entidad activa deja un marcador en su propia fila, en la posición de su paso actual sobre el plano, mostrando el valor acumulado.
         </p>
         <div className="mt-2">
           <div>

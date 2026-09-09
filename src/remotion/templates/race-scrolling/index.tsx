@@ -13,12 +13,13 @@ import {textStyle} from '../shared/text';
 // visible. Its bar grows IN PLACE from that axis, with length proportional to
 // the accumulated value up to the current moment (interpolated between data
 // points), so the bar "eats" each date's value as the now-line passes it. Only
-// the DATE axis band below scrolls horizontally, keeping the current moment
-// pinned under a fixed "now" line. Each active entity drops a MARKER on the
-// scrolling axis band at its current step showing the accumulated value as a
-// number, an icon (ICON_GLYPHS) or a reference image (its avatar URL). The
-// axis supports dates (timestamp ms) or plain numbers (years, rounds, days)
-// via `axisUnit`.
+// the grid bands scroll horizontally, keeping the current moment pinned under a
+// fixed "now" line: a positional band (dates or plain numbers, `axisUnit`) and
+// an optional cardinality band with the live value scale (0 → current max),
+// each at the top or the bottom. `axisDirection` flips the sweep (Mayor→Menor
+// only reverses the value→position mapping). Each active entity drops a MARKER
+// IN ITS OWN LANE at its current step on the plane showing the accumulated
+// value as a number, an icon (ICON_GLYPHS) or a reference image (avatar URL).
 //
 // The layout is fully responsive: it reads the composition width/height via
 // `useVideoConfig()` and re-flows for landscape, portrait (9:16), post (4:5),
@@ -48,6 +49,13 @@ export type RaceScrollingProps = {
   showDateLabel?: boolean;
   showXAxis?: boolean;
   axisPosition?: 'top' | 'bottom';
+  // Axis sweep direction: 'asc' (Menor→Mayor) or 'desc' (Mayor→Menor). Only
+  // the value→position mapping reverses; camera and ranking are unchanged.
+  axisDirection?: 'asc' | 'desc';
+  // Second grid band: a live cardinality scale (0 → current max) on the
+  // traveling plane, independent of the positional band.
+  showValueAxis?: boolean;
+  valueAxisPosition?: 'top' | 'bottom';
   // Camera anchor: % of the track width where the "now" line stays fixed
   // (5-95, default 35). The plane scrolls so this point always matches `now`.
   anchorX?: number;
@@ -139,6 +147,9 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   showDateLabel = true,
   showXAxis = true,
   axisPosition = 'bottom',
+  axisDirection = 'asc',
+  showValueAxis = false,
+  valueAxisPosition = 'bottom',
   anchorX = 35,
   axisTicks = 8,
   showMarkers = true,
@@ -304,6 +315,12 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // ---- scroll mode: ranked bars traveling on the scrolling axis ----
   const [min, max] = domain ?? [0, 1];
   const span = Math.max(max - min, 1);
+  // 'desc' (Mayor→Menor) only flips the mapping value→position: the same value
+  // sits further right as the race sweeps from max towards min. The sweep t
+  // (0→1) and the camera keep their normal behavior.
+  const desc = axisDirection === 'desc';
+  const posToX = (v: number) => (desc ? 1 - (v - min) / span : (v - min) / span);
+  const valueAtX = (fx: number) => (desc ? max - span * fx : min + span * fx);
 
   const innerW = W - PAD_L - PAD_R;
   const ROW_GAP_PX = rowGapH ?? innerW * 0.03;
@@ -335,7 +352,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // ---- Group steps by entity ----
   const byLabel = new Map<string, {image?: string | null; steps: {x: number; value: number}[]}>();
   for (const r of rows) {
-    const x = Math.min(Math.max((r.pos - min) / span, 0), 1);
+    const x = Math.min(Math.max(posToX(r.pos), 0), 1);
     let entry = byLabel.get(r.label);
     if (!entry) {
       entry = {image: r.image, steps: []};
@@ -450,7 +467,8 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const anchorWorld = anchorFrac * BAR_MAX_W;
   const nowWorld = guideT * BAR_MAX_W;
   const scrollX = anchorWorld - nowWorld;
-  const nowLabel = axisUnit === 'date' ? fmtDate(min + span * guideT, dateFormat) : fmtValue(Math.round(min + span * guideT), valueFormat, currencySymbol);
+  const nowWorldValue = valueAtX(guideT);
+  const nowLabel = axisUnit === 'date' ? fmtDate(nowWorldValue, dateFormat) : fmtValue(Math.round(nowWorldValue), valueFormat, currencySymbol);
 
   // ---- Winner reveal + outro ----
   const raceFinished = guideT >= 0.99;
@@ -482,43 +500,73 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // Fixed "now" line on screen, over the bar track (right of the entity axis).
   const anchorXPx = BAR_TRACK_X + anchorWorld;
 
-  // ---- Scrolling axis band (ticks + per-entity markers): the part that scrolls ----
+  // ---- Grid bands + markers: the part that scrolls (the "plane") ----
   const MARKER_SIZE = markerSize ?? (isPortrait ? Math.round(W * 0.055) : 26);
   const AXIS_FONT = isPortrait ? Math.round(W * 0.026) : 13;
-  const BAND_H = showXAxis ? Math.max(40, MARKER_SIZE + 20) : 0;
+  const BAND_H = Math.max(40, MARKER_SIZE + 20);
+  const BAND_GAP = 12;
 
+  // Each of the two configurable bands occupies a slot on its side: the
+  // positional (date/number) band always sits next to the rows and the
+  // cardinality band stacks outside it when both share a side.
+  const posTop = showXAxis && axisPosition === 'top';
+  const posBottom = showXAxis && axisPosition === 'bottom';
+  const valTop = showValueAxis && valueAxisPosition === 'top';
+  const valBottom = showValueAxis && valueAxisPosition === 'bottom';
+  const topBands = (posTop ? 1 : 0) + (valTop ? 1 : 0);
+  const bottomBands = (posBottom ? 1 : 0) + (valBottom ? 1 : 0);
+  const topPx = topBands * (BAND_H + BAND_GAP);
+  const rowsTopY = topPx + 18;
+  const bottomEnd = bottomBands > 0 ? rowsHeight + 18 + (bottomBands - 1) * (BAND_H + BAND_GAP) + BAND_H : rowsHeight;
+  const bandYFor = (slot: number, side: 'top' | 'bottom') =>
+    side === 'top' ? -(slot + 1) * (BAND_H + BAND_GAP) : rowsHeight + 18 + slot * (BAND_H + BAND_GAP);
+  const valSlotFor = (side: 'top' | 'bottom') => (showXAxis && axisPosition === side ? 1 : 0);
+
+  const tickLabels = (t: number) => (axisUnit === 'date' ? fmtDate(t, dateFormat) : fmtValue(t, valueFormat, currencySymbol));
   const ticks = (() => {
     const n = Math.min(Math.max(Math.round(axisTicks ?? 8), 2), 24);
     const out: {label: string; x: number}[] = [];
     for (let i = 0; i < n; i++) {
       const t = min + (i / (n - 1)) * span;
-      out.push({
-        label: axisUnit === 'date' ? fmtDate(t, dateFormat) : fmtValue(t, valueFormat, currencySymbol),
-        x: ((t - min) / span) * BAR_MAX_W,
-      });
+      out.push({label: tickLabels(t), x: posToX(t) * BAR_MAX_W});
     }
     return out;
   })();
 
+  // Cardinality band: live scale of the accumulated value (0 → current max),
+  // painted on the plane so it travels left→right like the positional band.
+  const valueTicks = (() => {
+    if (!showValueAxis) return [];
+    const n = Math.min(Math.max(Math.round(axisTicks ?? 8), 2), 24);
+    const out: {label: string; x: number}[] = [];
+    for (let i = 0; i < n; i++) {
+      const frac = i / (n - 1);
+      out.push({label: fmtValue(Math.round(currentMax * frac), valueFormat, currencySymbol), x: frac * BAR_MAX_W});
+    }
+    return out;
+  })();
+
+  // Per-row markers: each active entity leaves its marker in ITS OWN lane at
+  // its current step on the scrolling plane (translating left→right with it).
   const markerGlyph = ICON_GLYPHS[markerIcon ?? 'star'] ?? ICON_GLYPHS.star;
   const markerFor = (p: Participant) => {
     if (!showMarkers) return null;
     if (markerMode === 'image' && p.image) {
       return (
-        <div style={{position: 'absolute', left: p.curX * BAR_MAX_W - MARKER_SIZE / 2, top: '50%', transform: 'translateY(-50%)', width: MARKER_SIZE, height: MARKER_SIZE, borderRadius: Math.max(2, MARKER_SIZE * 0.18), overflow: 'hidden', border: '1px solid rgba(255,255,255,0.28)'}}>
+        <div style={{position: 'absolute', left: p.curX * BAR_MAX_W - MARKER_SIZE / 2, top: '50%', transform: `translateX(${scrollX}px) translateY(-50%)`, width: MARKER_SIZE, height: MARKER_SIZE, borderRadius: Math.max(2, MARKER_SIZE * 0.18), overflow: 'hidden', border: '1px solid rgba(255,255,255,0.28)'}}>
           <Img src={p.image} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
         </div>
       );
     }
     if (markerMode === 'icon') {
       return (
-        <div style={{position: 'absolute', left: p.curX * BAR_MAX_W - MARKER_SIZE / 2, top: '50%', transform: 'translateY(-50%)', width: MARKER_SIZE, height: MARKER_SIZE, display: 'flex', alignItems: 'center', justifyContent: 'center', color: barFillOf(p), filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))'}}>
+        <div style={{position: 'absolute', left: p.curX * BAR_MAX_W - MARKER_SIZE / 2, top: '50%', transform: `translateX(${scrollX}px) translateY(-50%)`, width: MARKER_SIZE, height: MARKER_SIZE, display: 'flex', alignItems: 'center', justifyContent: 'center', color: barFillOf(p), filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))'}}>
           <svg viewBox="0 0 24 24" width={MARKER_SIZE} height={MARKER_SIZE}><path d={markerGlyph} fill="currentColor" /></svg>
         </div>
       );
     }
     return (
-      <div style={{position: 'absolute', left: p.curX * BAR_MAX_W, top: '50%', transform: 'translate(-50%, -50%)', ...textStyle(markerText, {color: '#ffffff', size: AXIS_FONT + 2, weight: 700}), fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap'}}>
+      <div style={{position: 'absolute', left: p.curX * BAR_MAX_W, top: '50%', transform: `translateX(${scrollX}px) translate(-50%, -50%)`, ...textStyle(markerText, {color: '#ffffff', size: AXIS_FONT + 2, weight: 700}), fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap'}}>
         {fmtValue(Math.round(p.current), valueFormat, currencySymbol)}
       </div>
     );
@@ -590,6 +638,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
               {fmtValue(Math.round(p.current), valueFormat, currencySymbol)}
             </span>
           </div>
+          {markerFor(p)}
         </div>
       ),
       avatar: (
@@ -621,8 +670,6 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
         })
       : currentRank.full;
 
-  const rowsTopY = axisPosition === 'top' ? BAND_H + 18 : 0;
-
   return (
     <div style={{width: '100%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", padding: `${PAD_T}px ${PAD_R}px ${PAD_B}px ${PAD_L}px`, boxSizing: 'border-box', overflow: 'hidden'}}>
       {bgLayer}
@@ -643,11 +690,11 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
         fallbackTitle="Race Scrolling"
       />
 
-      {/* Static rows: the ENTITY AXIS is fixed. Only the axis band below
-          scrolls; the now-guide and the header stay fixed. */}
+      {/* Static rows: the ENTITY AXIS is fixed. Only the grid bands (positional
+          + optional cardinality) scroll; the now-guide and header stay fixed. */}
       <div style={{flex: 1, position: 'relative', marginTop: isPortrait ? H * 0.03 : 36, overflow: 'hidden'}}>
         {/* Now-guide line */}
-        <div style={{position: 'absolute', left: anchorXPx, top: axisPosition === 'top' ? rowsTopY - BAND_H - 26 : rowsTopY - 8, height: rowsHeight + 16 + (showXAxis ? BAND_H + 18 : 0), width: 2, borderRadius: 1, backgroundColor: accentColor, opacity: 0.45, zIndex: 1, boxShadow: `0 0 10px ${accentColor}66`}} />
+        <div style={{position: 'absolute', left: anchorXPx, top: topBands > 0 ? rowsTopY - topPx - 26 : rowsTopY - 8, height: (topBands > 0 ? topPx + 10 : 0) + rowsHeight + 16 + (bottomBands > 0 ? bottomEnd - rowsHeight : 0), width: 2, borderRadius: 1, backgroundColor: accentColor, opacity: 0.45, zIndex: 1, boxShadow: `0 0 10px ${accentColor}66`}} />
 
         {/* Rows container — static, aligned to the left of the plane */}
         <div style={{position: 'absolute', left: PAD_L, top: rowsTopY, width: innerW, height: Math.max(rowsHeight, 1), zIndex: 2}}>
@@ -659,16 +706,24 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
           <div style={{position: 'absolute', left: BAR_TRACK_X, top: rowsTop, height: rowsHeight, width: yAxisWidth ?? 2, borderRadius: 1, backgroundColor: yAxisColor ?? '#334155'}} />
         )}
 
-        {/* World container — the scrolling axis band with ticks + markers */}
-        <div style={{position: 'absolute', left: BAR_TRACK_X, top: rowsTopY, width: BAR_MAX_W, height: Math.max(rowsHeight, 1), transform: `translateX(${scrollX}px)`, zIndex: 1}}>
-          {showXAxis && BAND_H > 0 && (
-            <div style={{position: 'absolute', left: 0, top: axisPosition === 'top' ? -BAND_H - 18 : rowsHeight + 18, width: BAR_MAX_W, height: BAND_H, borderTop: axisPosition === 'bottom' ? '1px solid #1f2937' : 'none', borderBottom: axisPosition === 'top' ? '1px solid #1f2937' : 'none', fontSize: AXIS_FONT, color: '#64748b', fontVariantNumeric: 'tabular-nums'}}>
+        {/* World container — the scrolling plane holding the grid bands */}
+        <div style={{position: 'absolute', left: BAR_TRACK_X, top: rowsTopY, width: BAR_MAX_W, height: Math.max(rowsHeight, bottomEnd), transform: `translateX(${scrollX}px)`, zIndex: 1}}>
+          {showXAxis && (
+            <div style={{position: 'absolute', left: 0, top: bandYFor(0, axisPosition), width: BAR_MAX_W, height: BAND_H, borderTop: axisPosition === 'bottom' ? '1px solid #1f2937' : 'none', borderBottom: axisPosition === 'top' ? '1px solid #1f2937' : 'none', fontSize: AXIS_FONT, color: '#64748b', fontVariantNumeric: 'tabular-nums'}}>
               {ticks.map((tick, i) => (
                 <div key={i} style={{position: 'absolute', top: 6, transform: 'translateX(-50%)', whiteSpace: 'nowrap'}}>
                   <span>{tick.label}</span>
                 </div>
               ))}
-              {renderPool.map((p) => (p.active ? markerFor(p) : null))}
+            </div>
+          )}
+          {showValueAxis && (
+            <div style={{position: 'absolute', left: 0, top: bandYFor(valSlotFor(valueAxisPosition), valueAxisPosition), width: BAR_MAX_W, height: BAND_H, borderTop: valueAxisPosition === 'bottom' ? '1px solid #1f2937' : 'none', borderBottom: valueAxisPosition === 'top' ? '1px solid #1f2937' : 'none', fontSize: AXIS_FONT, color: '#64748b', fontVariantNumeric: 'tabular-nums'}}>
+              {valueTicks.map((tick, i) => (
+                <div key={i} style={{position: 'absolute', top: 6, transform: 'translateX(-50%)', whiteSpace: 'nowrap'}}>
+                  <span>{tick.label}</span>
+                </div>
+              ))}
             </div>
           )}
         </div>

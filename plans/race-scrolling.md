@@ -12,9 +12,11 @@ left, always visible. Its bar grows IN PLACE from that axis, with length
 proportional to the accumulated value up to the current moment (interpolated
 between data points), so the bar "eats" each date's value as the now-line
 passes it. Per the approved plan, the axis supports **dates or numbers with
-auto-detection**, and each active entity drops a **marker on the scrolling axis
-band** at its current step showing the accumulated value as a **number, an
-icon, or a reference image**.
+auto-detection**, the sweep can run **Menor→Mayor or Mayor→Menor**, the grid
+can show **two configurable bands** (a positional one and a **cardinality**
+one with the live value scale, each top or bottom), and each active entity
+drops a **marker in its own row** at its current step showing the accumulated
+value as a **number, an icon, or a reference image**.
 
 Verified with the repo gate: `npx tsc --noEmit` (lint is broken repo-wide).
 
@@ -91,3 +93,28 @@ Verified with the repo gate: `npx tsc --noEmit` (lint is broken repo-wide).
 ## Verification
 - `npm run build:templates` regenerates registry/Root/schema (3 templates).
 - `npx tsc --noEmit` passes clean.
+
+## Feedback round (2026-09-09) — cardinalidad, doble banda, marcadores por fila
+User feedback items addressed in this round:
+
+1. **Campo de cardinalidad + dirección** — the Datos tab now has a single
+   "Eje de la carrera (cardinalidad)" field (`role="any"`, numbers OR dates,
+   auto-detected; legacy `dateField` still honored as fallback) plus a
+   "Presentación del eje" control (`axisDirection: 'asc' | 'desc'`). `desc`
+   only reverses the value→position mapping (`posToX`/`valueAtX`); the sweep,
+   camera and ranking are unchanged. Added the plain-numeric guard so a year/
+   round column is never coerced into a bogus 1970 date axis.
+2. **Al menos un eje de cardinalidad** — the grid can show a SECOND band
+   (`showValueAxis`, `valueAxisPosition`) with the live value scale
+   (0 → current max, `fmtValue(currentMax * frac)`), painted on the traveling
+   plane like the positional band; each band stacks on its own side (positional
+   next to the rows, cardinality outside it when sharing a side).
+3. **Marcadores distribuidos por fila** — markers are no longer stacked on the
+   band; each active entity renders its number/icon/image marker INSIDE ITS OWN
+   row's bar segment at `curX * BAR_MAX_W` with `translateX(scrollX)`, so it
+   travels left→right with the plane while staying on its entity's lane.
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`,
+`src/lib/viz-to-remotion.ts`, `src/lib/animation-config.ts`,
+`src/components/builder/animation-config-panel.tsx`, this plan. Gate
+`npx tsc --noEmit` clean.
