@@ -1425,7 +1425,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
                     type="button"
                     onClick={() => update({avatarBg: 'transparent'})}
                     className={`text-xs px-2 py-1 rounded border ${
-                      config.avatarBg === 'transparent'
+                      (!config.avatarBg || config.avatarBg === 'transparent')
                         ? 'border-amber-500 text-amber-400'
                         : 'border-border-default text-muted hover:text-primary'
                     }`}

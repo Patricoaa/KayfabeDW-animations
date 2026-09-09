@@ -339,50 +339,6 @@ function AvatarSection({value, onChange, participants = []}: {
         </div>
         <p className="text-[10px] text-muted mt-0.5">Color y grosor en px (0 = sin borde).</p>
       </div>
-      {/* Fondo del avatar */}
-      <div>
-        <label className="text-sm font-medium mb-1 block">Fondo del avatar</label>
-        <div className="flex gap-2 items-center">
-          <input
-            type="color"
-            value={value.avatarBg && value.avatarBg !== 'transparent' ? value.avatarBg : '#1f2937'}
-            onChange={(e) => onChange({avatarBg: e.target.value})}
-            className="h-8 w-8 rounded border border-border-default cursor-pointer"
-          />
-          <button
-            type="button"
-            onClick={() => onChange({avatarBg: 'transparent'})}
-            className={`text-xs px-2 py-1 rounded border ${
-              value.avatarBg === 'transparent'
-                ? 'border-amber-500 text-amber-400'
-                : 'border-border-default text-muted hover:text-primary'
-            }`}
-          >
-            Transparente
-          </button>
-        </div>
-      </div>
-      {/* Borde del avatar */}
-      <div>
-        <label className="text-sm font-medium mb-1 block">Borde del avatar</label>
-        <div className="flex gap-2 items-center">
-          <input
-            type="color"
-            value={value.avatarBorderColor ?? '#ffffff'}
-            onChange={(e) => onChange({avatarBorderColor: e.target.value})}
-            className="h-8 w-8 rounded border border-border-default cursor-pointer"
-          />
-          <input
-            type="number"
-            min={0} max={16} step={1}
-            value={value.avatarBorderWidth ?? ''}
-            placeholder="Grosor (px)"
-            onChange={(e) => onChange({avatarBorderWidth: e.target.value ? Number(e.target.value) : undefined})}
-            className="w-24 bg-elevated border border-border-default rounded-lg px-2 py-1 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-          />
-        </div>
-        <p className="text-[10px] text-muted mt-0.5">Color y grosor en px (0 = sin borde).</p>
-      </div>
       {participants.length > 0 && (
         <div className="pt-2 border-t border-border-subtle">
           <div className="flex items-center justify-between mb-0.5">

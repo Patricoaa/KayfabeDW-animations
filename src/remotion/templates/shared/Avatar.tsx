@@ -28,7 +28,7 @@ export const Avatar: React.FC<{
         borderRadius,
         overflow: 'hidden',
         flexShrink: 0,
-        backgroundColor: bg !== 'transparent' && bg ? bg : '#1f2937',
+        backgroundColor: bg === 'transparent' ? 'transparent' : (bg || '#1f2937'),
         position: 'relative',
         border: bw > 0 && borderColor ? `${bw}px solid ${borderColor}` : undefined,
         boxSizing: 'border-box' as const,
