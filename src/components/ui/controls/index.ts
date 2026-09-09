@@ -11,3 +11,4 @@ export { AutoColorInput } from './auto-color-input';
 export { EntitySearch } from './entity-search';
 export { FieldSelect } from './field-select';
 export { PalettePicker } from './palette-picker';
+export { OverlayEditor } from './overlay-editor';

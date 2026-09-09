@@ -1,7 +1,7 @@
 'use client';
 
 import React, {useState} from 'react';
-import { SelectControl, NumberControl, ColorPickerControl, SwitchControl, Collapsible, Tabs, TextStyleControls, SliderNumberInput, FileUploadInput, FieldSelect, EntitySearch, AutoColorInput, PalettePicker } from '@/components/ui/controls';
+import { SelectControl, NumberControl, ColorPickerControl, SwitchControl, Collapsible, Tabs, TextStyleControls, SliderNumberInput, FileUploadInput, FieldSelect, EntitySearch, PalettePicker, OverlayEditor } from '@/components/ui/controls';
 import type {ColumnMeta} from '@/components/builder/chart-config-panel';
 import type {TimelineRaceConfig, RankingConfig, DateFormat, AvatarShape, AvatarCrop, RaceTextStyle, ValueFormat, RowEntryElement, CommonHeaderConfig, CommonCanvasConfig} from '@/lib/animation-config';
 import {avatarCropRect, VALUE_FORMATS} from '@/lib/animation-config';
@@ -769,139 +769,18 @@ function OverlaysSection<T extends {overlays?: import('@/lib/chart-config').Char
         </p>
       )}
       {overlays.map((ov, i) => (
-        <div key={ov.id} className="rounded-lg border border-border-subtle p-2.5 space-y-2.5">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-semibold text-secondary uppercase tracking-widest font-display">
-              {ov.type === 'shape' ? `Forma (${ov.shape ?? 'rect'})` : ov.type === 'image' ? 'Imagen' : 'Texto'} {i + 1}
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                const next = [...overlays];
-                next.splice(i, 1);
-                update({overlays: next} as unknown as Partial<T>);
-              }}
-              className="text-muted hover:text-red-500 text-xs"
-              aria-label="Eliminar adicional"
-            >
-              ✕
-            </button>
-          </div>
-
-          {/* Controles comunes: Capa / Orden (Frente / Detrás), Opacidad y Blur */}
-          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border-subtle">
-            <div>
-              <label className="text-xs font-medium mb-1 block">Capa / Posición</label>
-              <div className="flex gap-1">
-                {[
-                  {value: 'front', label: 'Al frente'},
-                  {value: 'back', label: 'Detrás (Fondo)'},
-                ].map((z) => (
-                  <button
-                    key={z.value}
-                    type="button"
-                    onClick={() => setOverlay(i, {zIndex: z.value as 'front' | 'back'})}
-                    className={`flex-1 px-1.5 py-1 rounded text-[10px] font-medium transition-colors ${
-                      (ov.zIndex ?? 'front') === z.value ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover'
-                    }`}
-                  >
-                    {z.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-1">
-              <NumberControl label="Opacidad" value={ov.opacity ?? ov.layout?.opacity ?? 1} min={0} max={1} step={0.05} onChange={(v) => setOverlay(i, {opacity: v, layout: {...(ov.layout ?? {}), opacity: v}})} />
-              <NumberControl label="Blur (px)" value={ov.blur ?? 0} min={0} max={40} step={1} onChange={(v) => setOverlay(i, {blur: v})} />
-            </div>
-          </div>
-
-          {ov.type === 'text' ? (
-            <>
-              <textarea
-                value={ov.text ?? ''}
-                onChange={(e) => setOverlay(i, {text: e.target.value})}
-                rows={2}
-                placeholder="Texto"
-                className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <TextStyleControls
-                  label="Texto"
-                  value={ov.font as unknown as import('@/lib/animation-config').RaceTextStyle}
-                  onChange={(patch) => {
-                    const fontPatch: Partial<import('@/lib/chart-config').SectionFont> = {
-                      ...patch,
-                      weight: patch.weight as import('@/lib/chart-config').FontWeight | undefined,
-                    };
-                    setOverlay(i, {font: {...(ov.font ?? {}), ...fontPatch}});
-                  }}
-                 showTextTransform showSpacing showHighlight showUnderline maxSize={160}/>
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Posición (px)</p>
-                  <NumberControl label="X (px)" value={ov.layout?.x} onChange={(x) => setOverlay(i, {layout: {...(ov.layout ?? {}), x}})} />
-                  <NumberControl label="Y (px)" value={ov.layout?.y} onChange={(y) => setOverlay(i, {layout: {...(ov.layout ?? {}), y}})} />
-                  <NumberControl label="Rotación (°)" value={ov.layout?.rotation} onChange={(r) => setOverlay(i, {layout: {...(ov.layout ?? {}), rotation: r}})} />
-                </div>
-              </div>
-            </>
-          ) : ov.type === 'shape' ? (
-            <>
-              <div>
-                <label className="text-xs font-medium mb-1 block">Tipo de Forma</label>
-                <div className="flex gap-1">
-                  {[
-                    {value: 'rect', label: 'Rectángulo'},
-                    {value: 'circle', label: 'Círculo / Óvalo'},
-                    {value: 'line', label: 'Línea'},
-                  ].map((s) => (
-                    <button
-                      key={s.value}
-                      type="button"
-                      onClick={() => setOverlay(i, {shape: s.value as import('@/lib/chart-config').OverlayShapeType})}
-                      className={`flex-1 px-1.5 py-1 rounded text-xs font-medium transition-colors ${
-                        (ov.shape ?? 'rect') === s.value ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover'
-                      }`}
-                    >
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <AutoColorInput label="Relleno / Color" value={ov.fill ?? '#f59e0b'} onChange={(v) => setOverlay(i, {fill: v || undefined})} />
-                <AutoColorInput label="Color de borde" value={ov.stroke ?? ''} onChange={(v) => setOverlay(i, {stroke: v || 'none'})} />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <NumberControl label="X (px)" value={ov.x} onChange={(x) => setOverlay(i, {x})} />
-                <NumberControl label="Y (px)" value={ov.y} onChange={(y) => setOverlay(i, {y})} />
-                <NumberControl label="Ancho (px)" value={ov.width} min={0} max={2000} onChange={(w) => setOverlay(i, {width: w})} />
-                <NumberControl label="Alto (px)" value={ov.height} min={0} max={2000} onChange={(h) => setOverlay(i, {height: h})} />
-                {ov.shape === 'rect' && (
-                  <NumberControl label="Radio esquinas" value={ov.radius} min={0} max={100} onChange={(r) => setOverlay(i, {radius: r})} />
-                )}
-                <NumberControl label="Grosor borde" value={ov.strokeWidth} min={0} max={20} onChange={(w) => setOverlay(i, {strokeWidth: w})} />
-                <NumberControl label="Rotación (°)" value={ov.rotation} onChange={(r) => setOverlay(i, {rotation: r})} />
-              </div>
-            </>
-          ) : (
-            <div className="space-y-2">
-              <FileUploadInput
-                label="Imagen de la capa"
-                value={ov.src}
-                onLoad={(dataUrl) => setOverlay(i, {src: dataUrl})}
-                onClear={() => setOverlay(i, {src: undefined})}
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <NumberControl label="X (px)" value={ov.x} onChange={(x) => setOverlay(i, {x})} />
-                <NumberControl label="Y (px)" value={ov.y} onChange={(y) => setOverlay(i, {y})} />
-                <NumberControl label="Ancho (px)" value={ov.width} onChange={(w) => setOverlay(i, {width: w})} />
-                <NumberControl label="Alto (px)" value={ov.height} onChange={(h) => setOverlay(i, {height: h})} />
-                <NumberControl label="Rotación (°)" value={ov.rotation} onChange={(r) => setOverlay(i, {rotation: r})} />
-              </div>
-            </div>
-          )}
-        </div>
+        <OverlayEditor
+          key={ov.id}
+          overlay={ov}
+          index={i}
+          variant="animation"
+          onPatch={(patch) => setOverlay(i, patch)}
+          onRemove={() => {
+            const next = [...overlays];
+            next.splice(i, 1);
+            update({overlays: next} as unknown as Partial<T>);
+          }}
+        />
       ))}
     </Collapsible>
   );
