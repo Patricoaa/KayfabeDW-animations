@@ -200,13 +200,14 @@ const anchorOf = (a?: TextAlign): 'start' | 'middle' | 'end' =>
   a === 'left' ? 'start' : a === 'right' ? 'end' : 'middle';
 
 // Bottom x-axis title honoring the xLabel font's alignment (left/center/right).
-export function XAxisTitle({text, width, height, color, size, family, weight, align}: {
-  text: string; width: number; height: number; color: string; size: number; family?: string; weight?: number; align?: TextAlign;
+export function XAxisTitle({text, width, height, color, size, family, weight, align, angle}: {
+  text: string; width: number; height: number; color: string; size: number; family?: string; weight?: number; align?: TextAlign; angle?: number;
 }) {
   const a = anchorOf(align);
   const x = a === 'start' ? 12 : a === 'end' ? width - 12 : width / 2;
+  const y = height - 6;
   return (
-    <text x={x} y={height - 6} textAnchor={a} fill={color} fontSize={size} fontFamily={family} fontWeight={weight}>{text}</text>
+    <text x={x} y={y} textAnchor={a} fill={color} fontSize={size} fontFamily={family} fontWeight={weight} transform={angle ? `rotate(${angle}, ${x}, ${y})` : undefined}>{text}</text>
   );
 }
 
@@ -377,12 +378,15 @@ function TitleBlock({
   const top = (layout?.y ?? 0) + 4;
   const bgPad = layout?.bgPadding ?? 4;
   const lineTops = lines.map((_, i) => top + i * lineH + size / 2);
+  const pivotY = (layout?.y ?? 0);
+  const rot = (d: number | undefined) => (d ? `rotate(${d}, ${refX}, ${pivotY})` : '');
+  const rotTransform = `${rot(layout?.rotation)} ${rot(font?.angle)}`.trim() || undefined;
 
   return (
     <g
       fontFamily={family}
       fontWeight={weight}
-      transform={layout?.rotation ? `rotate(${layout.rotation}, ${refX}, ${layout.y ?? 0})` : undefined}
+      transform={rotTransform}
       opacity={opacity}
     >
       {layout?.bgColor && (
@@ -463,12 +467,12 @@ export function SvgHeader({config, st, width}: {config: ChartConfig; st: Resolve
   return (
     <g fontFamily={family} fontWeight={config.headerFont?.weight ?? 700}>
       {title && titleLines.map((ln, i) => (
-        <text key={`t-${i}`} x={titleX} y={y + i * (titleSize + 2)} fill={titleColor} fontSize={titleSize} textAnchor={titleAnchor}>
+        <text key={`t-${i}`} x={titleX} y={y + i * (titleSize + 2)} fill={titleColor} fontSize={titleSize} textAnchor={titleAnchor} transform={config.headerFont?.angle ? `rotate(${config.headerFont.angle}, ${titleX}, ${y + i * (titleSize + 2)})` : undefined}>
           {ln}
         </text>
       ))}
       {sub && subLines.map((ln, i) => (
-        <text key={`s-${i}`} x={subX} y={4 + titleH + (titleLines.length > 0 ? 2 : 0) + subSize + i * (subSize + 2)} fill={subColor} fontSize={subSize} fontFamily={subFamily} fontWeight={config.subtitleFont?.weight ?? 400} textAnchor={subAnchor}>
+        <text key={`s-${i}`} x={subX} y={4 + titleH + (titleLines.length > 0 ? 2 : 0) + subSize + i * (subSize + 2)} fill={subColor} fontSize={subSize} fontFamily={subFamily} fontWeight={config.subtitleFont?.weight ?? 400} textAnchor={subAnchor} transform={config.subtitleFont?.angle ? `rotate(${config.subtitleFont.angle}, ${subX}, ${4 + titleH + (titleLines.length > 0 ? 2 : 0) + subSize + i * (subSize + 2)})` : undefined}>
           {ln}
         </text>
       ))}

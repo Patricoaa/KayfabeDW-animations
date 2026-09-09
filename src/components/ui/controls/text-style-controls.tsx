@@ -86,6 +86,20 @@ export function TextStyleControls({
           </div>
         )}
       </div>
+      <div className="flex items-end gap-1">
+        <NumberControl label="Ángulo (°)" value={v.angle} min={-180} max={180} step={5} onChange={(n) => onChange({angle: n || undefined})} className="flex-1" />
+        {v.angle !== undefined && (
+          <button
+            type="button"
+            onClick={() => onChange({angle: undefined})}
+            title="Restablecer (sin rotación)"
+            aria-label="Restablecer ángulo (sin rotación)"
+            className="h-8 px-2 rounded-lg text-[11px] font-medium bg-elevated border border-border-default text-secondary hover:bg-card-hover"
+          >
+            Auto
+          </button>
+        )}
+      </div>
       {showOverflow && (
         <div>
           <label className="text-xs font-semibold text-muted uppercase tracking-widest font-display">Desbordamiento</label>

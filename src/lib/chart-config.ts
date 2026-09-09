@@ -70,6 +70,7 @@ export type TextStyle = {
   highlightColor?: string;
   highlightRadius?: number;
   underline?: boolean;
+  angle?: number;
 };
 
 // Per-section text style. Every field is optional: empty sections "inherit"

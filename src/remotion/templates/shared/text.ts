@@ -21,5 +21,9 @@ export function textStyle(over: RaceTextStyle | undefined, defaults: {color: str
     s.display = 'inline-block';
     s.padding = '0.14em 0.22em';
   }
+  if (over?.angle) {
+    s.transform = `rotate(${over.angle}deg)`;
+    s.transformOrigin = 'center';
+  }
   return s;
 }

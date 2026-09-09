@@ -508,7 +508,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
               );
             })}
             {config.xLabel && (
-              <XAxisTitle text={config.xLabel} width={width} height={height} color={xAxisColor} size={11} family={xAxisFamily} weight={config.xLabelFont?.weight ?? 400} align={config.xLabelFont?.align} />
+              <XAxisTitle text={config.xLabel} width={width} height={height} color={xAxisColor} size={11} family={xAxisFamily} weight={config.xLabelFont?.weight ?? 400} align={config.xLabelFont?.align} angle={config.xLabelFont?.angle} />
             )}
           </Zone>
           <Zone id="left-axis">
@@ -1174,7 +1174,7 @@ const fill = barFill(s.color, config, val < 0);
         </Zone>
         <Zone id="footer">
             {config.xLabel && (
-              <XAxisTitle text={config.xLabel} width={width} height={height} color={xAxisColor} size={11} family={xAxisFamily} weight={config.xLabelFont?.weight ?? 400} align={config.xLabelFont?.align} />
+              <XAxisTitle text={config.xLabel} width={width} height={height} color={xAxisColor} size={11} family={xAxisFamily} weight={config.xLabelFont?.weight ?? 400} align={config.xLabelFont?.align} angle={config.xLabelFont?.angle} />
             )}
         </Zone>
         <Zone id="labels">
@@ -1385,7 +1385,7 @@ function SingleBar({data, config}: Props) {
                 </g>
               );
             })}
-            {config.xLabel && <XAxisTitle text={config.xLabel} width={width} height={height} color={xAxisColor} size={11} family={xAxisFamily} weight={config.xLabelFont?.weight ?? 400} align={config.xLabelFont?.align} />}
+            {config.xLabel && <XAxisTitle text={config.xLabel} width={width} height={height} color={xAxisColor} size={11} family={xAxisFamily} weight={config.xLabelFont?.weight ?? 400} align={config.xLabelFont?.align} angle={config.xLabelFont?.angle} />}
           </Zone>
           <Zone id="left-axis">
             {config.yLabel && <YAxisTitle text={config.yLabel} height={height} color={yAxisColor} size={11} family={yAxisFamily} weight={config.yLabelFont?.weight ?? 400} align={config.yLabelFont?.align} x={14} />}
@@ -1571,7 +1571,7 @@ function SingleBar({data, config}: Props) {
         })}
         </Zone>
         <Zone id="footer">
-          {config.xLabel && <XAxisTitle text={config.xLabel} width={width} height={height} color={xAxisColor} size={11} family={xAxisFamily} weight={config.xLabelFont?.weight ?? 400} align={config.xLabelFont?.align} />}
+          {config.xLabel && <XAxisTitle text={config.xLabel} width={width} height={height} color={xAxisColor} size={11} family={xAxisFamily} weight={config.xLabelFont?.weight ?? 400} align={config.xLabelFont?.align} angle={config.xLabelFont?.angle} />}
         </Zone>
         <ChartOverlays config={config} st={st} width={width} zIndexFilter="front" />
       </svg>
