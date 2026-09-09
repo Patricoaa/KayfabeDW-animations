@@ -44,6 +44,11 @@ export default function CanvasZoom({
   const [w, setW] = useState(contentWidth ?? 0);
   const [h, setH] = useState(contentHeight ?? 0);
 
+  useEffect(() => {
+    if (contentWidth) setW(contentWidth);
+    if (contentHeight) setH(contentHeight);
+  }, [contentWidth, contentHeight]);
+
   useLayoutEffect(() => {
     if (w && h) return;
     const stage = stageRef.current?.firstElementChild;
