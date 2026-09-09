@@ -40,6 +40,7 @@ import type {AnimationTemplateConfig} from '@/lib/animation-config';
 import {emptyAnimationConfig} from '@/lib/animation-config';
 import {loadSafeZones, saveSafeZones, safeZonesFromConfig, type SafeZoneSettings} from '@/lib/safe-zones';
 import {useToast} from '@/components/ui/toast';
+import {useResizableWidth} from '@/hooks/use-resizable-width';
 import {DEFAULT_EXPORT_PRESET, EXPORT_PRESETS, getExportPreset} from '@/lib/export-presets';
 import type {ExportPresetId} from '@/lib/export-presets';
 
@@ -91,6 +92,8 @@ function BuilderContent() {
   const [saved, setSaved] = useState(false);
   const [view, setView] = useState<View>('data');
   const [resultStep, setResultStep] = useState<2 | 3>(2);
+  const {width: configWidth, onHandlePointerDown: onConfigHandlePointerDown} = useResizableWidth(352, {min: 320, max: 640, edge: 'left'});
+  const {width: exportWidth, onHandlePointerDown: onExportHandlePointerDown} = useResizableWidth(352, {min: 320, max: 640, edge: 'left'});
   const [outputMode, setOutputMode] = useState<OutputMode>(
     templateParam ? 'animated' : 'static',
   );
@@ -789,9 +792,17 @@ function BuilderContent() {
         </main>
 
         {/* Right config panel — step 2 (Configurar): full config sidebar */}
-        {view === 'result' && resultStep === 2 && (
-        <aside className="fixed inset-x-0 bottom-12 z-10 mx-2 mb-2 h-[58vh] rounded-xl border border-border-default flex flex-col overflow-hidden bg-card md:static md:inset-auto md:mx-0 md:mb-0 md:h-auto md:w-[22rem] md:shrink-0 md:rounded-none md:border-x-0 md:border-b-0 md:border-t lg:md:w-96">
-                    <div className="flex items-center justify-between px-4 h-12 border-b border-border-default shrink-0">
+{view === 'result' && resultStep === 2 && (
+        <>
+        <div
+          onPointerDown={onConfigHandlePointerDown}
+          className="hidden md:block w-2 shrink-0 cursor-col-resize self-stretch mr-0.5 hover:bg-amber-500/30 transition-colors"
+          role="separator"
+          aria-label="Redimensionar panel de configuración"
+          aria-orientation="vertical"
+        />
+        <aside className="fixed inset-x-0 bottom-12 z-10 mx-2 mb-2 h-[58vh] rounded-xl border border-border-default flex flex-col overflow-hidden bg-card md:static md:inset-auto md:mx-0 md:mb-0 md:h-auto md:w-[var(--config-w)] md:shrink-0 md:rounded-none md:border-x-0 md:border-b-0 md:border-t" style={{'--config-w': `${configWidth}px`} as React.CSSProperties}>
+          <div className="flex items-center justify-between px-4 h-12 border-b border-border-default shrink-0">
             <div className="flex items-center gap-2">
               <SlidersHorizontal size={14} className="text-amber-500" />
               <span className="text-micro font-semibold text-secondary uppercase tracking-widest font-display">
@@ -873,11 +884,20 @@ function BuilderContent() {
 
           </div>
         </aside>
+        </>
         )}
 
         {/* Right export panel — step 3 (Exportar) */}
         {view === 'result' && resultStep === 3 && (
-        <aside className="fixed inset-x-0 bottom-12 z-10 mx-2 mb-2 h-[58vh] rounded-xl border border-border-default flex flex-col overflow-hidden bg-card md:static md:inset-auto md:mx-0 md:mb-0 md:h-auto md:w-[22rem] md:shrink-0 md:rounded-none md:border-x-0 md:border-b-0 md:border-t lg:md:w-96">
+        <>
+        <div
+          onPointerDown={onExportHandlePointerDown}
+          className="hidden md:block w-2 shrink-0 cursor-col-resize self-stretch mr-0.5 hover:bg-amber-500/30 transition-colors"
+          role="separator"
+          aria-label="Redimensionar panel de exportar"
+          aria-orientation="vertical"
+        />
+        <aside className="fixed inset-x-0 bottom-12 z-10 mx-2 mb-2 h-[58vh] rounded-xl border border-border-default flex flex-col overflow-hidden bg-card md:static md:inset-auto md:mx-0 md:mb-0 md:h-auto md:w-[var(--config-w)] md:shrink-0 md:rounded-none md:border-x-0 md:border-b-0 md:border-t" style={{'--config-w': `${exportWidth}px`} as React.CSSProperties}>
           <div className="flex items-center justify-between px-4 h-10 border-b border-border-default shrink-0">
             <div className="flex items-center gap-2">
               <Download size={14} className="text-amber-500" />
@@ -911,6 +931,7 @@ function BuilderContent() {
             onCanvasSizeChange={(w, h) => setChartConfig((c) => ({...c, width: w, height: h}))}
           />
         </aside>
+        </>
         )}
       </div>
 

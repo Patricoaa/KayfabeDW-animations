@@ -21,6 +21,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import {RotateCcw, RotateCw, Eraser, Database, MousePointerClick, Plus, Waypoints} from 'lucide-react';
 import {useUndoRedo} from '@/hooks/use-undo-redo';
+import {useResizableWidth} from '@/hooks/use-resizable-width';
 
 import {TableNode} from './table-node';
 import type {TableNodeData} from './table-node';
@@ -61,6 +62,7 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
 
   // Undo/redo
   const {current, push, undo, redo, canUndo, canRedo} = useUndoRedo({nodes: [], edges: []});
+  const {width: tablesWidth, onHandlePointerDown: onTablesHandlePointerDown} = useResizableWidth(224, {min: 200, max: 480, edge: 'right'});
   const skipPushRef = useRef(false);
 
   // Push to history on node/edge changes (debounced)
@@ -745,7 +747,14 @@ export function QueryCanvas({spec, onChange, meta}: QueryCanvasProps) {
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
       {/* Left sidebar — table list */}
-      <div className="w-56 shrink-0 min-h-0 border-r border-border-default p-2 flex flex-col">
+      <div className="relative w-56 md:w-[var(--tables-w)] shrink-0 min-h-0 border-r border-border-default p-2 flex flex-col" style={{'--tables-w': `${tablesWidth}px`} as React.CSSProperties}>
+        <div
+          onPointerDown={onTablesHandlePointerDown}
+          className="absolute inset-y-0 -right-1.5 w-3 cursor-col-resize hidden md:block z-10"
+          role="separator"
+          aria-label="Redimensionar panel de tablas"
+          aria-orientation="vertical"
+        />
         <div className="flex items-center justify-between mb-2 shrink-0">
           <label className="text-micro font-semibold text-muted uppercase tracking-widest font-display">
             Tablas
