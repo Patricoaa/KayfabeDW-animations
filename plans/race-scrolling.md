@@ -243,3 +243,42 @@ cada grid de fecha (hoy están solapadas, todas juntas)."
 Changed: `src/remotion/templates/race-scrolling/index.tsx`,
 `src/components/builder/animation-config-panel.tsx`, `src/lib/viz-to-remotion.ts`,
 `src/lib/animation-config.ts`, this plan. Gate `npx tsc --noEmit` clean.
+
+## Feedback round (2026-09-09) — sin controles obsoletos, plot alineado a filas
+User feedback: "remueve los siguientes controles: Posición del grupo de filas
+(barsX/barsY), Ancla de la cámara (anchorX), Orden de la fila (rowOrder);
+showValueAxis/valueAxisPosition/axisPosition/rowOrder remover del esquema, no
+consideres compatibilidad. El eje Y permanente para posicionarse correctamente
+debe considerar el tamaño de los avatares (radio + padding) y la 'Separación
+vertical entre filas (px)' para el inicio y fin del plot en vertical. El GRID DE
+FECHAS también debe considerar ese control para posicionar inicio/final del eje
++ un padding."
+
+1. **Controles/fields eliminados** — se quitan del `RaceScrollingPanel`:
+   "Posición del grupo de filas" (`barsX`/`barsY`), "Ancla de la cámara"
+   (`anchorX`) y "Orden de la fila". Del esquema se borran
+   `showValueAxis`/`valueAxisPosition`/`anchorX` y, vía
+   `Omit<TimelineRaceConfig, 'axisPosition'|'rowOrder'|'barsX'|'barsY'>`,
+   `axisPosition`/`rowOrder`/`barsX`/`barsY` dejan de existir para
+   race-scrolling (timeline-race/ranking siguen usándolos en el tipo compartido).
+   El renderer fija el ancla de cámara en 35% y ya no recibe `anchorX`/`barsX`/`barsY`.
+2. **Alineación horizontal con las filas** — `BAR_TRACK_X` pasa de
+   `PAD_L + NAME_W + ROW_GAP_PX` a
+   `PAD_L + NAME_W + ROW_GAP_PX + AVATAR_W + ROW_GAP_PX`: el layout de cada fila es
+   `[nombre][avatar][barra]`, así el origen real de la barra queda tras nombre +
+   gap + avatar (su tamaño + padding ≈ radio + aire) + gap. Todo el plot
+   (gridlines, etiquetas, eje Y, now-guide, `anchorXPx`) hereda ese origen.
+3. **Inicio/fin del plot en vertical** — la extensión vertical deriva del bloque
+   de filas (cuya altura incluye cada hueco de la "Separación vertical entre
+   filas") más un padding proporcional al mismo control:
+   `PLOT_PAD_Y = max(8, ROW_GAP/2)`, `DATE_BAND_H = DATE_LABEL_H + 10`,
+   `rowsTopY = DATE_BAND_H + PLOT_PAD_Y`, `plotTop = rowsTopY - PLOT_PAD_Y`,
+   `bottomEnd = rowsHeight + PLOT_PAD_Y * 2`. Eje Y, gridlines de fecha,
+   now-guide y la franja de etiquetas comparten esa geometría (antes el eje Y
+   usaba `rowsTop` centrado y las filas render con `rowsTop + laneY`, dos bases
+   distintas → desalineación vertical). La banda de fechas se reserva en
+   `rowBudget` para que filas + etiquetas quepan.
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`,
+`src/components/builder/animation-config-panel.tsx`, `src/lib/viz-to-remotion.ts`,
+`src/lib/animation-config.ts`, this plan. Gate `npx tsc --noEmit` clean.

@@ -54,16 +54,11 @@ export type RaceScrollingProps = {
   raceDurationSeconds?: number;
   podiumEffect?: boolean;
   showRail?: boolean;
-  barsX?: number;
-  barsY?: number;
   showDateLabel?: boolean;
   showXAxis?: boolean;
   // Axis sweep direction: 'asc' (Menor→Mayor) or 'desc' (Mayor→Menor). Only
   // the value→position mapping reverses; camera and ranking are unchanged.
   axisDirection?: 'asc' | 'desc';
-  // Camera anchor: % of the track width where the "now" line stays fixed
-  // (5-95, default 35). The plane scrolls so this point always matches `now`.
-  anchorX?: number;
   // Ticks on the PERMANENT value (Y) axis (2-24, default 8): a cardinality
   // scale 0 → current max drawn statically on the right edge of the plot. The
   // positional band draws one tick/gridline per real data date, thinned by
@@ -155,12 +150,9 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   raceDurationSeconds,
   podiumEffect = true,
   showRail = true,
-  barsX,
-  barsY,
   showDateLabel = true,
   showXAxis = true,
   axisDirection = 'asc',
-  anchorX = 35,
   axisTicks = 8,
   gridSpacing,
   showLabels = true,
@@ -345,7 +337,12 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // Explicit `avatarSize` wins (mirrors the timeline-race); otherwise the avatar
   // takes the leftover width after the name column and the bar track.
   const AVATAR_W = avatarSize ?? Math.max(innerW - NAME_W - BAR_MAX_W - ROW_GAP_PX * 2, 0);
-  const BAR_TRACK_X = PAD_L + NAME_W + ROW_GAP_PX;
+  // The plot (gridlines, date labels, now-guide and value Y axis) is aligned to
+  // the ACTUAL bar track: rows lay out as [name][avatar][bar], so the bar
+  // origin sits after the name column, the horizontal gap, the avatar column
+  // (its size + a padding covers the avatar radius + breathing room) and the
+  // gap again. Everything left-to-right derives from this.
+  const BAR_TRACK_X = PAD_L + NAME_W + ROW_GAP_PX + AVATAR_W + ROW_GAP_PX;
   const EASE = 26;
   const OUTRO = Math.min(45, Math.max(0, Math.floor(durationInFrames * 0.12)));
   const sweepBudget = Math.max(0, durationInFrames - EASE * 2 - OUTRO);
@@ -469,17 +466,25 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // Dynamic value max over the active entities (recalibrates as the race advances).
   const currentMax = Math.max(...visibleActive.map((p) => p.current), 0) || 1;
 
-  const rowBudget = H - PAD_T - PAD_B - TITLE_SIZE * 1.4 - (isPortrait ? H * 0.12 : 100) - (isPortrait ? 12 : 36);
-  const ROW_H = rowCount <= 6 ? Math.min(rowBudget / rowCount * 0.72, isPortrait ? 150 : 96) : Math.max(52, rowBudget / rowCount * 0.62);
+  // Vertical plot geometry derives from the rows block (its height sums every
+  // row gap from the "Separación vertical entre filas" control) plus a padding
+  // that scales with that same control. A band above the plot hosts the date
+  // labels; rows start right below it.
+  const DATE_LABEL_H = 26;
+  const DATE_BAND_H = DATE_LABEL_H + 10;
   const ROW_GAP = rowGap ?? (isPortrait ? 14 : 8);
-  const rowsTop = Math.max(0, (rowBudget - rowCount * ROW_H - (rowCount - 1) * ROW_GAP) / 2);
+  const PLOT_PAD_Y = Math.max(8, Math.round(ROW_GAP / 2));
+  const rowBudget = H - PAD_T - PAD_B - TITLE_SIZE * 1.4 - (isPortrait ? H * 0.12 : 100) - (isPortrait ? 12 : 36) - (DATE_BAND_H + PLOT_PAD_Y);
+  const ROW_H = rowCount <= 6 ? Math.min(rowBudget / rowCount * 0.72, isPortrait ? 150 : 96) : Math.max(52, rowBudget / rowCount * 0.62);
   const rowsHeight = rowCount * ROW_H + (rowCount - 1) * ROW_GAP;
 
   const GROOVE_H = barThickness != null ? Math.min(Math.max(4, Math.round(barThickness)), Math.max(12, ROW_H * 0.7)) : Math.max(12, ROW_H * 0.42);
   const BAR_H = GROOVE_H + Math.max(2, Math.round(ROW_H * 0.06));
 
   // ---- Scrolling plane geometry ----
-  const anchorFrac = Math.min(Math.max(anchorX ?? 35, 5), 95) / 100;
+  // Fixed "now" line: camera anchored at a hardcoded 35% of the track, right of
+  // the entity axis (no user control for this template).
+  const anchorFrac = 0.35;
   const anchorWorld = anchorFrac * BAR_MAX_W;
   const nowWorld = guideT * BAR_MAX_W;
   const scrollX = anchorWorld - nowWorld;
@@ -523,9 +528,9 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // Date labels live in a reserved strip DIRECTLY ABOVE each date gridline and
   // scroll with it. The value scale is the PERMANENT static Y axis at the right
   // edge of the plot (see below), so there are no extra traveling bands.
-  const DATE_LABEL_H = 26;
-  const rowsTopY = 18 + DATE_LABEL_H;
-  const bottomEnd = rowsHeight;
+  const rowsTopY = DATE_BAND_H + PLOT_PAD_Y;
+  const plotTop = rowsTopY - PLOT_PAD_Y;
+  const bottomEnd = rowsHeight + PLOT_PAD_Y * 2;
 
   const tickLabels = (t: number) => (axisUnit === 'date' ? fmtDate(t, dateFormat) : fmtValue(t, valueFormat, currencySymbol));
   // Positional band: ONE tick/gridline per distinct real position (date bucket /
@@ -619,13 +624,13 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
     const scale = isLeader(p) ? winnerScale : 1;
     const dim = isLeader(p) ? 1 : dimOthers;
 
-    const yNow = rowsTop + laneY(rankNow(p.label));
+    const yNow = laneY(rankNow(p.label));
     const change = evalChange(p.label);
     let top = yNow;
     let rowOpacity = dim;
     if (change) {
       const sw = Math.min((frame - change.atFrame) / (SWAP - 1), 1);
-      top = rowsTop + laneY(change.fromRank) + (yNow - (rowsTop + laneY(change.fromRank))) * Easing.out(Easing.cubic)(Math.max(sw, 0));
+      top = laneY(change.fromRank) + (yNow - laneY(change.fromRank)) * Easing.out(Easing.cubic)(Math.max(sw, 0));
     }
 
     const evalBoundary = (label: string) => {
@@ -648,10 +653,10 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
       const sw = Math.min((frame - bnd.atFrame) / (SWAP - 1), 1);
       const ease = Easing.out(Easing.cubic)(Math.max(sw, 0));
       if (bnd.entering) {
-        top = rowsTop + laneY(belowLane) + (rowsTop + laneY(bnd.nowRank) - (rowsTop + laneY(belowLane))) * ease;
+        top = laneY(belowLane) + (laneY(bnd.nowRank) - laneY(belowLane)) * ease;
         rowOpacity = dim * ease;
       } else {
-        top = rowsTop + laneY(bnd.fromRank) + (rowsTop + laneY(belowLane) - (rowsTop + laneY(bnd.fromRank))) * ease;
+        top = laneY(bnd.fromRank) + (laneY(belowLane) - laneY(bnd.fromRank)) * ease;
         rowOpacity = dim * (1 - ease);
       }
     }
@@ -730,7 +735,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
           + optional cardinality) scroll; the now-guide and header stay fixed. */}
       <div style={{flex: 1, position: 'relative', marginTop: isPortrait ? H * 0.03 : 36, overflow: 'hidden'}}>
         {/* Now-guide line */}
-        <div style={{position: 'absolute', left: anchorXPx, top: rowsTopY - 8, height: rowsHeight + 16, width: 2, borderRadius: 1, backgroundColor: accentColor, opacity: 0.45, zIndex: 1, boxShadow: `0 0 10px ${accentColor}66`}} />
+        <div style={{position: 'absolute', left: anchorXPx, top: plotTop, height: bottomEnd, width: 2, borderRadius: 1, backgroundColor: accentColor, opacity: 0.45, zIndex: 1, boxShadow: `0 0 10px ${accentColor}66`}} />
 
         {/* Rows container — static, aligned to the left of the plane */}
         <div style={{position: 'absolute', left: PAD_L, top: rowsTopY, width: innerW, height: Math.max(rowsHeight, 1), zIndex: 2}}>
@@ -740,10 +745,10 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
         {/* Permanent Y axis: static cardinality scale (0 → current max), STRUCK
             at the RIGHT edge of the plot. Its thickness/color frame the region
             where the scrolling date tape is visible on screen. */}
-        <div style={{position: 'absolute', left: BAR_TRACK_X + BAR_MAX_W, top: rowsTop, height: rowsHeight, zIndex: 3}}>
+        <div style={{position: 'absolute', left: BAR_TRACK_X + BAR_MAX_W, top: plotTop, height: bottomEnd, zIndex: 3}}>
           <div style={{position: 'absolute', left: -(yAxisWidth ?? 2) / 2, top: 0, bottom: 0, width: yAxisWidth ?? 2, borderRadius: 1, backgroundColor: yAxisColor ?? '#334155'}} />
           {valueTicks.map((tick, i) => {
-            const y = rowsHeight * (1 - tick.frac);
+            const y = PLOT_PAD_Y + rowsHeight * (1 - tick.frac);
             return (
               <div key={i} style={{position: 'absolute', left: 0, top: y, transform: 'translateY(-50%)', display: 'flex', alignItems: 'center'}}>
                 <div style={{position: 'absolute', width: 5, height: 1, backgroundColor: yAxisColor ?? '#334155', transform: 'translateX(-100%)'}} />
@@ -757,7 +762,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
             scrolls with the tape. Labels that would overlap the previous one
             are skipped (see `dateLabels`), so they never bunch together. */}
         {showXAxis && (
-          <div style={{position: 'absolute', left: BAR_TRACK_X, top: rowsTopY - DATE_LABEL_H - 8, width: BAR_MAX_W + 160, height: DATE_LABEL_H + 12, transform: `translateX(${scrollX}px)`, overflow: 'hidden', zIndex: 3}}>
+          <div style={{position: 'absolute', left: BAR_TRACK_X, top: rowsTopY - DATE_BAND_H, width: BAR_MAX_W + 160, height: DATE_BAND_H, transform: `translateX(${scrollX}px)`, overflow: 'hidden', zIndex: 3}}>
             {dateLabels.map((tick, i) => (
               <span key={i} style={{position: 'absolute', top: 4, left: tick.x, transform: 'translateX(-50%)', whiteSpace: 'nowrap', fontSize: AXIS_FONT, color: '#e2e8f0', fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.7)', fontVariantNumeric: 'tabular-nums'}}>{tick.label}</span>
             ))}
@@ -767,11 +772,11 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
         {/* Plot box — fixed clip viewport over the bar track. The scrolling
             tape (date gridlines) lives INSIDE it, so dates slide out and
             disappear when they cross the plot limits ("cinta que se desplaza"). */}
-        <div style={{position: 'absolute', left: BAR_TRACK_X, top: rowsTopY, width: BAR_MAX_W, height: bottomEnd, overflow: 'hidden', zIndex: 1}}>
+        <div style={{position: 'absolute', left: BAR_TRACK_X, top: plotTop, width: BAR_MAX_W, height: bottomEnd, overflow: 'hidden', zIndex: 1}}>
           <div style={{position: 'absolute', left: 0, top: 0, width: BAR_MAX_W, height: bottomEnd, transform: `translateX(${scrollX}px)`}}>
-            {/* Vertical gridlines: one per real date/value, over the rows area */}
+            {/* Vertical gridlines: one per real date/value, aligned to the rows area */}
             {showXAxis && (
-              <div style={{position: 'absolute', left: 0, top: 0, width: BAR_MAX_W, height: rowsHeight}}>
+              <div style={{position: 'absolute', left: 0, top: PLOT_PAD_Y, width: BAR_MAX_W, height: rowsHeight}}>
                 {ticks.map((tick, i) => (
                   <div key={i} style={{position: 'absolute', left: tick.x, top: 0, bottom: 0, width: 1, backgroundColor: 'rgba(51, 65, 85, 0.35)'}} />
                 ))}

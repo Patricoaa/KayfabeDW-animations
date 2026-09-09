@@ -1054,13 +1054,6 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           </p>
           <NumberControl label="Radio de esquina de la barra (vacío = píldora)" value={value.barRadius} min={0} max={60} step={1} onChange={(v) => update({barRadius: v})} />
           <NumberControl label="Grosor de la barra (px, vacío = automático)" value={value.barThickness} min={4} max={120} step={2} onChange={(v) => update({barThickness: v})} />
-          <div className="pt-2 mt-1 border-t border-border-subtle">
-            <p className="text-[10px] text-muted mb-1.5">Posición del grupo de filas (offset en px desde su lugar por defecto).</p>
-            <div className="grid grid-cols-2 gap-2">
-              <NumberControl label="X (px)" value={value.barsX} step={4} onChange={(v) => update({barsX: v})} />
-              <NumberControl label="Y (px)" value={value.barsY} step={4} onChange={(v) => update({barsY: v})} />
-            </div>
-          </div>
         </Collapsible>
       )}
 
@@ -1081,17 +1074,6 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
             Agrupa los datos por día, mes o año y re-agrega el valor acumulado en cada rango.
           </p>
         </div>
-        <SliderNumberInput
-          label="Ancla de la cámara (% del carril)"
-          value={value.anchorX ?? 35}
-          min={5}
-          max={95}
-          step={1}
-          onChange={(v) => update({anchorX: v})}
-        />
-        <p className="text-[10px] text-muted mb-1">
-          Donde queda fija la línea "ahora": todo el plano se desplaza para que el momento actual pase siempre por ahí. Un valor alto = el recorrido ocurre a la izquierda.
-        </p>
         <SliderNumberInput
           label="Marcas del eje de valores"
           value={value.axisTicks ?? 8}
@@ -1123,6 +1105,9 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           Cada fecha real dibuja una gridline vertical con su etiqueta justo encima (colisión-safe: las etiquetas que se juntarían se omiten). Solo el eje de fechas se desplaza; la escala de valores es el eje Y permanente al borde derecho del plot.
         </p>
         <SliderNumberInput label="Separación vertical entre filas (px)" value={value.rowGap ?? 0} min={0} max={120} step={2} onChange={(v) => update({rowGap: v || undefined})} />
+        <p className="text-[10px] text-muted mt-0.5 mb-1">
+          También define el inicio y fin del plot: el eje Y y las gridlines de fecha abarcan el bloque de filas (incluidos los huecos) más un padding proporcional.
+        </p>
         <SliderNumberInput label="Separación horizontal (px)" value={value.rowGapH ?? 0} min={0} max={80} step={2} onChange={(v) => update({rowGapH: v || undefined})} />
         <SelectControl
           label="Formato del valor acumulado"
