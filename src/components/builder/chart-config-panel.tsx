@@ -7,6 +7,7 @@ import {FONT_PRESETS, PALETTES} from '@/lib/chart-config';
 import {pickColor, colorFor} from '@/lib/chart-data';
 import {ICON_GLYPHS, ICON_GLYPH_NAMES} from '@/lib/chart-icons';
 import {TextControls} from '@/components/builder/text-controls';
+import { Tabs, SelectControl, NumberControl, ColorPickerControl, SwitchControl, Collapsible } from '@/components/ui/controls';
 
 // Metadata for a selected column available to the axis selectors: its alias
 // (the value used as a row key), its origin table, the bare column name, and
@@ -247,8 +248,18 @@ const setLegendTextOverride = (label: string, value?: string) => {
     !!config.aggregate && aggDangerous && !!yTable && fanOutTables.includes(yTable);
 
   return (
-    <div className="space-y-3">
-      {/* Chart type selector */}
+    <Tabs 
+      tabs={[
+        { id: 'data', label: 'Datos' },
+        { id: 'design', label: 'Diseño' }
+      ]}
+      className="h-full"
+    >
+      {(activeTab) => (
+        <div className="space-y-4 pb-12">
+          {activeTab === 'data' && (
+            <>
+              {/* Chart type selector */}
       <div>
         <label className="text-sm font-medium mb-1 block font-display">Tipo de gráfico</label>
         <div className="grid grid-cols-3 gap-1">
@@ -270,7 +281,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
       </div>
 
       {/* ============ DATOS ============ */}
-      <Section title="Datos" defaultOpen>
+      <Collapsible title="Datos" defaultOpen>
         {/* Field mappings — vary by chart type */}
         {config.type === 'pie' ? (
           <>
@@ -355,7 +366,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
             )}
             {(config.filters ?? []).map((f, i) => (
               <div key={i} className="flex items-center gap-1 mb-1.5">
-                <select
+                <SelectControl
                   value={f.column}
                   onChange={(e) => updateFilter(i, {column: e.target.value})}
                   className="flex-1 bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -363,8 +374,8 @@ const setLegendTextOverride = (label: string, value?: string) => {
                   {columns.map((c) => (
                     <option key={c} value={c}>{c}</option>
                   ))}
-                </select>
-                <select
+                </SelectControl>
+                <SelectControl
                   value={f.op}
                   onChange={(e) => updateFilter(i, {op: e.target.value as ChartFilterOp})}
                   className="bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -372,7 +383,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
                   {FILTER_OPS.map((op) => (
                     <option key={op.value} value={op.value}>{op.label}</option>
                   ))}
-                </select>
+                </SelectControl>
                 {f.op !== 'is_empty' && f.op !== 'is_not_empty' && (
                   <input
                     type="text"
@@ -410,14 +421,19 @@ const setLegendTextOverride = (label: string, value?: string) => {
             <p className="text-[10px] text-muted mt-0.5">Límite de presentación en el gráfico; no altera los datos capturados.</p>
           </div>
         )}
-      </Section>
+      </Collapsible>
 
+            </>
+          )}
+          
+          {activeTab === 'design' && (
+            <>
       {/* ============ FUENTE ============ */}
       {config.type !== 'table' && (
-        <Section title="Fuente">
+        <Collapsible title="Fuente">
           <div>
             <label className="text-sm font-medium mb-1 block">Fuente raíz del gráfico</label>
-            <select
+            <SelectControl
               value={config.style?.fontFamily ?? ''}
               onChange={(e) => updateStyle({fontFamily: e.target.value || undefined})}
               className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -426,15 +442,15 @@ const setLegendTextOverride = (label: string, value?: string) => {
               {FONT_PRESETS.map((f) => (
                 <option key={f.name} value={f.family}>{f.name}</option>
               ))}
-            </select>
+            </SelectControl>
           </div>
-          <ColorInput label="Color de la fuente general" value={config.style?.textColor} onChange={(v) => updateStyle({textColor: v || undefined})} />
-        </Section>
+          <ColorPickerControl label="Color de la fuente general" value={config.style?.textColor} onChange={(v) => updateStyle({textColor: v || undefined})} />
+        </Collapsible>
       )}
 
       {/* ============ HEADER ============ */}
       {config.type !== 'table' && (
-        <Section title="Header">
+        <Collapsible title="Header">
           <div>
             <label className="text-sm font-medium mb-1 block">Título</label>
             <textarea
@@ -484,12 +500,12 @@ const setLegendTextOverride = (label: string, value?: string) => {
               update({titleLayout: t1, subtitleLayout: s1});
             }}
           />
-        </Section>
+        </Collapsible>
       )}
 
       {/* ============ COLORES ============ */}
       {config.type !== 'table' && (
-        <Section title="Colores">
+        <Collapsible title="Colores">
           {/* Palettes */}
           <div>
             <label className="text-sm font-medium mb-1 block">Paleta de colores</label>
@@ -573,14 +589,14 @@ const setLegendTextOverride = (label: string, value?: string) => {
           )}
 
           {config.type === 'bar' && (
-            <ColorInput label="Color de valores negativos" value={config.negativeColor} onChange={(v) => update({negativeColor: v || undefined})} />
+            <ColorPickerControl label="Color de valores negativos" value={config.negativeColor} onChange={(v) => update({negativeColor: v || undefined})} />
           )}
-        </Section>
+        </Collapsible>
       )}
 
       {/* ============ VISUALIZACIÓN (barras / iconos) ============ */}
       {config.type === 'bar' && (
-        <Section title="Visualización">
+        <Collapsible title="Visualización">
           {/* Tipo: Barras / Iconos */}
           <div>
             <label className="text-sm font-medium mb-1 block">Tipo</label>
@@ -653,37 +669,37 @@ const setLegendTextOverride = (label: string, value?: string) => {
               </div>
             </div>
           )}
-        </Section>
+        </Collapsible>
       )}
 
       {/* ============ BARRAS — estilo (solo en modo barras) ============ */}
       {config.type === 'bar' && (config.iconMode ?? 'bars') !== 'icons' && (
-        <Section title="Barras">
-          <NumberInput label="Radio de esquinas" value={config.barRadius} min={0} max={24} onChange={(v) => update({barRadius: v})} />
+        <Collapsible title="Barras">
+          <NumberControl label="Radio de esquinas" value={config.barRadius} min={0} max={24} onChange={(v) => update({barRadius: v})} />
           {(config.groupMode === 'stacked' || config.groupMode === 'stacked-percent') && (
             <div className="grid grid-cols-2 gap-2">
-              <NumberInput label="Radio sup. izq." value={config.barRadiusTL} min={0} max={24} onChange={(v) => update({barRadiusTL: v})} />
-              <NumberInput label="Radio sup. der." value={config.barRadiusTR} min={0} max={24} onChange={(v) => update({barRadiusTR: v})} />
-              <NumberInput label="Radio inf. izq." value={config.barRadiusBL} min={0} max={24} onChange={(v) => update({barRadiusBL: v})} />
-              <NumberInput label="Radio inf. der." value={config.barRadiusBR} min={0} max={24} onChange={(v) => update({barRadiusBR: v})} />
+              <NumberControl label="Radio sup. izq." value={config.barRadiusTL} min={0} max={24} onChange={(v) => update({barRadiusTL: v})} />
+              <NumberControl label="Radio sup. der." value={config.barRadiusTR} min={0} max={24} onChange={(v) => update({barRadiusTR: v})} />
+              <NumberControl label="Radio inf. izq." value={config.barRadiusBL} min={0} max={24} onChange={(v) => update({barRadiusBL: v})} />
+              <NumberControl label="Radio inf. der." value={config.barRadiusBR} min={0} max={24} onChange={(v) => update({barRadiusBR: v})} />
             </div>
           )}
           <div className="grid grid-cols-2 gap-2">
-            <NumberInput label="Grosor de borde" value={config.barBorderWidth} min={0} max={6} onChange={(v) => update({barBorderWidth: v})} />
+            <NumberControl label="Grosor de borde" value={config.barBorderWidth} min={0} max={6} onChange={(v) => update({barBorderWidth: v})} />
             {(config.barBorderWidth ?? 0) > 0 && (
-              <ColorInput label="Color de borde" value={config.barBorderColor} onChange={(v) => update({barBorderColor: v || undefined})} />
+              <ColorPickerControl label="Color de borde" value={config.barBorderColor} onChange={(v) => update({barBorderColor: v || undefined})} />
             )}
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <NumberInput label="Gap entre barras" value={config.barGap} min={0} max={20} onChange={(v) => update({barGap: v})} />
-            <NumberInput label="Gap de categoría" value={config.barCategoryGap} min={0} max={0.4} step={0.01} onChange={(v) => update({barCategoryGap: v})} />
+            <NumberControl label="Gap entre barras" value={config.barGap} min={0} max={20} onChange={(v) => update({barGap: v})} />
+            <NumberControl label="Gap de categoría" value={config.barCategoryGap} min={0} max={0.4} step={0.01} onChange={(v) => update({barCategoryGap: v})} />
           </div>
-        </Section>
+        </Collapsible>
       )}
 
       {/* ============ ICONOS (pictograma) ============ */}
       {config.type === 'bar' && config.iconMode === 'icons' && (
-        <Section title="Iconos">
+        <Collapsible title="Iconos">
           <div>
             <label className="text-sm font-medium mb-1 block">Icono base (SVG)</label>
             <div className="grid grid-cols-7 gap-1">
@@ -707,7 +723,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
           </div>
           <div className="pt-1 border-t border-border-subtle mt-1">
             <label className="text-sm font-medium mb-1 block">Campo de icono del modelo</label>
-            <select
+            <SelectControl
               value={config.iconField ?? ''}
               onChange={(e) => update({iconField: e.target.value || undefined})}
               className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -718,7 +734,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
                   {c}
                 </option>
               ))}
-            </select>
+            </SelectControl>
           </div>
           <div className="pt-1 border-t border-border-subtle mt-1">
             <label className="text-sm font-medium mb-1 block">Icono personalizado (Imagen)</label>
@@ -740,7 +756,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
             </div>
           </div>
           {isStackedPercent && (
-            <NumberInput
+            <NumberControl
               label="% por icono"
               value={config.iconPercentPerGlyph}
               min={0.1}
@@ -750,7 +766,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
             />
           )}
           {!isStackedPercent && (
-            <NumberInput
+            <NumberControl
               label="Valor por icono (vacío = auto)"
               value={config.iconUnitsPerGlyph}
               min={1}
@@ -760,31 +776,31 @@ const setLegendTextOverride = (label: string, value?: string) => {
             />
           )}
           <div className="grid grid-cols-2 gap-2">
-            <NumberInput label="Tamaño" value={config.iconSize} min={6} max={48} onChange={(v) => update({iconSize: v})} />
-            <NumberInput label="Separación" value={config.iconPadding} min={0} max={20} onChange={(v) => update({iconPadding: v})} />
+            <NumberControl label="Tamaño" value={config.iconSize} min={6} max={48} onChange={(v) => update({iconSize: v})} />
+            <NumberControl label="Separación" value={config.iconPadding} min={0} max={20} onChange={(v) => update({iconPadding: v})} />
           </div>
-          <NumberInput label="Máx. por fila" value={config.iconMaxPerRow} min={1} max={50} onChange={(v) => update({iconMaxPerRow: v})} />
-        </Section>
+          <NumberControl label="Máx. por fila" value={config.iconMaxPerRow} min={1} max={50} onChange={(v) => update({iconMaxPerRow: v})} />
+        </Collapsible>
       )}
 
       {/* ============ LÍNEAS Y PUNTOS ============ */}
       {(config.type === 'line' || config.type === 'area' || config.type === 'scatter') && (
-        <Section title="Líneas y puntos">
+        <Collapsible title="Líneas y puntos">
           {(config.type === 'line' || config.type === 'area') && (
             <>
-              <Toggle label="Horizontal" checked={config.horizontal ?? false} onChange={(v) => update({horizontal: v})} />
-              <Toggle label="Curva suavizada" checked={config.lineSmooth ?? false} onChange={(v) => update({lineSmooth: v})} />
-              <Toggle label="Línea discontinua" checked={config.lineDash ?? false} onChange={(v) => update({lineDash: v})} />
+              <SwitchControl label="Horizontal" checked={config.horizontal ?? false} onChange={(v) => update({horizontal: v})} />
+              <SwitchControl label="Curva suavizada" checked={config.lineSmooth ?? false} onChange={(v) => update({lineSmooth: v})} />
+              <SwitchControl label="Línea discontinua" checked={config.lineDash ?? false} onChange={(v) => update({lineDash: v})} />
             </>
           )}
           {(config.type === 'line' || config.type === 'area') && (
             <>
-              <NumberInput label="Grosor de línea" value={config.style?.lineWidth} min={1} max={8} step={0.5} onChange={(v) => updateStyle({lineWidth: v})} />
-              <Toggle label="Mostrar puntos" checked={config.showMarkers ?? true} onChange={(v) => update({showMarkers: v})} />
+              <NumberControl label="Grosor de línea" value={config.style?.lineWidth} min={1} max={8} step={0.5} onChange={(v) => updateStyle({lineWidth: v})} />
+              <SwitchControl label="Mostrar puntos" checked={config.showMarkers ?? true} onChange={(v) => update({showMarkers: v})} />
               {(config.showMarkers ?? true) && (
                 <div className="grid grid-cols-2 gap-2">
-                  <NumberInput label="Tamaño de punto" value={config.style?.pointSize} min={1} max={12} onChange={(v) => updateStyle({pointSize: v})} />
-                  <NumberInput label="Opacidad de punto" value={config.style?.pointOpacity} min={0.1} max={1} step={0.05} onChange={(v) => updateStyle({pointOpacity: v})} />
+                  <NumberControl label="Tamaño de punto" value={config.style?.pointSize} min={1} max={12} onChange={(v) => updateStyle({pointSize: v})} />
+                  <NumberControl label="Opacidad de punto" value={config.style?.pointOpacity} min={0.1} max={1} step={0.05} onChange={(v) => updateStyle({pointOpacity: v})} />
                 </div>
               )}
             </>
@@ -792,19 +808,19 @@ const setLegendTextOverride = (label: string, value?: string) => {
           {config.type === 'scatter' && (
             <>
               <div className="grid grid-cols-2 gap-2">
-                <NumberInput label="Tamaño de punto" value={config.style?.pointSize} min={1} max={12} onChange={(v) => updateStyle({pointSize: v})} />
-                <NumberInput label="Opacidad de punto" value={config.style?.pointOpacity} min={0.1} max={1} step={0.05} onChange={(v) => updateStyle({pointOpacity: v})} />
+                <NumberControl label="Tamaño de punto" value={config.style?.pointSize} min={1} max={12} onChange={(v) => updateStyle({pointSize: v})} />
+                <NumberControl label="Opacidad de punto" value={config.style?.pointOpacity} min={0.1} max={1} step={0.05} onChange={(v) => updateStyle({pointOpacity: v})} />
               </div>
-              <Toggle label="Línea de tendencia" checked={config.trendline ?? false} onChange={(v) => update({trendline: v})} />
+              <SwitchControl label="Línea de tendencia" checked={config.trendline ?? false} onChange={(v) => update({trendline: v})} />
             </>
           )}
-        </Section>
+        </Collapsible>
       )}
 
       {/* ============ SEGMENTOS (PIE) ============ */}
       {config.type === 'pie' && (
-        <Section title="Segmentos">
-          <Toggle label="Donut" checked={(config.innerRadius ?? 0) > 0} onChange={(v) => update({innerRadius: v ? 66 : 0})} />
+        <Collapsible title="Segmentos">
+          <SwitchControl label="Donut" checked={(config.innerRadius ?? 0) > 0} onChange={(v) => update({innerRadius: v ? 66 : 0})} />
           {(config.innerRadius ?? 0) > 0 && (
             <div>
               <label className="text-sm font-medium mb-1 block">Grosor del anillo</label>
@@ -820,7 +836,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
           )}
           <div>
             <label className="text-sm font-medium mb-1 block">Etiquetas de segmento</label>
-            <select
+            <SelectControl
               value={config.pieLabel ?? 'percent'}
               onChange={(e) => update({pieLabel: e.target.value as 'none' | 'value' | 'percent' | 'both'})}
               className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -829,22 +845,22 @@ const setLegendTextOverride = (label: string, value?: string) => {
               <option value="value">Valor</option>
               <option value="both">Valor y porcentaje</option>
               <option value="none">Ninguna</option>
-            </select>
+            </SelectControl>
           </div>
-          <NumberInput label="Máx. segmentos" value={config.sliceLimit} min={1} max={50} onChange={(v) => update({sliceLimit: v})} />
-        </Section>
+          <NumberControl label="Máx. segmentos" value={config.sliceLimit} min={1} max={50} onChange={(v) => update({sliceLimit: v})} />
+        </Collapsible>
       )}
 
       {/* ============ ETIQUETAS ============ */}
       {config.type !== 'table' && (
-        <Section title="Etiquetas">
-          <Toggle label="Mostrar etiquetas de datos" checked={config.showDataLabels ?? true} onChange={(v) => update({showDataLabels: v})} />
+        <Collapsible title="Etiquetas">
+          <SwitchControl label="Mostrar etiquetas de datos" checked={config.showDataLabels ?? true} onChange={(v) => update({showDataLabels: v})} />
           {(config.showDataLabels ?? true) && (
             <>
               {config.type === 'bar' && config.iconMode !== 'icons' && (
                 <div>
                   <label className="text-sm font-medium mb-1 block">Posición</label>
-                  <select
+                  <SelectControl
                     value={config.dataLabelPosition ?? 'auto'}
                     onChange={(e) => update({dataLabelPosition: e.target.value as 'auto' | 'inside' | 'outside' | 'center'})}
                     className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -853,7 +869,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
                     <option value="outside">Fuera de la barra</option>
                     <option value="center">Centro</option>
                     <option value="inside">Dentro</option>
-                  </select>
+                  </SelectControl>
                 </div>
               )}
               <div>
@@ -870,7 +886,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
               {isStackedPercent ? (
                 <p className="text-[10px] text-muted py-1">Forzado a porcentaje en modo %.</p>
               ) : (
-                <select
+                <SelectControl
                   value={config.numberFormat ?? 'short'}
                   onChange={(e) => update({numberFormat: e.target.value as NumberFormat})}
                   className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -878,16 +894,16 @@ const setLegendTextOverride = (label: string, value?: string) => {
                   {NUMBER_FORMATS.map((nf) => (
                     <option key={nf.value} value={nf.value}>{nf.label}</option>
                   ))}
-                </select>
+                </SelectControl>
               )}
             </div>
           )}
-        </Section>
+        </Collapsible>
       )}
 
       {/* ============ EJE X / CATEGORÍA ============ */}
       {isCartesian && (
-        <Section title="Eje X / Categoría">
+        <Collapsible title="Eje X / Categoría">
           <div>
             <label className="text-sm font-medium mb-1 block">Etiqueta eje X</label>
             <input
@@ -935,10 +951,10 @@ const setLegendTextOverride = (label: string, value?: string) => {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <NumberInput label="Offset X" value={config.categoryLabelOffsetX ?? 0} step={1} onChange={(v) => update({categoryLabelOffsetX: v})} />
+                  <NumberControl label="Offset X" value={config.categoryLabelOffsetX ?? 0} step={1} onChange={(v) => update({categoryLabelOffsetX: v})} />
                 </div>
                 <div>
-                  <NumberInput label="Offset Y" value={config.categoryLabelOffsetY ?? 0} step={1} onChange={(v) => update({categoryLabelOffsetY: v})} />
+                  <NumberControl label="Offset Y" value={config.categoryLabelOffsetY ?? 0} step={1} onChange={(v) => update({categoryLabelOffsetY: v})} />
                 </div>
               </div>
             </div>
@@ -946,8 +962,8 @@ const setLegendTextOverride = (label: string, value?: string) => {
 
           {config.type === 'scatter' && (
             <div className="grid grid-cols-2 gap-2">
-              <NumberInput label="X mín." value={config.xMin} min={-1e9} max={1e9} onChange={(v) => update({xMin: v})} />
-              <NumberInput label="X máx." value={config.xMax} min={-1e9} max={1e9} onChange={(v) => update({xMax: v})} />
+              <NumberControl label="X mín." value={config.xMin} min={-1e9} max={1e9} onChange={(v) => update({xMin: v})} />
+              <NumberControl label="X máx." value={config.xMax} min={-1e9} max={1e9} onChange={(v) => update({xMax: v})} />
             </div>
           )}
 
@@ -1014,12 +1030,12 @@ const setLegendTextOverride = (label: string, value?: string) => {
               </div>
             </div>
           )}
-        </Section>
+        </Collapsible>
       )}
 
       {/* ============ EJE Y / DATOS ============ */}
       {isCartesian && (
-        <Section title="Eje Y / Datos">
+        <Collapsible title="Eje Y / Datos">
           <div>
             <label className="text-sm font-medium mb-1 block">Etiqueta eje Y</label>
             <input
@@ -1044,7 +1060,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
               {isSingleSeries && (
                 <div>
                   <label className="text-sm font-medium mb-1 block">Ordenar por</label>
-                  <select
+                  <SelectControl
                     value={config.sortBy ?? 'none'}
                     onChange={(e) => update({sortBy: e.target.value as SortBy})}
                     className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -1052,19 +1068,19 @@ const setLegendTextOverride = (label: string, value?: string) => {
                     {SORTS.map((s) => (
                       <option key={s.value} value={s.value}>{s.label}</option>
                     ))}
-                  </select>
+                  </SelectControl>
                 </div>
               )}
-              <Toggle label="Empezar en cero" checked={config.startAtZero ?? true} onChange={(v) => update({startAtZero: v})} />
-              <NumberInput label="Cantidad de divisiones (Y)" value={config.tickCount} min={2} max={12} onChange={(v) => update({tickCount: v})} />
+              <SwitchControl label="Empezar en cero" checked={config.startAtZero ?? true} onChange={(v) => update({startAtZero: v})} />
+              <NumberControl label="Cantidad de divisiones (Y)" value={config.tickCount} min={2} max={12} onChange={(v) => update({tickCount: v})} />
               <div className="grid grid-cols-2 gap-2">
-                <NumberInput label="Y mín." value={config.yMin} min={-1e9} max={1e9} onChange={(v) => update({yMin: v})} />
-                <NumberInput label="Y máx." value={config.yMax} min={-1e9} max={1e9} onChange={(v) => update({yMax: v})} />
+                <NumberControl label="Y mín." value={config.yMin} min={-1e9} max={1e9} onChange={(v) => update({yMin: v})} />
+                <NumberControl label="Y máx." value={config.yMax} min={-1e9} max={1e9} onChange={(v) => update({yMax: v})} />
               </div>
             </>
           )}
 
-          <Toggle label="Mostrar grid" checked={config.showGrid ?? true} onChange={(v) => update({showGrid: v})} />
+          <SwitchControl label="Mostrar grid" checked={config.showGrid ?? true} onChange={(v) => update({showGrid: v})} />
 
           {/* Reference lines */}
           <div className="pt-1 border-t border-border-subtle">
@@ -1159,20 +1175,20 @@ const setLegendTextOverride = (label: string, value?: string) => {
               </div>
             ))}
           </div>
-        </Section>
+        </Collapsible>
       )}
 
       {/* ============ LEYENDAS ============ */}
       {(config.type === 'bar' || config.type === 'line' || config.type === 'area' || config.type === 'scatter' || config.type === 'pie') && (
-        <Section title="Leyendas">
-          <Toggle label="Mostrar leyenda" checked={config.showLegend ?? true} onChange={(v) => update({showLegend: v})} />
+        <Collapsible title="Leyendas">
+          <SwitchControl label="Mostrar leyenda" checked={config.showLegend ?? true} onChange={(v) => update({showLegend: v})} />
           {(config.showLegend ?? true) && (
             <>
               <LayoutControls title="Coordenadas libres (offset, px)" value={config.legendLayout} onChange={setLegendLayout} />
             </>
           )}
           {(config.type === 'line' || config.type === 'area') && (
-            <Toggle label="Mostrar puntos" checked={config.showMarkers ?? true} onChange={(v) => update({showMarkers: v})} />
+            <SwitchControl label="Mostrar puntos" checked={config.showMarkers ?? true} onChange={(v) => update({showMarkers: v})} />
           )}
           <div className="pt-1 border-t border-border-subtle">
             <label className="text-xs font-semibold text-muted uppercase tracking-widest font-display">Fuente de la leyenda</label>
@@ -1221,11 +1237,11 @@ const setLegendTextOverride = (label: string, value?: string) => {
               </div>
             </div>
           )}
-        </Section>
+        </Collapsible>
       )}
 
       {/* ============ LIENZO ============ */}
-      <Section title="Lienzo">
+      <Collapsible title="Lienzo">
         <div>
           <label className="text-sm font-medium mb-1 block">Fondo del lienzo</label>
           <div className="flex gap-1 flex-wrap">
@@ -1247,14 +1263,14 @@ const setLegendTextOverride = (label: string, value?: string) => {
         </div>
 
         {(config.backgroundType ?? 'none') === 'color' && (
-          <ColorInput label="Color de fondo" value={config.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
+          <ColorPickerControl label="Color de fondo" value={config.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
         )}
 
         {(config.backgroundType ?? 'none') === 'pattern' && (
           <>
             <div>
               <label className="text-sm font-medium mb-1 block">Patrón</label>
-              <select
+              <SelectControl
                 value={config.backgroundPattern ?? 'dots'}
                 onChange={(e) => update({backgroundPattern: e.target.value as NonNullable<ChartConfig['backgroundPattern']>})}
                 className="w-full bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -1263,12 +1279,12 @@ const setLegendTextOverride = (label: string, value?: string) => {
                 <option value="stripes">Rayas</option>
                 <option value="grid">Cuadrícula</option>
                 <option value="checkers">Cuadros</option>
-              </select>
+              </SelectControl>
             </div>
             {config.backgroundPattern === 'stripes' && (
               <SliderNumberInput label="Ángulo (grados)" value={config.backgroundAngle ?? 45} min={0} max={360} step={15} onChange={(v) => update({backgroundAngle: v || undefined})} />
             )}
-            <ColorInput label="Color del patrón" value={config.background ?? '#3b82f6'} onChange={(v) => update({background: v || undefined})} />
+            <ColorPickerControl label="Color del patrón" value={config.background ?? '#3b82f6'} onChange={(v) => update({background: v || undefined})} />
             <SliderNumberInput label="Opacidad (%)" value={Math.round((config.backgroundOpacity ?? 1) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundOpacity: v ? v / 100 : undefined})} />
           </>
         )}
@@ -1276,8 +1292,8 @@ const setLegendTextOverride = (label: string, value?: string) => {
         {(config.backgroundType ?? 'none') === 'gradient' && (
           <>
             <div className="grid grid-cols-2 gap-2">
-              <ColorInput label="Color inicial" value={config.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
-              <ColorInput label="Color final" value={config.backgroundSecondary ?? '#1f2937'} onChange={(v) => update({backgroundSecondary: v || undefined})} />
+              <ColorPickerControl label="Color inicial" value={config.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
+              <ColorPickerControl label="Color final" value={config.backgroundSecondary ?? '#1f2937'} onChange={(v) => update({backgroundSecondary: v || undefined})} />
             </div>
             <SliderNumberInput label="Ángulo (grados)" value={config.backgroundAngle ?? 135} min={0} max={360} step={15} onChange={(v) => update({backgroundAngle: v || undefined})} />
             <SliderNumberInput label="Distribución inicio→fin (%)" value={Math.round((config.backgroundGradientDist ?? 0) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundGradientDist: v / 100})} />
@@ -1290,7 +1306,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
             <FileUploadInput label="Imagen de fondo" value={config.backgroundImage} onLoad={(dataUrl) => update({backgroundImage: dataUrl})} onClear={() => update({backgroundImage: undefined})} />
             <div>
               <label className="text-sm font-medium mb-1 block">Ajuste</label>
-              <select
+              <SelectControl
                 value={config.backgroundFit ?? 'cover'}
                 onChange={(e) => update({backgroundFit: e.target.value as NonNullable<ChartConfig['backgroundFit']>})}
                 className="w-full bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -1298,9 +1314,9 @@ const setLegendTextOverride = (label: string, value?: string) => {
                 <option value="cover">Cubrir</option>
                 <option value="contain">Contener</option>
                 <option value="fill">Rellenar</option>
-              </select>
+              </SelectControl>
             </div>
-            <ColorInput label="Color base (debajo)" value={config.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
+            <ColorPickerControl label="Color base (debajo)" value={config.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
             <SliderNumberInput label="Opacidad (%)" value={Math.round((config.backgroundOpacity ?? 1) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundOpacity: v ? v / 100 : undefined})} />
           </>
         )}
@@ -1309,17 +1325,17 @@ const setLegendTextOverride = (label: string, value?: string) => {
 
         <div className="pt-1 border-t border-border-subtle">
           <div className="grid grid-cols-2 gap-2 mt-2">
-            <NumberInput label="Borde (grosor)" value={config.canvasBorderWidth} min={0} max={8} onChange={(v) => update({canvasBorderWidth: v})} />
+            <NumberControl label="Borde (grosor)" value={config.canvasBorderWidth} min={0} max={8} onChange={(v) => update({canvasBorderWidth: v})} />
             {(config.canvasBorderWidth ?? 0) > 0 && (
-              <ColorInput label="Borde (color)" value={config.canvasBorderColor} onChange={(v) => update({canvasBorderColor: v || undefined})} />
+              <ColorPickerControl label="Borde (color)" value={config.canvasBorderColor} onChange={(v) => update({canvasBorderColor: v || undefined})} />
             )}
           </div>
-          <NumberInput label="Radio de esquinas del lienzo" value={config.canvasBorderRadius} min={0} max={40} onChange={(v) => update({canvasBorderRadius: v})} />
+          <NumberControl label="Radio de esquinas del lienzo" value={config.canvasBorderRadius} min={0} max={40} onChange={(v) => update({canvasBorderRadius: v})} />
         </div>
-      </Section>
+      </Collapsible>
 
       {/* ============ ESPACIADO ============ */}
-      <Section title="Espaciado">
+      <Collapsible title="Espaciado">
         <SliderNumberInput
           label="Header (abajo)"
           value={config.spacing?.headerPadding ?? 0}
@@ -1364,11 +1380,11 @@ const setLegendTextOverride = (label: string, value?: string) => {
             onChange={(v) => update({spacing: {...(config.spacing ?? {}), plotMarginLeft: v}})}
           />
         </div>
-      </Section>
+      </Collapsible>
 
       {/* ============ AVATAR ============ */}
       {config.type === 'bar' && (
-        <Section title="Avatar">
+        <Collapsible title="Avatar">
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium block">Avatares (imágenes)</label>
             {config.avatarField && (
@@ -1408,9 +1424,9 @@ const setLegendTextOverride = (label: string, value?: string) => {
                   ))}
                 </div>
               </div>
-              <NumberInput label="Tamaño" value={config.avatarSize} min={8} max={128} step={2} onChange={(v) => update({avatarSize: v})} />
+              <NumberControl label="Tamaño" value={config.avatarSize} min={8} max={128} step={2} onChange={(v) => update({avatarSize: v})} />
               {(config.avatarShape ?? 'rounded') === 'rounded' && (
-                <NumberInput label="Radio de esquina (vacío = auto)" value={config.avatarRadius} min={0} max={40} step={1} onChange={(v) => update({avatarRadius: v})} />
+                <NumberControl label="Radio de esquina (vacío = auto)" value={config.avatarRadius} min={0} max={40} step={1} onChange={(v) => update({avatarRadius: v})} />
               )}
               <div>
                 <label className="text-sm font-medium mb-1 block">Fondo del avatar</label>
@@ -1457,8 +1473,8 @@ const setLegendTextOverride = (label: string, value?: string) => {
               <div>
                 <label className="text-sm font-medium mb-1 block">Posición (coordenadas, px)</label>
                 <div className="grid grid-cols-2 gap-2">
-                  <NumberInput label="Offset X" value={config.avatarOffsetX} step={1} onChange={(v) => update({avatarOffsetX: v})} />
-                  <NumberInput label="Offset Y" value={config.avatarOffsetY} step={1} onChange={(v) => update({avatarOffsetY: v})} />
+                  <NumberControl label="Offset X" value={config.avatarOffsetX} step={1} onChange={(v) => update({avatarOffsetX: v})} />
+                  <NumberControl label="Offset Y" value={config.avatarOffsetY} step={1} onChange={(v) => update({avatarOffsetY: v})} />
                 </div>
                 <p className="text-[10px] text-muted pt-1">Desplazamiento global en px desde un punto FIJO del área del gráfico (el borde izquierdo en cada fila en horizontal; el borde superior en cada columna en vertical). Desacoplado de la barra: el tamaño/posición del avatar no mueve las barras ni el plot, y el layout de barras no lo afecta.</p>
               </div>
@@ -1519,9 +1535,9 @@ const setLegendTextOverride = (label: string, value?: string) => {
                               )}
                             </div>
                             <div className="grid grid-cols-3 gap-2 flex-1">
-                              <NumberInput label="Zoom" value={cr?.zoom} min={0.1} max={3} step={0.05} onChange={(v) => setAvatarCrop(label, {...cr, zoom: v})} />
-                              <NumberInput label="Foco X" value={cr ? (cr.focusX ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setAvatarCrop(label, {...cr, focusX: (v ?? 0) / 100})} />
-                              <NumberInput label="Foco Y" value={cr ? (cr.focusY ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setAvatarCrop(label, {...cr, focusY: (v ?? 0) / 100})} />
+                              <NumberControl label="Zoom" value={cr?.zoom} min={0.1} max={3} step={0.05} onChange={(v) => setAvatarCrop(label, {...cr, zoom: v})} />
+                              <NumberControl label="Foco X" value={cr ? (cr.focusX ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setAvatarCrop(label, {...cr, focusX: (v ?? 0) / 100})} />
+                              <NumberControl label="Foco Y" value={cr ? (cr.focusY ?? 0) * 100 : 0} min={-100} max={100} step={5} onChange={(v) => setAvatarCrop(label, {...cr, focusY: (v ?? 0) / 100})} />
                             </div>
                           </div>
                         </div>
@@ -1533,12 +1549,12 @@ const setLegendTextOverride = (label: string, value?: string) => {
               <p className="text-[10px] text-muted">Las imágenes se muestran en el preview y en el SVG descargado; puede que no aparezcan al exportar a PNG.</p>
             </>
           )}
-        </Section>
+        </Collapsible>
       )}
 
       {/* ============ ADICIONALES ============ */}
       {config.type !== 'table' && (
-        <Section title="Adicionales">
+        <Collapsible title="Adicionales">
           <div className="grid grid-cols-3 gap-1.5">
             <button
               type="button"
@@ -1608,8 +1624,8 @@ const setLegendTextOverride = (label: string, value?: string) => {
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-1">
-                  <NumberInput label="Opacidad" value={ov.opacity ?? ov.layout?.opacity ?? 1} min={0} max={1} step={0.05} onChange={(v) => setOverlay(i, {opacity: v, layout: {...(ov.layout ?? {}), opacity: v}})} />
-                  <NumberInput label="Blur (px)" value={ov.blur ?? 0} min={0} max={40} step={1} onChange={(v) => setOverlay(i, {blur: v})} />
+                  <NumberControl label="Opacidad" value={ov.opacity ?? ov.layout?.opacity ?? 1} min={0} max={1} step={0.05} onChange={(v) => setOverlay(i, {opacity: v, layout: {...(ov.layout ?? {}), opacity: v}})} />
+                  <NumberControl label="Blur (px)" value={ov.blur ?? 0} min={0} max={40} step={1} onChange={(v) => setOverlay(i, {blur: v})} />
                 </div>
               </div>
 
@@ -1626,7 +1642,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
                     <TextControls value={ov.font} onChange={(patch) => setOverlay(i, {font: {...(ov.font ?? {}), ...patch}})} />
                     <div className="space-y-2">
                       <LayoutControls title="Posición (px)" value={ov.layout} onChange={(patch) => setOverlay(i, {layout: {...(ov.layout ?? {}), ...patch}})} />
-                      <NumberInput label="Ancho máx. (px)" value={ov.maxWidth} min={0} max={2000} onChange={(v) => setOverlay(i, {maxWidth: v})} />
+                      <NumberControl label="Ancho máx. (px)" value={ov.maxWidth} min={0} max={2000} onChange={(v) => setOverlay(i, {maxWidth: v})} />
                     </div>
                   </div>
                 </>
@@ -1654,19 +1670,19 @@ const setLegendTextOverride = (label: string, value?: string) => {
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <ColorInput label="Relleno / Color" value={ov.fill ?? '#f59e0b'} onChange={(v) => setOverlay(i, {fill: v})} />
-                    <ColorInput label="Color de borde" value={ov.stroke ?? ''} onChange={(v) => setOverlay(i, {stroke: v || 'none'})} />
+                    <ColorPickerControl label="Relleno / Color" value={ov.fill ?? '#f59e0b'} onChange={(v) => setOverlay(i, {fill: v})} />
+                    <ColorPickerControl label="Color de borde" value={ov.stroke ?? ''} onChange={(v) => setOverlay(i, {stroke: v || 'none'})} />
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <NumberInput label="X (izq.)" value={ov.x} onChange={(v) => setOverlay(i, {x: v})} />
-                    <NumberInput label="Y (top)" value={ov.y} onChange={(v) => setOverlay(i, {y: v})} />
-                    <NumberInput label="Ancho" value={ov.width} min={0} max={2000} onChange={(v) => setOverlay(i, {width: v})} />
-                    <NumberInput label="Alto" value={ov.height} min={0} max={2000} onChange={(v) => setOverlay(i, {height: v})} />
+                    <NumberControl label="X (izq.)" value={ov.x} onChange={(v) => setOverlay(i, {x: v})} />
+                    <NumberControl label="Y (top)" value={ov.y} onChange={(v) => setOverlay(i, {y: v})} />
+                    <NumberControl label="Ancho" value={ov.width} min={0} max={2000} onChange={(v) => setOverlay(i, {width: v})} />
+                    <NumberControl label="Alto" value={ov.height} min={0} max={2000} onChange={(v) => setOverlay(i, {height: v})} />
                     {ov.shape === 'rect' && (
-                      <NumberInput label="Radio esquinas" value={ov.radius} min={0} max={100} onChange={(v) => setOverlay(i, {radius: v})} />
+                      <NumberControl label="Radio esquinas" value={ov.radius} min={0} max={100} onChange={(v) => setOverlay(i, {radius: v})} />
                     )}
-                    <NumberInput label="Grosor borde" value={ov.strokeWidth} min={0} max={20} onChange={(v) => setOverlay(i, {strokeWidth: v})} />
-                    <NumberInput label="Rotación (°)" value={ov.rotation} onChange={(v) => setOverlay(i, {rotation: v})} />
+                    <NumberControl label="Grosor borde" value={ov.strokeWidth} min={0} max={20} onChange={(v) => setOverlay(i, {strokeWidth: v})} />
+                    <NumberControl label="Rotación (°)" value={ov.rotation} onChange={(v) => setOverlay(i, {rotation: v})} />
                   </div>
                 </>
               ) : (
@@ -1679,51 +1695,23 @@ const setLegendTextOverride = (label: string, value?: string) => {
                     className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
                   />
                   <div className="grid grid-cols-2 gap-2">
-                    <NumberInput label="X (izq.)" value={ov.x} onChange={(v) => setOverlay(i, {x: v})} />
-                    <NumberInput label="Y (top)" value={ov.y} onChange={(v) => setOverlay(i, {y: v})} />
-                    <NumberInput label="Ancho" value={ov.width} min={0} max={2000} onChange={(v) => setOverlay(i, {width: v})} />
-                    <NumberInput label="Alto" value={ov.height} min={0} max={2000} onChange={(v) => setOverlay(i, {height: v})} />
-                    <NumberInput label="Rotación (°)" value={ov.rotation} onChange={(v) => setOverlay(i, {rotation: v})} />
+                    <NumberControl label="X (izq.)" value={ov.x} onChange={(v) => setOverlay(i, {x: v})} />
+                    <NumberControl label="Y (top)" value={ov.y} onChange={(v) => setOverlay(i, {y: v})} />
+                    <NumberControl label="Ancho" value={ov.width} min={0} max={2000} onChange={(v) => setOverlay(i, {width: v})} />
+                    <NumberControl label="Alto" value={ov.height} min={0} max={2000} onChange={(v) => setOverlay(i, {height: v})} />
+                    <NumberControl label="Rotación (°)" value={ov.rotation} onChange={(v) => setOverlay(i, {rotation: v})} />
                   </div>
                 </>
               )}
             </div>
           ))}
-        </Section>
+        </Collapsible>
       )}
-    </div>
-  );
-}
-
-function ColorInput({label, value, onChange}: {label: string; value?: string; onChange: (v: string) => void}) {
-  return (
-    <label className="flex items-center gap-2">
-      <input
-        type="color"
-        value={value ?? '#888888'}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-8 h-8 rounded cursor-pointer border border-border-default bg-transparent"
-        aria-label={label}
-      />
-      <span className="text-xs text-secondary">{label}</span>
-    </label>
-  );
-}
-
-function NumberInput({label, value, min, max, step = 1, onChange}: {label: string; value?: number; min?: number; max?: number; step?: number; onChange: (v: number | undefined) => void}) {
-  return (
-    <div>
-      <label className="text-sm font-medium mb-1 block">{label}</label>
-      <input
-        type="number"
-        {...(min !== undefined ? {min} : {})}
-        {...(max !== undefined ? {max} : {})}
-        step={step}
-        value={value ?? ''}
-        onChange={(e) => onChange(e.target.value ? Number(e.target.value) : undefined)}
-        className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-      />
-    </div>
+            </>
+          )}
+        </div>
+      )}
+    </Tabs>
   );
 }
 
@@ -1796,7 +1784,7 @@ function LayoutControls({title, value, onChange}: {title: string; value?: TextLa
       <div className="mt-2 grid grid-cols-2 gap-2">
         <div>
           <label className="text-sm font-medium mb-1 block">Ancla</label>
-          <select
+          <SelectControl
             value={value?.anchor ?? 'center'}
             onChange={(e) => set({anchor: e.target.value as TextLayout['anchor']})}
             className="w-full bg-elevated border border-border-default rounded-lg px-2 py-1 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -1804,11 +1792,11 @@ function LayoutControls({title, value, onChange}: {title: string; value?: TextLa
             <option value="left">Izquierda</option>
             <option value="center">Centro</option>
             <option value="right">Derecha</option>
-          </select>
+          </SelectControl>
         </div>
         <div>
           <label className="text-sm font-medium mb-1 block">Alineación</label>
-          <select
+          <SelectControl
             value={value?.align ?? 'center'}
             onChange={(e) => set({align: e.target.value as TextLayout['align']})}
             className="w-full bg-elevated border border-border-default rounded-lg px-2 py-1 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -1816,14 +1804,14 @@ function LayoutControls({title, value, onChange}: {title: string; value?: TextLa
             <option value="left">Izquierda</option>
             <option value="center">Centro</option>
             <option value="right">Derecha</option>
-          </select>
+          </SelectControl>
         </div>
-        <NumberInput label="X (px)" value={value?.x} onChange={(v) => set({x: v})} />
-        <NumberInput label="Y (px)" value={value?.y} onChange={(v) => set({y: v})} />
-        <NumberInput label="Rotación (°)" value={value?.rotation} min={-180} max={180} onChange={(v) => set({rotation: v})} />
-        <NumberInput label="Espaciado (px)" value={value?.letterSpacing} min={-4} max={20} step={0.5} onChange={(v) => set({letterSpacing: v})} />
-        <NumberInput label="Opacidad" value={value?.opacity} min={0} max={1} step={0.05} onChange={(v) => set({opacity: v})} />
-        <NumberInput label="Alto línea" value={value?.lineHeight} min={0} max={80} step={0.5} onChange={(v) => set({lineHeight: v})} />
+        <NumberControl label="X (px)" value={value?.x} onChange={(v) => set({x: v})} />
+        <NumberControl label="Y (px)" value={value?.y} onChange={(v) => set({y: v})} />
+        <NumberControl label="Rotación (°)" value={value?.rotation} min={-180} max={180} onChange={(v) => set({rotation: v})} />
+        <NumberControl label="Espaciado (px)" value={value?.letterSpacing} min={-4} max={20} step={0.5} onChange={(v) => set({letterSpacing: v})} />
+        <NumberControl label="Opacidad" value={value?.opacity} min={0} max={1} step={0.05} onChange={(v) => set({opacity: v})} />
+        <NumberControl label="Alto línea" value={value?.lineHeight} min={0} max={80} step={0.5} onChange={(v) => set({lineHeight: v})} />
         <div className="col-span-2">
           <label className="text-sm font-medium mb-1 block">Color de fondo (caja)</label>
           <input
@@ -1834,9 +1822,9 @@ function LayoutControls({title, value, onChange}: {title: string; value?: TextLa
             aria-label="Color de fondo del título"
           />
         </div>
-        <NumberInput label="Padding caja" value={value?.bgPadding} min={0} max={40} onChange={(v) => set({bgPadding: v})} />
-        <NumberInput label="Radio caja" value={value?.bgRadius} min={0} max={40} onChange={(v) => set({bgRadius: v})} />
-        <NumberInput label="Opac. caja" value={value?.bgOpacity} min={0} max={1} step={0.05} onChange={(v) => set({bgOpacity: v})} />
+        <NumberControl label="Padding caja" value={value?.bgPadding} min={0} max={40} onChange={(v) => set({bgPadding: v})} />
+        <NumberControl label="Radio caja" value={value?.bgRadius} min={0} max={40} onChange={(v) => set({bgRadius: v})} />
+        <NumberControl label="Opac. caja" value={value?.bgOpacity} min={0} max={1} step={0.05} onChange={(v) => set({bgOpacity: v})} />
       </div>
     </div>
   );
@@ -1867,13 +1855,13 @@ function FieldSelect({
     return (
       <div>
         <label className="text-sm font-medium mb-1 block">{label}</label>
-        <select
+        <SelectControl
           value={value}
           onChange={(e) => onChange(e.target.value)}
           className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
         >
           {children}
-        </select>
+        </SelectControl>
       </div>
     );
   }
@@ -1889,7 +1877,7 @@ function FieldSelect({
   return (
     <div>
       <label className="text-sm font-medium mb-1 block">{label}</label>
-      <select
+      <SelectControl
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -1910,7 +1898,7 @@ function FieldSelect({
             {showTable ? value : value} (no disponible para este eje)
           </option>
         )}
-      </select>
+      </SelectControl>
     </div>
   );
 }
@@ -2028,7 +2016,7 @@ function TableControls({
       <div className="space-y-2">
         <label className="text-sm font-medium block">Ordenar por</label>
         <div className="flex gap-2">
-          <select
+          <SelectControl
             value={config.tableSort?.column ?? ''}
             onChange={(e) =>
               onUpdate({
@@ -2043,9 +2031,9 @@ function TableControls({
             {columns.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
-          </select>
+          </SelectControl>
           {config.tableSort?.column && (
-            <select
+            <SelectControl
               value={config.tableSort.direction}
               onChange={(e) =>
                 onUpdate({tableSort: {column: config.tableSort!.column, direction: e.target.value as 'asc' | 'desc'}})
@@ -2054,7 +2042,7 @@ function TableControls({
             >
               <option value="asc">Asc</option>
               <option value="desc">Desc</option>
-            </select>
+            </SelectControl>
           )}
         </div>
       </div>
@@ -2062,22 +2050,6 @@ function TableControls({
   );
 }
 
-function Toggle({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <label className="flex items-center justify-between cursor-pointer select-none">
-      <span className="text-sm text-secondary">{label}</span>
-      <input
-        type="checkbox"
-        role="switch"
-        checked={checked}
         onChange={(e) => onChange(e.target.checked)}
         className="peer sr-only"
       />

@@ -791,49 +791,45 @@ function BuilderContent() {
         {/* Right config panel — step 2 (Configurar): full config sidebar */}
         {view === 'result' && resultStep === 2 && (
         <aside className="fixed inset-x-0 bottom-12 z-10 mx-2 mb-2 h-[58vh] rounded-xl border border-border-default flex flex-col overflow-hidden bg-card md:static md:inset-auto md:mx-0 md:mb-0 md:h-auto md:w-[22rem] md:shrink-0 md:rounded-none md:border-x-0 md:border-b-0 md:border-t lg:md:w-96">
-          <div className="flex items-center gap-2 px-4 h-10 border-b border-border-default shrink-0">
-            <SlidersHorizontal size={14} className="text-amber-500" />
-            <span className="text-micro font-semibold text-secondary uppercase tracking-widest font-display">
-              Configuración
-            </span>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {/* Output mode toggle */}
-            <div>
-              <label className="text-micro font-semibold text-muted uppercase tracking-widest mb-2 block font-display">
-                Modo de salida
-              </label>
-              <div role="group" aria-label="Modo de salida" className="grid grid-cols-2 gap-1">
-                <button
-                  onClick={() => {
-                    templateDeselectRef.current = true;
-                    setOutputMode('static');
-                  }}
-                  aria-pressed={outputMode === 'static'}
-                  className={`cursor-pointer px-3 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
-                    outputMode === 'static'
-                      ? 'bg-amber-500 text-black'
-                      : 'bg-elevated text-secondary hover:bg-card-hover'
-                  }`}
-                >
-                  <BarChart3 size={14} />
-                  Estático
-                </button>
-                <button
-                  onClick={() => setOutputMode('animated')}
-                  aria-pressed={outputMode === 'animated'}
-                  className={`cursor-pointer px-3 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
-                    outputMode === 'animated'
-                      ? 'bg-amber-500 text-black'
-                      : 'bg-elevated text-secondary hover:bg-card-hover'
-                  }`}
-                >
-                  <Film size={14} />
-                  Animación
-                </button>
-              </div>
+                    <div className="flex items-center justify-between px-4 h-12 border-b border-border-default shrink-0">
+            <div className="flex items-center gap-2">
+              <SlidersHorizontal size={14} className="text-amber-500" />
+              <span className="text-micro font-semibold text-secondary uppercase tracking-widest font-display">
+                Configuración
+              </span>
             </div>
+            <div role="group" aria-label="Modo de salida" className="flex bg-elevated rounded-lg p-0.5 border border-border-default h-8">
+              <button
+                onClick={() => {
+                  templateDeselectRef.current = true;
+                  setOutputMode('static');
+                }}
+                aria-pressed={outputMode === 'static'}
+                className={`cursor-pointer px-3 rounded-md text-[11px] font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                  outputMode === 'static'
+                    ? 'bg-amber-500 text-black shadow-sm'
+                    : 'text-secondary hover:text-primary hover:bg-card-hover'
+                }`}
+              >
+                <BarChart3 size={12} />
+                Estático
+              </button>
+              <button
+                onClick={() => setOutputMode('animated')}
+                aria-pressed={outputMode === 'animated'}
+                className={`cursor-pointer px-3 rounded-md text-[11px] font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                  outputMode === 'animated'
+                    ? 'bg-amber-500 text-black shadow-sm'
+                    : 'text-secondary hover:text-primary hover:bg-card-hover'
+                }`}
+              >
+                <Film size={12} />
+                Animación
+              </button>
+            </div>
+          </div>
 
+          <div className="flex-1 flex flex-col min-h-0">
             {outputMode === 'static' && (
               <ChartConfigPanel
                 config={chartConfig}
