@@ -1,6 +1,6 @@
 # UI/UX — Controls Consolidation & Panel Ordering
 
-**Status:** Done (Fases A–F)
+**Status:** Done (Fases A–G)
 **App:** `/animations`
 
 ## Objective
@@ -116,6 +116,32 @@ Espaciado → Avatar → Adicionales.**
 - **Known limitation (pre-existing, untouched)**: the animation templates do
   not consume `overlays` — timeline/ranking overlay controls configure data
   that is not yet rendered.
+
+## Fase G — Canvas gradient controls
+- New shared helper `mixHex(a, b, t)` (hex interpolation) and
+  `resolveGradient(cfg)` in `lib/chart-config.ts`; both renderers consume the
+  same stop model (initial color held until `dist`, fade over `smooth` of the
+  remaining path to the blended final color).
+- New optional fields on `ChartConfig` and `CommonCanvasConfig` (no migration;
+  defaults reproduce prior output):
+  - `backgroundGradientShape: 'linear' | 'radial'`
+  - `backgroundGradientCenterX/Y` — radial center (% of canvas, default 50/50)
+  - `backgroundGradientRadius` — radial reach (% of the shorter side, 0–200)
+  - `backgroundGradientBlend` — **intensity** (0–1): end color blended toward
+    the initial; 0 = imperceptible gradient, 1 = full end color
+  - `backgroundGradientSmooth` — transition width over the remaining path;
+    1 = full fade (legacy), 0 = hard cut
+- Static SVG (`chart-frame.tsx` `CanvasBackground`): linear via `linearGradient`
+  (existing vector) or radial via `radialGradient` (userSpaceOnUse, px center +
+  radius). Animation (`Background.tsx`): CSS `linear-gradient(angle, …, …)` or
+  `radial-gradient(ellipse r% r% at cx% cy%, …, …)`; the ellipse % per-axis
+  reach approximates the SVG radius (documented, not pixel-identical).
+- Plumbing for the templates: `viz-to-remotion.ts` `commonPropsOf` + prop
+  destructuring/forwarding in `timeline-race/index.tsx` and `ranking/index.tsx`.
+- Controls: **Lienzo → Degradado** in both panels now show Forma (Lineal /
+  Radial chips), radial → Centro X/Y + Radio (Ángulo hidden), then
+  **Intensidad (%)** and **Suavizado (%)** next to the existing Distribución /
+  Opacidad.
 
 ## Verification
 - `npx tsc --noEmit` clean.
