@@ -328,7 +328,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const percentMode = stackedPercent || groupedPercent;
   const showLegend = config.showLegend ?? true;
   const legendPosition = 'bottom';
-  const labelAngle = config.labelAngle ?? (multi.categories.length > 8 ? -30 : 0);
+  const labelAngle = config.xLabelFont?.angle ?? config.labelAngle ?? (multi.categories.length > 8 ? -30 : 0);
 
   const avatarField = config.avatarField;
   const avatarSize = config.avatarSize ?? 24;
@@ -814,7 +814,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                   return (
                     <g key={`lb-${ci}`}>
                       {catLabel(label, {...p, anchor: labelAnchor(config.xLabelFont?.align, p.anchor), font: catFont, overflow: catOv, cap: focusCap, rotate: labelAngle})}
-                      {desc && catLabel(desc, {x: p.x, y: p.y + catSize + 2, anchor: labelAnchor(config.xLabelFont?.align, p.anchor), font: descFont, overflow: descOv, cap: 20})}
+                      {desc && catLabel(desc, {x: p.x, y: p.y + catSize + 2, anchor: labelAnchor(config.xLabelFont?.align, p.anchor), font: descFont, overflow: descOv, cap: 20, rotate: config.categoryDescriptionFont?.angle})}
                     </g>
                   );
                 };
@@ -1222,7 +1222,7 @@ const fill = barFill(s.color, config, val < 0);
               return (
                 <g key={`lb-${ci}`}>
                   {catLabel(label, {...p, font: catFont, overflow: catOv, cap: focusCap, rotate: labelAngle})}
-                  {desc && catLabel(desc, {x: p.x, y: p.y + catSize + 2, anchor: p.anchor, font: descFont, overflow: descOv, cap: 20})}
+                  {desc && catLabel(desc, {x: p.x, y: p.y + catSize + 2, anchor: p.anchor, font: descFont, overflow: descOv, cap: 20, rotate: config.categoryDescriptionFont?.angle})}
                 </g>
               );
             };
@@ -1335,7 +1335,7 @@ function SingleBar({data, config}: Props) {
   const dlFamily = dlFont?.fontFamily ?? config.dataLabelFontFamily;
   const dlAlign = config.dataLabelFont?.align;
   const dlWeight = dlFont?.weight ?? 400;
-  const labelAngle = config.labelAngle ?? (n > 8 ? -30 : 0);
+  const labelAngle = config.xLabelFont?.angle ?? config.labelAngle ?? (n > 8 ? -30 : 0);
   const yTickFamily = config.yLabelFont?.fontFamily;
   const yTickSize = config.yLabelFont?.size ?? 10;
   const yTickColor = config.yLabelFont?.color ?? st.textColor;
@@ -1414,7 +1414,7 @@ function SingleBar({data, config}: Props) {
               return (
                 <g key={`lb-${i}`}>
                   {catLabel(label, {...p, anchor: labelAnchor(config.xLabelFont?.align, p.anchor), font: catFont, overflow: catOv, cap: 16, rotate: labelAngle})}
-                  {desc && catLabel(desc, {x: p.x, y: p.y + catSize + 2, anchor: labelAnchor(config.xLabelFont?.align, p.anchor), font: descFont, overflow: descOv, cap: 20})}
+                  {desc && catLabel(desc, {x: p.x, y: p.y + catSize + 2, anchor: labelAnchor(config.xLabelFont?.align, p.anchor), font: descFont, overflow: descOv, cap: 20, rotate: config.categoryDescriptionFont?.angle})}
                 </g>
               );
             };

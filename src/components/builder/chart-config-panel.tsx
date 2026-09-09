@@ -189,6 +189,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
   const setLegendFont = (patch: Partial<SectionFont>) => update({legendFont: {...(config.legendFont ?? {}), ...patch}});
   const setDataLabelFont = (patch: Partial<SectionFont>) => update({dataLabelFont: {...(config.dataLabelFont ?? {}), ...patch}});
   const setCategoryDescriptionFont = (patch: Partial<SectionFont>) => update({categoryDescriptionFont: {...(config.categoryDescriptionFont ?? {}), ...patch}});
+  const setXLabelFont = (patch: Partial<SectionFont>) => update({xLabelFont: {...(config.xLabelFont ?? {}), ...patch}});
 
   // Fan-out detection: when aggregating a field from a shallower (non-leaf)
   // table with a plain count/sum/avg, the result reflects the deepest table's
@@ -730,6 +731,13 @@ const setLegendTextOverride = (label: string, value?: string) => {
               </div>
             </div>
           )}
+
+          <div className="pt-1 border-t border-border-subtle">
+              <label className="text-xs font-semibold text-muted uppercase tracking-widest font-display">Fuente de las etiquetas</label>
+              <div className="mt-2">
+                <TextStyleControls value={config.xLabelFont} onChange={setXLabelFont} showOverflow />
+              </div>
+            </div>
 
           {config.categoryDescriptionField && (
             <div className="pt-1 border-t border-border-subtle">

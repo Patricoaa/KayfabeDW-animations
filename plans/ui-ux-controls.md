@@ -87,12 +87,17 @@ Espaciado → Avatar → Adicionales.**
     `md+` flex handle on their left edge via `md:w-[var(--config-w)]`
     (320–640 px); mobile bottom-sheet layout untouched.
 - **Axis-title controls removed** (`chart-config-panel.tsx`): deleted the
-  `Etiqueta eje X` input + `Fuente de etiquetas` (`xLabel` / `xLabelFont`) and
-  `Etiqueta eje Y` + `Fuente de etiquetas` (`yLabel` / `yLabelFont`), plus the
-  `Ángulo de etiquetas` slider (`labelAngle`). Fields stay in `ChartConfig` (no
-  migration): saved configs keep rendering their old axis titles and label
-  angle; category-label and Y-tick typography fall back to the global style
-  defaults. `setXLabelFont`/`setYLabelFont` removed.
+  `Etiqueta eje X` input (`xLabel`) and `Etiqueta eje Y` + `Fuente de etiquetas`
+  (`yLabel` / `yLabelFont`) and the `Ángulo de etiquetas` slider (`labelAngle`).
+  Fields stay in `ChartConfig` (no migration): saved configs keep rendering
+  their old axis titles and label angle. `setYLabelFont` removed.
+- **Category label typography** (`chart-config-panel.tsx` + `bar-chart.tsx`):
+  the `Eje X / Categoría` section now exposes a "Fuente de las etiquetas"
+  `TextStyleControls` over `xLabelFont` (re-added `setXLabelFont`; the category
+  labels render from it) alongside the existing "Fuente de la descripción".
+  Category-label angle = `xLabelFont.angle`, falling back to the legacy
+  `labelAngle` (incl. the −30° auto-tilt for >8 categories). The description now
+  honors its `categoryDescriptionFont.angle` (previously ignored).
 - **Text angle**: `TextStyle` gains `angle?: number` (deg); `TextStyleControls`
   adds an "Ángulo (°)" `NumberControl` (−180…180, Auto reset). Rendered by the
   shared `textStyle()` remotion helper (both templates) and, for static SVG, on
