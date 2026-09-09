@@ -118,3 +118,35 @@ Changed: `src/remotion/templates/race-scrolling/index.tsx`,
 `src/lib/viz-to-remotion.ts`, `src/lib/animation-config.ts`,
 `src/components/builder/animation-config-panel.tsx`, this plan. Gate
 `npx tsc --noEmit` clean.
+
+## Feedback round (2026-09-09) — grid por cada fecha + plot box (cinta)
+User feedback: "El eje debe tener grid o ejes con cada fecha ... scrolleando
+horizontalmente dentro del plot ... van desapareciendo en la medida que
+sobrepasan esos límites (como una cinta que se desplaza) al igual que sus
+marcadores."
+
+1. **Grid por cada fecha real** — the positional band no longer draws
+   evenly-spaced synthetic ticks from `axisTicks`. It now collects the distinct
+   real positions of the data (`[...new Set(items.map(r => r.pos))].sort()`)
+   and renders ONE tick + label + VERTICAL GRIDLINE per distinct date (or
+   numeric axis value) at its exact spot (`posToX(p) * BAR_MAX_W`). Labels may
+   overlap at high density; the user accepted that ("no es necesario hacer un
+   solapado ... los ejes van apareciendo en el plot").
+2. **Plot box = clip viewport** — the scrolling content (positional band,
+   cardinality band, gridlines) now lives inside a fixed clip viewport exactly
+   over the bar track (`left: BAR_TRACK_X, top: rowsTopY - topPx, width:
+   BAR_MAX_W, height: topPx + bottomEnd; overflow: hidden`). The translated
+   plane sits inside it, so labels and gridlines visibly slide out and vanish
+   as they cross the plot's left (entity-axis) or right edge — the moving
+   ribbon effect. Rows, names, avatars and the now-guide stay outside the clip.
+3. **Marcadores recortados en el plot** — each row's bar segment gained a
+   marker-only clip layer (`position:absolute; inset:0; overflow:hidden;
+   pointerEvents:none`) wrapping `markerFor(p)`. Markers keep their
+   `translateX(scrollX)` ride but now disappear when they pass the bar-track
+   limits, matching the tape (the layer clips only markers, not the bar glow
+   or the in-bar value label).
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`,
+`src/components/builder/animation-config-panel.tsx` (relabeled the "Marcas del
+eje" slider → "Marcas del eje de valores", updated hint texts), this plan. Gate
+`npx tsc --noEmit` clean.

@@ -12,14 +12,22 @@ import {textStyle} from '../shared/text';
 // rows is a fixed lane with its name (and avatar) pinned on the left, always
 // visible. Its bar grows IN PLACE from that axis, with length proportional to
 // the accumulated value up to the current moment (interpolated between data
-// points), so the bar "eats" each date's value as the now-line passes it. Only
-// the grid bands scroll horizontally, keeping the current moment pinned under a
-// fixed "now" line: a positional band (dates or plain numbers, `axisUnit`) and
-// an optional cardinality band with the live value scale (0 → current max),
-// each at the top or the bottom. `axisDirection` flips the sweep (Mayor→Menor
-// only reverses the value→position mapping). Each active entity drops a MARKER
-// IN ITS OWN LANE at its current step on the plane showing the accumulated
-// value as a number, an icon (ICON_GLYPHS) or a reference image (avatar URL).
+// points), so the bar "eats" each date's value as the now-line passes it.
+//
+// The scrolling ribbon lives inside a PLOT BOX — a fixed clip viewport exactly
+// covering the bar track ([BAR_TRACK_X, BAR_TRACK_X+BAR_MAX_W], bounded by the
+// entity axis on the left). Inside it the plane scrolls horizontally like a
+// moving tape, keeping the current moment pinned under a fixed "now" line:
+//   - a positional band with ONE TICK + VERTICAL GRIDLINE per real date (or
+//     numeric axis value) present in the data — not evenly-spaced synthetic
+//     marks — plus an optional cardinality band (live value scale 0 → max);
+//   - per-active-entity MARKERS in their own lane at their current step.
+// Everything on the tape (labels, gridlines, markers) is clipped at the plot
+// box, so it visibly slides out and disappears as it crosses the plot's limits
+// — exactly like a moving ribbon.
+// `axisDirection` flips the sweep (Mayor→Menor only reverses the value→position
+// mapping). Markers show the accumulated value as a number, an icon
+// (ICON_GLYPHS) or a reference image (avatar URL).
 //
 // The layout is fully responsive: it reads the composition width/height via
 // `useVideoConfig()` and re-flows for landscape, portrait (9:16), post (4:5),
@@ -59,7 +67,8 @@ export type RaceScrollingProps = {
   // Camera anchor: % of the track width where the "now" line stays fixed
   // (5-95, default 35). The plane scrolls so this point always matches `now`.
   anchorX?: number;
-  // Number of ticks drawn on the scrolling axis band (2-24, default 8).
+  // Ticks on the CARDINALITY (value) band (2-24, default 8). The positional
+  // band ignores this: it always draws one tick/gridline per real data date.
   axisTicks?: number;
   // Per-entity markers on the scrolling axis band: number / icon / image.
   showMarkers?: boolean;
@@ -523,14 +532,15 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const valSlotFor = (side: 'top' | 'bottom') => (showXAxis && axisPosition === side ? 1 : 0);
 
   const tickLabels = (t: number) => (axisUnit === 'date' ? fmtDate(t, dateFormat) : fmtValue(t, valueFormat, currencySymbol));
+  // Positional band: ONE tick/gridline per distinct real position (date bucket /
+  // numeric axis value) present in the data, at its exact spot — a real grid of
+  // "cada fecha", not an evenly-spaced synthetic march.
   const ticks = (() => {
-    const n = Math.min(Math.max(Math.round(axisTicks ?? 8), 2), 24);
-    const out: {label: string; x: number}[] = [];
-    for (let i = 0; i < n; i++) {
-      const t = min + (i / (n - 1)) * span;
-      out.push({label: tickLabels(t), x: posToX(t) * BAR_MAX_W});
-    }
-    return out;
+    const seen = new Set<number>();
+    for (const r of items) if (Number.isFinite(r.pos)) seen.add(r.pos);
+    return [...seen]
+      .sort((a, b) => a - b)
+      .map((p) => ({label: tickLabels(p), x: posToX(p) * BAR_MAX_W}));
   })();
 
   // Cardinality band: live scale of the accumulated value (0 → current max),
@@ -638,7 +648,11 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
               {fmtValue(Math.round(p.current), valueFormat, currencySymbol)}
             </span>
           </div>
-          {markerFor(p)}
+          {/* Markers ride the tape but are clipped at the plot box (this lane's
+              bar-track bounds), so they disappear as they cross the limits. */}
+          <div style={{position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, overflow: 'hidden', pointerEvents: 'none'}}>
+            {markerFor(p)}
+          </div>
         </div>
       ),
       avatar: (
@@ -706,26 +720,38 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
           <div style={{position: 'absolute', left: BAR_TRACK_X, top: rowsTop, height: rowsHeight, width: yAxisWidth ?? 2, borderRadius: 1, backgroundColor: yAxisColor ?? '#334155'}} />
         )}
 
-        {/* World container — the scrolling plane holding the grid bands */}
-        <div style={{position: 'absolute', left: BAR_TRACK_X, top: rowsTopY, width: BAR_MAX_W, height: Math.max(rowsHeight, bottomEnd), transform: `translateX(${scrollX}px)`, zIndex: 1}}>
-          {showXAxis && (
-            <div style={{position: 'absolute', left: 0, top: bandYFor(0, axisPosition), width: BAR_MAX_W, height: BAND_H, borderTop: axisPosition === 'bottom' ? '1px solid #1f2937' : 'none', borderBottom: axisPosition === 'top' ? '1px solid #1f2937' : 'none', fontSize: AXIS_FONT, color: '#64748b', fontVariantNumeric: 'tabular-nums'}}>
-              {ticks.map((tick, i) => (
-                <div key={i} style={{position: 'absolute', top: 6, transform: 'translateX(-50%)', whiteSpace: 'nowrap'}}>
-                  <span>{tick.label}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          {showValueAxis && (
-            <div style={{position: 'absolute', left: 0, top: bandYFor(valSlotFor(valueAxisPosition), valueAxisPosition), width: BAR_MAX_W, height: BAND_H, borderTop: valueAxisPosition === 'bottom' ? '1px solid #1f2937' : 'none', borderBottom: valueAxisPosition === 'top' ? '1px solid #1f2937' : 'none', fontSize: AXIS_FONT, color: '#64748b', fontVariantNumeric: 'tabular-nums'}}>
-              {valueTicks.map((tick, i) => (
-                <div key={i} style={{position: 'absolute', top: 6, transform: 'translateX(-50%)', whiteSpace: 'nowrap'}}>
-                  <span>{tick.label}</span>
-                </div>
-              ))}
-            </div>
-          )}
+        {/* Plot box — fixed clip viewport over the bar track. The scrolling tape
+            (gridlines + bands) lives INSIDE it, so everything slides out and
+            disappears when it crosses the plot limits ("cinta que se desplaza"). */}
+        <div style={{position: 'absolute', left: BAR_TRACK_X, top: rowsTopY - topPx, width: BAR_MAX_W, height: topPx + bottomEnd, overflow: 'hidden', zIndex: 1}}>
+          <div style={{position: 'absolute', left: 0, top: topPx, width: BAR_MAX_W, height: bottomEnd, transform: `translateX(${scrollX}px)`}}>
+            {/* Vertical gridlines: one per real date/value, over the rows area */}
+            {showXAxis && (
+              <div style={{position: 'absolute', left: 0, top: 0, width: BAR_MAX_W, height: rowsHeight}}>
+                {ticks.map((tick, i) => (
+                  <div key={i} style={{position: 'absolute', left: tick.x, top: 0, bottom: 0, width: 1, backgroundColor: 'rgba(51, 65, 85, 0.35)'}} />
+                ))}
+              </div>
+            )}
+            {showXAxis && (
+              <div style={{position: 'absolute', left: 0, top: bandYFor(0, axisPosition), width: BAR_MAX_W, height: BAND_H, borderTop: axisPosition === 'bottom' ? '1px solid #1f2937' : 'none', borderBottom: axisPosition === 'top' ? '1px solid #1f2937' : 'none', fontSize: AXIS_FONT, color: '#64748b', fontVariantNumeric: 'tabular-nums'}}>
+                {ticks.map((tick, i) => (
+                  <div key={i} style={{position: 'absolute', top: 6, transform: 'translateX(-50%)', whiteSpace: 'nowrap'}}>
+                    <span>{tick.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {showValueAxis && (
+              <div style={{position: 'absolute', left: 0, top: bandYFor(valSlotFor(valueAxisPosition), valueAxisPosition), width: BAR_MAX_W, height: BAND_H, borderTop: valueAxisPosition === 'bottom' ? '1px solid #1f2937' : 'none', borderBottom: valueAxisPosition === 'top' ? '1px solid #1f2937' : 'none', fontSize: AXIS_FONT, color: '#64748b', fontVariantNumeric: 'tabular-nums'}}>
+                {valueTicks.map((tick, i) => (
+                  <div key={i} style={{position: 'absolute', top: 6, transform: 'translateX(-50%)', whiteSpace: 'nowrap'}}>
+                    <span>{tick.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

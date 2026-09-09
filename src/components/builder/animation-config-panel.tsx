@@ -1020,13 +1020,16 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           Donde queda fija la línea "ahora": todo el plano se desplaza para que el momento actual pase siempre por ahí. Un valor alto = el recorrido ocurre a la izquierda.
         </p>
         <SliderNumberInput
-          label="Marcas del eje"
+          label="Marcas del eje de valores"
           value={value.axisTicks ?? 8}
           min={2}
           max={24}
           step={1}
           onChange={(v) => update({axisTicks: v})}
         />
+        <p className="text-[10px] text-muted mb-1">
+          Solo aplica a la banda de cardinalidad. El eje posicional dibuja una marca y gridline por cada fecha real de los datos.
+        </p>
         <SwitchControl
           label="Mostrar eje (banda desplazable)"
           checked={value.showXAxis ?? true}
@@ -1105,7 +1108,7 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           </div>
         )}
         <p className="text-[10px] text-muted">
-          El grid muestra la banda posicional (fechas, o números con el eje de cardinalidad) y, si está activo, la banda de valores; ambas viajan con el plano y pueden ir arriba o abajo. La fecha en pantalla se muestra abajo a la derecha e indica el momento del recorrido.
+          El plot es la caja que delimita los ejes: el eje posicional lleva una gridline + etiqueta por cada fecha real de "campo fecha" (o por cada valor del eje numérico) y, si está activo, una banda de valores (0 → máximo). Todo viaja como una cinta dentro del plot y se recorta al cruzar sus límites; las marcas por entidad también desaparecen al sobrepasarlos. La fecha en pantalla se muestra abajo a la derecha.
         </p>
       </Collapsible>
 
@@ -1117,7 +1120,7 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           onChange={(v) => update({showMarkers: v})}
         />
         <p className="text-[10px] text-muted mt-0.5">
-          Cada entidad activa deja un marcador en su propia fila, en la posición de su paso actual sobre el plano, mostrando el valor acumulado.
+          Cada entidad activa deja un marcador en su propia fila, en la posición de su paso actual sobre el plano, mostrando el valor acumulado. El marcador viaja con la cinta y desaparece al cruzar los límites del plot.
         </p>
         <div className="mt-2">
           <div>
