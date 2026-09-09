@@ -1031,7 +1031,39 @@ const setLegendTextOverride = (label: string, value?: string) => {
               <ColorPickerControl label="Color inicial" value={config.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
               <ColorPickerControl label="Color final" value={config.backgroundSecondary ?? '#1f2937'} onChange={(v) => update({backgroundSecondary: v || undefined})} />
             </div>
-            <SliderNumberInput label="Ángulo (grados)" value={config.backgroundAngle ?? 135} min={0} max={360} step={15} onChange={(v) => update({backgroundAngle: v || undefined})} />
+            <div>
+              <label className="text-sm font-medium mb-1 block">Forma</label>
+              <div className="flex gap-1">
+                {([
+                  {value: 'linear', label: 'Lineal'},
+                  {value: 'radial', label: 'Radial'},
+                ] as const).map((s) => (
+                  <button
+                    key={s.value}
+                    type="button"
+                    onClick={() => update({backgroundGradientShape: s.value})}
+                    className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                      (config.backgroundGradientShape ?? 'linear') === s.value
+                        ? 'bg-amber-500 text-black'
+                        : 'bg-elevated text-secondary hover:bg-card-hover'
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {(config.backgroundGradientShape ?? 'linear') === 'linear' ? (
+              <SliderNumberInput label="Ángulo (grados)" value={config.backgroundAngle ?? 135} min={0} max={360} step={15} onChange={(v) => update({backgroundAngle: v || undefined})} />
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                <SliderNumberInput label="Centro X (%)" value={config.backgroundGradientCenterX ?? 50} min={0} max={100} step={5} onChange={(v) => update({backgroundGradientCenterX: v})} />
+                <SliderNumberInput label="Centro Y (%)" value={config.backgroundGradientCenterY ?? 50} min={0} max={100} step={5} onChange={(v) => update({backgroundGradientCenterY: v})} />
+                <SliderNumberInput label="Radio (%)" value={config.backgroundGradientRadius ?? 100} min={0} max={200} step={5} onChange={(v) => update({backgroundGradientRadius: v})} />
+              </div>
+            )}
+            <SliderNumberInput label="Intensidad (%)" value={Math.round((config.backgroundGradientBlend ?? 1) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundGradientBlend: v / 100})} />
+            <SliderNumberInput label="Suavizado (%)" value={Math.round((config.backgroundGradientSmooth ?? 1) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundGradientSmooth: v / 100})} />
             <SliderNumberInput label="Distribución inicio→fin (%)" value={Math.round((config.backgroundGradientDist ?? 0) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundGradientDist: v / 100})} />
             <SliderNumberInput label="Opacidad (%)" value={Math.round((config.backgroundOpacity ?? 1) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundOpacity: v ? v / 100 : undefined})} />
           </>
