@@ -8,15 +8,17 @@ import {Avatar} from '../shared/Avatar';
 import {fmtValue} from '../shared/fmt';
 import {textStyle} from '../shared/text';
 
-// A scrolling-plane ranked bar race. Instead of a static guide sweeping over
-// fixed bars, the WHOLE plane (bars + axis band) translates horizontally so
-// the current time stays pinned under a fixed "now" line (camera following
-// the leader). Each entity's bar travels on the axis, stuck by its TIP to its
-// position on the passing time axis; the bar grows proportionally to its
-// accumulated value. The axis supports dates (timestamp ms) or plain numbers
-// (years, rounds, days) via `axisUnit`. Each active entity drops a MARKER on
-// the scrolling axis band at its current step showing the accumulated value
-// as a number, an icon (ICON_GLYPHS) or a reference image (its avatar URL).
+// A scrolling-axis ranked bar race. The ENTITY AXIS is STATIC: each entity
+// rows is a fixed lane with its name (and avatar) pinned on the left, always
+// visible. Its bar grows IN PLACE from that axis, with length proportional to
+// the accumulated value up to the current moment (interpolated between data
+// points), so the bar "eats" each date's value as the now-line passes it. Only
+// the DATE axis band below scrolls horizontally, keeping the current moment
+// pinned under a fixed "now" line. Each active entity drops a MARKER on the
+// scrolling axis band at its current step showing the accumulated value as a
+// number, an icon (ICON_GLYPHS) or a reference image (its avatar URL). The
+// axis supports dates (timestamp ms) or plain numbers (years, rounds, days)
+// via `axisUnit`.
 //
 // The layout is fully responsive: it reads the composition width/height via
 // `useVideoConfig()` and re-flows for landscape, portrait (9:16), post (4:5),
@@ -306,7 +308,14 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const innerW = W - PAD_L - PAD_R;
   const ROW_GAP_PX = rowGapH ?? innerW * 0.03;
   const BAR_RATIO = Math.min(Math.max(barWidth ?? 0.75, 0.1), 0.95);
-  const BAR_MAX_W = Math.max(innerW * BAR_RATIO, 1);
+  // Static entity axis: a fixed name column on the left of every row. Its
+  // width fits the longest entity label (approx. char width for the label font).
+  const LABEL_FONT = Math.max(12, Math.round(ROW_FONT * 0.8));
+  const NAME_W = Math.min(innerW * 0.34, Math.max(110, Math.max(...items.map((r) => r.label.length), 1) * LABEL_FONT * 0.52 + 16));
+  // Bars grow IN PLACE from this column, so only the track to its right scrolls.
+  const BAR_MAX_W = Math.max((innerW - NAME_W - ROW_GAP_PX * 2) * BAR_RATIO, 1);
+  const AVATAR_W = Math.max(innerW - NAME_W - BAR_MAX_W - ROW_GAP_PX * 2, 0);
+  const BAR_TRACK_X = PAD_L + NAME_W + ROW_GAP_PX;
   const EASE = 26;
   const OUTRO = Math.min(45, Math.max(0, Math.floor(durationInFrames * 0.12)));
   const sweepBudget = Math.max(0, durationInFrames - EASE * 2 - OUTRO);
@@ -315,9 +324,6 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const sweepFrames = raceDurationSeconds != null
     ? Math.max(1, Math.min(Math.max(1, Math.round(raceDurationSeconds * fps)), sweepBudget))
     : Math.max(sweepBudget - holdFinalFrames, 1);
-  const holdFrames = raceDurationSeconds != null
-    ? (sweepFrames >= sweepBudget ? 0 : Math.max(holdFinalFrames, sweepBudget - sweepFrames))
-    : holdFinalFrames;
   const raceEndFrame = EASE + sweepFrames;
   const guideTAt = (f: number) => {
     const r = interpolate(f, [EASE, EASE + sweepFrames], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
@@ -455,14 +461,6 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const winnerScale = podiumEffect ? 1 + 0.05 * winnerT : 1;
   const dimOthers = podiumEffect ? 1 - 0.35 * winnerT : 1;
 
-  const outroStart = raceEndFrame + holdFrames;
-  const outroEase = interpolate(frame, [outroStart, outroStart + Math.max(1, Math.min(30, OUTRO))], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
-  const outro = Easing.out(Easing.cubic)(Math.max(Math.min(outroEase, 1), 0));
-  const FINAL_W = Math.min(
-    BAR_MAX_W * 0.9,
-    Math.max(48, fmtValue(Math.max(...rows.map((r) => r.value), 0), valueFormat, currencySymbol).length * ROW_FONT * 0.58 + 28),
-  );
-
   const avatarCropFor = (label: string, image?: string | null): {zoom: number; focusX: number; focusY: number} => {
     const c = avatarCrops?.[label] ?? (image ? avatarCrops?.[image] : undefined);
     return {zoom: c?.zoom ?? 1, focusX: c?.focusX ?? 0, focusY: c?.focusY ?? 0};
@@ -481,9 +479,10 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const best = (p: Participant) => visibleActive[0] && p.current === visibleActive[0].current && visibleActive[0].current > 0;
   const isLeader = (p: Participant) => best(p);
 
-  const anchorXPx = PAD_L + anchorWorld;
+  // Fixed "now" line on screen, over the bar track (right of the entity axis).
+  const anchorXPx = BAR_TRACK_X + anchorWorld;
 
-  // ---- Scrolling axis band (ticks + per-entity markers), travels with the plane ----
+  // ---- Scrolling axis band (ticks + per-entity markers): the part that scrolls ----
   const MARKER_SIZE = markerSize ?? (isPortrait ? Math.round(W * 0.055) : 26);
   const AXIS_FONT = isPortrait ? Math.round(W * 0.026) : 13;
   const BAND_H = showXAxis ? Math.max(40, MARKER_SIZE + 20) : 0;
@@ -538,9 +537,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
       config: {damping: 22, stiffness: 110},
       durationInFrames: 28,
     });
-    const w = rawW * pop + (FINAL_W - rawW * pop) * outro;
-    const tipX = p.curX * BAR_MAX_W;
-    const startX = tipX - w;
+    const w = rawW * pop;
     const scale = isLeader(p) ? winnerScale : 1;
     const dim = isLeader(p) ? 1 : dimOthers;
 
@@ -587,26 +584,26 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
       bar: (
         <div style={{flexShrink: 0, width: BAR_MAX_W, height: BAR_H, position: 'relative', display: 'flex', alignItems: 'center'}}>
           {showRail !== false && <div style={{position: 'absolute', left: 0, right: 0, top: '50%', height: GROOVE_H, transform: 'translateY(-50%)', backgroundColor: '#171717', borderRadius: barRadius ?? 999, opacity: pop}} />}
-          <div style={{position: 'absolute', left: startX, top: '50%', width: Math.max(0, w), height: BAR_H, transform: `translateY(-50%) scaleY(${scale})`, backgroundColor: barFill, borderRadius: barRadius ?? 999, boxShadow: isLeader(p) && podiumEffect ? `0 0 ${18 * scale}px ${accentColor}99` : 'none'}} />
-          <div style={{position: 'absolute', right: BAR_MAX_W - tipX + 12, top: 0, bottom: 0, maxWidth: Math.max(0, w - 24), minWidth: 0, display: 'flex', alignItems: 'center', overflow: 'hidden', pointerEvents: 'none', opacity: pop}}>
+          <div style={{position: 'absolute', left: 0, top: '50%', width: Math.max(0, w), height: BAR_H, transform: `translateY(-50%) scaleY(${scale})`, backgroundColor: barFill, borderRadius: barRadius ?? 999, boxShadow: isLeader(p) && podiumEffect ? `0 0 ${18 * scale}px ${accentColor}99` : 'none'}} />
+          <div style={{position: 'absolute', right: BAR_MAX_W - Math.max(0, w) + 12, top: 0, bottom: 0, maxWidth: Math.max(0, w - 24), minWidth: 0, display: 'flex', alignItems: 'center', overflow: 'hidden', pointerEvents: 'none', opacity: pop}}>
             <span style={{fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textShadow: '0 1px 2px rgba(0,0,0,0.45)', ...textStyle(valueText, {color: '#ffffff', size: ROW_FONT, weight: 800})}}>
               {fmtValue(Math.round(p.current), valueFormat, currencySymbol)}
             </span>
           </div>
-          <div style={{position: 'absolute', left: startX, top: 0, bottom: 0, width: Math.max(0, w), display: 'flex', alignItems: 'center', opacity: outro}}>
-            <span style={{whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', paddingLeft: 12, paddingRight: 8, ...textStyle(labelText, {color: '#d4d4d8', size: Math.round(ROW_FONT * 0.92), weight: 700})}}>{p.label}</span>
-          </div>
         </div>
       ),
       avatar: (
-        <div style={{width: Math.max(innerW - BAR_MAX_W - ROW_GAP_PX, 0), flexShrink: 0, textAlign: 'right'}}>
-          {showAvatar && p.image && <Avatar src={p.image} size={Math.max(innerW - BAR_MAX_W - ROW_GAP_PX, 0)} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(p.label, p.image)} bg={avatarBg} borderColor={avatarBorderColor} borderWidth={avatarBorderWidth} />}
+        <div style={{width: AVATAR_W, flexShrink: 0, textAlign: 'right'}}>
+          {showAvatar && p.image && <Avatar src={p.image} size={AVATAR_W} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(p.label, p.image)} bg={avatarBg} borderColor={avatarBorderColor} borderWidth={avatarBorderWidth} />}
         </div>
       ),
     };
 
     return (
       <div key={p.label} style={{position: 'absolute', left: 0, right: 0, height: ROW_H, top, display: 'flex', alignItems: 'center', gap: ROW_GAP_PX, opacity: rowOpacity}}>
+        <div style={{width: NAME_W, flexShrink: 0, overflow: 'hidden', textAlign: 'right', paddingRight: ROW_GAP_PX * 0.5, display: 'flex', alignItems: 'center', justifyContent: 'flex-end'}}>
+          <span style={{whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', ...textStyle(labelText, {color: '#e4e4e7', size: LABEL_FONT, weight: 700}), opacity: pop}}>{p.label}</span>
+        </div>
         {order.map((seg) => segments[seg])}
       </div>
     );
@@ -646,23 +643,24 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
         fallbackTitle="Race Scrolling"
       />
 
-      {/* Scrolling plane: everything inside translates by `scrollX` ("todo el
-          plano scrollea"). The now-guide and the header stay fixed. */}
+      {/* Static rows: the ENTITY AXIS is fixed. Only the axis band below
+          scrolls; the now-guide and the header stay fixed. */}
       <div style={{flex: 1, position: 'relative', marginTop: isPortrait ? H * 0.03 : 36, overflow: 'hidden'}}>
         {/* Now-guide line */}
-        <div style={{position: 'absolute', left: anchorXPx, top: rowsTopY - 8, height: rowsHeight + 8 + (showXAxis ? BAND_H + 18 : 0), width: 2, borderRadius: 1, backgroundColor: accentColor, opacity: 0.45, zIndex: 1, boxShadow: `0 0 10px ${accentColor}66`}} />
+        <div style={{position: 'absolute', left: anchorXPx, top: axisPosition === 'top' ? rowsTopY - BAND_H - 26 : rowsTopY - 8, height: rowsHeight + 16 + (showXAxis ? BAND_H + 18 : 0), width: 2, borderRadius: 1, backgroundColor: accentColor, opacity: 0.45, zIndex: 1, boxShadow: `0 0 10px ${accentColor}66`}} />
 
-        {/* World container — the parts of the plane that travel */}
-        <div style={{position: 'absolute', left: PAD_L, top: rowsTopY, width: innerW, height: Math.max(rowsHeight, 1), transform: `translateX(${scrollX}px)`, zIndex: 2}}>
-          {/* Rows */}
+        {/* Rows container — static, aligned to the left of the plane */}
+        <div style={{position: 'absolute', left: PAD_L, top: rowsTopY, width: innerW, height: Math.max(rowsHeight, 1), zIndex: 2}}>
           {renderPool.map((p) => renderRow(p))}
+        </div>
 
-          {/* Y axis rides the plane at the bars' origin (all-time zero) */}
-          {showYAxis && (
-            <div style={{position: 'absolute', left: 0, top: rowsTop, height: rowsHeight, width: yAxisWidth ?? 2, borderRadius: 1, backgroundColor: yAxisColor ?? '#334155'}} />
-          )}
+        {/* Y axis: static at the bars' origin (right of the entity axis) */}
+        {showYAxis && (
+          <div style={{position: 'absolute', left: BAR_TRACK_X, top: rowsTop, height: rowsHeight, width: yAxisWidth ?? 2, borderRadius: 1, backgroundColor: yAxisColor ?? '#334155'}} />
+        )}
 
-          {/* Axis band: ticks + markers ride the plane */}
+        {/* World container — the scrolling axis band with ticks + markers */}
+        <div style={{position: 'absolute', left: BAR_TRACK_X, top: rowsTopY, width: BAR_MAX_W, height: Math.max(rowsHeight, 1), transform: `translateX(${scrollX}px)`, zIndex: 1}}>
           {showXAxis && BAND_H > 0 && (
             <div style={{position: 'absolute', left: 0, top: axisPosition === 'top' ? -BAND_H - 18 : rowsHeight + 18, width: BAR_MAX_W, height: BAND_H, borderTop: axisPosition === 'bottom' ? '1px solid #1f2937' : 'none', borderBottom: axisPosition === 'top' ? '1px solid #1f2937' : 'none', fontSize: AXIS_FONT, color: '#64748b', fontVariantNumeric: 'tabular-nums'}}>
               {ticks.map((tick, i) => (

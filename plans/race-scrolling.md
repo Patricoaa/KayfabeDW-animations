@@ -5,34 +5,41 @@
 
 ## Objective
 Add a new animation template, `race-scrolling`, that builds on `timeline-race`
-but with a *scrolling plane*: instead of a fixed guide sweeping over static
-bars, the WHOLE plane (ranked bars + axis band) translates horizontally so the
-current moment stays pinned under a fixed "now" line (camera following the
-leader — "todo el plano scrollea"). Each entity's bar travels on the axis,
-stuck by its TIP to its current step position, and its length is proportional
-to the accumulated value. Per the approved plan, the axis supports **dates or
-numbers with auto-detection**, and each active entity drops a **marker on the
-scrolling axis band** at its current step showing the accumulated value as a
-**number, an icon, or a reference image**.
+but with a *scrolling plane*: the DATE axis band translates horizontally so the
+current moment stays pinned under a fixed "now" line. The **ENTITY AXIS is
+STATIC**: each entity has a fixed lane with its name (and avatar) pinned on the
+left, always visible. Its bar grows IN PLACE from that axis, with length
+proportional to the accumulated value up to the current moment (interpolated
+between data points), so the bar "eats" each date's value as the now-line
+passes it. Per the approved plan, the axis supports **dates or numbers with
+auto-detection**, and each active entity drops a **marker on the scrolling axis
+band** at its current step showing the accumulated value as a **number, an
+icon, or a reference image**.
 
 Verified with the repo gate: `npx tsc --noEmit` (lint is broken repo-wide).
 
 ## Decisions (from the plan review)
-1. **Visual model:** "Todo el plano scrollea" — rows + axis band translate as a
-   block; the plane scrolls so that current playback always passes the fixed
-   `anchorX` "now" line.
-2. **Value in the axis:** "Marcador por entidad con modo configurable" —
+1. **Visual model:** "Filas estáticas + barra crece en sitio" — each entity gets
+   a fixed row; the bar grows from the name column with the accumulated value
+   (interpolated between data points). Only the date axis band below scrolls; the
+   now-guide and the header stay fixed.
+2. **Bar growth:** "Longitud = acumulado, con interpolación" — bar length is
+   proportional to the accumulated value up to the current moment
+   (`(current/currentMax) * BAR_MAX_W`), interpolating continuously between data
+   points; the bar grows smoothly and the step "bumps" on the date.
+3. **Value in the axis:** "Marcador por entidad con modo configurable" —
    `markerMode: 'number' | 'icon' | 'image'`; icon glyphs come from
    `ICON_GLYPHS`, image markers reuse the entity's avatar URL (`imageField`)
    with a fallback to the number when no URL exists.
-3. **Axis type:** dates + numbers with auto-detection — `dateField` is parsed
+4. **Axis type:** dates + numbers with auto-detection — `dateField` is parsed
    to timestamps (bucketed per `dateFormat`); if no usable date column exists,
    `axisField` (or a heuristic time-ish fully-numeric column) drives the same
    scrolling race with `axisUnit: 'number'`. With neither, the template falls
    back to the parallel-bar compat mode.
-4. **Bar anchor convention:** the bar TIP is pinned to the entity's *current
-   step* (`curX * BAR_MAX_W`), not to the fixed "now" line, so the bar is at
-   its data position on the axis and the value grows backward from it.
+5. **Bar anchor convention:** the bar GROWS FROM THE LEFT (entity axis,
+   `BAR_TRACK_X = PAD_L + NAME_W + ROW_GAP_PX`), length `(current/currentMax) *
+   BAR_MAX_W`, no longer pinned by tip to the scrolling axis. The scrolling only
+   affects the axis band, whose markers pass under the fixed now-line.
 
 ## New files
 - `src/remotion/templates/race-scrolling/meta.json` — id `race-scrolling`,
