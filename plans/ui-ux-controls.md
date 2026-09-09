@@ -1,6 +1,6 @@
 # UI/UX — Controls Consolidation & Panel Ordering
 
-**Status:** Done (Fases A–E)
+**Status:** Done (Fases A–F)
 **App:** `/animations`
 
 ## Objective
@@ -77,6 +77,39 @@ Espaciado → Avatar → Adicionales.**
   inputs, chart filter value input, custom-icon file input.
 - `SwitchControl` already exposed `aria-label`; `ColorPickerControl` already
   labeled its swatch input.
+
+## Fase F — Resizable sidebars, axis cleanup, text angle & overlay layout
+- **Resizable sidebars** (`src/hooks/use-resizable-width.ts`): shared drag
+  pointer hook (default/min/max width + `edge: 'left' | 'right'`).
+  - QueryCanvas: `Tablas` sidebar (`query-canvas.tsx`) resizes from its right
+    edge (`w-56` → `md:w-[var(--tables-w)]`, 200–480 px).
+  - Builder: Configurar + Exportar asides (`builder/page.tsx`) resize from a
+    `md+` flex handle on their left edge via `md:w-[var(--config-w)]`
+    (320–640 px); mobile bottom-sheet layout untouched.
+- **Axis-title controls removed** (`chart-config-panel.tsx`): deleted the
+  `Etiqueta eje X` input + `Fuente de etiquetas` (`xLabel` / `xLabelFont`) and
+  `Etiqueta eje Y` + `Fuente de etiquetas` (`yLabel` / `yLabelFont`). Fields
+  stay in `ChartConfig` (no migration): saved configs keep rendering their old
+  axis titles; category-label and Y-tick typography fall back to the global
+  style defaults. `setXLabelFont`/`setYLabelFont` removed.
+- **Text angle**: `TextStyle` gains `angle?: number` (deg); `TextStyleControls`
+  adds an "Ángulo (°)" `NumberControl` (−180…180, Auto reset). Rendered by the
+  shared `textStyle()` remotion helper (both templates) and, for static SVG, on
+  the title/subtitle (`SvgHeader` / `TitleBlock`, combined with the existing
+  `layout.rotation`) and the X-axis title (`XAxisTitle`, `angle` prop). The
+  Y-axis title keeps its fixed −90° layout.
+- **Overlay editor shared**: new `src/components/ui/controls/overlay-editor.tsx`
+  (`OverlayEditor`) replaces the duplicated per-overlay markup in the static
+  panel and the animation `OverlaysSection`. Header + shared "Capa / Posición ·
+  Opacidad · Blur" row, then type cards: text (textarea + `TextStyleControls` +
+  full `LayoutControls` for static / compact X·Y·Rotación for animation),
+  shape (type chips, colors, geometry incl. radius/stroke/rotation), image
+  (URL input for static / `FileUploadInput` for animation, geometry). The
+  static variant keeps `ColorPickerControl`; the animation variant keeps
+  `AutoColorInput`.
+- **Known limitation (pre-existing, untouched)**: the animation templates do
+  not consume `overlays` — timeline/ranking overlay controls configure data
+  that is not yet rendered.
 
 ## Verification
 - `npx tsc --noEmit` clean.
