@@ -212,6 +212,53 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
   valueText?: RaceTextStyle;
 };
 
+// Race Scrolling: a ranked bar race on a plane that SCROLLS horizontally as a
+// whole (bars + axis band travel together, "camera following the leader")
+// instead of a fixed guide sweeping over static bars. Each entity's bar is
+// stuck by its TIP to its current position on the passing axis and its length
+// is proportional to the accumulated value; the current time always sits under
+// a fixed "now" line. The axis supports dates (`dateField` → timestamps,
+// `dateFormat` day/month/year) or plain numbers (`axisField` → years, rounds,
+// days). When neither a usable date column nor a numeric axis column exists,
+// the template falls back to Timeline Race's parallel-bar mode so older data
+// keeps rendering.
+//
+// The bar geometry, entry/pop, ranking swaps, winner reveal and outro mirror
+// the timeline race. What's new is the scrolling world: `anchorX` (5-95%)
+// places the fixed "now" line on the track, `axisTicks` controls the tick
+// density on the traveling band, and `showMarkers`/`markerMode` draw one
+// marker per active entity on the band at its current step showing the
+// accumulated value as a number, an icon (from ICON_GLYPHS) or a reference
+// image (the entity's avatar URL). `barColors`, `barPalette` and the row/avatar
+// controls are shared with the timeline race.
+export type RaceScrollingConfig = TimelineRaceConfig & {
+  // Optional axis column for the numeric axis mode. When set and the dataset
+  // has no usable date column, rows are positioned on the axis using this
+  // column's numbers instead (years, rounds, days...). Mirrors `dateField`.
+  axisField?: string;
+
+  // Camera anchor: % of the track width where the fixed "now" line sits
+  // (5-95, default 35). The whole plane scrolls so this point always matches
+  // the current playback position.
+  anchorX?: number;
+
+  // Number of ticks drawn on the scrolling axis band (2-24, default 8).
+  axisTicks?: number;
+
+  // Per-entity markers on the scrolling axis band at each entity's current
+  // step. Default OFF-marker rendering is driven by `markerMode`:
+  // 'number' (+2px bold on the axis font), 'icon' (a glyph from ICON_GLYPHS,
+  // tinted with the entity's bar color) or 'image' (the entity's avatar photo
+  // in a rounded frame). `markerIcon` picks the glyph, `markerSize` (px) sets
+  // the box size (band auto-grows to fit) and `markerText` overrides the
+  // number's typography.
+  showMarkers?: boolean;
+  markerMode?: 'number' | 'icon' | 'image';
+  markerIcon?: string;
+  markerSize?: number;
+  markerText?: RaceTextStyle;
+};
+
 // The movable elements of a ranking row. During entry each one travels along a
 // straight cardinal path; per-element direction/delay overrides are keyed by
 // these ids ('bar' is the bar in bars mode and the label in table mode).
@@ -374,6 +421,7 @@ export type RankingConfig = CommonAnimationConfig & {
 // the static chart's xField/yField mapping until their own config UI lands.
 export type AnimationTemplateConfig = {
   'timeline-race'?: TimelineRaceConfig;
+  'race-scrolling'?: RaceScrollingConfig;
   'ranking'?: RankingConfig;
 };
 

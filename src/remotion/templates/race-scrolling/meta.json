@@ -1,0 +1,21 @@
+{
+  "id": "race-scrolling",
+  "name": "Race Scrolling",
+  "description": "Carrera con plano desplazable: fechas o números en scroll, valor acumulado marcado en el eje",
+  "componentId": "RaceScrolling",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "defaultDuration": 14,
+  "dataOptions": [],
+  "dataProfile": {
+    "requiredColumns": ["label", "value"],
+    "optionalColumns": ["date", "image"],
+    "columnHints": {
+      "label": ["text"],
+      "value": ["number"]
+    },
+    "minRows": 2,
+    "rowMatch": "at_least"
+  }
+}

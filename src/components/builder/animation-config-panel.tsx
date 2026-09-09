@@ -3,8 +3,9 @@
 import React, {useState} from 'react';
 import { SelectControl, NumberControl, ColorPickerControl, SwitchControl, Collapsible, Tabs, TextStyleControls, SliderNumberInput, FileUploadInput, FieldSelect, EntitySearch, PalettePicker, OverlayEditor } from '@/components/ui/controls';
 import type {ColumnMeta} from '@/components/builder/chart-config-panel';
-import type {TimelineRaceConfig, RankingConfig, DateFormat, AvatarShape, AvatarCrop, RaceTextStyle, ValueFormat, RowEntryElement, CommonHeaderConfig, CommonCanvasConfig} from '@/lib/animation-config';
+import type {TimelineRaceConfig, RaceScrollingConfig, RankingConfig, DateFormat, AvatarShape, AvatarCrop, RaceTextStyle, ValueFormat, RowEntryElement, CommonHeaderConfig, CommonCanvasConfig} from '@/lib/animation-config';
 import {avatarCropRect, VALUE_FORMATS} from '@/lib/animation-config';
+import {ICON_GLYPHS, ICON_GLYPH_NAMES} from '@/lib/chart-icons';
 
 type Participant = {label: string; image?: string | null};
 
@@ -21,8 +22,8 @@ type AnimationConfigPanelProps = {
   templateId: string;
   columns: string[];
   fieldMeta: ColumnMeta[];
-  value: TimelineRaceConfig | RankingConfig;
-  onChange: (next: TimelineRaceConfig | RankingConfig) => void;
+  value: TimelineRaceConfig | RaceScrollingConfig | RankingConfig;
+  onChange: (next: TimelineRaceConfig | RaceScrollingConfig | RankingConfig) => void;
   participants?: Participant[];
   templateSelector?: React.ReactNode;
 };
@@ -739,6 +740,454 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
   );
 }
 
+// Race Scrolling config UI: same header/cols/avatar/bars/canvas as the
+// timeline race, plus the scrolling "Eje" section (camera anchor + ticks) and
+// the "Marcadores del eje" section (per-entity value markers on the band).
+type RaceScrollingPanelProps = Omit<AnimationConfigPanelProps, 'value' | 'onChange'> & {
+  value: RaceScrollingConfig;
+  onChange: (next: RaceScrollingConfig) => void;
+};
+
+function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, participants = [], templateSelector}: RaceScrollingPanelProps) {
+  const update = (patch: Partial<RaceScrollingConfig>) => onChange({...value, ...patch});
+  const fmt = (value.dateFormat ?? 'day') as DateFormat;
+  const setBarColor = (label: string, color?: string) => {
+    const next = {...(value.barColors ?? {})};
+    if (color) next[label] = color;
+    else delete next[label];
+    update({barColors: next});
+  };
+  const setRowOrder = (order: ('bar' | 'avatar')[]) => update({rowOrder: order});
+
+  const [colorQ, setColorQ] = useState('');
+  const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const matchQ = (label: string, q: string) => (q.trim() === '' ? true : norm(label).includes(norm(q)));
+  const filteredColors = participants.filter((p) => matchQ(p.label, colorQ));
+  const barPalette = value.barPalette ?? [];
+  const palIndex = new Map(participants.map((p, i) => [p.label, i]));
+  const setBarPalette = (colors?: string[]) => update({barPalette: colors});
+
+  const markerMode = value.markerMode ?? 'number';
+
+  return (
+    <Tabs
+      tabs={[{ id: 'data', label: 'Datos' }, { id: 'design', label: 'Diseño' }]}
+      className="h-full"
+    >
+      {(activeTab) => (
+        <div className="space-y-4 pb-12">
+          {activeTab === 'data' && (
+            <>
+              {templateSelector}
+
+              <Collapsible title="Datos" defaultOpen>
+        <FieldSelect
+          label="Entidad / etiqueta"
+          value={value.labelField ?? ''}
+          options={fieldMeta}
+          fallback={columns}
+          onChange={(v) => update({labelField: v || undefined})}
+        />
+        <FieldSelect
+          label="Imagen de la entidad (opcional)"
+          value={value.imageField ?? ''}
+          options={fieldMeta}
+          fallback={columns}
+          role="any"
+          optional
+          onChange={(v) => update({imageField: v || undefined})}
+        />
+        <FieldSelect
+          label="Campo de fecha"
+          value={value.dateField ?? ''}
+          options={fieldMeta}
+          fallback={columns}
+          role="date"
+          onChange={(v) => update({dateField: v || undefined})}
+        />
+        <FieldSelect
+          label="Campo del eje numérico (opcional)"
+          value={value.axisField ?? ''}
+          options={fieldMeta}
+          fallback={columns}
+          role="numeric"
+          optional
+          onChange={(v) => update({axisField: v || undefined})}
+        />
+        <p className="text-[10px] text-muted -mt-1">
+          Si el dataset no tiene una columna de fechas usable, el plano se desplaza por los números de esta columna (años, rondas, días...). El tipo de eje se detecta automáticamente.
+        </p>
+        <FieldSelect
+          label="Campo de valor acumulado"
+          value={value.valueField ?? ''}
+          options={fieldMeta}
+          fallback={columns}
+          role="numeric"
+          onChange={(v) => update({valueField: v || undefined})}
+        />
+        <div>
+          <label className="text-sm font-medium mb-1 block">Agregación por periodo</label>
+          <SelectControl
+            value={value.valueAgg ?? 'sum'}
+            onChange={(e) => update({valueAgg: e.target.value as RaceScrollingConfig['valueAgg']})}
+            className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+          >
+            <option value="sum">Suma</option>
+            <option value="count">Conteo</option>
+            <option value="avg">Promedio</option>
+            <option value="min">Mínimo</option>
+            <option value="max">Máximo</option>
+            <option value="last">Último valor</option>
+          </SelectControl>
+          <p className="text-[10px] text-muted mt-0.5">
+            Función aplicada cuando varios registros caen en el mismo periodo para la misma entidad.
+          </p>
+        </div>
+        <div>
+          <label className="text-sm font-medium mb-1 block">Modo de acumulación</label>
+          <SelectControl
+            value={value.accumulateMode ?? 'running'}
+            onChange={(e) => update({accumulateMode: e.target.value as RaceScrollingConfig['accumulateMode']})}
+            className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+          >
+            <option value="running">Acumulado corriente (clásico)</option>
+            <option value="period">Solo valor del periodo</option>
+          </SelectControl>
+          <p className="text-[10px] text-muted mt-0.5">
+            "Acumulado corriente": cada paso suma al total previo. "Solo periodo": cada paso muestra únicamente el valor de ese rango.
+          </p>
+        </div>
+      </Collapsible>
+
+      <Collapsible title="Ranking">
+        <div>
+          <label className="text-sm font-medium mb-1 block">Máximo de entidades</label>
+          <input
+            type="number"
+            min={0}
+            max={50}
+            value={value.maxRows ?? 0}
+            onChange={(e) => update({maxRows: Number(e.target.value) || undefined})}
+            className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+          />
+          <p className="text-[10px] text-muted mt-0.5">
+            0 = sin límite. Limita la cantidad de entidades visibles en la carrera.
+          </p>
+        </div>
+        <SliderNumberInput
+          label="Duración de la carrera (s)"
+          value={value.raceDurationSeconds ?? 0}
+          min={0}
+          max={60}
+          step={1}
+          onChange={(v) => update({raceDurationSeconds: v > 0 ? v : undefined})}
+        />
+        <p className="text-[10px] text-muted mt-0.5">
+          Tiempo del recorrido del eje. 0 = automático (la carrera ocupa todo el tiempo disponible). Al fijarla, el tiempo sobrante queda congelado en el resultado final.
+        </p>
+        <SwitchControl
+          label="Efecto podio al final"
+          checked={value.podiumEffect ?? true}
+          onChange={(v) => update({podiumEffect: v})}
+        />
+        <p className="text-[10px] text-muted">
+          Cuando se revela el ganador, lo agranda con brillo y atenúa a los que no quedaron primeros. Apagado = sin atenuación ni brillo.
+        </p>
+      </Collapsible>
+            </>
+          )}
+          {activeTab === 'design' && (
+            <>
+      {/* ============ HEADER ============ */}
+      <HeaderSection value={value} update={update} />
+
+      {/* ============ COLORES ============ */}
+      {participants.length > 0 && (
+        <Collapsible title="Colores">
+          <div className="flex items-center justify-between mb-0.5">
+            <label className="text-sm font-medium block">Colores por entidad</label>
+            {Object.keys(value.barColors ?? {}).length > 0 && (
+              <button type="button" onClick={() => update({barColors: undefined})} className="text-[10px] text-muted hover:text-red-500">
+                Limpiar todos
+              </button>
+            )}
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Paleta de colores</label>
+            <PalettePicker selected={barPalette} onSelect={setBarPalette} onClear={() => setBarPalette(undefined)} />
+          </div>
+          <p className="text-[10px] text-muted">
+            La paleta colorea cada entidad cíclicamente; un color manual por entidad tiene prioridad sobre ella.
+          </p>
+          <EntitySearch value={colorQ} onChange={setColorQ} shown={filteredColors.length} total={participants.length} />
+          <div className="space-y-1.5">
+            {filteredColors.map((p) => {
+              const paletteColor = barPalette.length ? barPalette[(palIndex.get(p.label) ?? 0) % barPalette.length] : undefined;
+              const color = value.barColors?.[p.label] ?? paletteColor ?? '#3f3f46';
+              return (
+                <div key={p.label} className="flex items-center gap-2">
+                  <span className="w-12 h-8 shrink-0 rounded border border-border-default" style={{backgroundColor: paletteColor ?? 'transparent', boxShadow: value.barColors?.[p.label] ? `inset 0 0 0 2px ${color}` : 'none'}} />
+                  <span className="sr-only">{paletteColor ? 'Color de paleta' : 'Color manual'}</span>
+                  <input
+                    type="color"
+                    value={color}
+                    onChange={(e) => setBarColor(p.label, e.target.value)}
+                    className="w-8 h-8 rounded cursor-pointer border border-border-default bg-transparent"
+                    aria-label={`Color de ${p.label}`}
+                  />
+                  <span className="text-xs text-secondary truncate flex-1">{p.label}</span>
+                  {value.barColors?.[p.label] && (
+                    <button
+                      onClick={() => setBarColor(p.label)}
+                      className="text-muted hover:text-red-500 px-1 text-xs"
+                      aria-label={`Restablecer color de ${p.label}`}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </Collapsible>
+      )}
+
+      {/* ============ BARRAS ============ */}
+      {participants.length > 0 && (
+        <Collapsible title="Barras">
+          <SliderNumberInput
+            label="Ancho de las barras (%)"
+            value={value.barWidth ? Math.round(value.barWidth * 100) : 75}
+            min={40}
+            max={95}
+            step={5}
+            onChange={(v) => update({barWidth: v ? v / 100 : undefined})}
+          />
+          <p className="text-[10px] text-muted mb-1">
+            Reduce el porcentaje para dar más espacio al valor y al avatar (útil cuando el valor se sale de pantalla).
+          </p>
+          <NumberControl label="Radio de esquina de la barra (vacío = píldora)" value={value.barRadius} min={0} max={60} step={1} onChange={(v) => update({barRadius: v})} />
+          <NumberControl label="Grosor de la barra (px, vacío = automático)" value={value.barThickness} min={4} max={120} step={2} onChange={(v) => update({barThickness: v})} />
+          <div className="pt-2 mt-1 border-t border-border-subtle">
+            <p className="text-[10px] text-muted mb-1.5">Posición del grupo de filas (offset en px desde su lugar por defecto).</p>
+            <div className="grid grid-cols-2 gap-2">
+              <NumberControl label="X (px)" value={value.barsX} step={4} onChange={(v) => update({barsX: v})} />
+              <NumberControl label="Y (px)" value={value.barsY} step={4} onChange={(v) => update({barsY: v})} />
+            </div>
+          </div>
+        </Collapsible>
+      )}
+
+      {/* ============ EJE (scrolling) ============ */}
+      <Collapsible title="Eje" defaultOpen>
+        <div>
+          <label className="text-sm font-medium mb-1 block">Formato de fecha</label>
+          <SelectControl
+            value={fmt}
+            onChange={(e) => update({dateFormat: e.target.value as DateFormat})}
+            className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+          >
+            <option value="day">Día</option>
+            <option value="month">Mes</option>
+            <option value="year">Año</option>
+          </SelectControl>
+          <p className="text-[10px] text-muted mt-0.5">
+            Agrupa los datos por día, mes o año y re-agrega el valor acumulado en cada rango.
+          </p>
+        </div>
+        <SliderNumberInput
+          label="Ancla de la cámara (% del carril)"
+          value={value.anchorX ?? 35}
+          min={5}
+          max={95}
+          step={1}
+          onChange={(v) => update({anchorX: v})}
+        />
+        <p className="text-[10px] text-muted mb-1">
+          Donde queda fija la línea "ahora": todo el plano se desplaza para que el momento actual pase siempre por ahí. Un valor alto = el recorrido ocurre a la izquierda.
+        </p>
+        <SliderNumberInput
+          label="Marcas del eje"
+          value={value.axisTicks ?? 8}
+          min={2}
+          max={24}
+          step={1}
+          onChange={(v) => update({axisTicks: v})}
+        />
+        <SwitchControl
+          label="Mostrar eje (banda desplazable)"
+          checked={value.showXAxis ?? true}
+          onChange={(v) => update({showXAxis: v})}
+        />
+        <div>
+          <label className="text-sm font-medium mb-1 block">Posición del eje</label>
+          <div className="grid grid-cols-2 gap-1">
+            {(['bottom', 'top'] as const).map((pos) => (
+              <button
+                key={pos}
+                type="button"
+                onClick={() => update({axisPosition: pos})}
+                className={`px-2 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  (value.axisPosition ?? 'bottom') === pos
+                    ? 'bg-amber-500 text-black'
+                    : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
+                }`}
+              >
+                {pos === 'bottom' ? 'Abajo' : 'Arriba'}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <label className="text-sm font-medium mb-2 block">Orden de la fila (izq → der)</label>
+          <RowOrderControl value={value.rowOrder ?? ['bar', 'avatar']} onChange={setRowOrder} />
+        </div>
+        <SliderNumberInput label="Separación vertical entre filas (px)" value={value.rowGap ?? 0} min={0} max={120} step={2} onChange={(v) => update({rowGap: v || undefined})} />
+        <SliderNumberInput label="Separación horizontal (px)" value={value.rowGapH ?? 0} min={0} max={80} step={2} onChange={(v) => update({rowGapH: v || undefined})} />
+        <SelectControl
+          label="Formato del valor acumulado"
+          value={value.valueFormat ?? 'number'}
+          options={VALUE_FORMATS}
+          onChange={(e) => update({valueFormat: e.target.value as ValueFormat})}
+        />
+        {(value.valueFormat ?? 'number') === 'currency' && (
+          <div>
+            <label className="text-sm font-medium mb-1 block">Símbolo de moneda</label>
+            <input
+              value={value.currencySymbol ?? '$'}
+              onChange={(e) => update({currencySymbol: e.target.value || undefined})}
+              className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+            />
+          </div>
+        )}
+        <p className="text-[10px] text-muted">
+          El eje muestra fechas (o números, con el campo del eje numérico) y viaja con el plano. La fecha en pantalla se muestra abajo a la derecha e indica el momento del recorrido.
+        </p>
+      </Collapsible>
+
+      {/* ============ MARCADORES DEL EJE ============ */}
+      <Collapsible title="Marcadores del eje">
+        <SwitchControl
+          label="Marcadores por entidad"
+          checked={value.showMarkers ?? true}
+          onChange={(v) => update({showMarkers: v})}
+        />
+        <p className="text-[10px] text-muted mt-0.5">
+          Cada entidad activa deja un marcador en la banda del eje en su paso actual, mostrando el valor acumulado.
+        </p>
+        <div className="mt-2">
+          <div>
+            <label className="text-sm font-medium mb-1 block">Modo del marcador</label>
+              <SelectControl
+                value={markerMode}
+                onChange={(e) => update({markerMode: e.target.value as RaceScrollingConfig['markerMode']})}
+                className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+              >
+                <option value="number">Número</option>
+                <option value="icon">Ícono</option>
+                <option value="image">Imagen de referencia</option>
+              </SelectControl>
+            </div>
+            {markerMode === 'icon' && (
+              <div>
+                <label className="text-sm font-medium mb-1 block">Ícono (tintado con el color de la barra)</label>
+                <div className="grid grid-cols-7 gap-1">
+                  {ICON_GLYPH_NAMES.map((name) => (
+                    <button
+                      key={name}
+                      onClick={() => update({markerIcon: name})}
+                      title={name}
+                      className={`p-1.5 rounded flex items-center justify-center transition-colors ${
+                        (value.markerIcon ?? 'star') === name ? 'bg-amber-500 text-black' : 'bg-elevated text-secondary hover:bg-card-hover'
+                      }`}
+                    >
+                      <svg viewBox="0 0 24 24" width="18" height="18">
+                        <path d={ICON_GLYPHS[name]} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                      </svg>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-muted mt-1">
+                  Usa el ícono base o uno por entidad vía «Imagen de la entidad» si usas el modo imagen.
+                </p>
+              </div>
+            )}
+            {markerMode === 'image' && (
+              <p className="text-[10px] text-muted mt-1">
+                Reutiliza la imagen de cada entidad («Imagen de la entidad» en Datos) como marcador; si una entidad no tiene imagen, se muestra su número.
+              </p>
+            )}
+            <NumberControl label="Tamaño del marcador (px)" value={value.markerSize} min={12} max={120} step={2} onChange={(v) => update({markerSize: v})} />
+            {markerMode === 'number' && (
+              <div className="pt-2 mt-1 border-t border-border-subtle">
+                <TextStyleControls label="Texto del marcador" value={value.markerText} onChange={(patch) => update({markerText: {...(value.markerText ?? {}), ...patch}})} showTextTransform showSpacing showHighlight showUnderline maxSize={80} />
+              </div>
+            )}
+          </div>
+      </Collapsible>
+
+      {/* ============ EJE Y ============ */}
+      <Collapsible title="Eje Y">
+        <SwitchControl
+          label="Eje vertical (Y)"
+          checked={value.showYAxis ?? false}
+          onChange={(v) => update({showYAxis: v || undefined})}
+        />
+        <ColorPickerControl label="Color del eje" value={value.yAxisColor ?? '#334155'} onChange={(v) => update({yAxisColor: v || undefined})} />
+        <SliderNumberInput label="Grosor del eje (px)" value={value.yAxisWidth ?? 2} min={1} max={12} step={1} onChange={(v) => update({yAxisWidth: v || undefined})} />
+        <p className="text-[10px] text-muted">
+          Línea vertical en el origen (mínimo del eje) de las barras. Se desplaza con el plano.
+        </p>
+      </Collapsible>
+
+      {/* ============ FECHA ============ */}
+      <Collapsible title="Fecha">
+        <SwitchControl
+          label="Mostrar fecha en pantalla"
+          checked={value.showDateLabel ?? true}
+          onChange={(v) => update({showDateLabel: v})}
+        />
+        <div className="pt-2 mt-1 border-t border-border-subtle">
+          <p className="text-[10px] text-muted mb-1.5">Posición de la fecha (offset en px desde la esquina inferior derecha).</p>
+          <div className="grid grid-cols-2 gap-2">
+            <NumberControl label="X (px)" value={value.dateX} step={4} onChange={(v) => update({dateX: v})} />
+            <NumberControl label="Y (px)" value={value.dateY} step={4} onChange={(v) => update({dateY: v})} />
+          </div>
+        </div>
+        <div className="pt-2 mt-1 border-t border-border-subtle">
+          <TextStyleControls label="Texto de la fecha" value={value.dateText} onChange={(patch) => update({dateText: {...(value.dateText ?? {}), ...patch}})}  showTextTransform showSpacing showHighlight showUnderline maxSize={160}/>
+        </div>
+      </Collapsible>
+
+      {/* ============ ETIQUETAS ============ */}
+      <Collapsible title="Etiquetas">
+        <TextStyleControls label="Texto de la etiqueta" value={value.labelText} onChange={(patch) => update({labelText: {...(value.labelText ?? {}), ...patch}})}  showTextTransform showSpacing showHighlight showUnderline maxSize={160}/>
+        <p className="text-[10px] text-muted mt-0.5">
+          El nombre de la entidad que se apoya sobre la barra en el outro final.
+        </p>
+        <div className="h-px bg-border-default my-3" />
+        <TextStyleControls label="Texto del dato (dentro de la barra)" value={value.valueText} onChange={(patch) => update({valueText: {...(value.valueText ?? {}), ...patch}})}  showTextTransform showSpacing showHighlight showUnderline maxSize={160}/>
+        <p className="text-[10px] text-muted mt-0.5">
+          El valor acumulado que viaja dentro de cada barra.
+        </p>
+      </Collapsible>
+
+      {/* ============ LIENZO ============ */}
+      <CanvasSection value={value} update={update} />
+
+      {/* ============ AVATAR ============ */}
+      <AvatarSection value={value} onChange={update} participants={participants} />
+
+      {/* ============ ADICIONALES ============ */}
+      <OverlaysSection value={value} update={update} />
+            </>
+          )}
+        </div>
+      )}
+    </Tabs>
+  );
+}
+
 let animOverlayIdCounter = 0;
 function newAnimOverlayId(): string {
   return `ov-${Date.now()}-${++animOverlayIdCounter}`;
@@ -1399,6 +1848,9 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = [], t
 export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onChange, participants = [], templateSelector}: AnimationConfigPanelProps) {
   if (templateId === 'ranking') {
     return <RankingPanel columns={columns} fieldMeta={fieldMeta} value={value as RankingConfig} onChange={onChange as (n: RankingConfig) => void} participants={participants} templateSelector={templateSelector} />;
+  }
+  if (templateId === 'race-scrolling') {
+    return <RaceScrollingPanel templateId={templateId} columns={columns} fieldMeta={fieldMeta} value={value as RaceScrollingConfig} onChange={onChange as (n: RaceScrollingConfig) => void} participants={participants} templateSelector={templateSelector} />;
   }
   if (templateId !== 'timeline-race') return null;
   return <TimelineRacePanel templateId={templateId} columns={columns} fieldMeta={fieldMeta} value={value as TimelineRaceConfig} onChange={onChange as (n: TimelineRaceConfig) => void} participants={participants} templateSelector={templateSelector} />;

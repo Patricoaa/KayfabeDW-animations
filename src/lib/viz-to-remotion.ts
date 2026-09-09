@@ -2,7 +2,7 @@ import type {ChartConfig} from './chart-config';
 import {TEMPLATES} from '@/remotion/generated/registry';
 import type {TemplateId} from '@/remotion/generated/registry';
 import {matchTemplates} from './profile-matcher';
-import type {AnimationTemplateConfig, CommonAnimationConfig, RankingConfig, TimelineRaceConfig} from './animation-config';
+import type {AnimationTemplateConfig, CommonAnimationConfig, RaceScrollingConfig, RankingConfig, TimelineRaceConfig} from './animation-config';
 
 export type RemotionInputProps = {
   templateId: string;
@@ -431,6 +431,252 @@ export function getTimelineRaceParticipants(
   return out;
 }
 
+// ---- Race Scrolling ----
+//
+// Like the timeline race, but the whole plane (bars + axis band) SCROLLS so
+// the current time stays pinned under a fixed "now" line. The axis quantity is
+// auto-detected: dates (`dateField`, bucketed by `dateFormat`) win, else a
+// numeric axis column (`axisField`, or a time-ish fully-numeric column: years,
+// rounds, days...) runs the same scrolling race with `axisUnit: 'number'`.
+// With neither a usable date nor a numeric axis column the template falls back
+// to the parallel-bar compat mode so older datasets keep rendering.
+function convertRaceScrolling(
+  data: Record<string, unknown>[],
+  config: ChartConfig,
+  tc?: RaceScrollingConfig,
+): Record<string, unknown> {
+  // Race-specific presentation fields (offset geometry, avatar/bar styling,
+  // scrolling axis + per-entity markers).
+  const presentationOf = (t: RaceScrollingConfig | undefined) => ({
+    ...commonPropsOf(t),
+    showDateLabel: t?.showDateLabel,
+    showXAxis: t?.showXAxis,
+    axisPosition: t?.axisPosition,
+    anchorX: t?.anchorX,
+    axisTicks: t?.axisTicks,
+    showMarkers: t?.showMarkers,
+    markerMode: t?.markerMode,
+    markerIcon: t?.markerIcon,
+    markerSize: t?.markerSize,
+    markerText: t?.markerText,
+    maxRows: t?.maxRows,
+    holdFinalSeconds: t?.holdFinalSeconds,
+    raceDurationSeconds: t?.raceDurationSeconds,
+    podiumEffect: t?.podiumEffect,
+    showRail: t?.showRail,
+    barsX: t?.barsX,
+    barsY: t?.barsY,
+    rowOrder: t?.rowOrder,
+    rowGapH: t?.rowGapH,
+    rowGap: t?.rowGap,
+    barWidth: t?.barWidth,
+    dateX: t?.dateX,
+    dateY: t?.dateY,
+    showAvatar: t?.showAvatar,
+    avatarSize: t?.avatarSize,
+    avatarShape: t?.avatarShape,
+    avatarRadius: t?.avatarRadius,
+    avatarBg: t?.avatarBg,
+    avatarBorderColor: t?.avatarBorderColor,
+    avatarBorderWidth: t?.avatarBorderWidth,
+    avatarCrops: t?.avatarCrops,
+    barColors: t?.barColors,
+    barRadius: t?.barRadius,
+    barPalette: t?.barPalette,
+    barThickness: t?.barThickness,
+    valueFormat: t?.valueFormat,
+    currencySymbol: t?.currencySymbol,
+    showYAxis: t?.showYAxis,
+    yAxisColor: t?.yAxisColor,
+    yAxisWidth: t?.yAxisWidth,
+    dateText: t?.dateText,
+    labelText: t?.labelText,
+    valueText: t?.valueText,
+  });
+
+  const rows = data ?? [];
+  if (rows.length === 0) {
+    return {title: (tc?.title || config.title) ?? '', items: [], accentColor: config.colors?.[0] ?? '#FFD700', dateMode: false, ...presentationOf(tc)};
+  }
+
+  const labelField = resolveLabelField(rows, config, tc);
+  const valueField = tc?.valueField ?? config.yField;
+  const imageField = tc?.imageField;
+  const startField =
+    tc?.dateField ??
+    Object.keys(rows[0]).find((k) =>
+      k.toLowerCase().includes('date') || k.toLowerCase().includes('fecha') ||
+      k.toLowerCase().includes('inicio') || k.toLowerCase().includes('start'));
+
+  const items = rows
+    .map((row) => ({
+      label: String(row[labelField] ?? ''),
+      image: imageField ? avatarUrlOf(row[imageField]) : null,
+      date: startField ? parseDateValue(row[startField]) : null,
+      value: Number(row[valueField ?? Object.keys(row)[1] ?? ''] ?? 0),
+      row,
+    }))
+    .filter((it) => !isNaN(it.value));
+
+  // dateMode only when we actually parsed dates for at least two rows.
+  const dates = items.map((i) => i.date).filter((d): d is number => d != null);
+  const dateMode = dates.length >= 2;
+
+  // Numeric axis fallback: a fully-numeric column (prefer an explicit
+  // `axisField`, else a time-ish named column) drives the same scrolling race
+  // with axisUnit 'number'. Never reuse the value or label columns.
+  let numericAxisField: string | null = null;
+  if (!dateMode) {
+    const isStrictNumeric = (v: unknown) => {
+      if (typeof v === 'number') return true;
+      if (typeof v === 'string' && v.trim() !== '') {
+        const cleaned = v.trim().replace(/[%\s]/g, '').replace(/,/g, '.');
+        return !isNaN(Number(cleaned));
+      }
+      return false;
+    };
+    const numericCols = Object.keys(rows[0] ?? {}).filter(
+      (f) => f !== valueField && f !== labelField && !/imagen|image|url|avatar|icono/i.test(f) && rows.every((r) => isStrictNumeric(r[f])),
+    );
+    const explicit = tc?.axisField ? resolveKey(rows, tc.axisField) : '';
+    if (explicit && numericCols.includes(explicit)) numericAxisField = explicit;
+    else if (numericCols.length > 0) {
+      const timeish = numericCols.find((f) => /round|ronda|season|temporada|fecha|d[ií]a|a[ñn]o|year|day|week|semana|edici[óo]n|jornada|mes|month/i.test(f));
+      numericAxisField = timeish ?? numericCols[0];
+    }
+  }
+
+  const axisUnit: 'date' | 'number' = dateMode ? 'date' : numericAxisField ? 'number' : 'date';
+
+  if (!dateMode && !numericAxisField) {
+    // Compat: simple parallel bar ordered by value (no scrolling axis).
+    const sorted = [...items.filter((it) => it.date == null)].sort((a, b) => b.value - a.value);
+    return {
+      title: (tc?.title || config.title) ?? '',
+      items: sorted.map(({label, image, value}) => ({label, image, value})),
+      accentColor: config.colors?.[0] ?? '#FFD700',
+      dateMode: false,
+      ...presentationOf(tc),
+    };
+  }
+
+  // Every row carries its axis position: date ms (later bucketed by period) or
+  // the raw numeric value of the axis column.
+  const positioned = items.map((it) => ({
+    ...it,
+    pos: dateMode ? (it.date ?? NaN) : numericAxisField ? toNumeric(it.row[numericAxisField]) : NaN,
+  }));
+
+  // ---- Bucket positions per entity ----
+  const fmt = tc?.dateFormat ?? 'day';
+  const periodStart = (t: number, f: typeof fmt): number => {
+    const d = new Date(t);
+    if (f === 'year') return new Date(d.getFullYear(), 0, 1).getTime();
+    if (f === 'month') return new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  };
+  const bucketOf = (pos: number): number => (dateMode ? periodStart(pos, fmt) : pos);
+
+  const byLabel = new Map<string, {image: string | null; map: Map<number, {value: number; count: number; raws: number[]}>}>();
+  for (const it of positioned) {
+    if (it.label === '' || isNaN(it.pos)) continue;
+    let entry = byLabel.get(it.label);
+    if (!entry) {
+      entry = {image: it.image, map: new Map()};
+      byLabel.set(it.label, entry);
+    }
+    const bucket = bucketOf(it.pos);
+    let b = entry.map.get(bucket);
+    if (!b) {
+      b = {value: it.value, count: 1, raws: [it.value]};
+      entry.map.set(bucket, b);
+    } else {
+      b.count += 1;
+      b.raws.push(it.value);
+      b.value += it.value;
+    }
+  }
+
+  const agg = tc?.valueAgg ?? 'sum';
+  const accumulate = tc?.accumulateMode !== 'period';
+
+  const steps: {label: string; image: string | null; pos: number; value: number}[] = [];
+  for (const [label, entry] of byLabel) {
+    const ordered = Array.from(entry.map.entries()).sort((a, b) => a[0] - b[0]);
+    let running = 0;
+    for (const [period, bucket] of ordered) {
+      let periodValue: number;
+      if (agg === 'count') {
+        periodValue = bucket.count;
+      } else if (agg === 'avg') {
+        periodValue = bucket.raws.reduce((s, v) => s + v, 0) / bucket.count;
+      } else if (agg === 'min') {
+        periodValue = Math.min(...bucket.raws);
+      } else if (agg === 'max') {
+        periodValue = Math.max(...bucket.raws);
+      } else if (agg === 'last') {
+        periodValue = bucket.raws[bucket.raws.length - 1];
+      } else {
+        periodValue = bucket.raws.reduce((s, v) => s + v, 0);
+      }
+      running += periodValue;
+      steps.push({label, image: entry.image, pos: period, value: accumulate ? running : periodValue});
+    }
+  }
+
+  if (steps.length === 0) {
+    return {
+      title: (tc?.title || config.title) ?? '',
+      items: [],
+      accentColor: config.colors?.[0] ?? '#FFD700',
+      dateMode,
+      axisUnit,
+      dateFormat: dateMode ? fmt : undefined,
+      domain: (dateMode && dates.length > 0 ? [Math.min(...dates), Math.max(...dates)] : [0, 1]) as [number, number],
+      ...presentationOf(tc),
+    };
+  }
+
+  const stepPos = steps.map((s) => s.pos);
+  const sMin = Math.min(...stepPos);
+  const sMax = Math.max(...stepPos);
+
+  steps.sort((a, b) => a.label.localeCompare(b.label) || a.pos - b.pos);
+
+  return {
+    title: (tc?.title || config.title) ?? '',
+    items: steps,
+    accentColor: config.colors?.[0] ?? '#FFD700',
+    dateMode,
+    axisUnit,
+    dateFormat: dateMode ? fmt : undefined,
+    domain: [sMin, sMax] as [number, number],
+    ...presentationOf(tc),
+  };
+}
+
+// Distinct participants (label + avatar) for the per-entity controls of the
+// Race Scrolling config panel. Same resolution as convertRaceScrolling.
+export function getRaceScrollingParticipants(
+  data: Record<string, unknown>[],
+  config: ChartConfig,
+  tc?: RaceScrollingConfig,
+): {label: string; image?: string | null}[] {
+  const rows = data ?? [];
+  if (rows.length === 0) return [];
+  const labelField = resolveLabelField(rows, config, tc);
+  const imageField = tc?.imageField;
+  const seen = new Map<string, true>();
+  const out: {label: string; image?: string | null}[] = [];
+  for (const row of rows) {
+    const label = String(row[labelField] ?? '');
+    if (!label || seen.has(label)) continue;
+    seen.set(label, true);
+    out.push({label, image: imageField ? avatarUrlOf(row[imageField]) : null});
+  }
+  return out;
+}
+
 // Distinct participants (label + avatar) for the per-participant large-image
 // controls in the Ranking config panel. Mirrors getTimelineRaceParticipants
 // resolution (label from the ranking's labelField, avatar from imageField).
@@ -701,6 +947,7 @@ function aggregateRankingRows(
 
 const CONVERTERS: Record<string, (data: Record<string, unknown>[], config: ChartConfig, templateConfig?: unknown) => Record<string, unknown>> = {
   'timeline-race': (data, config, tc) => convertTimelineRace(data, config, tc as TimelineRaceConfig | undefined),
+  'race-scrolling': (data, config, tc) => convertRaceScrolling(data, config, tc as RaceScrollingConfig | undefined),
   'ranking': (data, config, rc) => convertRanking(data, config, rc as RankingConfig | undefined),
 };
 

@@ -22,7 +22,7 @@ import type {ChartConfig} from '@/lib/chart-config';
 import {DEFAULT_CHART_CONFIG, applyChartDefaults} from '@/lib/chart-config';
 import type {SchemaMetadata} from '@/lib/schema-metadata';
 import {getSchemaMetadata, getTableDepth, isNumericType} from '@/lib/schema-metadata';
-import {suggestBestTemplate, convertToRemotionProps, getTimelineRaceParticipants, getRankingParticipants} from '@/lib/viz-to-remotion';
+import {suggestBestTemplate, convertToRemotionProps, getTimelineRaceParticipants, getRankingParticipants, getRaceScrollingParticipants} from '@/lib/viz-to-remotion';
 import {applyChartFilters} from '@/lib/chart-data';
 import {chartToDataUrl} from '@/lib/export-static';
 import dynamic from 'next/dynamic';
@@ -570,6 +570,9 @@ function BuilderContent() {
     () => {
       if (activeTemplate === 'timeline-race') {
         return getTimelineRaceParticipants(filteredData, chartConfig, templateConfig['timeline-race']);
+      }
+      if (activeTemplate === 'race-scrolling') {
+        return getRaceScrollingParticipants(filteredData, chartConfig, templateConfig['race-scrolling']);
       }
       if (activeTemplate === 'ranking') {
         return getRankingParticipants(filteredData, chartConfig, templateConfig['ranking']);
