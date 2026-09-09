@@ -150,3 +150,25 @@ Changed: `src/remotion/templates/race-scrolling/index.tsx`,
 `src/components/builder/animation-config-panel.tsx` (relabeled the "Marcas del
 eje" slider → "Marcas del eje de valores", updated hint texts), this plan. Gate
 `npx tsc --noEmit` clean.
+
+## Feedback round (2026-09-09) — grid spacing configurable + etiqueta toggle
+User feedback: "la separación entre cada grid es configurable ... los ejes no
+tienen que mostrarse todos dentro del plot ... la separación entre fechas (grid
+debe ser configurable)" + "toggle para mostrar/ocultar etiqueta de la entidad."
+
+1. **Separación del grid configurable** — new `gridSpacing` (px, 20-320,
+   default 90) = min horizontal distance between consecutive positional
+   gridlines/labels. `ticks` still starts from the distinct real positions of
+   the data but only keeps one when `|x − lastKeptX| >= gridSpacing` (uses
+   `Math.abs`, so it also thins correctly on `desc` sweeps). Closer dates are
+   skipped; the rest slide in/out with the scroll and stay distinguishable.
+2. **Toggle de etiqueta de entidad** — new `showLabels` (default true). When
+   false `NAME_W = 0` and the renderer skips the name column, so the bar track
+   / plot box expands to the left (`BAR_TRACK_X`, `BAR_MAX_W`, now-guide and
+   gridlines all adapt since they derive from `NAME_W`).
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`,
+`src/lib/animation-config.ts`, `src/lib/viz-to-remotion.ts`,
+`src/components/builder/animation-config-panel.tsx` ("Separación del grid (px)"
+in Eje; "Mostrar etiqueta de la entidad" in Etiquetas; fixed stale hint about
+the outro label), this plan. Gate `npx tsc --noEmit` clean.

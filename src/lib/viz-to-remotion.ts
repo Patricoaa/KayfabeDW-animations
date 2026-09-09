@@ -458,6 +458,8 @@ function convertRaceScrolling(
     valueAxisPosition: t?.valueAxisPosition,
     anchorX: t?.anchorX,
     axisTicks: t?.axisTicks,
+    gridSpacing: t?.gridSpacing,
+    showLabels: t?.showLabels,
     showMarkers: t?.showMarkers,
     markerMode: t?.markerMode,
     markerIcon: t?.markerIcon,

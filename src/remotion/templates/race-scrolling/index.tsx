@@ -19,8 +19,10 @@ import {textStyle} from '../shared/text';
 // entity axis on the left). Inside it the plane scrolls horizontally like a
 // moving tape, keeping the current moment pinned under a fixed "now" line:
 //   - a positional band with ONE TICK + VERTICAL GRIDLINE per real date (or
-//     numeric axis value) present in the data — not evenly-spaced synthetic
-//     marks — plus an optional cardinality band (live value scale 0 → max);
+//     numeric axis value) present in the data, thinned so consecutive gridlines
+//     are at least `gridSpacing` px apart (the ones closer than that are
+//     skipped, the rest slide in/out with the scroll) — plus an optional
+//     cardinality band (live value scale 0 → max);
 //   - per-active-entity MARKERS in their own lane at their current step.
 // Everything on the tape (labels, gridlines, markers) is clipped at the plot
 // box, so it visibly slides out and disappears as it crosses the plot's limits
@@ -68,8 +70,16 @@ export type RaceScrollingProps = {
   // (5-95, default 35). The plane scrolls so this point always matches `now`.
   anchorX?: number;
   // Ticks on the CARDINALITY (value) band (2-24, default 8). The positional
-  // band ignores this: it always draws one tick/gridline per real data date.
+  // band ignores this: it draws one tick/gridline per real data date, thinned
+  // by `gridSpacing` (min px between consecutive gridlines, default 90).
   axisTicks?: number;
+  // Min horizontal distance (px, 20-320, default 90) between consecutive
+  // positional gridlines/labels on the plane. Dates closer than this are
+  // skipped; farther ones scroll in/out and stay distinguishable.
+  gridSpacing?: number;
+  // Show the entity name label on the fixed left axis (default true). When
+  // false the name column collapses and the bar track / plot expands left.
+  showLabels?: boolean;
   // Per-entity markers on the scrolling axis band: number / icon / image.
   showMarkers?: boolean;
   markerMode?: 'number' | 'icon' | 'image';
@@ -161,6 +171,8 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   valueAxisPosition = 'bottom',
   anchorX = 35,
   axisTicks = 8,
+  gridSpacing,
+  showLabels = true,
   showMarkers = true,
   markerMode = 'number',
   markerIcon = 'star',
@@ -336,8 +348,12 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const BAR_RATIO = Math.min(Math.max(barWidth ?? 0.75, 0.1), 0.95);
   // Static entity axis: a fixed name column on the left of every row. Its
   // width fits the longest entity label (approx. char width for the label font).
+  // When `showLabels` is off the column collapses (NAME_W = 0) and the plot /
+  // bar track expands to the left.
   const LABEL_FONT = Math.max(12, Math.round(ROW_FONT * 0.8));
-  const NAME_W = Math.min(innerW * 0.34, Math.max(110, Math.max(...items.map((r) => r.label.length), 1) * LABEL_FONT * 0.52 + 16));
+  const NAME_W = (showLabels ?? true)
+    ? Math.min(innerW * 0.34, Math.max(110, Math.max(...items.map((r) => r.label.length), 1) * LABEL_FONT * 0.52 + 16))
+    : 0;
   // Bars grow IN PLACE from this column, so only the track to its right scrolls.
   const BAR_MAX_W = Math.max((innerW - NAME_W - ROW_GAP_PX * 2) * BAR_RATIO, 1);
   const AVATAR_W = Math.max(innerW - NAME_W - BAR_MAX_W - ROW_GAP_PX * 2, 0);
@@ -533,14 +549,22 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
 
   const tickLabels = (t: number) => (axisUnit === 'date' ? fmtDate(t, dateFormat) : fmtValue(t, valueFormat, currencySymbol));
   // Positional band: ONE tick/gridline per distinct real position (date bucket /
-  // numeric axis value) present in the data, at its exact spot — a real grid of
-  // "cada fecha", not an evenly-spaced synthetic march.
+  // numeric axis value), at its exact spot, thinned by `gridSpacing` (px) so
+  // consecutive gridlines are distinguishable — dates closer than the minimum
+  // are skipped, the rest slide in/out with the scroll like a tape.
   const ticks = (() => {
     const seen = new Set<number>();
     for (const r of items) if (Number.isFinite(r.pos)) seen.add(r.pos);
-    return [...seen]
-      .sort((a, b) => a - b)
-      .map((p) => ({label: tickLabels(p), x: posToX(p) * BAR_MAX_W}));
+    const spacing = Math.max(gridSpacing ?? 90, 20);
+    const out: {label: string; x: number}[] = [];
+    let lastX = Number.NEGATIVE_INFINITY;
+    for (const p of [...seen].sort((a, b) => a - b)) {
+      const x = posToX(p) * BAR_MAX_W;
+      if (Math.abs(x - lastX) < spacing) continue;
+      out.push({label: tickLabels(p), x});
+      lastX = x;
+    }
+    return out;
   })();
 
   // Cardinality band: live scale of the accumulated value (0 → current max),
@@ -664,9 +688,11 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
 
     return (
       <div key={p.label} style={{position: 'absolute', left: 0, right: 0, height: ROW_H, top, display: 'flex', alignItems: 'center', gap: ROW_GAP_PX, opacity: rowOpacity}}>
-        <div style={{width: NAME_W, flexShrink: 0, overflow: 'hidden', textAlign: 'right', paddingRight: ROW_GAP_PX * 0.5, display: 'flex', alignItems: 'center', justifyContent: 'flex-end'}}>
-          <span style={{whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', ...textStyle(labelText, {color: '#e4e4e7', size: LABEL_FONT, weight: 700}), opacity: pop}}>{p.label}</span>
-        </div>
+        {(showLabels ?? true) && (
+          <div style={{width: NAME_W, flexShrink: 0, overflow: 'hidden', textAlign: 'right', paddingRight: ROW_GAP_PX * 0.5, display: 'flex', alignItems: 'center', justifyContent: 'flex-end'}}>
+            <span style={{whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', ...textStyle(labelText, {color: '#e4e4e7', size: LABEL_FONT, weight: 700}), opacity: pop}}>{p.label}</span>
+          </div>
+        )}
         {order.map((seg) => segments[seg])}
       </div>
     );

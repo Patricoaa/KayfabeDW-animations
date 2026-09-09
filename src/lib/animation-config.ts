@@ -227,7 +227,8 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
 //
 // The bar geometry, entry/pop, ranking swaps, winner reveal and outro mirror
 // the timeline race. `anchorX` (5-95%) places the fixed "now" line on the
-// track, `axisTicks` controls the tick density on both traveling bands, and
+// track, `axisTicks` controls the tick count of the CARDINALITY band (the
+// positional band uses `gridSpacing` px), and
 // `showMarkers`/`markerMode` draw one marker per active entity IN ITS OWN ROW
 // at its current step on the plane showing the accumulated value as a number,
 // an icon (from ICON_GLYPHS) or a reference image (the entity's avatar URL).
@@ -256,8 +257,19 @@ export type RaceScrollingConfig = TimelineRaceConfig & {
   // the current playback position.
   anchorX?: number;
 
-  // Number of ticks drawn on the scrolling axis band (2-24, default 8).
+  // Number of ticks drawn on the CARDINALITY (value) band (2-24, default 8).
+  // The positional band ignores this: its tick density comes from
+  // `gridSpacing` (min px between consecutive gridlines/labels, default 90).
   axisTicks?: number;
+
+  // Min horizontal distance (px, 20-320, default 90) between consecutive
+  // positional gridlines/labels on the plane. Dates closer than this are
+  // skipped; farther ones scroll in/out and stay distinguishable.
+  gridSpacing?: number;
+
+  // Show the entity name label on the fixed left axis (default true). When
+  // false the name column collapses and the bar track / plot expands left.
+  showLabels?: boolean;
 
   // Per-entity markers on the scrolling axis band at each entity's current
   // step. Default OFF-marker rendering is driven by `markerMode`:

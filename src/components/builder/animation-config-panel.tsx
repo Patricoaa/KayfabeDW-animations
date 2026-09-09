@@ -1030,6 +1030,17 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
         <p className="text-[10px] text-muted mb-1">
           Solo aplica a la banda de cardinalidad. El eje posicional dibuja una marca y gridline por cada fecha real de los datos.
         </p>
+        <SliderNumberInput
+          label="Separación del grid (px)"
+          value={value.gridSpacing ?? 90}
+          min={20}
+          max={320}
+          step={5}
+          onChange={(v) => update({gridSpacing: v || undefined})}
+        />
+        <p className="text-[10px] text-muted mb-1">
+          Distancia mínima entre gridlines del eje posicional: las fechas más juntas se omiten y el resto van apareciendo con el scroll.
+        </p>
         <SwitchControl
           label="Mostrar eje (banda desplazable)"
           checked={value.showXAxis ?? true}
@@ -1208,9 +1219,17 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
 
       {/* ============ ETIQUETAS ============ */}
       <Collapsible title="Etiquetas">
+        <SwitchControl
+          label="Mostrar etiqueta de la entidad"
+          checked={value.showLabels ?? true}
+          onChange={(v) => update({showLabels: v || undefined})}
+        />
+        <p className="text-[10px] text-muted mt-0.5">
+          El nombre de la entidad en el eje fijo de la izquierda. Al ocultarlo la columna se colapsa y el plot/banda de barras se expande hacia la izquierda.
+        </p>
         <TextStyleControls label="Texto de la etiqueta" value={value.labelText} onChange={(patch) => update({labelText: {...(value.labelText ?? {}), ...patch}})}  showTextTransform showSpacing showHighlight showUnderline maxSize={160}/>
         <p className="text-[10px] text-muted mt-0.5">
-          El nombre de la entidad que se apoya sobre la barra en el outro final.
+          El nombre de la entidad en el eje fijo de la izquierda.
         </p>
         <div className="h-px bg-border-default my-3" />
         <TextStyleControls label="Texto del dato (dentro de la barra)" value={value.valueText} onChange={(patch) => update({valueText: {...(value.valueText ?? {}), ...patch}})}  showTextTransform showSpacing showHighlight showUnderline maxSize={160}/>
