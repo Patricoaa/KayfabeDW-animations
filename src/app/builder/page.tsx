@@ -843,32 +843,31 @@ function BuilderContent() {
             )}
             {outputMode === 'animated' && (
               <div className="flex flex-col flex-1 min-h-0">
-                <div className="shrink-0">
-                  <TemplatePicker
-                    data={filteredData}
-                    config={chartConfig}
-                    selectedTemplate={activeTemplate}
-                    onSelect={(id) => {
-                      templateDeselectRef.current = false;
-                      setSelectedTemplate(id);
-                    }}
-                  />
-                </div>
-
-                {activeTemplate && (
-                  <div className="flex-1 flex flex-col min-h-0">
-                    <AnimationConfigPanel
-                      templateId={activeTemplate}
-                      columns={columns}
-                      fieldMeta={fieldMeta}
-                      value={templateConfig[activeTemplate as keyof AnimationTemplateConfig] ?? {}}
-                      onChange={(tc) =>
-                        setTemplateConfig((prev) => ({...prev, [activeTemplate]: tc}))
-                      }
-                      participants={timelineParticipants}
+                <AnimationConfigPanel
+                  templateId={activeTemplate || 'timeline-race'}
+                  columns={columns}
+                  fieldMeta={fieldMeta}
+                  value={
+                    activeTemplate 
+                      ? templateConfig[activeTemplate as keyof AnimationTemplateConfig] ?? {}
+                      : {}
+                  }
+                  onChange={(tc) => {
+                    if (activeTemplate) setTemplateConfig((prev) => ({...prev, [activeTemplate]: tc}));
+                  }}
+                  participants={timelineParticipants}
+                  templateSelector={
+                    <TemplatePicker
+                      data={filteredData}
+                      config={chartConfig}
+                      selectedTemplate={activeTemplate}
+                      onSelect={(id) => {
+                        templateDeselectRef.current = false;
+                        setSelectedTemplate(id);
+                      }}
                     />
-                  </div>
-                )}
+                  }
+                />
               </div>
             )}
 

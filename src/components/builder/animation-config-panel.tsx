@@ -36,6 +36,7 @@ type AnimationConfigPanelProps = {
   value: TimelineRaceConfig | RankingConfig;
   onChange: (next: TimelineRaceConfig | RankingConfig) => void;
   participants?: Participant[];
+  templateSelector?: React.ReactNode;
 };
 
 // Collapsible accordion section (Flourish-style), mirrors the static chart
@@ -421,7 +422,7 @@ type TimelineRacePanelProps = Omit<AnimationConfigPanelProps, 'value' | 'onChang
 
 // Timeline Race config UI: header (shared) + cols + x/y axis + date + ranking
 // reveal + avatar + bars + label + canvas (shared).
-function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, participants = []}: TimelineRacePanelProps) {
+function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, participants = [], templateSelector}: TimelineRacePanelProps) {
   const update = (patch: Partial<TimelineRaceConfig>) => onChange({...value, ...patch});
   const fmt = (value.dateFormat ?? 'day') as DateFormat;
   const setBarColor = (label: string, color?: string) => {
@@ -451,6 +452,7 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
         <div className="space-y-4 pb-12">
           {activeTab === 'data' && (
             <>
+              {templateSelector}
               <HeaderSection value={value} update={update} />
 
               <Collapsible title="Datos" defaultOpen>
@@ -1241,7 +1243,8 @@ function RowImageSection({value, onChange, participants = []}: {
   );
 }
 
-function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: {
+function RankingPanel({columns, fieldMeta, value, onChange, participants = [], templateSelector}: {
+  templateSelector?: React.ReactNode;
   columns: string[];
   fieldMeta: ColumnMeta[];
   value: RankingConfig;
@@ -1259,6 +1262,7 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
         <div className="space-y-4 pb-12">
           {activeTab === 'data' && (
             <>
+              {templateSelector}
               <HeaderSection value={value} update={update} />
 
               <Collapsible title="Datos" defaultOpen>
@@ -1565,12 +1569,12 @@ function RankingPanel({columns, fieldMeta, value, onChange, participants = []}: 
   );
 }
 
-export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onChange, participants = []}: AnimationConfigPanelProps) {
+export function AnimationConfigPanel({templateId, columns, fieldMeta, value, onChange, participants = [], templateSelector}: AnimationConfigPanelProps) {
   if (templateId === 'ranking') {
-    return <RankingPanel columns={columns} fieldMeta={fieldMeta} value={value as RankingConfig} onChange={onChange as (n: RankingConfig) => void} participants={participants} />;
+    return <RankingPanel columns={columns} fieldMeta={fieldMeta} value={value as RankingConfig} onChange={onChange as (n: RankingConfig) => void} participants={participants} templateSelector={templateSelector} />;
   }
   if (templateId !== 'timeline-race') return null;
-  return <TimelineRacePanel templateId={templateId} columns={columns} fieldMeta={fieldMeta} value={value as TimelineRaceConfig} onChange={onChange as (n: TimelineRaceConfig) => void} participants={participants} />;
+  return <TimelineRacePanel templateId={templateId} columns={columns} fieldMeta={fieldMeta} value={value as TimelineRaceConfig} onChange={onChange as (n: TimelineRaceConfig) => void} participants={participants} templateSelector={templateSelector} />;
 }
 
 function FileUploadInput({label, value, onLoad, onClear}: {label: string; value?: string; onLoad: (dataUrl: string) => void; onClear: () => void}) {
