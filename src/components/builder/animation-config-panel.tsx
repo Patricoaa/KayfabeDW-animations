@@ -1222,7 +1222,7 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
         <SwitchControl
           label="Mostrar etiqueta de la entidad"
           checked={value.showLabels ?? true}
-          onChange={(v) => update({showLabels: v || undefined})}
+          onChange={(v) => update({showLabels: v})}
         />
         <p className="text-[10px] text-muted mt-0.5">
           El nombre de la entidad en el eje fijo de la izquierda. Al ocultarlo la columna se colapsa y el plot/banda de barras se expande hacia la izquierda.
