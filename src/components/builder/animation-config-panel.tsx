@@ -1135,7 +1135,7 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           onChange={(v) => update({showMarkers: v})}
         />
         <p className="text-[10px] text-muted mt-0.5">
-          Cada grid de fecha ("caja eje") muestra el marcador de cada entidad que aporta valor en esa fecha, colocado sobre la gridline a la altura de su fila. Muestra la cantidad que aporta esa fecha en particular (el delta, no el total acumulado); si el valor de la fecha es 0, el marcador no se visualiza. Viaja con la cinta y desaparece al cruzar los límites del plot.
+          Cada grid de fecha ("caja eje") muestra el marcador de cada entidad cuyo acumulado cambia en esa fecha, colocado sobre la gridline a la altura de su fila. En modo número muestra el delta: valor acumulado en esa fecha − valor acumulado en la fecha anterior (lo que la fecha aporta al acumulado, no el total); si ese delta es 0, el marcador no se visualiza. Viaja con la cinta y desaparece al cruzar los límites del plot.
         </p>
         <div className="mt-2">
           <div>

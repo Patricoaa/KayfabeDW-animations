@@ -235,10 +235,12 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
   // block (whose height includes every row gap) plus a padding that scales
   // with the "Separación vertical entre filas" control.
   // `showMarkers`/`markerMode` pin one marker per entity onto each DATE GRID
-  // ("caja eje"): every kept grid carries the marker of each entity with a
-  // non-zero value on that date, placed at the lane height of its entity and
-  // showing the per-period amount that date adds (the delta, not the running
-  // total). A date whose value is 0 shows no marker.
+  // ("caja eje"): every kept grid carries the marker of each entity whose
+  // accumulated value CHANGES at that date, placed at the lane height of its
+  // entity. The number marker shows that date's delta — value accumulated at
+  // that date MINUS value accumulated at the previous date (the amount the date
+  // adds to the accumulated total, not the total itself). A date whose delta is
+  // 0 shows no marker.
   // `barColors`, `barPalette` and the row/avatar controls are shared with the
   // timeline race.
   //

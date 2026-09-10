@@ -453,6 +453,7 @@ function convertRaceScrolling(
     showDateLabel: t?.showDateLabel,
     showXAxis: t?.showXAxis,
     axisDirection: t?.axisDirection,
+    accumulateMode: t?.accumulateMode,
     gridSpacing: t?.gridSpacing,
     showLabels: t?.showLabels,
     showMarkers: t?.showMarkers,

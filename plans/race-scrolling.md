@@ -380,3 +380,26 @@ etiquetas, etc)."
 Changed: `src/remotion/templates/race-scrolling/index.tsx`,
 `src/components/builder/animation-config-panel.tsx`, `src/lib/viz-to-remotion.ts`,
 `src/lib/animation-config.ts`, this plan. Gate `npx tsc --noEmit` clean.
+
+## Feedback round (2026-09-09) — marcador número = delta entre acumulados
+User feedback: "Cada marcador de eje, si es número, debe mostrar la cantidad delta
+entre valor acumulado en fecha − valor acumulado fecha anterior, para mostrar el
+valor de la fecha que aporta al acumulado."
+
+1. **Delta calculado en el renderer** — `markersByPos` ya no confía en el campo
+   `delta` de los items; calcula por entidad `delta = value(pos) − value(pos
+   anterior)` (el primer valor es su propio aporte), recorriendo `rows` en orden
+   de posición con un mapa `prevValue` por label. Es exactamente "valor acumulado
+   en fecha − valor acumulado en la fecha anterior" y queda autoritativo sin
+   depender del origen de datos (viz, compat o queryData legacy).
+2. **Modo 'period'** — se pasa `accumulateMode` al renderer (prop + passthrough en
+   `viz-to-remotion`). En modo running delta = resta de acumulados; en modo period
+   `value` YA es la cantidad del periodo, así que delta = value directamente.
+   Se oculta el marcador cuando el delta es 0 (sin cambio de valor).
+3. **Docs/hints** — cabecera del renderer, doc de `RaceScrollingItem.delta`
+   (queda informacional), nota de `showMarkers` en `animation-config.ts` y hint
+   del panel "Marcadores del eje" describen la fórmula del acumulado.
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`,
+`src/lib/viz-to-remotion.ts`, `src/components/builder/animation-config-panel.tsx`,
+`src/lib/animation-config.ts`, this plan. Gate `npx tsc --noEmit` clean.

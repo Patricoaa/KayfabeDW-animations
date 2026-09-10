@@ -23,18 +23,19 @@ import {textStyle} from '../shared/text';
 //     are at least `gridSpacing` px apart (the ones closer than that are
 //     skipped, the rest slide in/out with the scroll);
 //   - date-grid MARKERS: each kept grid ("caja eje") carries the number/icon/
-//     image of every entity with a NON-ZERO value on that date, pinned ON the
-//     gridline at the lane height of its entity. A date whose value is 0 draws
-//     no marker.
+//     image of every entity whose accumulated value CHANGES at that date (delta
+//     ≠ 0), pinned ON the gridline at the lane height of its entity. A date
+//     with delta 0 draws no marker.
 // Everything on the tape (labels, gridlines, markers) is clipped at the plot
 // box, so it visibly slides out and disappears as it crosses the plot's limits
 // — exactly like a moving ribbon. The PERMANENT Y axis is a static vertical
 // line right AFTER the avatar column (the origin of the bar track, padded by
 // the row gap) that the bars grow from.
 // `axisDirection` flips the sweep (Mayor→Menor only reverses the value→position
-// mapping). Markers show the per-period amount that date adds (the delta, not
-// the running total) as a number, an icon (ICON_GLYPHS) or a reference image
-// (avatar URL), hidden when that date's value is 0.
+// mapping). The NUMBER marker shows the amount that date adds: delta = "valor
+// acumulado en fecha − valor acumulado en la fecha anterior" (acumulated diff,
+// not the running total); icon/image markers follow the same delta≠0 rule.
+// Hidden when delta is 0.
 // `barsX`/`barsY` (px) shift the whole anchored block — bars, avatars, row
 // labels, the permanent Y axis, the scrolling grid/date labels and the
 // now-guide — from its default placement.
@@ -47,7 +48,7 @@ export type RaceScrollingItem = {
   image?: string | null;      // optional avatar + marker image (url / data: / root-relative)
   pos: number;                // position on the scrolling axis (date ms or plain number)
   value: number;              // accumulated numeric shown once activated
-  delta?: number;             // per-period amount this step's date adds (marker value)
+  delta?: number;             // (informational) per-period amount that date adds; the number marker computes its own delta from `value`
 };
 
 export type RaceScrollingProps = {
@@ -75,6 +76,10 @@ export type RaceScrollingProps = {
   // Show the entity name label on the fixed left axis (default true). When
   // false the name column collapses and the bar track / plot expands left.
   showLabels?: boolean;
+  // 'running' (default): `value` is the accumulated total up to that pos;
+  // 'period': `value` is the per-period amount. Only the grid markers consume
+  // this (to derive the delta from `value`); the bars just interpolate `value`.
+  accumulateMode?: 'running' | 'period';
   // Per-entity markers on the scrolling axis band: number / icon / image.
   showMarkers?: boolean;
   markerMode?: 'number' | 'icon' | 'image';
@@ -164,6 +169,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   axisDirection = 'asc',
   gridSpacing,
   showLabels = true,
+  accumulateMode,
   showMarkers = true,
   markerMode = 'number',
   markerIcon = 'star',
@@ -581,15 +587,22 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // max, so it stands as the value-axis origin the bars grow from.
 
   // Markers are pinned to the DATE GRIDS (the "caja eje"): each kept tick
-  // carries the markers of every entity that contributes a NON-ZERO value at
-  // that date (delta ≠ 0), drawn ON the gridline at their lane's height, in
-  // world coordinates so they scroll in/out with the tape. A date whose entity
-  // value is 0 shows no marker; grids dropped by `gridSpacing` draw none either.
+  // carries the markers of every entity that CHANGES its accumulated value at
+  // that date, drawn ON the gridline at their lane's height, in world
+  // coordinates so they scroll in/out with the tape. The NUMBER marker shows
+  // the amount that date adds: delta = "valor acumulado en fecha − valor
+  // acumulado en la fecha anterior" (in 'period' mode `value` already IS the
+  // period amount, so delta = value). A date whose delta is 0 draws no marker;
+  // grids dropped by `gridSpacing` draw none either.
   const markersByPos = (() => {
     const map = new Map<number, {label: string; image?: string | null; delta: number}[]>();
+    const prevValue = new Map<string, {value: number; started: boolean}>();
+    const isRunning = (accumulateMode ?? 'running') === 'running';
     for (const r of rows) {
       if (!Number.isFinite(r.pos)) continue;
-      const delta = r.delta ?? 0;
+      const prev = prevValue.get(r.label) ?? {value: 0, started: false};
+      const delta = isRunning ? (prev.started ? r.value - prev.value : r.value) : r.value;
+      prevValue.set(r.label, {value: r.value, started: true});
       if (delta === 0) continue;
       let list = map.get(r.pos);
       if (!list) {
