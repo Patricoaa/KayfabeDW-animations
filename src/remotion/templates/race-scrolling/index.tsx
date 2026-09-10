@@ -23,19 +23,18 @@ import {textStyle} from '../shared/text';
 // before the first date, so every bar begins at 0 and the first date grid
 // appears at the CENTER of the plot, sliding left until the last grid ends
 // touching the axis:
-//   - a positional band with ONE TICK + VERTICAL GRIDLINE per real date (or
-//     numeric axis value) present in the data, thinned so consecutive gridlines
-//     are at least `gridSpacing` px apart (the ones closer than that are
-//     skipped, the rest slide in/out with the scroll);
-//   - date-grid MARKERS: each kept grid ("caja eje") carries the number/icon/
+//   - a positional band with ONE TICK + VERTICAL GRIDLINE for EVERY real date
+//     (or numeric axis value) present in the data — no date is skipped; each
+//     gridline travels with the tape and hides exactly at the permanent Y axis;
+//   - date-grid MARKERS: each grid ("caja eje") carries the number/icon/
 //     image of every entity whose accumulated value CHANGES at that date (delta
 //     ≠ 0), pinned ON the gridline at the lane height of its entity. A date
 //     with delta 0 draws no marker.
 // Everything on the tape (labels, gridlines, markers) is clipped at the plot
 // box, so it visibly slides out and disappears as it crosses the plot's limits
 // — exactly like a moving ribbon. The PERMANENT Y axis is a static vertical
-// line right AFTER the avatar column (the origin of the bar track, padded by
-// the row gap) that the bars grow from.
+// line right AT the avatar's right edge (the origin of the bar track), where
+// the bars begin TOUCHING the avatar; it spans exactly the rows block.
 // `axisDirection` flips the sweep (Mayor→Menor only reverses the value→position
 // mapping). The NUMBER marker shows the amount that date adds: delta = "valor
 // acumulado en fecha − valor acumulado en la fecha anterior" (acumulated diff,
@@ -74,9 +73,8 @@ export type RaceScrollingProps = {
   // Axis sweep direction: 'asc' (Menor→Mayor) or 'desc' (Mayor→Menor). Only
   // the value→position mapping reverses; camera and ranking are unchanged.
   axisDirection?: 'asc' | 'desc';
-  // Min horizontal distance (px, 20-320, default 90) between consecutive
-  // positional gridlines/labels on the plane. Dates closer than this are
-  // skipped; farther ones scroll in/out and stay distinguishable.
+  // DEPRECATED/ignored: every distinct date/value now draws its own gridline
+  // (no thinning), so `gridSpacing` has no effect. Kept for saved projects.
   gridSpacing?: number;
   // Show the entity name label on the fixed left axis (default true). When
   // false the name column collapses and the bar track / plot expands left.
@@ -174,7 +172,6 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   showDateLabel = true,
   showXAxis = true,
   axisDirection = 'asc',
-  gridSpacing,
   showLabels = true,
   accumulateMode,
   showMarkers = true,
@@ -363,10 +360,12 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const AVATAR_W = avatarSize ?? Math.max(innerW - NAME_W - BAR_MAX_W - ROW_GAP_PX * 2, 0);
   // The plot (gridlines, date labels and value Y axis) is aligned to
   // the ACTUAL bar track: rows lay out as [name][avatar][bar], so the bar
-  // origin sits after the name column, the horizontal gap, the avatar column
-  // (its size + a padding covers the avatar radius + breathing room) and the
-  // gap again. Everything left-to-right derives from this.
-  const BAR_TRACK_X = PAD_L + NAME_W + ROW_GAP_PX + AVATAR_W + ROW_GAP_PX;
+  // origin sits right AT the avatar's right edge — the bars TOUCH the avatar
+  // (the bar segment pulls itself back by the flex gap, see `renderRow`, and
+  // this origin has no trailing gap). Everything left-to-right derives from
+  // this: the permanent Y axis, the plot box and the scrolling tape all start
+  // here, so gridlines slide under it and hide exactly at the axis.
+  const BAR_TRACK_X = PAD_L + NAME_W + ROW_GAP_PX + AVATAR_W;
   const EASE = 26;
   const OUTRO = Math.min(45, Math.max(0, Math.floor(durationInFrames * 0.12)));
   const sweepBudget = Math.max(0, durationInFrames - EASE * 2 - OUTRO);
@@ -557,39 +556,21 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const bottomEnd = rowsHeight + PLOT_PAD_Y * 2;
 
   const tickLabels = (t: number) => (axisUnit === 'date' ? fmtDate(t, dateFormat) : fmtValue(t, valueFormat, currencySymbol));
-  // Positional band: ONE tick/gridline per distinct real position (date bucket /
-  // numeric axis value), at its exact spot, thinned by `gridSpacing` (px) so
-  // consecutive gridlines are distinguishable — dates closer than the minimum
-  // are skipped, the rest slide in/out with the scroll like a tape.
+  // Positional band: ONE tick/gridline per EVERY distinct real position (date
+  // bucket / numeric axis value) at its exact spot — no date is skipped; the
+  // tape carries whichever fall outside the plot clip.
   const ticks = (() => {
     const seen = new Set<number>();
     for (const r of items) if (Number.isFinite(r.pos)) seen.add(r.pos);
-    const spacing = Math.max(gridSpacing ?? 90, 20);
-    const out: {label: string; x: number; pos: number}[] = [];
-    let lastX = Number.NEGATIVE_INFINITY;
-    for (const p of [...seen].sort((a, b) => a - b)) {
-      const x = posToX(p) * BAR_MAX_W;
-      if (Math.abs(x - lastX) < spacing) continue;
-      out.push({label: tickLabels(p), x, pos: p});
-      lastX = x;
-    }
-    return out;
+    return [...seen]
+      .sort((a, b) => a - b)
+      .map((p) => ({label: tickLabels(p), x: posToX(p) * BAR_MAX_W, pos: p}));
   })();
 
-  // Overlap guard for the DATE labels: even after the `gridSpacing` thinning, a
-  // label whose estimated width would collide with the previously kept label is
-  // dropped so they never bunch up on top of each other.
-  const dateLabels = (() => {
-    const out: {label: string; x: number}[] = [];
-    let lastRight = Number.NEGATIVE_INFINITY;
-    for (const t of ticks) {
-      const w = t.label.length * 7 + 12;
-      if (t.x - lastRight < 4) continue;
-      out.push(t);
-      lastRight = t.x + w;
-    }
-    return out;
-  })();
+  // Every tick gets its date label above the gridline, even if two labels
+  // touch/overlap when dates are very close together (dense dates may look
+  // crowded — that is the point of "show all dates, no skips").
+  const dateLabels = ticks.map((t) => ({label: t.label, x: t.x}));
 
   // Permanent Y axis: a single vertical line right AFTER the avatar column,
   // at the origin of the bar track (BAR_TRACK_X, the "minimum padding" from
@@ -602,8 +583,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // coordinates so they scroll in/out with the tape. The NUMBER marker shows
   // the amount that date adds: delta = "valor acumulado en fecha − valor
   // acumulado en la fecha anterior" (in 'period' mode `value` already IS the
-  // period amount, so delta = value). A date whose delta is 0 draws no marker;
-  // grids dropped by `gridSpacing` draw none either.
+  // period amount, so delta = value). A date whose delta is 0 draws no marker.
   const markersByPos = (() => {
     const map = new Map<number, {label: string; image?: string | null; delta: number}[]>();
     const prevValue = new Map<string, {value: number; started: boolean}>();
@@ -712,7 +692,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
 
     const segments: Record<'bar' | 'avatar', React.ReactNode> = {
       bar: (
-        <div style={{flexShrink: 0, width: BAR_MAX_W, height: BAR_H, position: 'relative', display: 'flex', alignItems: 'center'}}>
+        <div style={{flexShrink: 0, width: BAR_MAX_W, height: BAR_H, position: 'relative', display: 'flex', alignItems: 'center', marginLeft: -ROW_GAP_PX}}>
           {showRail !== false && <div style={{position: 'absolute', left: 0, right: 0, top: '50%', height: GROOVE_H, transform: 'translateY(-50%)', backgroundColor: '#171717', borderRadius: barRadius ?? 999, opacity: pop}} />}
           <div style={{position: 'absolute', left: 0, top: '50%', width: Math.max(0, w), height: BAR_H, transform: `translateY(-50%) scaleY(${scale})`, backgroundColor: barFill, borderRadius: barRadius ?? 999, boxShadow: isLeader(p) && podiumEffect ? `0 0 ${18 * scale}px ${accentColor}99` : 'none'}} />
           <div style={{position: 'absolute', right: BAR_MAX_W - Math.max(0, w) + 12, top: 0, bottom: 0, maxWidth: Math.max(0, w - 24), minWidth: 0, display: 'flex', alignItems: 'center', overflow: 'hidden', pointerEvents: 'none', opacity: pop}}>
@@ -811,8 +791,8 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
         </div>
 
         {/* Date labels: one DIRECTLY ABOVE each date gridline, in a strip that
-            scrolls with the tape. Labels that would overlap the previous one
-            are skipped (see `dateLabels`), so they never bunch together. */}
+            scrolls with the tape. Every date shows its label (dense dates may
+            overlap). */}
         {showXAxis && (
           <div style={{position: 'absolute', left: BAR_TRACK_X, top: rowsTopY - DATE_BAND_H, width: BAR_MAX_W + 160, height: DATE_BAND_H, transform: `translateX(${scrollX}px)`, overflow: 'hidden', zIndex: 3}}>
             {dateLabels.map((tick, i) => (

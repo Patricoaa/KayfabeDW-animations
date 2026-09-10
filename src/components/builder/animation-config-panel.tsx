@@ -1099,24 +1099,13 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
             Agrupa los datos por día, mes o año y re-agrega el valor acumulado en cada rango.
           </p>
         </div>
-        <SliderNumberInput
-          label="Separación del grid (px)"
-          value={value.gridSpacing ?? 90}
-          min={20}
-          max={320}
-          step={5}
-          onChange={(v) => update({gridSpacing: v || undefined})}
-        />
-        <p className="text-[10px] text-muted mb-1">
-          Distancia mínima entre gridlines del eje posicional: las fechas más juntas se omiten y el resto van apareciendo con el scroll.
-        </p>
         <SwitchControl
           label="Mostrar gridlines de fechas"
           checked={value.showXAxis ?? true}
           onChange={(v) => update({showXAxis: v})}
         />
         <p className="text-[10px] text-muted mt-0.5">
-          Cada fecha real dibuja una gridline vertical con su etiqueta justo encima (colisión-safe: las etiquetas que se juntarían se omiten). Solo el eje de fechas se desplaza; el eje Y es la línea permanente justo a la derecha del avatar.
+          Cada fecha real dibuja su gridline vertical con su etiqueta justo encima, SIN saltos (si las fechas están muy juntas las etiquetas pueden empalmarse). La cinta nace en el eje Y permanente — que queda justo en el borde derecho del avatar, donde tocan las barras — con un tramo vacío antes del primer dato. Al hacer scroll, cada gridline se oculta exactamente en la posición del eje Y. Solo el eje de fechas se desplaza.
         </p>
         <SelectControl
           label="Formato del valor acumulado"
@@ -1135,7 +1124,7 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           </div>
         )}
         <p className="text-[10px] text-muted">
-          El plot es la caja que delimita los ejes: cada fecha real de "campo fecha" (o valor del eje numérico) dibuja una gridline con su etiqueta justo encima; la cinta se desliza y se recorta al cruzar los límites del plot. El eje Y es la línea permanente a la derecha del avatar (escala implícita 0 → máximo acumulado), el origen desde el que crecen las barras. Las marcas por entidad desaparecen al sobrepasar los límites. La fecha en pantalla se muestra abajo a la derecha.
+          El plot es la caja que delimita los ejes: cada fecha real de "campo fecha" (o valor del eje numérico) dibuja su gridline con su etiqueta justo encima; la cinta se desliza y se recorta al cruzar los límites del plot. El eje Y es la línea permanente en el borde derecho del avatar (escala implícita 0 → máximo acumulado global), el origen desde el que crecen las barras —las barras tocan el avatar—; las gridlines se ocultan justo al llegar a esa línea durante el scroll. Las marcas por entidad desaparecen al sobrepasar los límites. La fecha en pantalla se muestra abajo a la derecha.
         </p>
       </Collapsible>
 

@@ -454,3 +454,37 @@ Changed: `src/remotion/templates/race-scrolling/index.tsx`,
 `src/lib/viz-to-remotion.ts`, `src/lib/animation-config.ts`,
 `src/components/builder/animation-config-panel.tsx`, this plan.
 Gate `npx tsc --noEmit` clean.
+
+## Feedback round (2026-09-09) — barras pegadas al avatar, gridlines sin saltos
+User requirements: "las barras en su extremo izquierdo deben tocar el avatar";
+"las gridlines deberían mostrar todas las fechas, sin saltos"; "el gridline con
+fechas debe tener un eje x donde cada valor de eje es una fecha y debería
+comenzar en una fecha vacía en el inicio (perpendicular al eje y)"; "el
+ocultamiento del gridline de fechas se oculta justo en la posición del eje y
+permanente al hacer scrolling".
+
+1. **Barras tocando el avatar** — `BAR_TRACK_X` ya no incluye el `ROW_GAP_PX`
+   final (`PAD_L + NAME_W + ROW_GAP_PX + AVATAR_W`): es el borde derecho del
+   avatar. El segmento bar se tira `marginLeft: -ROW_GAP_PX` para cancelar el
+   flex gap, así la barra arranca exactamente contra el avatar.
+2. **Gridlines SIN saltos** — se elimina el descarte por `gridSpacing` en
+   `ticks` (una gridline por cada posición real distinta) y el filtro de
+   solapamiento en `dateLabels` (toda fecha muestra su etiqueta, aunque se
+   empalmen en fechas densas). `gridSpacing` queda deprecated/ignorado (se
+   conserva el campo por compatibilidad de proyectos guardados); se retira su
+   control del panel.
+3. **Eje x de fechas + fecha vacía al inicio** — confirmado sin cambios: la
+   cinta (eje x, cada valor = una fecha) nace en el eje Y con tramo vacío y el
+   primer dato aparece al centro y recorre hacia el eje (decisión del usuario).
+   Sin línea base ni tick vacío explícito.
+4. **Ocultamiento en el eje Y** — preservado por construcción: el clip del plot
+   box empieza en el nuevo `BAR_TRACK_X`, así que cada gridline se oculta
+   exactamente al cruzar el eje Y durante el scroll.
+
+Panel: se quita el control "Separación del grid (px)" y se actualizan los hints
+del collapsible "Gridline" y del texto del plot (barras tocan el avatar, todas
+las fechas se dibujan, ocultamiento en el eje Y).
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`,
+`src/components/builder/animation-config-panel.tsx`,
+`src/lib/animation-config.ts`, this plan. Gate `npx tsc --noEmit` clean.
