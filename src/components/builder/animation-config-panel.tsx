@@ -896,17 +896,42 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
 
       <Collapsible title="Ranking">
         <div>
-          <label className="text-sm font-medium mb-1 block">Máximo de entidades</label>
-          <input
-            type="number"
-            min={0}
-            max={50}
-            value={value.maxRows ?? 0}
-            onChange={(e) => update({maxRows: Number(e.target.value) || undefined})}
-            className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+          <p className="text-[10px] text-muted mb-1.5">
+            Decide si la carrera trunca las entidades al Top N o muestra todas (libertad).
+          </p>
+          <SwitchControl
+            label="Limitar a Top N"
+            checked={(value.maxRows ?? 0) > 0}
+            onChange={(on) => update(on ? {maxRows: value.maxRows && value.maxRows > 0 ? value.maxRows : 10} : {maxRows: undefined})}
+          />
+          {(value.maxRows ?? 0) > 0 && (
+            <div className="mt-2">
+              <label className="text-sm font-medium mb-1 block">Cantidad N</label>
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={value.maxRows ?? 10}
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  update({maxRows: n > 0 ? Math.min(50, Math.max(1, n)) : undefined});
+                }}
+                className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+              />
+            </div>
+          )}
+          <p className="text-[10px] text-muted mt-0.5">
+            Apagado = corren TODAS las entidades. Encendido = solo las N mejores según la "Selección de entidades" de abajo (mayor/menor valor final acumulado).
+          </p>
+        </div>
+        <div className="pt-2 mt-1 border-t border-border-subtle">
+          <SwitchControl
+            label="Reordenar filas según valor (temporizado)"
+            checked={value.reorderByValue ?? false}
+            onChange={(v) => update({reorderByValue: v || undefined})}
           />
           <p className="text-[10px] text-muted mt-0.5">
-            0 = sin límite. Limita la cantidad de entidades visibles en la carrera.
+            Encendido: los carriles cambian de puesto según el valor acumulado en cada momento de la cinta (race-chart clásico, con intercambios animados). Apagado: orden estático fijo.
           </p>
         </div>
         <div>
@@ -1113,8 +1138,14 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           onChange={(v) => update({gridSpacing: v || undefined})}
         />
         <p className="text-[10px] text-muted mt-0.5">
-          TODAS las fechas reales dibujan su gridline vertical con su etiqueta justo encima — nunca se omite ninguna. En 0 (por defecto) cada una queda en su posición real según su valor acumulado; al subir el valor las gridlines se separan EXACTAMENTE ese px (fechas equidistantes, todas visibles) y las que queden fuera del lienzo se arrastran de vuelta por la cinta. Esta nace en el eje Y permanente — justo en el borde derecho del avatar, donde la barra queda 6px por DETRÁS del avatar — con un tramo vacío antes del primer dato. Al hacer scroll, cada gridline Y SU ETIQUETA se ocultan exactamente en la posición del eje Y. Solo el eje de fechas se desplaza.
+          TODAS las fechas reales dibujan su gridline vertical con su etiqueta justo encima — nunca se omite ninguna. En 0 (por defecto) cada una queda en su posición real según su valor acumulado; al subir el valor las gridlines se separan EXACTAMENTE ese px (fechas equidistantes, todas visibles) y las que queden fuera del lienzo se arrastran de vuelta por la cinta. Esta nace en el eje Y permanente — justo en el borde derecho del avatar, donde la barra queda 12px por DETRÁS del avatar — y, con espaciado uniforme, la primera fecha entra tras UN solo hueco de separación (misma cadencia que el resto). Al hacer scroll, cada gridline Y SU ETIQUETA se ocultan exactamente en la posición del eje Y. Solo el eje de fechas se desplaza.
         </p>
+        <div className="pt-2 mt-1 border-t border-border-subtle">
+          <p className="text-[10px] text-muted mb-1.5">Apariencia de las gridlines (intervalos verticales de fecha).</p>
+          <ColorPickerControl label="Color de gridlines" value={value.gridlineColor ?? '#334155'} onChange={(v) => update({gridlineColor: v || undefined})} />
+          <SliderNumberInput label="Grosor de gridlines (px)" value={value.gridlineWidth ?? 1} min={1} max={8} step={1} onChange={(v) => update({gridlineWidth: v || undefined})} />
+          <SliderNumberInput label="Opacidad de gridlines (%)" value={Math.round((value.gridlineOpacity ?? 0.35) * 100)} min={0} max={100} step={5} onChange={(v) => update({gridlineOpacity: v === 0 ? 0 : (v || 35) / 100})} />
+        </div>
         <SelectControl
           label="Formato del valor acumulado"
           value={value.valueFormat ?? 'number'}
@@ -1132,7 +1163,7 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           </div>
         )}
         <p className="text-[10px] text-muted">
-          El plot es la caja que delimita los ejes: cada fecha real de "campo fecha" (o valor del eje numérico) dibuja su gridline con su etiqueta justo encima — nunca se omite ninguna —; la cinta se desliza y se recorta al cruzar los límites del plot. El eje Y es la línea permanente en el borde derecho del avatar (escala implícita 0 → máximo acumulado global), el origen desde el que crecen las barras —las barras van 6px por DETRÁS del avatar, y solo aumentan cuando un marcador del eje cruza la línea Y (salto con mini-ease, plano entre fechas)—; las gridlines y sus etiquetas se ocultan justo al llegar a esa línea durante el scroll. Las marcas por entidad desaparecen al sobrepasar los límites. La fecha en pantalla se muestra abajo a la derecha.
+          El plot es la caja que delimita los ejes: cada fecha real de "campo fecha" (o valor del eje numérico) dibuja su gridline con su etiqueta justo encima — nunca se omite ninguna —; la cinta se desliza y se recorta al cruzar los límites del plot. El eje Y es la línea permanente en el borde derecho del avatar (escala implícita 0 → máximo acumulado global), el origen desde el que crecen las barras —las barras van 12px por DETRÁS del avatar, y solo aumentan cuando un marcador del eje cruza la línea Y (salto con mini-ease, plano entre fechas)—; con espaciado uniforme de gridlines la primera fecha entra tras un solo hueco de separación. Las gridlines y sus etiquetas se ocultan justo al llegar a esa línea durante el scroll. Las marcas por entidad desaparecen al sobrepasar los límites. La fecha en pantalla se muestra abajo a la derecha.
         </p>
       </Collapsible>
 

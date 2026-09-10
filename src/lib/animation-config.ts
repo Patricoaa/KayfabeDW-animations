@@ -271,6 +271,17 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
   // date is ever skipped — only the spacing between gridlines changes.
   gridSpacing?: number;
 
+  // Vertical date gridline styling: color (default #334155), thickness in px
+  // (default 1) and opacity 0-1 (default 0.35 — the classic translucent look).
+  gridlineColor?: string;
+  gridlineWidth?: number;
+  gridlineOpacity?: number;
+
+  // Reorder the row lanes by the CURRENT accumulated value at every snapshot
+  // (classic race-chart behavior, animated by the lane-swap machinery). false
+  // (default) keeps the rows in a fixed static order (alphabetical by label).
+  reorderByValue?: boolean;
+
   // Show the entity name label on the fixed left axis (default true). When
   // false the name column collapses and the bar track / plot expands left.
   showLabels?: boolean;

@@ -21,9 +21,11 @@ import {textStyle} from '../shared/text';
 // whose gridline is touching the axis at any moment is the "now", and the bars
 // increase ONLY when a date's axis MARKER crosses the axis (they jump to that
 // date's total with a short ease and hold flat until the next crossing — no
-// continuous ramp). The sweep starts HALF A PLOT before the first date, so
-// every bar begins at 0 and the first date grid appears at the CENTER of the
-// plot, sliding left until the last grid ends touching the axis:
+// continuous ramp). The sweep starts ONE LEAD-IN before the first date: on the
+// uniform gridline axis that is exactly one `gridSpacing` (so the first grid
+// enters with the same cadence as the rest); on the proportional axis it is
+// half a plot. Every bar begins at 0 and the first date grid appears at the
+// CENTER of the plot, sliding left until the last grid ends touching the axis:
 //   - a positional band with ONE TICK + VERTICAL GRIDLINE for EVERY real date
 //     (or numeric axis value) present in the data — no date is skipped; each
 //     gridline travels with the tape and hides exactly at the permanent Y axis;
@@ -34,8 +36,9 @@ import {textStyle} from '../shared/text';
 // Everything on the tape (labels, gridlines, markers) is clipped at the plot
 // box, so it visibly slides out and disappears as it crosses the plot's limits
 // — exactly like a moving ribbon. The PERMANENT Y axis is a static vertical
-// line right AT the avatar's right edge (the origin of the bar track), where
-// the bars begin TOUCHING the avatar; it spans exactly the rows block.
+// line at the left edge of the bar track, right BELOW the avatar's right edge
+// (the origin of the bar track): the bars are pulled 12px to the left and
+// render BEHIND the avatar; the axis spans exactly the rows block.
 // `axisDirection` flips the sweep (Mayor→Menor only reverses the value→position
 // mapping). The NUMBER marker shows the amount that date adds: delta = "valor
 // acumulado en fecha − valor acumulado en la fecha anterior" (acumulated diff,
@@ -74,10 +77,20 @@ export type RaceScrollingProps = {
   // Axis sweep direction: 'asc' (Menor→Mayor) or 'desc' (Mayor→Menor). Only
   // the value→position mapping reverses; camera and ranking are unchanged.
   axisDirection?: 'asc' | 'desc';
-  // Min horizontal distance (px, 0-320, default 0 = no thinning) between
-  // consecutive positional gridlines/labels on the plane. 0 keeps EVERY date;
-  // a value > 0 skips dates closer than that many px to the previous gridline.
+  // Fixed separation in px between consecutive positional gridlines on the
+  // plane (0-320). 0 (default) = every date at its real value-proportional
+  // position; > 0 = every date EQUIDISTANT, that many px apart. Either way NO
+  // date is ever skipped — only the spacing between gridlines changes.
   gridSpacing?: number;
+  // Vertical date gridline styling: color, thickness (px) and opacity (0-1).
+  // Defaults keep the classic look: #334155 at 35% opacity, 1px.
+  gridlineColor?: string;
+  gridlineWidth?: number;
+  gridlineOpacity?: number;
+  // Reorder the lanes by the CURRENT accumulated value at every snapshot
+  // (classic race-chart behavior, animated by the SWAP machinery). false
+  // (default) keeps the lanes in a fixed alphabetical order.
+  reorderByValue?: boolean;
   // Show the entity name label on the fixed left axis (default true). When
   // false the name column collapses and the bar track / plot expands left.
   showLabels?: boolean;
@@ -227,6 +240,10 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   yAxisColor = '#334155',
   yAxisWidth = 2,
   gridSpacing,
+  gridlineColor,
+  gridlineWidth,
+  gridlineOpacity,
+  reorderByValue,
   barsX,
   barsY,
   titleText,
@@ -369,10 +386,10 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // this: the permanent Y axis, the plot box and the scrolling tape all start
   // here, so gridlines slide under it and hide exactly at the axis.
   const BAR_TRACK_X = PAD_L + NAME_W + ROW_GAP_PX + AVATAR_W;
-  // The bar is pulled an extra 6px left (on top of canceling the flex gap) so
-  // it tucks a few pixels under the avatar's right edge (rendered BEHIND the
-  // avatar, see `renderRow`) instead of landing exactly on it.
-  const BAR_TOUCH_PX = 6;
+  // The bar is pulled an extra 12px left (on top of canceling the flex gap) so
+  // it tucks well under the avatar's right edge (rendered BEHIND the avatar,
+  // see `renderRow`) instead of landing on its edge.
+  const BAR_TOUCH_PX = 12;
   const EASE = 26;
   const OUTRO = Math.min(45, Math.max(0, Math.floor(durationInFrames * 0.12)));
   const sweepBudget = Math.max(0, durationInFrames - EASE * 2 - OUTRO);
@@ -415,6 +432,15 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // plot width, so fixed positions can go past the clip).
   const xPx = (frac: number) => frac * ribbonLen;
   const planeW = Math.max(BAR_MAX_W, ribbonLen);
+  // Lead-in before the first grid: on the uniform axis EXACTLY one grid
+  // separation (so the first date crosses the axis with the same cadence as
+  // every other grid); on the proportional axis half a plot (as before). It is
+  // expressed both in px (`leadPx`) and as a tape fraction (`leadFrac`) next to
+  // the sweep span ratio (`tapeSpan`), so `nowFracAt`/`axisReachFrame` can stay
+  // generic. Proportional maps back to the historical 1.5-plot formula.
+  const leadPx = uniformAxis && nPos > 1 ? gridSpacingPx : BAR_MAX_W / 2;
+  const leadFrac = leadPx / ribbonLen;
+  const tapeSpan = (ribbonLen + leadPx) / ribbonLen;
 
   // ---- Group steps by entity ----
   const byLabel = new Map<string, {image?: string | null; steps: {x: number; value: number}[]}>();
@@ -429,9 +455,11 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   }
   for (const e of byLabel.values()) e.steps.sort((a, b) => a.x - b.x);
 
-  // Race-Scrolling keeps STATIC rows: the lane order is fixed ONCE (alphabetical
-  // by label) and never re-sorted by the live value as the axis sweeps — unlike
-  // a timeline-race, whose rows swap every sweep. Only the bars grow in place.
+  // Base lane order (alphabetical, fixed for colors/palette). By default rows
+  // stay STATIC — lanes are assigned once and never re-sorted by the live value
+  // as the axis sweeps, only the bars grow in place. With `reorderByValue` the
+  // lanes DO swap at every snapshot (sorted by the current accumulated value,
+  // animated by the SWAP machinery in `renderRow`).
   const staticOrder = [...byLabel.keys()].sort((a, b) => a.localeCompare(b));
 
   // ---- Discrete accumulation pinned to the PERMANENT Y AXIS ----
@@ -454,9 +482,11 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   };
 
   // Fraction currently sitting AT the permanent Y axis (the same used by the
-  // scrolling tape). It lags `guideT` on purpose: the axis first has to reach
-  // x=0 (the first date) before any accumulation can happen.
-  const nowFracAt = (f: number) => Math.max(0, Math.min(1, guideTAt(f) * 1.5 - 0.5));
+  // scrolling tape). It lags `guideT` because the axis first has to cross the
+  // lead-in (`leadFrac`) before any accumulation can happen: with a uniform
+  // axis that is exactly one grid separation, with proportional positions it
+  // is half a plot.
+  const nowFracAt = (f: number) => Math.max(0, Math.min(1, guideTAt(f) * tapeSpan - leadFrac));
 
   // Invert the smoothstep in `guideTAt` so we know the exact frame each date's
   // gridline touches the axis (Newton; smoothstep is monotonic in the sweep).
@@ -475,8 +505,8 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
     const fx = Math.max(0, Math.min(1, frac));
     const cached = fracFrameCache.get(fx);
     if (cached !== undefined) return cached;
-    // nowFrac = guideT*1.5 - 0.5  =>  guideT = (fx + 0.5) / 1.5
-    const g = (fx + 0.5) / 1.5;
+    // nowFrac = guideT*tapeSpan − leadFrac  =>  guideT = (fx + leadFrac) / tapeSpan
+    const g = (fx + leadFrac) / tapeSpan;
     const f = EASE + sweepFrames * invSmooth(Math.max(0, Math.min(1, g)));
     fracFrameCache.set(fx, f);
     return f;
@@ -531,7 +561,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
       const current = active ? targetValueAt(steps, i) : 0;
       list.push({label, image: e.image, active, firstX: steps[0]?.x ?? 1, current});
     }
-    const full = list; // fixed alphabetical order — lanes are assigned once and never swap
+    const full = reorderByValue ? [...list].sort((a, b) => b.current - a.current || staticOrder.indexOf(a.label) - staticOrder.indexOf(b.label)) : list;
     const all = maxRows && maxRows > 0 ? full.slice(0, maxRows) : full;
     const visActive = all.filter((p) => p.active);
     const visInactive = all.filter((p) => !p.active);
@@ -605,16 +635,16 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
 
   // ---- Scrolling plane geometry ----
   // Fixed "now" line: pinned to the PERMANENT Y AXIS (the left edge of the bar
-  // track, x=0 de cada barra). The sweep starts HALF A TAPE BEFORE the first
-  // date, so every bar begins at 0 and each date's amount accumulates into the
-  // bars exactly when its gridline crosses the Y axis. The first grid appears
-  // at the CENTER of the plot; the last one ends TOUCHING the axis. On a
-  // uniform axis the tape length is `ribbonLen` (may differ from the plot
-  // width), so all positions scale with it.
+  // track, x=0 de cada barra). The sweep starts one lead-in before the first
+  // date (`leadFrac`, see above), so every bar begins at 0 and each date's
+  // amount accumulates into the bars exactly when its gridline crosses the Y
+  // axis. The first grid appears at the CENTER of the plot; the last one ends
+  // TOUCHING the axis. On a uniform axis the tape length is `ribbonLen` (may
+  // differ from the plot width), so all positions scale with it.
   const anchorWorld = 0;
-  const nowWorld = (guideT * 1.5 - 0.5) * ribbonLen;
+  const nowWorld = -leadPx + guideT * (ribbonLen + leadPx);
   const scrollX = anchorWorld - nowWorld; // = -nowWorld
-  const nowFrac = Math.max(0, Math.min(1, guideT * 1.5 - 0.5)); // clamp del "now" al primer dato
+  const nowFrac = Math.max(0, Math.min(1, guideT * tapeSpan - leadFrac)); // clamp del "now" al primer dato
   // Value sitting at the permanent axis: on the uniform axis it snaps to the
   // nearest date grid; on the proportional axis it maps back through the real
   // value scale (as before).
@@ -919,7 +949,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
             {showXAxis && (
               <div style={{position: 'absolute', left: 0, top: DATE_BAND_H, width: planeW, height: rowsHeight}}>
                 {ticks.map((tick, i) => (
-                  <div key={i} style={{position: 'absolute', left: tick.x, top: 0, bottom: 0, width: 1, backgroundColor: 'rgba(51, 65, 85, 0.35)'}} />
+                  <div key={i} style={{position: 'absolute', left: tick.x, top: 0, bottom: 0, width: gridlineWidth ?? 1, backgroundColor: gridlineColor ?? '#334155', opacity: gridlineOpacity ?? 0.35}} />
                 ))}
               </div>
             )}

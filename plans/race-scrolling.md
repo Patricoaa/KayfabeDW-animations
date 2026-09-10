@@ -586,3 +586,45 @@ la barra quede por detrás del avatar."
 Nota de diseño: el modo uniforme pierde la proporción temporal/valor del eje
 (los puntos quedan igualmente espaciados); la acumulación y los saltos se
 mantienen. Gate `npx tsc --noEmit` clean.
+
+## Feedback round (2026-09-10) — barras 12px, entrada por separación, gridlines configurables, Top N + reordenamiento
+User requirement: "Mueve más las barras a la izquierda. Asegúrate que la entrada
+del primer grid sea según la separación (hoy la primera fecha demora mucho en
+entrar). Asegúrate que los gridline tengan control de color y grosor.
+Reincorpora 2 features que antes existían pero hardcodeados: [1] control para
+truncar el ranking según top n o libertad para mostrar; [2] control (on/off)
+para permitir cambio de puesto de las filas según temporalidad."
+
+1. **Barras 12px a la izquierda**: `BAR_TOUCH_PX` 6 → 12 (sigue con `zIndex`
+   barra 1 / avatar 2, la barra queda por detrás del avatar).
+2. **Entrada del primer grid según la separación**: el eje antes arrancaba a
+   `-0.5·ribbon`; ahora el tramo vacío antes del primer grid es parámetro:
+   - `leadPx = uniformAxis && nPos > 1 ? gridSpacingPx : BAR_MAX_W/2`
+     (uniforme → EXACTAMENTE un hueco de separación; proporcional → 0.5 plot).
+   - `leadFrac = leadPx/ribbonLen`, `tapeSpan = (ribbonLen + leadPx)/ribbonLen`.
+   - `nowWorld = -leadPx + guideT·(ribbonLen + leadPx)`;
+     `nowFracAt(f) = clamp(guideTAt(f)·tapeSpan − leadFrac, 0, 1)`;
+     `axisReachFrame(frac)`: `guideT = (frac + leadFrac)/tapeSpan` (Newton).
+   - Verificación: modo proporcional → `tapeSpan 1.5, leadFrac 0.5` = fórmula
+     histórica idéntica. Uniforme → el primer grid cruza el eje tras un solo
+     `gridSpacing` (misma cadencia que los demás). Acumulación/barras sin
+     cambios (siguen por fracciones).
+3. **Gridlines configurables**: `gridlineColor` (≈#334155), `gridlineWidth`
+   (px, ≈1), `gridlineOpacity` (0–1, ≈0.35) en `RaceScrollingConfig` +
+   passthrough `presentationOf` + renderer (backgroundColor/width/opacity) +
+   panel (ColorPicker + "Grosor 1–8" + "Opacidad %" en la sección Gridline).
+4. **Top N vs libertad**: el campo "Máximo de entidades" pasa a `SwitchControl
+   "Limitar a Top N"` (OFF → `maxRows: undefined` = todas corren; ON → número
+   N, default 10). "Selección de entidades" (final-value/manual) y extremo
+   (top/bottom) sin cambios; la lógica de `viz-to-remotion` intacta.
+5. **Reordenar filas según temporalidad (on/off)**: `reorderByValue?: boolean`
+   (default false) en config/panel/renderer. En `buildSnap`,
+   `full = reorderByValue ? [...list].sort(b.current − a.current, empate por
+   orden alfabético estático) : list;` — el mecanismo SWAP/evalChange/rankNow
+   ya anima los intercambios (usa `nowFracAt`, la fracción temporal en el eje).
+   La paleta de colores se mantiene anclada a `staticOrder`.
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`,
+`src/components/builder/animation-config-panel.tsx`,
+`src/lib/animation-config.ts`, `src/lib/viz-to-remotion.ts`, this plan. Gate
+`npx tsc --noEmit` clean.
