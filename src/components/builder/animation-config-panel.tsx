@@ -1200,7 +1200,7 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           onChange={(v) => update({showMarkers: v})}
         />
         <p className="text-[10px] text-muted mt-0.5">
-          Cada grid de fecha ("caja eje") muestra el marcador de cada entidad cuyo acumulado cambia en esa fecha, colocado sobre la gridline a la altura de su fila. En modo número muestra el delta: valor acumulado en esa fecha − valor acumulado en la fecha anterior (lo que la fecha aporta al acumulado, no el total); si ese delta es 0, el marcador no se visualiza. Viaja con la cinta y desaparece al cruzar los límites del plot.
+          Cada grid de fecha ("caja eje") muestra el marcador de cada entidad cuyo acumulado cambia en esa fecha, colocado sobre la gridline a la altura de su fila. En modo número muestra el delta: valor acumulado en esa fecha − valor acumulado en la fecha anterior (lo que la fecha aporta al acumulado, no el total); si ese delta es 0, el marcador no se visualiza. En ícono/imagen de referencia el delta se apila horizontalmente (tope 6 + chip «+N»). Viaja con la cinta y desaparece al cruzar los límites del plot.
         </p>
         <div className="mt-2">
           <div>
@@ -1235,13 +1235,32 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
                   ))}
                 </div>
                 <p className="text-[10px] text-muted mt-1">
-                  Usa el ícono base o uno por entidad vía «Imagen de la entidad» si usas el modo imagen.
+                  Los íconos se repiten en fila según el delta de la fecha, tintados con el color de la barra de la entidad.
                 </p>
               </div>
             )}
             {markerMode === 'image' && (
+              <>
+                <p className="text-[10px] text-muted mt-1">
+                  Si cargas un campo (url) de referencia, cada marcador usa ESA imagen por entidad; si una entidad no tiene valor en el campo, se reutiliza «Imagen de la entidad». Sin ninguna, se muestra su número.
+                </p>
+                <FieldSelect
+                  label="Imagen de referencia (campo url)"
+                  value={value.markerImageField ?? ''}
+                  options={fieldMeta}
+                  fallback={columns}
+                  role="any"
+                  optional
+                  onChange={(v) => update({markerImageField: v || undefined})}
+                />
+                <p className="text-[10px] text-muted -mt-1">
+                  Columna del modelo con la URL (o data-URI) de la imagen de referencia para el marcador, por entidad.
+                </p>
+              </>
+            )}
+            {markerMode !== 'number' && (
               <p className="text-[10px] text-muted mt-1">
-                Reutiliza la imagen de cada entidad («Imagen de la entidad» en Datos) como marcador; si una entidad no tiene imagen, se muestra su número.
+                En modo ícono e imagen de referencia, el marcador apila HORIZONTALMENTE tantos glifos como unidades aporta esa fecha (el delta): delta=3 → 3 en fila, con tope de 6 y un chip «+N» para el excedente.
               </p>
             )}
             <NumberControl label="Tamaño del marcador (px)" value={value.markerSize} min={12} max={120} step={2} onChange={(v) => update({markerSize: v})} />

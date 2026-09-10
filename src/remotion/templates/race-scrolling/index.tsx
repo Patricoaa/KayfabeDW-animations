@@ -54,6 +54,8 @@ import {textStyle} from '../shared/text';
 export type RaceScrollingItem = {
   label: string;              // entity / event name
   image?: string | null;      // optional avatar + marker image (url / data: / root-relative)
+  markerImage?: string | null; // optional REFERENCE image (url / data:) loaded from a model
+                              // field for the 'image' marker mode; falls back to `image`.
   pos: number;                // position on the scrolling axis (date ms or plain number)
   value: number;              // accumulated numeric shown once activated
   delta?: number;             // (informational) per-period amount that date adds; the number marker computes its own delta from `value`
@@ -120,6 +122,11 @@ export type RaceScrollingProps = {
   markerIcon?: string;
   markerSize?: number;
   markerText?: RaceTextStyle;
+  // In icon/image modes each marker is a HORIZONTAL STACK of glyphs: as many
+  // icons / reference images as the amount that date adds (the marker's delta),
+  // capped at `MARKER_STACK_MAX` with an overflow "+N" chip; a delta of 1 keeps
+  // the single-glyph look. The reference image comes from `item.markerImage`
+  // (model field) falling back to the entity avatar `item.image`.
   rowGapH?: number;
   rowGap?: number;
   barWidth?: number;
@@ -751,7 +758,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // acumulado en la fecha anterior" (in 'period' mode `value` already IS the
   // period amount, so delta = value). A date whose delta is 0 draws no marker.
   const markersByPos = (() => {
-    const map = new Map<number, {label: string; image?: string | null; delta: number}[]>();
+    const map = new Map<number, {label: string; image?: string | null; markerImage?: string | null; delta: number}[]>();
     const prevValue = new Map<string, {value: number; started: boolean}>();
     const isRunning = (accumulateMode ?? 'running') === 'running';
     for (const r of rows) {
@@ -765,7 +772,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
         list = [];
         map.set(r.pos, list);
       }
-      list.push({label: r.label, image: r.image, delta});
+      list.push({label: r.label, image: r.image, markerImage: r.markerImage, delta});
     }
     return map;
   })();
@@ -774,21 +781,50 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const markerColorOf = (label: string, image?: string | null): string =>
     barColors?.[label] ?? (image ? barColors?.[image] : undefined) ?? palColor(label) ?? '#3f3f46';
 
+  // In icon / image modes each marker is a horizontal row of glyphs: as many as
+  // the amount that date adds (its delta), capped and followed by a "+N" chip.
+  const MARKER_STACK_MAX = 6;
+  const MARKER_GAP = Math.max(2, Math.round(MARKER_SIZE * 0.18));
+
   // One marker per entity at the grid of its date, centered on its lane.
-  const markerOnGrid = (tick: {x: number}, ent: {label: string; image?: string | null; delta: number}) => {
+  const markerOnGrid = (tick: {x: number}, ent: {label: string; image?: string | null; markerImage?: string | null; delta: number}) => {
     if (!currentRank.window.has(ent.label)) return null;
     const laneTop = PLOT_PAD_Y + laneY(rankNow(ent.label)) + ROW_H / 2;
-    if (markerMode === 'image' && ent.image) {
+    // The stacked count = the amount this date adds (delta), 1..MARKER_STACK_MAX;
+    // anything beyond the cap becomes a "+N" chip at the end of the row.
+    const raw = Math.round(Math.abs(ent.delta));
+    const count = Math.max(1, isNaN(raw) ? 1 : raw);
+    const shown = Math.min(count, MARKER_STACK_MAX);
+    const overflow = count - shown;
+    const chipFont = Math.max(10, AXIS_FONT);
+    const chip = overflow > 0 && (
+      <div style={{display: 'inline-flex', alignItems: 'center', height: MARKER_SIZE, padding: '0 6px', borderRadius: 5, background: 'rgba(2,6,23,0.85)', border: '1px solid rgba(255,255,255,0.2)', ...textStyle(markerText, {color: '#ffffff', size: chipFont, weight: 700}), fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap'}}>
+        +{overflow}
+      </div>
+    );
+    const refImage = ent.markerImage ?? ent.image;
+    if (markerMode === 'image' && refImage) {
       return (
-        <div key={ent.label} style={{position: 'absolute', left: tick.x - MARKER_SIZE / 2, top: laneTop - MARKER_SIZE / 2, width: MARKER_SIZE, height: MARKER_SIZE, borderRadius: Math.max(2, MARKER_SIZE * 0.18), overflow: 'hidden', border: '1px solid rgba(255,255,255,0.28)'}}>
-          <Img src={ent.image} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+        <div key={ent.label} style={{position: 'absolute', left: tick.x, top: laneTop - MARKER_SIZE / 2, transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: MARKER_GAP}}>
+          {Array.from({length: shown}, (_, i) => (
+            <div key={i} style={{width: MARKER_SIZE, height: MARKER_SIZE, borderRadius: Math.max(2, MARKER_SIZE * 0.18), overflow: 'hidden', border: '1px solid rgba(255,255,255,0.28)', flexShrink: 0}}>
+              <Img src={refImage} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+            </div>
+          ))}
+          {chip}
         </div>
       );
     }
     if (markerMode === 'icon') {
+      const color = markerColorOf(ent.label, ent.image);
       return (
-        <div key={ent.label} style={{position: 'absolute', left: tick.x - MARKER_SIZE / 2, top: laneTop - MARKER_SIZE / 2, width: MARKER_SIZE, height: MARKER_SIZE, display: 'flex', alignItems: 'center', justifyContent: 'center', color: markerColorOf(ent.label, ent.image), filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))'}}>
-          <svg viewBox="0 0 24 24" width={MARKER_SIZE} height={MARKER_SIZE}><path d={markerGlyph} fill="currentColor" /></svg>
+        <div key={ent.label} style={{position: 'absolute', left: tick.x, top: laneTop - MARKER_SIZE / 2, transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: MARKER_GAP}}>
+          {Array.from({length: shown}, (_, i) => (
+            <div key={i} style={{width: MARKER_SIZE, height: MARKER_SIZE, display: 'flex', alignItems: 'center', justifyContent: 'center', color, filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))', flexShrink: 0}}>
+              <svg viewBox="0 0 24 24" width={MARKER_SIZE} height={MARKER_SIZE}><path d={markerGlyph} fill="currentColor" /></svg>
+            </div>
+          ))}
+          {chip}
         </div>
       );
     }
@@ -1004,21 +1040,59 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
           <div style={{position: 'absolute', left: 0, top: 0, width: planeW, bottom: 0, transform: `translateX(${scrollX}px)`}}>
             {/* Date labels: one DIRECTLY ABOVE each date gridline, inside the
                 same fixed clip as the gridlines so they hide at the Y axis too.
-                Every date shows its label (dense dates may overlap). */}
+                Every date shows its label (dense dates may overlap). Each label
+                sits in its OWN "cajón" — a rounded dark plate with a subtle
+                border rendered ABOVE the gridlines (`zIndex`) — so the gridline
+                is masked right below the box and never overlaps the text. */}
             {showXAxis && (
-              <div style={{position: 'absolute', left: 0, top: 0, width: planeW, height: DATE_BAND_H}}>
+              <div style={{position: 'absolute', left: 0, top: 0, width: planeW, height: DATE_BAND_H, zIndex: 2}}>
                 {dateLabels.map((tick, i) => (
-                  <span key={i} style={{position: 'absolute', top: 4, left: tick.x, transform: 'translateX(-50%)', whiteSpace: 'nowrap', fontSize: AXIS_FONT, color: '#e2e8f0', fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.7)', fontVariantNumeric: 'tabular-nums'}}>{tick.label}</span>
+                  <div key={i} style={{position: 'absolute', bottom: -6, left: tick.x, transform: 'translateX(-50%)', display: 'inline-flex', padding: '2px 7px 5px', borderRadius: 6, background: 'rgba(2,6,23,0.88)', border: '1px solid rgba(226,232,240,0.14)', whiteSpace: 'nowrap'}}>
+                    <span style={{fontSize: AXIS_FONT, color: '#e2e8f0', fontWeight: 700, fontVariantNumeric: 'tabular-nums', lineHeight: 1}}>{tick.label}</span>
+                  </div>
                 ))}
               </div>
             )}
-            {/* Vertical gridlines: one per real date/value — DOTTED (default),
-                running from under the labels down to the CANVAS BOTTOM. */}
+            {/* Vertical gridlines: one per real date/value — DOTTED (default)
+                with STRETCHED dots (long dash streaks, ~7px on / 5px off, drawn
+                as a repeating gradient so the streak length is independent of
+                the line thickness), running from under the labels down to the
+                CANVAS BOTTOM. */}
             {showXAxis && (
               <div style={{position: 'absolute', left: 0, top: DATE_BAND_H, width: planeW, bottom: 0}}>
-                {ticks.map((tick, i) => (
-                  <div key={i} style={{position: 'absolute', left: tick.x, top: 0, bottom: 0, width: 0, borderLeft: `${gridlineWidth ?? 1}px ${gridlineStyle ?? 'dotted'} ${gridlineColor ?? '#334155'}`, opacity: gridlineOpacity ?? 0.35}} />
-                ))}
+                {ticks.map((tick, i) => {
+                  const w = gridlineWidth ?? 1;
+                  const c = gridlineColor ?? '#334155';
+                  const opacity = gridlineOpacity ?? 0.35;
+                  const style = gridlineStyle ?? 'dotted';
+                  return (
+                    <div
+                      key={i}
+                      style={
+                        style === 'dotted'
+                          ? {
+                              position: 'absolute',
+                              left: tick.x,
+                              top: 0,
+                              bottom: 0,
+                              width: Math.max(1, w),
+                              transform: `translateX(${w > 1 ? (-w + 1) / 2 : 0}px)`,
+                              background: `repeating-linear-gradient(to bottom, ${c} 0px, ${c} 7px, transparent 7px, transparent 12px)`,
+                              opacity,
+                            }
+                          : {
+                              position: 'absolute',
+                              left: tick.x,
+                              top: 0,
+                              bottom: 0,
+                              width: 0,
+                              borderLeft: `${w}px ${style} ${c}`,
+                              opacity,
+                            }
+                      }
+                    />
+                  );
+                })}
               </div>
             )}
           </div>

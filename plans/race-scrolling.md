@@ -711,3 +711,35 @@ Changed: `src/remotion/templates/race-scrolling/index.tsx`,
 `src/components/builder/animation-config-panel.tsx`,
 `src/lib/animation-config.ts`, `src/lib/viz-to-remotion.ts`, this plan. Gate
 `npx tsc --noEmit` clean.
+
+## Feedback round (2026-09-10) — dots estirados, cajón de fechas, imagen de referencia y apilado
+User requirements:
+1. Los dots de la línea punteada más estirados (líneas punteadas alargadas).
+2. Cada fecha con su propio "cajón" para que la línea no se solape con la etiqueta.
+3. En el marcador "imagen de referencia", poder cargar un CAMPO del modelo (url).
+4. En ícono y en imagen de referencia, apilar HORIZONTALMENTE la cantidad (delta) que
+   representan (confirmado: el delta de esa fecha; tope 6 con chip "+N").
+
+1. **Dots estirados**: `'dotted'` (default) ya no usa `borderLeft`; se dibuja con
+   `repeating-linear-gradient(to bottom, color 0 7px, transparent 7px 12px)` y
+   `width = gridlineWidth` (centrada), dando tramos alargados (~7px) con hueco de 5px,
+   independiente del grosor. 'dashed'/'solid' siguen con `borderLeft`.
+2. **Cajón de fechas**: cada etiqueta va en una placa redondeada oscura
+   (`rgba(2,6,23,0.88)`, borde sutil) que sobresale 6px por debajo de la banda de
+   etiquetas; el contenedor de etiquetas pasa a `zIndex: 2` para tapar el arranque de
+   la gridline y que nunca se sobreponga al texto.
+3. **Imagen de referencia por campo**: nueva `markerImageField?: string` en
+   `RaceScrollingConfig`; `FieldSelect "Imagen de referencia (campo url)"` en
+   "Marcadores del eje" (visible en modo imagen). `convertRaceScrolling` resuelve por
+   fila `markerImage = avatarUrlOf(row[markerImageField])`, lo pliega por entidad en
+   cada `step`; `RaceScrollingItem` gana `markerImage?: string | null`; en el renderer
+   el modo imagen usa `ent.markerImage ?? ent.image`.
+4. **Apilado por delta**: `markerOnGrid` (ícono e imagen) dibuja una fila horizontal
+   centrada en la gridline a la altura de la fila, con `n = clamp(round(|delta|), 1, 6)`
+   glifos (gap proporcional al tamaño) y un chip "+N" al final si `|delta| > 6`
+   (`MARKER_STACK_MAX = 6`). delta=1 conserva la marca única; modo número intacto.
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`,
+`src/components/builder/animation-config-panel.tsx`,
+`src/lib/animation-config.ts`, `src/lib/viz-to-remotion.ts`, this plan. Gate
+`npx tsc --noEmit` clean.

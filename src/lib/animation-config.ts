@@ -307,16 +307,23 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
   showLabels?: boolean;
 
   // Per-entity markers pinned ON each date grid of the scrolling axis band.
-// Rendering is driven by `markerMode`:
+  // Rendering is driven by `markerMode`:
   // 'number' (+2px bold on the axis font), 'icon' (a glyph from ICON_GLYPHS,
   // tinted with the entity's bar color) or 'image' (the entity's avatar photo
   // in a rounded frame). `markerIcon` picks the glyph, `markerSize` (px) sets
   // the box size and `markerText` overrides the number's typography.
+  // In icon/image modes each marker is a HORIZONTAL STACK of glyphs: as many
+  // icons / reference images as the amount that date adds (the marker's delta),
+  // capped at 6 with an overflow "+N" chip (a delta of 1 keeps one glyph).
   showMarkers?: boolean;
   markerMode?: 'number' | 'icon' | 'image';
   markerIcon?: string;
   markerSize?: number;
   markerText?: RaceTextStyle;
+  // Data column (a URL) loaded per entity as the 'image' marker's REFERENCE
+  // image; overrides the avatar photo (`imageField`) in image mode and falls
+  // back to it when a row has no value here.
+  markerImageField?: string;
 
   // Which participant set runs the race (alongside `maxRows`):
   // - 'final-value' (default): keep exactly the `maxRows` entities with the

@@ -470,6 +470,7 @@ function convertRaceScrolling(
     markerIcon: t?.markerIcon,
     markerSize: t?.markerSize,
     markerText: t?.markerText,
+    markerImageField: t?.markerImageField,
     maxRows: t?.maxRows,
     entitySelection: t?.entitySelection,
     finalValueDirection: t?.finalValueDirection,
@@ -516,6 +517,7 @@ function convertRaceScrolling(
   const labelField = resolveLabelField(rows, config, tc);
   const valueField = tc?.valueField ?? config.yField;
   const imageField = tc?.imageField;
+  const markerImageField = tc?.markerImageField;
   // The cardinality axis column: explicit `axisField` first, then legacy
   // `dateField`, then an auto-detected date-ish column by name.
   const explicitAxis = tc?.axisField ? resolveKey(rows, tc.axisField) : '';
@@ -530,6 +532,7 @@ function convertRaceScrolling(
     .map((row) => ({
       label: String(row[labelField] ?? ''),
       image: imageField ? avatarUrlOf(row[imageField]) : null,
+      markerImage: markerImageField ? avatarUrlOf(row[markerImageField]) : null,
       date: startField ? parseDateValue(row[startField]) : null,
       value: Number(row[valueField ?? Object.keys(row)[1] ?? ''] ?? 0),
       row,
@@ -613,12 +616,12 @@ function convertRaceScrolling(
   };
   const bucketOf = (pos: number): number => (dateMode ? periodStart(pos, fmt) : pos);
 
-  const byLabel = new Map<string, {image: string | null; map: Map<number, {value: number; count: number; raws: number[]}>}>();
+  const byLabel = new Map<string, {image: string | null; markerImage: string | null; map: Map<number, {value: number; count: number; raws: number[]}>}>();
   for (const it of positioned) {
     if (it.label === '' || isNaN(it.pos)) continue;
     let entry = byLabel.get(it.label);
     if (!entry) {
-      entry = {image: it.image, map: new Map()};
+      entry = {image: it.image, markerImage: it.markerImage ?? null, map: new Map()};
       byLabel.set(it.label, entry);
     }
     const bucket = bucketOf(it.pos);
@@ -636,7 +639,7 @@ function convertRaceScrolling(
   const agg = tc?.valueAgg ?? 'sum';
   const accumulate = tc?.accumulateMode !== 'period';
 
-  const steps: {label: string; image: string | null; pos: number; value: number; delta: number}[] = [];
+  const steps: {label: string; image: string | null; markerImage: string | null; pos: number; value: number; delta: number}[] = [];
   for (const [label, entry] of byLabel) {
     const ordered = Array.from(entry.map.entries()).sort((a, b) => a[0] - b[0]);
     let running = 0;
@@ -656,7 +659,7 @@ function convertRaceScrolling(
         periodValue = bucket.raws.reduce((s, v) => s + v, 0);
       }
       running += periodValue;
-      steps.push({label, image: entry.image, pos: period, value: accumulate ? running : periodValue, delta: periodValue});
+      steps.push({label, image: entry.image, markerImage: entry.markerImage, pos: period, value: accumulate ? running : periodValue, delta: periodValue});
     }
   }
 
