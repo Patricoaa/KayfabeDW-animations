@@ -21,16 +21,18 @@ import {textStyle} from '../shared/text';
 //   - a positional band with ONE TICK + VERTICAL GRIDLINE per real date (or
 //     numeric axis value) present in the data, thinned so consecutive gridlines
 //     are at least `gridSpacing` px apart (the ones closer than that are
-//     skipped, the rest slide in/out with the scroll) — plus an optional
-//     cardinality band (live value scale 0 → max);
-//   - per-active-entity MARKERS in their own lane at their current step.
+//     skipped, the rest slide in/out with the scroll);
+//   - date-grid MARKERS: each kept grid ("caja eje") carries the number/icon/
+//     image of every entity with a NON-ZERO value on that date, pinned ON the
+//     gridline at the lane height of its entity. A date whose value is 0 draws
+//     no marker.
 // Everything on the tape (labels, gridlines, markers) is clipped at the plot
 // box, so it visibly slides out and disappears as it crosses the plot's limits
 // — exactly like a moving ribbon.
 // `axisDirection` flips the sweep (Mayor→Menor only reverses the value→position
-// mapping). Markers show the value of the marker's current date (the per-period
-// amount that date adds, not the running total) as a number, an icon
-// (ICON_GLYPHS) or a reference image (avatar URL).
+// mapping). Markers show the per-period amount that date adds (the delta, not
+// the running total) as a number, an icon (ICON_GLYPHS) or a reference image
+// (avatar URL), hidden when that date's value is 0.
 //
 // The layout is fully responsive: it reads the composition width/height via
 // `useVideoConfig()` and re-flows for landscape, portrait (9:16), post (4:5),
@@ -356,7 +358,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const guideT = raw * raw * (3 - 2 * raw);
 
   // ---- Group steps by entity ----
-  const byLabel = new Map<string, {image?: string | null; steps: {x: number; value: number; delta: number}[]}>();
+  const byLabel = new Map<string, {image?: string | null; steps: {x: number; value: number}[]}>();
   for (const r of rows) {
     const x = Math.min(Math.max(posToX(r.pos), 0), 1);
     let entry = byLabel.get(r.label);
@@ -364,7 +366,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
       entry = {image: r.image, steps: []};
       byLabel.set(r.label, entry);
     }
-    entry.steps.push({x, value: r.value, delta: r.delta ?? 0});
+    entry.steps.push({x, value: r.value});
   }
   for (const e of byLabel.values()) e.steps.sort((a, b) => a.x - b.x);
 
@@ -374,7 +376,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const staticOrder = [...byLabel.keys()].sort((a, b) => a.localeCompare(b));
 
   // ---- Live ranking snapshots, shared per sweep position (see timeline-race) ----
-  type Participant = {label: string; image?: string | null; active: boolean; firstX: number; curX: number; current: number; currentDelta: number};
+  type Participant = {label: string; image?: string | null; active: boolean; firstX: number; current: number};
   type RankSnap = {
     list: Participant[];
     full: Participant[];
@@ -397,23 +399,17 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
       }
       const active = i >= 0;
       let current = 0;
-      let currentDelta = 0;
-      let curX = active ? steps[i].x : (steps[0]?.x ?? 0);
       if (active) {
         const cur = steps[i];
         const nxt = steps[i + 1];
         current = cur.value;
-        currentDelta = cur.delta;
-        curX = cur.x;
         if (nxt) {
           const segSpan = Math.max(nxt.x - cur.x, 1e-4);
           const frac = Math.min(1, Math.max(0, (t - cur.x) / segSpan));
           current = cur.value + (nxt.value - cur.value) * frac;
-          currentDelta = cur.delta + (nxt.delta - cur.delta) * frac;
-          curX = cur.x + (nxt.x - cur.x) * frac;
         }
       }
-      list.push({label, image: e.image, active, firstX: steps[0]?.x ?? 1, curX, current, currentDelta});
+      list.push({label, image: e.image, active, firstX: steps[0]?.x ?? 1, current});
     }
     const full = list; // fixed alphabetical order — lanes are assigned once and never swap
     const all = maxRows && maxRows > 0 ? full.slice(0, maxRows) : full;
@@ -540,12 +536,12 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
     const seen = new Set<number>();
     for (const r of items) if (Number.isFinite(r.pos)) seen.add(r.pos);
     const spacing = Math.max(gridSpacing ?? 90, 20);
-    const out: {label: string; x: number}[] = [];
+    const out: {label: string; x: number; pos: number}[] = [];
     let lastX = Number.NEGATIVE_INFINITY;
     for (const p of [...seen].sort((a, b) => a - b)) {
       const x = posToX(p) * BAR_MAX_W;
       if (Math.abs(x - lastX) < spacing) continue;
-      out.push({label: tickLabels(p), x});
+      out.push({label: tickLabels(p), x, pos: p});
       lastX = x;
     }
     return out;
@@ -570,28 +566,52 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // (the scale is implied 0 → current max), marking where the scrolling date
   // tape is cut off.
 
-  // Per-row markers: each active entity leaves its marker in ITS OWN lane at
-  // its current step on the scrolling plane (translating left→right with it).
+  // Markers are pinned to the DATE GRIDS (the "caja eje"): each kept tick
+  // carries the markers of every entity that contributes a NON-ZERO value at
+  // that date (delta ≠ 0), drawn ON the gridline at their lane's height, in
+  // world coordinates so they scroll in/out with the tape. A date whose entity
+  // value is 0 shows no marker; grids dropped by `gridSpacing` draw none either.
+  const markersByPos = (() => {
+    const map = new Map<number, {label: string; image?: string | null; delta: number}[]>();
+    for (const r of rows) {
+      if (!Number.isFinite(r.pos)) continue;
+      const delta = r.delta ?? 0;
+      if (delta === 0) continue;
+      let list = map.get(r.pos);
+      if (!list) {
+        list = [];
+        map.set(r.pos, list);
+      }
+      list.push({label: r.label, image: r.image, delta});
+    }
+    return map;
+  })();
+
   const markerGlyph = ICON_GLYPHS[markerIcon ?? 'star'] ?? ICON_GLYPHS.star;
-  const markerFor = (p: Participant) => {
-    if (!showMarkers) return null;
-    if (markerMode === 'image' && p.image) {
+  const markerColorOf = (label: string, image?: string | null): string =>
+    barColors?.[label] ?? (image ? barColors?.[image] : undefined) ?? palColor(label) ?? '#3f3f46';
+
+  // One marker per entity at the grid of its date, centered on its lane.
+  const markerOnGrid = (tick: {x: number}, ent: {label: string; image?: string | null; delta: number}) => {
+    if (!currentRank.window.has(ent.label)) return null;
+    const laneTop = PLOT_PAD_Y + laneY(rankNow(ent.label)) + ROW_H / 2;
+    if (markerMode === 'image' && ent.image) {
       return (
-        <div style={{position: 'absolute', left: p.curX * BAR_MAX_W - MARKER_SIZE / 2, top: '50%', transform: `translateX(${scrollX}px) translateY(-50%)`, width: MARKER_SIZE, height: MARKER_SIZE, borderRadius: Math.max(2, MARKER_SIZE * 0.18), overflow: 'hidden', border: '1px solid rgba(255,255,255,0.28)'}}>
-          <Img src={p.image} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+        <div key={ent.label} style={{position: 'absolute', left: tick.x - MARKER_SIZE / 2, top: laneTop - MARKER_SIZE / 2, width: MARKER_SIZE, height: MARKER_SIZE, borderRadius: Math.max(2, MARKER_SIZE * 0.18), overflow: 'hidden', border: '1px solid rgba(255,255,255,0.28)'}}>
+          <Img src={ent.image} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
         </div>
       );
     }
     if (markerMode === 'icon') {
       return (
-        <div style={{position: 'absolute', left: p.curX * BAR_MAX_W - MARKER_SIZE / 2, top: '50%', transform: `translateX(${scrollX}px) translateY(-50%)`, width: MARKER_SIZE, height: MARKER_SIZE, display: 'flex', alignItems: 'center', justifyContent: 'center', color: barFillOf(p), filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))'}}>
+        <div key={ent.label} style={{position: 'absolute', left: tick.x - MARKER_SIZE / 2, top: laneTop - MARKER_SIZE / 2, width: MARKER_SIZE, height: MARKER_SIZE, display: 'flex', alignItems: 'center', justifyContent: 'center', color: markerColorOf(ent.label, ent.image), filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))'}}>
           <svg viewBox="0 0 24 24" width={MARKER_SIZE} height={MARKER_SIZE}><path d={markerGlyph} fill="currentColor" /></svg>
         </div>
       );
     }
     return (
-      <div style={{position: 'absolute', left: p.curX * BAR_MAX_W, top: '50%', transform: `translateX(${scrollX}px) translate(-50%, -50%)`, ...textStyle(markerText, {color: '#ffffff', size: AXIS_FONT + 2, weight: 700}), fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap'}}>
-        {fmtValue(Math.round(p.currentDelta), valueFormat, currencySymbol)}
+      <div key={ent.label} style={{position: 'absolute', left: tick.x, top: laneTop - (AXIS_FONT + 2) / 2, transform: 'translateX(-50%)', ...textStyle(markerText, {color: '#ffffff', size: AXIS_FONT + 2, weight: 700}), fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap'}}>
+        {fmtValue(Math.round(ent.delta), valueFormat, currencySymbol)}
       </div>
     );
   };
@@ -663,11 +683,6 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
 {fmtValue(Math.round(p.current), valueFormat, currencySymbol)}
             </span>
           </div>
-          {/* Markers ride the tape but are clipped at the plot box (this lane's
-              bar-track bounds), so they disappear as they cross the limits. */}
-          <div style={{position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, overflow: 'hidden', pointerEvents: 'none'}}>
-            {markerFor(p)}
-          </div>
         </div>
       ),
       avatar: (
@@ -731,6 +746,22 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
         <div style={{position: 'absolute', left: PAD_L, top: rowsTopY, width: innerW, height: Math.max(rowsHeight, 1), zIndex: 2}}>
           {renderPool.map((p) => renderRow(p))}
         </div>
+
+        {/* Grid markers — pinned to the DATE GRIDS ("caja eje"): each kept tick
+            shows the icon/image/number of every entity with a non-zero value at
+            that date, at its lane's height, scrolling with the tape inside the
+            plot box. Dates whose value is 0 draw nothing. */}
+        {showXAxis && showMarkers && (
+          <div style={{position: 'absolute', left: BAR_TRACK_X, top: plotTop, width: BAR_MAX_W, height: bottomEnd, overflow: 'hidden', zIndex: 3, pointerEvents: 'none'}}>
+            <div style={{position: 'absolute', left: 0, top: 0, width: BAR_MAX_W, height: bottomEnd, transform: `translateX(${scrollX}px)`}}>
+              {ticks.map((tick) => {
+                const ents = markersByPos.get(tick.pos);
+                if (!ents || ents.length === 0) return null;
+                return ents.map((ent) => markerOnGrid(tick, ent));
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Permanent Y axis: the static line at the RIGHT edge of the plot (no
             numeric ticks; the scale is implied 0 → current max). Its

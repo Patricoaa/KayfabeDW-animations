@@ -322,3 +322,34 @@ a representar no es el total sino el de esa fecha en particular."
 Changed: `src/remotion/templates/race-scrolling/index.tsx`,
 `src/components/builder/animation-config-panel.tsx`, `src/lib/viz-to-remotion.ts`,
 `src/lib/animation-config.ts`, this plan. Gate `npx tsc --noEmit` clean.
+## Feedback round (2026-09-09) — marcadores en cada grid de fecha ("caja eje")
+User feedback: "Los marcadores de posición deben ir apareciendo en caja eje (cada
+grid de fecha), no tener su propio eje permanente, de tal forma que cada eje tenga
+su marcador (en el caso de iconos/imágenes); si el valor es 0 no se visualiza."
+
+Decisions (clarified with the user):
+1. **Por entidad en los grids** — cada grid de fecha ("caja eje") lleva el
+   marcador (número/ícono/imagen) de cada entidad que aporta valor ESA fecha
+   (`delta ≠ 0`), PINNED sobre la gridline en la coordenada exacta de esa fecha.
+2. **Ocultar si valor == 0** — una fecha con valor 0 no dibuja marcador para esa
+   entidad.
+3. **A la altura de su fila** — el marcador se centra verticalmente en la fila de
+   la entidad (`PLOT_PAD_Y + laneY(rank) + ROW_H/2`).
+
+4. **Implementación** — se elimina el marcador viajero por-fila (`markerFor` +
+   capa en `renderRow`). `ticks` ahora lleva la posición cruda (`pos`) además de
+   `label`/`x`. Nuevo índice `markersByPos: Map<pos, {label, image, delta}[]>`
+   construido desde `rows` (solo `delta !== 0`). Capa de marcadores con la misma
+   geometría de clip del plot (`BAR_TRACK_X, plotTop, BAR_MAX_W, bottomEnd`,
+   `overflow hidden`, `translateX(scrollX)`, zIndex 3 sobre las barras), que
+   por cada tick conservado renderiza los marcadores de las entidades visibles
+   (`currentRank.window`). Solo los grids que `gridSpacing` mantiene llevan
+   marcador (coherente con "cada grid").
+5. **Limpieza** — `curX`/`currentDelta` ya no tienen consumidores → eliminados
+   de `Participant` y `buildSnap`; los steps quedan `{x, value}` (el `delta` se
+   lee de `rows`). El color del ícono usa `markerColorOf(label, image)`
+   (`barColors`/paleta) en vez de `barFillOf` (que dependía del participante).
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`,
+`src/components/builder/animation-config-panel.tsx`, `src/lib/animation-config.ts`,
+this plan. Gate `npx tsc --noEmit` clean.

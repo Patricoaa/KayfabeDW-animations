@@ -234,10 +234,11 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
   // (`NAME_W + AVATAR_W + gaps`) and the vertical extent derives from the rows
   // block (whose height includes every row gap) plus a padding that scales
   // with the "Separación vertical entre filas" control.
-  // `showMarkers`/`markerMode` draw one marker per active entity IN ITS OWN ROW
-  // at its current step on the plane showing the value of its current date (the
-  // per-period amount that date adds, not the running total), an icon (from
-  // ICON_GLYPHS) or a reference image (the entity's avatar URL).
+  // `showMarkers`/`markerMode` pin one marker per entity onto each DATE GRID
+  // ("caja eje"): every kept grid carries the marker of each entity with a
+  // non-zero value on that date, placed at the lane height of its entity and
+  // showing the per-period amount that date adds (the delta, not the running
+  // total). A date whose value is 0 shows no marker.
   // `barColors`, `barPalette` and the row/avatar controls are shared with the
   // timeline race.
   //
@@ -266,13 +267,12 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
   // false the name column collapses and the bar track / plot expands left.
   showLabels?: boolean;
 
-  // Per-entity markers on the scrolling axis band at each entity's current
-  // step. Default OFF-marker rendering is driven by `markerMode`:
+  // Per-entity markers pinned ON each date grid of the scrolling axis band.
+// Rendering is driven by `markerMode`:
   // 'number' (+2px bold on the axis font), 'icon' (a glyph from ICON_GLYPHS,
   // tinted with the entity's bar color) or 'image' (the entity's avatar photo
   // in a rounded frame). `markerIcon` picks the glyph, `markerSize` (px) sets
-  // the box size (band auto-grows to fit) and `markerText` overrides the
-  // number's typography.
+  // the box size and `markerText` overrides the number's typography.
   showMarkers?: boolean;
   markerMode?: 'number' | 'icon' | 'image';
   markerIcon?: string;

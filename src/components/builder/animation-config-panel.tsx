@@ -738,7 +738,8 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
 
 // Race Scrolling config UI: same header/cols/avatar/bars/canvas as the
 // timeline race, plus the scrolling "Eje" section (camera anchor + ticks) and
-// the "Marcadores del eje" section (per-entity value markers on the band).
+// the "Marcadores del eje" section (per-entity markers pinned to each date grid
+// of the band).
 type RaceScrollingPanelProps = Omit<AnimationConfigPanelProps, 'value' | 'onChange'> & {
   value: RaceScrollingConfig;
   onChange: (next: RaceScrollingConfig) => void;
@@ -1127,7 +1128,7 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           onChange={(v) => update({showMarkers: v})}
         />
         <p className="text-[10px] text-muted mt-0.5">
-          Cada entidad activa deja un marcador en su propia fila, en la posición de su paso actual sobre el plano, mostrando el valor de esa fecha en particular (la cantidad que aporta esa fecha, no el total acumulado). El marcador viaja con la cinta y desaparece al cruzar los límites del plot.
+          Cada grid de fecha ("caja eje") muestra el marcador de cada entidad que aporta valor en esa fecha, colocado sobre la gridline a la altura de su fila. Muestra la cantidad que aporta esa fecha en particular (el delta, no el total acumulado); si el valor de la fecha es 0, el marcador no se visualiza. Viaja con la cinta y desaparece al cruzar los límites del plot.
         </p>
         <div className="mt-2">
           <div>
