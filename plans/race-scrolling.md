@@ -772,3 +772,27 @@ Changed: `src/remotion/templates/race-scrolling/index.tsx`,
 `src/components/ui/controls/audio-upload-input.tsx` (nuevo) e `index.ts`,
 `src/lib/animation-config.ts`, `src/lib/viz-to-remotion.ts`, this plan. Gate
 `npx tsc --noEmit` clean.
+
+## Feedback round 2 (2026-09-10) — sin duración fija, pausa regula velocidad, dots largos, overrun final
+User requirements:
+1. Quitar el control "Duración de la carrera (s)" (redundante).
+2. Que "Pausa final (s)" regule la velocidad de scrolling según la duración de la pausa.
+3. Dots de gridline más largos y con más espaciado entre sí.
+4. Que al final el scroll pase un poco más allá de la última fecha (no quede clavado en el eje).
+
+1. **Sin duración fija**: el `SliderNumberInput "Duración de la carrera (s)"` del panel
+   Race Scrolling se elimina; el renderer deja de leer `raceDurationSeconds` (siempre modo
+   auto). El campo de props/config y el passthrough se conservan por retrocompatibilidad
+   (Timeline Race lo sigue usando).
+2. **Pausa → velocidad**: con el modo auto, `sweepFrames = max(sweepBudget − holdFinalFrames, 1)`;
+   a mayor pausa final la cinta recorre el mismo tramo en menos frames (más rápido). Texto de
+   ayuda actualizado.
+3. **Dots largos**: `repeating-linear-gradient` pasa de tramo 7px/sep 5px a **14px/10px**.
+4. **Overrun final**: `overrunPx = max(24, round(BAR_MAX_W*0.12))`, `sweepEndT = 1 + overrunPx/(ribbonLen+leadPx)`.
+   `guideTAt` interpola lineal hasta `sweepEndT`; `axisReachFrame` divide por `sweepEndT`
+   (`invSmooth = clamp(g/sweepEndT)`) para conservar la cadencia exacta de cruces y pops de
+   barra. Al terminar, la última grid queda ~40px a la izquierda del eje y ahí se congela la
+   pausa final.
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`,
+`src/components/builder/animation-config-panel.tsx`, this plan. Gate `npx tsc --noEmit` clean.

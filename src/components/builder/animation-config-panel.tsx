@@ -1014,17 +1014,6 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           </div>
         )}
         <SliderNumberInput
-          label="Duración de la carrera (s)"
-          value={value.raceDurationSeconds ?? 0}
-          min={0}
-          max={60}
-          step={1}
-          onChange={(v) => update({raceDurationSeconds: v > 0 ? v : undefined})}
-        />
-        <p className="text-[10px] text-muted mt-0.5">
-          Tiempo del recorrido del eje. 0 = automático (la carrera ocupa todo el tiempo disponible). Al fijarla, el tiempo sobrante queda congelado en el resultado final.
-        </p>
-        <SliderNumberInput
           label="Pausa final (s)"
           value={value.holdFinalSeconds ?? 2}
           min={0}
@@ -1033,7 +1022,7 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           onChange={(v) => update({holdFinalSeconds: v >= 0 ? v : undefined})}
         />
         <p className="text-[10px] text-muted mt-0.5">
-          El scroll viaja a velocidad constante; al llegar a la última fecha, la cinta se congela estos segundos para visualizar el resultado final antes del fade de salida.
+          El scroll viaja a velocidad constante; al llegar a la última fecha (que se desplaza un poco más allá del eje), la cinta se congela estos segundos antes del fade de salida. A mayor pausa, más rápido se desplaza la cinta para ocupar el resto del tiempo.
         </p>
         <SwitchControl
           label="Efecto podio al final"

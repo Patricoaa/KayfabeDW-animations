@@ -209,7 +209,6 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   axisUnit = 'date',
   maxRows,
   holdFinalSeconds = 2,
-  raceDurationSeconds,
   podiumEffect = true,
   showRail = false,
   showDateLabel = true,
@@ -432,16 +431,11 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const sweepBudget = Math.max(0, durationInFrames - EASE * 2 - OUTRO);
   const holdCap = Math.max(0, sweepBudget - 1);
   const holdFinalFrames = Math.max(0, Math.min(Math.round(holdFinalSeconds * fps), holdCap));
-  const sweepFrames = raceDurationSeconds != null
-    ? Math.max(1, Math.min(Math.max(1, Math.round(raceDurationSeconds * fps)), sweepBudget))
-    : Math.max(sweepBudget - holdFinalFrames, 1);
+  // Auto sweep: the tape always runs at CONSTANT speed and the "Pausa final (s)"
+  // control regulates how fast by calling off the trailing frames: a longer
+  // pause yields fewer sweep frames (faster ribbon); a shorter one, more (slower).
+  const sweepFrames = Math.max(sweepBudget - holdFinalFrames, 1);
   const raceEndFrame = EASE + sweepFrames;
-  // The sweep is LINEAR: the tape travels at CONSTANT speed from the first
-  // frame to the last (the extra seconds to view the result live in the
-  // trailing hold, `holdFinalFrames`, where the tape is frozen at the end).
-  const guideTAt = (f: number) =>
-    interpolate(f, [EASE, EASE + sweepFrames], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
-  const guideT = guideTAt(frame);
 
   // ---- Distinct axis positions + spacing policy ----
   // `positions` is the sorted list of every distinct real value bucket/date;
@@ -478,6 +472,16 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const leadPx = uniformAxis && nPos > 1 ? gridSpacingPx : BAR_MAX_W / 2;
   const leadFrac = leadPx / ribbonLen;
   const tapeSpan = (ribbonLen + leadPx) / ribbonLen;
+  // The sweep overshoots the LAST date's gridline by a small overrun so the
+  // ribbon keeps gliding PAST the axis at the very end (it never stops right
+  // on it); the freeze for the final result lands with the last grid slightly
+  // left of the axis. The sweep is LINEAR — constant speed start to end — and
+  // the Pausa final frames are frozen after `sweepEndT` is reached.
+  const overrunPx = Math.max(24, Math.round(BAR_MAX_W * 0.12));
+  const sweepEndT = Math.max(1, 1 + overrunPx / Math.max(ribbonLen + leadPx, 1));
+  const guideTAt = (f: number) =>
+    interpolate(f, [EASE, EASE + sweepFrames], [0, sweepEndT], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
+  const guideT = guideTAt(frame);
 
   // ---- Group steps by entity ----
   const byLabel = new Map<string, {image?: string | null; steps: {x: number; value: number}[]}>();
@@ -526,9 +530,10 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const nowFracAt = (f: number) => Math.max(0, Math.min(1, guideTAt(f) * tapeSpan - leadFrac));
 
   // Invert the linear sweep in `guideTAt` so we know the exact frame each
-  // date's gridline touches the axis (with constant speed the time map is the
-  // identity: a date sits proportionally where it does on the tape).
-  const invSmooth = (g: number) => Math.max(0, Math.min(1, g));
+  // date's gridline touches the axis: because the tape glides at constant
+  // speed over [0, sweepEndT], the frame of a fraction `frac` is its position
+  // `g` scaled down by `sweepEndT` against the full sweep.
+  const invSmooth = (g: number) => Math.max(0, Math.min(1, g / sweepEndT));
   const fracFrameCache = new Map<number, number>();
   const axisReachFrame = (frac: number) => {
     const fx = Math.max(0, Math.min(1, frac));
@@ -1085,7 +1090,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
                               bottom: 0,
                               width: Math.max(1, w),
                               transform: `translateX(${w > 1 ? (-w + 1) / 2 : 0}px)`,
-                              background: `repeating-linear-gradient(to bottom, ${c} 0px, ${c} 7px, transparent 7px, transparent 12px)`,
+                              background: `repeating-linear-gradient(to bottom, ${c} 0px, ${c} 14px, transparent 14px, transparent 24px)`,
                               opacity,
                             }
                           : {
