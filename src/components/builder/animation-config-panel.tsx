@@ -1054,11 +1054,16 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           </p>
           <NumberControl label="Radio de esquina de la barra (vacío = píldora)" value={value.barRadius} min={0} max={60} step={1} onChange={(v) => update({barRadius: v})} />
           <NumberControl label="Grosor de la barra (px, vacío = automático)" value={value.barThickness} min={4} max={120} step={2} onChange={(v) => update({barThickness: v})} />
+          <SliderNumberInput label="Separación vertical entre filas (px)" value={value.rowGap ?? 0} min={0} max={120} step={2} onChange={(v) => update({rowGap: v || undefined})} />
+          <p className="text-[10px] text-muted mt-0.5 mb-1">
+            También define el inicio y fin del plot: el eje Y y las gridlines de fecha abarcan el bloque de filas (incluidos los huecos) más un padding proporcional.
+          </p>
+          <SliderNumberInput label="Separación horizontal (px)" value={value.rowGapH ?? 0} min={0} max={80} step={2} onChange={(v) => update({rowGapH: v || undefined})} />
         </Collapsible>
       )}
 
-      {/* ============ EJE (scrolling) ============ */}
-      <Collapsible title="Eje" defaultOpen>
+      {/* ============ GRIDLINE ============ */}
+      <Collapsible title="Gridline" defaultOpen>
         <div>
           <label className="text-sm font-medium mb-1 block">Formato de fecha</label>
           <SelectControl
@@ -1074,17 +1079,6 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
             Agrupa los datos por día, mes o año y re-agrega el valor acumulado en cada rango.
           </p>
         </div>
-        <SliderNumberInput
-          label="Marcas del eje de valores"
-          value={value.axisTicks ?? 8}
-          min={2}
-          max={24}
-          step={1}
-          onChange={(v) => update({axisTicks: v})}
-        />
-        <p className="text-[10px] text-muted mb-1">
-          Aplica al eje Y permanente (la escala de valores). El eje posicional dibuja una marca y gridline por cada fecha real de los datos.
-        </p>
         <SliderNumberInput
           label="Separación del grid (px)"
           value={value.gridSpacing ?? 90}
@@ -1102,13 +1096,8 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           onChange={(v) => update({showXAxis: v})}
         />
         <p className="text-[10px] text-muted mt-0.5">
-          Cada fecha real dibuja una gridline vertical con su etiqueta justo encima (colisión-safe: las etiquetas que se juntarían se omiten). Solo el eje de fechas se desplaza; la escala de valores es el eje Y permanente al borde derecho del plot.
+          Cada fecha real dibuja una gridline vertical con su etiqueta justo encima (colisión-safe: las etiquetas que se juntarían se omiten). Solo el eje de fechas se desplaza; el eje Y es la línea permanente al borde derecho del plot.
         </p>
-        <SliderNumberInput label="Separación vertical entre filas (px)" value={value.rowGap ?? 0} min={0} max={120} step={2} onChange={(v) => update({rowGap: v || undefined})} />
-        <p className="text-[10px] text-muted mt-0.5 mb-1">
-          También define el inicio y fin del plot: el eje Y y las gridlines de fecha abarcan el bloque de filas (incluidos los huecos) más un padding proporcional.
-        </p>
-        <SliderNumberInput label="Separación horizontal (px)" value={value.rowGapH ?? 0} min={0} max={80} step={2} onChange={(v) => update({rowGapH: v || undefined})} />
         <SelectControl
           label="Formato del valor acumulado"
           value={value.valueFormat ?? 'number'}
@@ -1126,7 +1115,7 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           </div>
         )}
         <p className="text-[10px] text-muted">
-          El plot es la caja que delimita los ejes: cada fecha real de "campo fecha" (o valor del eje numérico) dibuja una gridline con su etiqueta justo encima; la cinta se desliza y se recorta al cruzar los límites del plot. El eje Y es permanente (escala 0 → máximo acumulado) en el borde derecho, marcando hasta dónde se ve el scroll de las fechas. Las marcas por entidad desaparecen al sobrepasar los límites. La fecha en pantalla se muestra abajo a la derecha.
+          El plot es la caja que delimita los ejes: cada fecha real de "campo fecha" (o valor del eje numérico) dibuja una gridline con su etiqueta justo encima; la cinta se desliza y se recorta al cruzar los límites del plot. El eje Y es la línea permanente en el borde derecho (escala implícita 0 → máximo acumulado), marcando hasta dónde se ve el scroll de las fechas. Las marcas por entidad desaparecen al sobrepasar los límites. La fecha en pantalla se muestra abajo a la derecha.
         </p>
       </Collapsible>
 
@@ -1138,7 +1127,7 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           onChange={(v) => update({showMarkers: v})}
         />
         <p className="text-[10px] text-muted mt-0.5">
-          Cada entidad activa deja un marcador en su propia fila, en la posición de su paso actual sobre el plano, mostrando el valor acumulado. El marcador viaja con la cinta y desaparece al cruzar los límites del plot.
+          Cada entidad activa deja un marcador en su propia fila, en la posición de su paso actual sobre el plano, mostrando el valor de esa fecha en particular (la cantidad que aporta esa fecha, no el total acumulado). El marcador viaja con la cinta y desaparece al cruzar los límites del plot.
         </p>
         <div className="mt-2">
           <div>
@@ -1196,7 +1185,7 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
         <ColorPickerControl label="Color del eje" value={value.yAxisColor ?? '#334155'} onChange={(v) => update({yAxisColor: v || undefined})} />
         <SliderNumberInput label="Grosor del eje (px)" value={value.yAxisWidth ?? 2} min={1} max={12} step={1} onChange={(v) => update({yAxisWidth: v || undefined})} />
         <p className="text-[10px] text-muted">
-          Eje Y permanente en el borde derecho del plot: escala de cardinalidad de 0 (abajo) al máximo acumulado (arriba). Su grosor y color definen hasta dónde se ve el scrolling de las fechas.
+          Eje Y permanente en el borde derecho del plot: una sola línea vertical (escala implícita 0 → máximo acumulado) que corta visualmente la cinta. Su grosor y color definen hasta dónde se ve el scrolling de las fechas.
         </p>
       </Collapsible>
 

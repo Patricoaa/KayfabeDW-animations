@@ -282,3 +282,37 @@ FECHAS también debe considerar ese control para posicionar inicio/final del eje
 Changed: `src/remotion/templates/race-scrolling/index.tsx`,
 `src/components/builder/animation-config-panel.tsx`, `src/lib/viz-to-remotion.ts`,
 `src/lib/animation-config.ts`, this plan. Gate `npx tsc --noEmit` clean.
+
+## Feedback round (2026-09-09) — sin marcas del eje Y, gridline, marcadores = valor de fecha
+User feedback: "remove la funcionalidad de Marcas del eje de valores; mueve la
+Separación vertical entre filas y horizontal a la sección Barras; los controles
+Eje se deben renombrar gridline; los marcadores corresponden al valor acumulado
+de la fecha específica que representa la cantidad a sumar de la fecha — el valor
+a representar no es el total sino el de esa fecha en particular."
+
+1. **Marcas del eje de valores eliminadas** — se borra `axisTicks` (y su
+   passthrough/doc) y `valueTicks`: el eje Y permanente queda como UNA línea
+   vertical (grosor `yAxisWidth` + color `yAxisColor` configurables) en el borde
+   derecho del plot, sin marcas ni etiquetas numéricas (escala implícita
+   0 → máximo acumulado). Se actualizan los hints del panel ("Marcas del eje de
+   valores", "Eje Y", párrafo del plot).
+2. **Separadores a "Barras"** — los controles "Separación vertical entre filas
+   (px)" (`rowGap`) y "Separación horizontal (px)" (`rowGapH`) salen del
+   collapsible "Eje" y van a "Barras" (tras "Grosor de la barra"); `rowGap`
+   conserva su hint (define inicio/fin del plot + padding).
+3. **"Eje" → "Gridline"** — el collapsible que agrupa formato de fecha, grid
+   `gridSpacing`, toggle de gridlines y formato del valor se renombra a
+   "Gridline" (solo race-scrolling; los "Eje X"/"Eje Y" de timeline-race/chart no
+   se tocan).
+4. **Marcadores = valor de la fecha (delta)** — el marcador numérico de entidad
+   ya no muestra el total acumulado (`p.current`, interpolado) sino el valor DE
+   ESA FECHA: la cantidad que aporta ese periodo. `convertRaceScrolling` emite
+   `delta: periodValue` por step (disponible también en modo acumulado, donde
+   `value[i]` es el running) y lo propaga hasta `RaceScrollingItem`;
+   `buildSnap` interpola `currentDelta` igual que `current` y el marcador
+   renderiza `Math.round(p.currentDelta)`. Las BARRAS siguen creciendo con el
+   total acumulado (solo cambia el número del marcador).
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`,
+`src/components/builder/animation-config-panel.tsx`, `src/lib/viz-to-remotion.ts`,
+`src/lib/animation-config.ts`, this plan. Gate `npx tsc --noEmit` clean.

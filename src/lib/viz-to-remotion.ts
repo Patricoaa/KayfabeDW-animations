@@ -453,7 +453,6 @@ function convertRaceScrolling(
     showDateLabel: t?.showDateLabel,
     showXAxis: t?.showXAxis,
     axisDirection: t?.axisDirection,
-    axisTicks: t?.axisTicks,
     gridSpacing: t?.gridSpacing,
     showLabels: t?.showLabels,
     showMarkers: t?.showMarkers,
@@ -624,7 +623,7 @@ function convertRaceScrolling(
   const agg = tc?.valueAgg ?? 'sum';
   const accumulate = tc?.accumulateMode !== 'period';
 
-  const steps: {label: string; image: string | null; pos: number; value: number}[] = [];
+  const steps: {label: string; image: string | null; pos: number; value: number; delta: number}[] = [];
   for (const [label, entry] of byLabel) {
     const ordered = Array.from(entry.map.entries()).sort((a, b) => a[0] - b[0]);
     let running = 0;
@@ -644,7 +643,7 @@ function convertRaceScrolling(
         periodValue = bucket.raws.reduce((s, v) => s + v, 0);
       }
       running += periodValue;
-      steps.push({label, image: entry.image, pos: period, value: accumulate ? running : periodValue});
+      steps.push({label, image: entry.image, pos: period, value: accumulate ? running : periodValue, delta: periodValue});
     }
   }
 

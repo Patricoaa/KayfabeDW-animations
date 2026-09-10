@@ -227,16 +227,17 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
 //
 // The bar geometry, entry/pop, ranking swaps, winner reveal and outro mirror
   // the timeline race. The fixed "now" line sits at a hardcoded 35% of the
-  // track and `axisTicks` controls the tick count of the PERMANENT value axis
-  // (the cardinality scale 0 → current max drawn statically at the right edge
-  // of the plot). The plot (gridlines, date labels, value Y axis) is aligned
-  // to the actual bar track — the left edge accounts for the avatar column
+  // track and the PERMANENT value axis is a single vertical line at the right
+  // edge of the plot (no numeric tick marks: the scale is implied 0 → current
+  // max). The plot (gridlines, date labels, value Y axis) is aligned to the
+  // actual bar track — the left edge accounts for the avatar column
   // (`NAME_W + AVATAR_W + gaps`) and the vertical extent derives from the rows
   // block (whose height includes every row gap) plus a padding that scales
   // with the "Separación vertical entre filas" control.
   // `showMarkers`/`markerMode` draw one marker per active entity IN ITS OWN ROW
-  // at its current step on the plane showing the accumulated value as a number,
-  // an icon (from ICON_GLYPHS) or a reference image (the entity's avatar URL).
+  // at its current step on the plane showing the value of its current date (the
+  // per-period amount that date adds, not the running total), an icon (from
+  // ICON_GLYPHS) or a reference image (the entity's avatar URL).
   // `barColors`, `barPalette` and the row/avatar controls are shared with the
   // timeline race.
   //
@@ -255,12 +256,6 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
   // Mayor→Menor. Only the value→position mapping is reversed; the ranking and
   // entry/exit animation keep their behavior.
   axisDirection?: 'asc' | 'desc';
-
-  // Number of ticks drawn on the PERMANENT value (Y) axis, a cardinality scale
-  // 0 → current max (2-24, default 8). The positional band ignores this: its
-  // tick density comes from `gridSpacing` (min px between consecutive
-  // gridlines/labels, default 90).
-  axisTicks?: number;
 
   // Min horizontal distance (px, 20-320, default 90) between consecutive
   // positional gridlines/labels on the plane. Dates closer than this are

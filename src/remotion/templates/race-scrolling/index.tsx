@@ -28,7 +28,8 @@ import {textStyle} from '../shared/text';
 // box, so it visibly slides out and disappears as it crosses the plot's limits
 // — exactly like a moving ribbon.
 // `axisDirection` flips the sweep (Mayor→Menor only reverses the value→position
-// mapping). Markers show the accumulated value as a number, an icon
+// mapping). Markers show the value of the marker's current date (the per-period
+// amount that date adds, not the running total) as a number, an icon
 // (ICON_GLYPHS) or a reference image (avatar URL).
 //
 // The layout is fully responsive: it reads the composition width/height via
@@ -39,6 +40,7 @@ export type RaceScrollingItem = {
   image?: string | null;      // optional avatar + marker image (url / data: / root-relative)
   pos: number;                // position on the scrolling axis (date ms or plain number)
   value: number;              // accumulated numeric shown once activated
+  delta?: number;             // per-period amount this step's date adds (marker value)
 };
 
 export type RaceScrollingProps = {
@@ -59,11 +61,6 @@ export type RaceScrollingProps = {
   // Axis sweep direction: 'asc' (Menor→Mayor) or 'desc' (Mayor→Menor). Only
   // the value→position mapping reverses; camera and ranking are unchanged.
   axisDirection?: 'asc' | 'desc';
-  // Ticks on the PERMANENT value (Y) axis (2-24, default 8): a cardinality
-  // scale 0 → current max drawn statically on the right edge of the plot. The
-  // positional band draws one tick/gridline per real data date, thinned by
-  // `gridSpacing` (min px between consecutive gridlines, default 90).
-  axisTicks?: number;
   // Min horizontal distance (px, 20-320, default 90) between consecutive
   // positional gridlines/labels on the plane. Dates closer than this are
   // skipped; farther ones scroll in/out and stay distinguishable.
@@ -153,7 +150,6 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   showDateLabel = true,
   showXAxis = true,
   axisDirection = 'asc',
-  axisTicks = 8,
   gridSpacing,
   showLabels = true,
   showMarkers = true,
@@ -360,7 +356,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const guideT = raw * raw * (3 - 2 * raw);
 
   // ---- Group steps by entity ----
-  const byLabel = new Map<string, {image?: string | null; steps: {x: number; value: number}[]}>();
+  const byLabel = new Map<string, {image?: string | null; steps: {x: number; value: number; delta: number}[]}>();
   for (const r of rows) {
     const x = Math.min(Math.max(posToX(r.pos), 0), 1);
     let entry = byLabel.get(r.label);
@@ -368,7 +364,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
       entry = {image: r.image, steps: []};
       byLabel.set(r.label, entry);
     }
-    entry.steps.push({x, value: r.value});
+    entry.steps.push({x, value: r.value, delta: r.delta ?? 0});
   }
   for (const e of byLabel.values()) e.steps.sort((a, b) => a.x - b.x);
 
@@ -378,7 +374,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const staticOrder = [...byLabel.keys()].sort((a, b) => a.localeCompare(b));
 
   // ---- Live ranking snapshots, shared per sweep position (see timeline-race) ----
-  type Participant = {label: string; image?: string | null; active: boolean; firstX: number; curX: number; current: number};
+  type Participant = {label: string; image?: string | null; active: boolean; firstX: number; curX: number; current: number; currentDelta: number};
   type RankSnap = {
     list: Participant[];
     full: Participant[];
@@ -401,20 +397,23 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
       }
       const active = i >= 0;
       let current = 0;
+      let currentDelta = 0;
       let curX = active ? steps[i].x : (steps[0]?.x ?? 0);
       if (active) {
         const cur = steps[i];
         const nxt = steps[i + 1];
         current = cur.value;
+        currentDelta = cur.delta;
         curX = cur.x;
         if (nxt) {
           const segSpan = Math.max(nxt.x - cur.x, 1e-4);
           const frac = Math.min(1, Math.max(0, (t - cur.x) / segSpan));
           current = cur.value + (nxt.value - cur.value) * frac;
+          currentDelta = cur.delta + (nxt.delta - cur.delta) * frac;
           curX = cur.x + (nxt.x - cur.x) * frac;
         }
       }
-      list.push({label, image: e.image, active, firstX: steps[0]?.x ?? 1, curX, current});
+      list.push({label, image: e.image, active, firstX: steps[0]?.x ?? 1, curX, current, currentDelta});
     }
     const full = list; // fixed alphabetical order — lanes are assigned once and never swap
     const all = maxRows && maxRows > 0 ? full.slice(0, maxRows) : full;
@@ -567,18 +566,9 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
     return out;
   })();
 
-  // Permanent Y axis: cardinality scale of the accumulated value (0 → current
-  // max) drawn STATICALLY on the axis at the right edge of the plot, marking
-  // where the scrolling date tape is cut off.
-  const valueTicks = (() => {
-    const n = Math.min(Math.max(Math.round(axisTicks ?? 8), 2), 24);
-    const out: {label: string; frac: number}[] = [];
-    for (let i = 0; i < n; i++) {
-      const frac = i / (n - 1);
-      out.push({label: fmtValue(Math.round(currentMax * frac), valueFormat, currencySymbol), frac});
-    }
-    return out;
-  })();
+  // Permanent Y axis: the single vertical line at the right edge of the plot
+  // (the scale is implied 0 → current max), marking where the scrolling date
+  // tape is cut off.
 
   // Per-row markers: each active entity leaves its marker in ITS OWN lane at
   // its current step on the scrolling plane (translating left→right with it).
@@ -670,7 +660,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
           <div style={{position: 'absolute', left: 0, top: '50%', width: Math.max(0, w), height: BAR_H, transform: `translateY(-50%) scaleY(${scale})`, backgroundColor: barFill, borderRadius: barRadius ?? 999, boxShadow: isLeader(p) && podiumEffect ? `0 0 ${18 * scale}px ${accentColor}99` : 'none'}} />
           <div style={{position: 'absolute', right: BAR_MAX_W - Math.max(0, w) + 12, top: 0, bottom: 0, maxWidth: Math.max(0, w - 24), minWidth: 0, display: 'flex', alignItems: 'center', overflow: 'hidden', pointerEvents: 'none', opacity: pop}}>
             <span style={{fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textShadow: '0 1px 2px rgba(0,0,0,0.45)', ...textStyle(valueText, {color: '#ffffff', size: ROW_FONT, weight: 800})}}>
-              {fmtValue(Math.round(p.current), valueFormat, currencySymbol)}
+{fmtValue(Math.round(p.currentDelta), valueFormat, currencySymbol)}
             </span>
           </div>
           {/* Markers ride the tape but are clipped at the plot box (this lane's
@@ -742,20 +732,12 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
           {renderPool.map((p) => renderRow(p))}
         </div>
 
-        {/* Permanent Y axis: static cardinality scale (0 → current max), STRUCK
-            at the RIGHT edge of the plot. Its thickness/color frame the region
-            where the scrolling date tape is visible on screen. */}
+        {/* Permanent Y axis: the static line at the RIGHT edge of the plot (no
+            numeric ticks; the scale is implied 0 → current max). Its
+            thickness/color frame the region where the scrolling date tape is
+            visible on screen. */}
         <div style={{position: 'absolute', left: BAR_TRACK_X + BAR_MAX_W, top: plotTop, height: bottomEnd, zIndex: 3}}>
           <div style={{position: 'absolute', left: -(yAxisWidth ?? 2) / 2, top: 0, bottom: 0, width: yAxisWidth ?? 2, borderRadius: 1, backgroundColor: yAxisColor ?? '#334155'}} />
-          {valueTicks.map((tick, i) => {
-            const y = PLOT_PAD_Y + rowsHeight * (1 - tick.frac);
-            return (
-              <div key={i} style={{position: 'absolute', left: 0, top: y, transform: 'translateY(-50%)', display: 'flex', alignItems: 'center'}}>
-                <div style={{position: 'absolute', width: 5, height: 1, backgroundColor: yAxisColor ?? '#334155', transform: 'translateX(-100%)'}} />
-                <div style={{marginLeft: 8, whiteSpace: 'nowrap', fontSize: AXIS_FONT, color: '#94a3b8', fontVariantNumeric: 'tabular-nums', textShadow: '0 1px 3px rgba(0,0,0,0.5)'}}>{tick.label}</div>
-              </div>
-            );
-          })}
         </div>
 
         {/* Date labels: one DIRECTLY ABOVE each date gridline, in a strip that
