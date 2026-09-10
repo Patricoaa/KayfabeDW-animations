@@ -488,3 +488,39 @@ las fechas se dibujan, ocultamiento en el eje Y).
 Changed: `src/remotion/templates/race-scrolling/index.tsx`,
 `src/components/builder/animation-config-panel.tsx`,
 `src/lib/animation-config.ts`, this plan. Gate `npx tsc --noEmit` clean.
+
+## Feedback round (2026-09-10) — barras 2px a la izquierda, etiquetas clipeadas en el eje, control de separación
+User requirements: "mueve un par de píxeles a la izquierda las barras"; "el
+gridline debe iniciar a la altura horizontal del eje permanente"; "el gridline
+debe tener control de la separación entre gridline"; "los marcadores de ejes
+desaparecen correctamente al scrollear hasta el eje permanente y, ese mismo
+comportamiento deben tener las etiquetas de fecha".
+
+1. **Barras 2px a la izquierda** — el segmento bar ya cancelaba el flex gap
+   ($-ROW_GAP_PX$); ahora se tira 2px más ($BAR_TOUCH_PX = 2$), así cada barra
+   tapa un par de píxeles del borde derecho del avatar. Eje Y y plot quedan en
+   $BAR_TRACK_X$ (no se mueven).
+2. **Etiquetas de fecha ocultándose en el eje — BUG real corregido** — la franja
+   de etiquetas aplicaba `transform: translateX(scrollX)` sobre sí misma con
+   `overflow: hidden`, así que su borde de recorte viajaba con la cinta y las
+   etiquetas NO se ocultaban en el eje (a diferencia de marcadores/gridlines,
+   que viven dentro de una caja de clip fija). Las etiquetas se movieron DENTRO
+   del plano del plot-box (clip fijo en $BAR_TRACK_X$), por lo que ahora
+   comparten exactamente el recorte de gridlines y marcadores: se ocultan en el
+   eje Y al hacer scroll. El plot box sube a `top: PLOT_PAD_Y` (cubre la banda de
+   etiquetas) y las gridlines usan `top: DATE_BAND_H` dentro del plano — siguen
+   arrancando en `rowsTopY`, el mismo tramo vertical que el eje Y (la altura del
+   gridline ya estaba alineada; se pidió explícitamente y se confirmó).
+3. **Cinta anclada al eje** — el origen x de la cinta ($x=0$) queda exactamente
+   en el eje Y; cada gridline nace ahí, cruza y se oculta en el mismo eje al
+   scrollear (misma geometría que antes; ahora garantizado por el clip único).
+4. **Control de separación entre gridlines** — se reintroduce `gridSpacing` como
+   separación MINIMA en px entre gridlines: 0 (default) = TODAS las fechas sin
+   saltos; >0 omite las fechas que quedan a menos de N px del gridline anterior.
+   Panel: SliderNumberInput "Separación mínima entre gridlines (px)" (0-320,
+   step 5) en la sección Gridline; hint actualizado. Se quita el comentario
+   DEPRECATED del campo en el interfaz y en `animation-config.ts`.
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`,
+`src/components/builder/animation-config-panel.tsx`,
+`src/lib/animation-config.ts`, this plan. Gate `npx tsc --noEmit` clean.

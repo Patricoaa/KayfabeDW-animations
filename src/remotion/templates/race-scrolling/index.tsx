@@ -73,8 +73,9 @@ export type RaceScrollingProps = {
   // Axis sweep direction: 'asc' (Menor→Mayor) or 'desc' (Mayor→Menor). Only
   // the value→position mapping reverses; camera and ranking are unchanged.
   axisDirection?: 'asc' | 'desc';
-  // DEPRECATED/ignored: every distinct date/value now draws its own gridline
-  // (no thinning), so `gridSpacing` has no effect. Kept for saved projects.
+  // Min horizontal distance (px, 0-320, default 0 = no thinning) between
+  // consecutive positional gridlines/labels on the plane. 0 keeps EVERY date;
+  // a value > 0 skips dates closer than that many px to the previous gridline.
   gridSpacing?: number;
   // Show the entity name label on the fixed left axis (default true). When
   // false the name column collapses and the bar track / plot expands left.
@@ -224,6 +225,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   backgroundAnimSpeed = 60,
   yAxisColor = '#334155',
   yAxisWidth = 2,
+  gridSpacing,
   barsX,
   barsY,
   titleText,
@@ -366,6 +368,10 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // this: the permanent Y axis, the plot box and the scrolling tape all start
   // here, so gridlines slide under it and hide exactly at the axis.
   const BAR_TRACK_X = PAD_L + NAME_W + ROW_GAP_PX + AVATAR_W;
+  // The bar is pulled an extra 2px left (on top of canceling the flex gap) so
+  // it tucks a couple of pixels under the avatar's right edge instead of
+  // landing exactly on it (see `renderRow`).
+  const BAR_TOUCH_PX = 2;
   const EASE = 26;
   const OUTRO = Math.min(45, Math.max(0, Math.floor(durationInFrames * 0.12)));
   const sweepBudget = Math.max(0, durationInFrames - EASE * 2 - OUTRO);
@@ -557,14 +563,23 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
 
   const tickLabels = (t: number) => (axisUnit === 'date' ? fmtDate(t, dateFormat) : fmtValue(t, valueFormat, currencySymbol));
   // Positional band: ONE tick/gridline per EVERY distinct real position (date
-  // bucket / numeric axis value) at its exact spot — no date is skipped; the
-  // tape carries whichever fall outside the plot clip.
+  // bucket / numeric axis value) at its exact spot. `gridSpacing` (default 0)
+  // can thin DENSE dates — a date closer than that many px to the previous kept
+  // gridline is skipped; otherwise no date is skipped and the tape carries
+  // whichever fall outside the plot clip.
   const ticks = (() => {
     const seen = new Set<number>();
     for (const r of items) if (Number.isFinite(r.pos)) seen.add(r.pos);
-    return [...seen]
-      .sort((a, b) => a - b)
-      .map((p) => ({label: tickLabels(p), x: posToX(p) * BAR_MAX_W, pos: p}));
+    const spacing = gridSpacing ?? 0;
+    const out: {label: string; x: number; pos: number}[] = [];
+    for (const p of [...seen].sort((a, b) => a - b)) {
+      const x = posToX(p) * BAR_MAX_W;
+      // `gridSpacing` thins DENSE dates: a date closer than `spacing` px to the
+      // previous kept gridline is skipped. 0/undefined keeps EVERY date.
+      if (spacing > 0 && out.length > 0 && x - out[out.length - 1].x < spacing) continue;
+      out.push({label: tickLabels(p), x, pos: p});
+    }
+    return out;
   })();
 
   // Every tick gets its date label above the gridline, even if two labels
@@ -692,7 +707,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
 
     const segments: Record<'bar' | 'avatar', React.ReactNode> = {
       bar: (
-        <div style={{flexShrink: 0, width: BAR_MAX_W, height: BAR_H, position: 'relative', display: 'flex', alignItems: 'center', marginLeft: -ROW_GAP_PX}}>
+        <div style={{flexShrink: 0, width: BAR_MAX_W, height: BAR_H, position: 'relative', display: 'flex', alignItems: 'center', marginLeft: -(ROW_GAP_PX + BAR_TOUCH_PX)}}>
           {showRail !== false && <div style={{position: 'absolute', left: 0, right: 0, top: '50%', height: GROOVE_H, transform: 'translateY(-50%)', backgroundColor: '#171717', borderRadius: barRadius ?? 999, opacity: pop}} />}
           <div style={{position: 'absolute', left: 0, top: '50%', width: Math.max(0, w), height: BAR_H, transform: `translateY(-50%) scaleY(${scale})`, backgroundColor: barFill, borderRadius: barRadius ?? 999, boxShadow: isLeader(p) && podiumEffect ? `0 0 ${18 * scale}px ${accentColor}99` : 'none'}} />
           <div style={{position: 'absolute', right: BAR_MAX_W - Math.max(0, w) + 12, top: 0, bottom: 0, maxWidth: Math.max(0, w - 24), minWidth: 0, display: 'flex', alignItems: 'center', overflow: 'hidden', pointerEvents: 'none', opacity: pop}}>
@@ -790,25 +805,27 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
           <div style={{position: 'absolute', left: -(yAxisWidth ?? 2) / 2, top: 0, bottom: 0, width: yAxisWidth ?? 2, borderRadius: 1, backgroundColor: yAxisColor ?? '#334155'}} />
         </div>
 
-        {/* Date labels: one DIRECTLY ABOVE each date gridline, in a strip that
-            scrolls with the tape. Every date shows its label (dense dates may
-            overlap). */}
-        {showXAxis && (
-          <div style={{position: 'absolute', left: BAR_TRACK_X, top: rowsTopY - DATE_BAND_H, width: BAR_MAX_W + 160, height: DATE_BAND_H, transform: `translateX(${scrollX}px)`, overflow: 'hidden', zIndex: 3}}>
-            {dateLabels.map((tick, i) => (
-              <span key={i} style={{position: 'absolute', top: 4, left: tick.x, transform: 'translateX(-50%)', whiteSpace: 'nowrap', fontSize: AXIS_FONT, color: '#e2e8f0', fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.7)', fontVariantNumeric: 'tabular-nums'}}>{tick.label}</span>
-            ))}
-          </div>
-        )}
-
         {/* Plot box — fixed clip viewport over the bar track. The scrolling
-            tape (date gridlines) lives INSIDE it, so dates slide out and
-            disappear when they cross the plot limits ("cinta que se desplaza"). */}
-        <div style={{position: 'absolute', left: BAR_TRACK_X, top: plotTop, width: BAR_MAX_W, height: bottomEnd, overflow: 'hidden', zIndex: 1}}>
-          <div style={{position: 'absolute', left: 0, top: 0, width: BAR_MAX_W, height: bottomEnd, transform: `translateX(${scrollX}px)`}}>
+            tape (date gridlines + their labels + markers) lives INSIDE it, and
+            it clips at the permanent Y axis (BAR_TRACK_X), so everything slides
+            out and disappears EXACTLY at the axis as it crosses it ("cinta que
+            se desplaza"). The box starts above the rows (label band) and ends
+            at the bottom padding. */}
+        <div style={{position: 'absolute', left: BAR_TRACK_X, top: PLOT_PAD_Y, width: BAR_MAX_W, height: bottomEnd + DATE_BAND_H, overflow: 'hidden', zIndex: 1}}>
+          <div style={{position: 'absolute', left: 0, top: 0, width: BAR_MAX_W, height: bottomEnd + DATE_BAND_H, transform: `translateX(${scrollX}px)`}}>
+            {/* Date labels: one DIRECTLY ABOVE each date gridline, inside the
+                same fixed clip as the gridlines so they hide at the Y axis too.
+                Every date shows its label (dense dates may overlap). */}
+            {showXAxis && (
+              <div style={{position: 'absolute', left: 0, top: 0, width: BAR_MAX_W, height: DATE_BAND_H}}>
+                {dateLabels.map((tick, i) => (
+                  <span key={i} style={{position: 'absolute', top: 4, left: tick.x, transform: 'translateX(-50%)', whiteSpace: 'nowrap', fontSize: AXIS_FONT, color: '#e2e8f0', fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.7)', fontVariantNumeric: 'tabular-nums'}}>{tick.label}</span>
+                ))}
+              </div>
+            )}
             {/* Vertical gridlines: one per real date/value, aligned to the rows area */}
             {showXAxis && (
-              <div style={{position: 'absolute', left: 0, top: PLOT_PAD_Y, width: BAR_MAX_W, height: rowsHeight}}>
+              <div style={{position: 'absolute', left: 0, top: DATE_BAND_H, width: BAR_MAX_W, height: rowsHeight}}>
                 {ticks.map((tick, i) => (
                   <div key={i} style={{position: 'absolute', left: tick.x, top: 0, bottom: 0, width: 1, backgroundColor: 'rgba(51, 65, 85, 0.35)'}} />
                 ))}

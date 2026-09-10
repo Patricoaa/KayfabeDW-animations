@@ -265,8 +265,9 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
   // entry/exit animation keep their behavior.
   axisDirection?: 'asc' | 'desc';
 
-  // DEPRECATED/ignored: every distinct date/value draws its own gridline (no
-  // thinning), so `gridSpacing` has no effect. Kept for saved projects.
+  // Min horizontal distance (px, 0-320, default 0 = no thinning) between
+  // consecutive positional gridlines/labels on the plane. 0 keeps EVERY date;
+  // a value > 0 skips dates closer than that many px to the previous gridline.
   gridSpacing?: number;
 
   // Show the entity name label on the fixed left axis (default true). When
