@@ -1132,7 +1132,7 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           </div>
         )}
         <p className="text-[10px] text-muted">
-          El plot es la caja que delimita los ejes: cada fecha real de "campo fecha" (o valor del eje numérico) dibuja su gridline con su etiqueta justo encima; la cinta se desliza y se recorta al cruzar los límites del plot. El eje Y es la línea permanente en el borde derecho del avatar (escala implícita 0 → máximo acumulado global), el origen desde el que crecen las barras —las barras tocan el avatar y sobresalen 2px—; las gridlines y sus etiquetas se ocultan justo al llegar a esa línea durante el scroll. Las marcas por entidad desaparecen al sobrepasar los límites. La fecha en pantalla se muestra abajo a la derecha.
+          El plot es la caja que delimita los ejes: cada fecha real de "campo fecha" (o valor del eje numérico) dibuja su gridline con su etiqueta justo encima; la cinta se desliza y se recorta al cruzar los límites del plot. El eje Y es la línea permanente en el borde derecho del avatar (escala implícita 0 → máximo acumulado global), el origen desde el que crecen las barras —las barras tocan el avatar y sobresalen 2px, y solo aumentan cuando un marcador del eje cruza la línea Y (salto con mini-ease, plano entre fechas)—; las gridlines y sus etiquetas se ocultan justo al llegar a esa línea durante el scroll. Las marcas por entidad desaparecen al sobrepasar los límites. La fecha en pantalla se muestra abajo a la derecha.
         </p>
       </Collapsible>
 

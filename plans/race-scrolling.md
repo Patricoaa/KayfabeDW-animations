@@ -524,3 +524,35 @@ comportamiento deben tener las etiquetas de fecha".
 Changed: `src/remotion/templates/race-scrolling/index.tsx`,
 `src/components/builder/animation-config-panel.tsx`,
 `src/lib/animation-config.ts`, this plan. Gate `npx tsc --noEmit` clean.
+
+## Feedback round (2026-09-10) — la barra aumenta SOLO cuando el marcador cruza el eje Y
+User requirement: "el aumento de la barra se produce solo cuando el marcador
+del eje sobrepasa el eje y permanente".
+
+1. **Causa raíz** — las barras acumulaban con `buildSnap(guideT)` (`rankAtFrame`
+   usaba `guideTAt(f)`), no con la fracción real en el eje (`nowFrac`). Como
+   `guideT` recorre 0→1 mientras el eje barre 1.5 plots, las barras crecían
+   ANTES de que el primer marcador tocara el eje y con una interp. lineal
+   continua entre fechas (lerp `cur + (nxt−cur)*frac`).
+2. **Fix** —
+   - `rankAtFrame(f)` usa `t = nowFracAt(f) = clamp(guideTAt(f)*1.5−0.5, 0, 1)`
+     (la fracción que está EN el eje; la misma que rige la cinta). Las barras
+     quedan planas en 0 durante el tramo vacío y empiezan a crecer cuando el
+     primer marcador cruza el eje.
+   - `buildSnap` sin lerp: target discreto por fecha cruzada
+     (`running`: `steps[i].value`; `period`: suma de periodos hasta `i`).
+   - **Mini-ease (decisión del usuario)**: `barDisplayValue(label, f)` anima la
+     anchura desde el valor anterior al nuevo durante `STEP_EASE_FRAMES`
+     (≈0.35s, smoothstep) empezando exactamente en `axisReachFrame(step.x)` —
+     el frame en que la gridline/el marcador de esa fecha toca el eje Y — y la
+     mantiene plana hasta el siguiente cruce. `axisReachFrame` invierte el
+     smoothstep (Newton) con cache por fracción.
+   - `maxAccum` pasa a ser el máximo TOTAL por entidad (`period` = suma de
+     periodos) para que las barras no desborden `BAR_MAX_W`.
+   - El texto del valor en la barra usa el valor suavizado; el ranking/líder
+     (`isLeader`) usa el target discreto.
+3. Panel: hint del plot actualizado. Renderer: encabezado actualizado.
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`,
+`src/components/builder/animation-config-panel.tsx`, this plan. Gate
+`npx tsc --noEmit` clean.

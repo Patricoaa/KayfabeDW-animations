@@ -19,10 +19,11 @@ import {textStyle} from '../shared/text';
 // entity axis on the left). Inside it the plane scrolls horizontally like a
 // moving tape, pinned to the PERMANENT Y AXIS at the plot's left edge: the date
 // whose gridline is touching the axis at any moment is the "now", and the bars
-// accumulate exactly as each grid passes it. The sweep starts HALF A PLOT
-// before the first date, so every bar begins at 0 and the first date grid
-// appears at the CENTER of the plot, sliding left until the last grid ends
-// touching the axis:
+// increase ONLY when a date's axis MARKER crosses the axis (they jump to that
+// date's total with a short ease and hold flat until the next crossing — no
+// continuous ramp). The sweep starts HALF A PLOT before the first date, so
+// every bar begins at 0 and the first date grid appears at the CENTER of the
+// plot, sliding left until the last grid ends touching the axis:
 //   - a positional band with ONE TICK + VERTICAL GRIDLINE for EVERY real date
 //     (or numeric axis value) present in the data — no date is skipped; each
 //     gridline travels with the tape and hides exactly at the permanent Y axis;
@@ -406,6 +407,74 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // a timeline-race, whose rows swap every sweep. Only the bars grow in place.
   const staticOrder = [...byLabel.keys()].sort((a, b) => a.localeCompare(b));
 
+  // ---- Discrete accumulation pinned to the PERMANENT Y AXIS ----
+  // The bars only grow when a date's gridline — and with it its axis marker —
+  // CROSSES the permanent Y axis (nowFrac reaches that date's position), and
+  // they HOLD that date's total until the next one crosses. No continuous ramp
+  // between dates; the bar JUMPS with a short ease right at the crossing.
+  const isRunningAcc = (accumulateMode ?? 'running') === 'running';
+  const STEP_EASE_FRAMES = Math.max(4, Math.round(fps * 0.35));
+
+  // Value an entity has at step index `i` (the date's grid that just crossed):
+  // 'running' keeps the accumulated total of that date; 'period' sums the
+  // period amounts up to it (the bar shows the running total then too).
+  const targetValueAt = (steps: {x: number; value: number}[], i: number) => {
+    if (i < 0) return 0;
+    if (isRunningAcc) return steps[i].value;
+    let sum = 0;
+    for (let k = 0; k <= i; k++) sum += steps[k].value;
+    return sum;
+  };
+
+  // Fraction currently sitting AT the permanent Y axis (the same used by the
+  // scrolling tape). It lags `guideT` on purpose: the axis first has to reach
+  // x=0 (the first date) before any accumulation can happen.
+  const nowFracAt = (f: number) => Math.max(0, Math.min(1, guideTAt(f) * 1.5 - 0.5));
+
+  // Invert the smoothstep in `guideTAt` so we know the exact frame each date's
+  // gridline touches the axis (Newton; smoothstep is monotonic in the sweep).
+  const invSmooth = (g: number) => {
+    let t = g;
+    for (let n = 0; n < 12; n++) {
+      const f0 = t * t * (3 - 2 * t) - g;
+      if (Math.abs(f0) < 1e-6) break;
+      const f1 = 6 * t * (1 - t);
+      t = Math.max(0, Math.min(1, t - f0 / Math.max(f1, 1e-6)));
+    }
+    return t;
+  };
+  const fracFrameCache = new Map<number, number>();
+  const axisReachFrame = (frac: number) => {
+    const fx = Math.max(0, Math.min(1, frac));
+    const cached = fracFrameCache.get(fx);
+    if (cached !== undefined) return cached;
+    // nowFrac = guideT*1.5 - 0.5  =>  guideT = (fx + 0.5) / 1.5
+    const g = (fx + 0.5) / 1.5;
+    const f = EASE + sweepFrames * invSmooth(Math.max(0, Math.min(1, g)));
+    fracFrameCache.set(fx, f);
+    return f;
+  };
+
+  // Displayed bar length: eased step function of frame. For the latest crossed
+  // date `i`, animate (over STEP_EASE_FRAMES, starting at its axis-crossing
+  // frame) from the previous total to date i's total; hold flat afterwards.
+  const barDisplayValue = (label: string, f: number) => {
+    const steps = byLabel.get(label)!.steps;
+    const fx = nowFracAt(f);
+    let i = -1;
+    for (let k = 0; k < steps.length; k++) {
+      if (fx >= steps[k].x) i = k;
+      else break;
+    }
+    if (i < 0) return 0; // nothing has crossed the axis yet -> bar starts at 0
+    const cross = axisReachFrame(steps[i].x);
+    const ease = Math.max(0, Math.min(1, (f - cross) / STEP_EASE_FRAMES));
+    const eased = ease * ease * (3 - 2 * ease);
+    const prev = targetValueAt(steps, i - 1);
+    const next = targetValueAt(steps, i);
+    return prev + (next - prev) * eased;
+  };
+
   // ---- Live ranking snapshots, shared per sweep position (see timeline-race) ----
   type Participant = {label: string; image?: string | null; active: boolean; firstX: number; current: number};
   type RankSnap = {
@@ -429,17 +498,10 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
         else break;
       }
       const active = i >= 0;
-      let current = 0;
-      if (active) {
-        const cur = steps[i];
-        const nxt = steps[i + 1];
-        current = cur.value;
-        if (nxt) {
-          const segSpan = Math.max(nxt.x - cur.x, 1e-4);
-          const frac = Math.min(1, Math.max(0, (t - cur.x) / segSpan));
-          current = cur.value + (nxt.value - cur.value) * frac;
-        }
-      }
+      // Discrete target: the total of the LAST date whose grid crossed the
+      // axis (no interpolation between dates). The smooth mini-ease of the
+      // rendered bar lives in `barDisplayValue`, not here.
+      const current = active ? targetValueAt(steps, i) : 0;
       list.push({label, image: e.image, active, firstX: steps[0]?.x ?? 1, current});
     }
     const full = list; // fixed alphabetical order — lanes are assigned once and never swap
@@ -459,7 +521,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
 
   const snapCache = new Map<number, RankSnap>();
   const rankAtFrame = (f: number): RankSnap => {
-    const t = guideTAt(f);
+    const t = nowFracAt(f);
     const cached = snapCache.get(t);
     if (cached) return cached;
     const snap = buildSnap(t);
@@ -490,9 +552,14 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const rankFullAt = (f: number, label: string) => rankAtFrame(f).fullIndex.get(label) ?? -1;
 
   // Fixed GLOBAL bar scale computed once from the whole dataset: the maximum
-  // accumulated value reached by any entity at any date. The bars grow toward
-  // this stable maximum from the start — never recalibrated mid-race.
-  const maxAccum = Math.max(...[...byLabel.values()].flatMap((e) => e.steps.map((s) => s.value)), 0) || 1;
+  // TOTAL an entity can reach ('running' takes the max accumulated step;
+  // 'period' sums the period amounts). The bars grow toward this stable
+  // maximum from the start — never recalibrated mid-race.
+  const maxAccum = (
+    isRunningAcc
+      ? Math.max(...[...byLabel.values()].flatMap((e) => e.steps.map((s) => s.value)), 0)
+      : Math.max(...[...byLabel.values()].map((e) => e.steps.reduce((sum, s) => sum + s.value, 0)), 0)
+  ) || 1;
 
   // Vertical plot geometry derives from the rows block (its height sums every
   // row gap from the "Separación vertical entre filas" control) plus a padding
@@ -652,7 +719,10 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
     barColors?.[p.label] ?? (p.image ? barColors?.[p.image] : undefined) ?? palColor(p.label) ?? (isLeader(p) ? accentColor : '#3f3f46');
 
   const renderRow = (p: Participant) => {
-    const display = p.current;
+    // Eased discrete bar length: the bar only increases when a date's marker
+    // crosses the Y axis, animating over ~STEP_EASE_FRAMES and holding flat
+    // between dates (see `barDisplayValue`).
+    const display = barDisplayValue(p.label, frame);
     const rawW = Math.max(0, (display / maxAccum) * BAR_MAX_W);
     const pop = p.active
       ? spring({
@@ -712,7 +782,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
           <div style={{position: 'absolute', left: 0, top: '50%', width: Math.max(0, w), height: BAR_H, transform: `translateY(-50%) scaleY(${scale})`, backgroundColor: barFill, borderRadius: barRadius ?? 999, boxShadow: isLeader(p) && podiumEffect ? `0 0 ${18 * scale}px ${accentColor}99` : 'none'}} />
           <div style={{position: 'absolute', right: BAR_MAX_W - Math.max(0, w) + 12, top: 0, bottom: 0, maxWidth: Math.max(0, w - 24), minWidth: 0, display: 'flex', alignItems: 'center', overflow: 'hidden', pointerEvents: 'none', opacity: pop}}>
             <span style={{fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textShadow: '0 1px 2px rgba(0,0,0,0.45)', ...textStyle(valueText, {color: '#ffffff', size: ROW_FONT, weight: 800})}}>
-{fmtValue(Math.round(p.current), valueFormat, currencySymbol)}
+{fmtValue(Math.round(display), valueFormat, currencySymbol)}
             </span>
           </div>
         </div>
