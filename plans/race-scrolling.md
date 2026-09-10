@@ -403,3 +403,25 @@ valor de la fecha que aporta al acumulado."
 Changed: `src/remotion/templates/race-scrolling/index.tsx`,
 `src/lib/viz-to-remotion.ts`, `src/components/builder/animation-config-panel.tsx`,
 `src/lib/animation-config.ts`, this plan. Gate `npx tsc --noEmit` clean.
+
+## Feedback round (2026-09-09) — acumulación anclada al eje Y permanente
+User requirements: "todas las barras comiencen en 0"; "el primer valor del grid
+de fechas comience en la mitad del plot"; "la acumulación se represente
+visualmente cuando el grid con la fecha toque el eje y permanente".
+
+1. **"Now" clavado en el eje Y** — `anchorWorld = 0` (borde izquierdo del plot,
+   `BAR_TRACK_X` = origen de las barras). Se elimina la línea now-guide accent
+   (antes al 35%) y la variable `anchorXPx`: el eje Y permanente ES el punto de
+   acumulación (decisión del usuario: eliminarla para no superponer líneas).
+2. **Barrido 1.5 plots** — `nowWorld = (guideT · 1.5 − 0.5) · BAR_MAX_W`:
+   - `guideT=0` → `buildSnap(-0.5)` (ningún step activo) → **todas las barras
+     en 0** y el primer grid (x=0) queda **al centro del plot**.
+   - `guideT=1` → último grid **tocando el eje Y**, acumulado completo.
+   Cada grid que cruza el eje va incorporando su valor a las barras; la
+   interpolación entre fechas (crecimiento suave) se conserva.
+3. **Now-label** — `nowFrac = clamp(guideT·1.5−0.5, 0, 1)` para `valueAtX`:
+   muestra la primera fecha mientras la cinta llega, luego avanza con el
+   barrido. Ritmo: misma duración (cinta a 1.5× por frame, decisión del usuario).
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`, this plan.
+Gate `npx tsc --noEmit` clean.

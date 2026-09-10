@@ -17,7 +17,12 @@ import {textStyle} from '../shared/text';
 // The scrolling ribbon lives inside a PLOT BOX — a fixed clip viewport exactly
 // covering the bar track ([BAR_TRACK_X, BAR_TRACK_X+BAR_MAX_W], bounded by the
 // entity axis on the left). Inside it the plane scrolls horizontally like a
-// moving tape, keeping the current moment pinned under a fixed "now" line:
+// moving tape, pinned to the PERMANENT Y AXIS at the plot's left edge: the date
+// whose gridline is touching the axis at any moment is the "now", and the bars
+// accumulate exactly as each grid passes it. The sweep starts HALF A PLOT
+// before the first date, so every bar begins at 0 and the first date grid
+// appears at the CENTER of the plot, sliding left until the last grid ends
+// touching the axis:
 //   - a positional band with ONE TICK + VERTICAL GRIDLINE per real date (or
 //     numeric axis value) present in the data, thinned so consecutive gridlines
 //     are at least `gridSpacing` px apart (the ones closer than that are
@@ -37,8 +42,8 @@ import {textStyle} from '../shared/text';
 // not the running total); icon/image markers follow the same delta≠0 rule.
 // Hidden when delta is 0.
 // `barsX`/`barsY` (px) shift the whole anchored block — bars, avatars, row
-// labels, the permanent Y axis, the scrolling grid/date labels and the
-// now-guide — from its default placement.
+// labels, the permanent Y axis and the scrolling grid/date labels — from its
+// default placement.
 //
 // The layout is fully responsive: it reads the composition width/height via
 // `useVideoConfig()` and re-flows for landscape, portrait (9:16), post (4:5),
@@ -353,7 +358,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // Explicit `avatarSize` wins (mirrors the timeline-race); otherwise the avatar
   // takes the leftover width after the name column and the bar track.
   const AVATAR_W = avatarSize ?? Math.max(innerW - NAME_W - BAR_MAX_W - ROW_GAP_PX * 2, 0);
-  // The plot (gridlines, date labels, now-guide and value Y axis) is aligned to
+  // The plot (gridlines, date labels and value Y axis) is aligned to
   // the ACTUAL bar track: rows lay out as [name][avatar][bar], so the bar
   // origin sits after the name column, the horizontal gap, the avatar column
   // (its size + a padding covers the avatar radius + breathing room) and the
@@ -495,13 +500,16 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const BAR_H = GROOVE_H + Math.max(2, Math.round(ROW_H * 0.06));
 
   // ---- Scrolling plane geometry ----
-  // Fixed "now" line: camera anchored at a hardcoded 35% of the track, right of
-  // the entity axis (no user control for this template).
-  const anchorFrac = 0.35;
-  const anchorWorld = anchorFrac * BAR_MAX_W;
-  const nowWorld = guideT * BAR_MAX_W;
-  const scrollX = anchorWorld - nowWorld;
-  const nowWorldValue = valueAtX(guideT);
+  // Fixed "now" line: pinned to the PERMANENT Y AXIS (the left edge of the bar
+  // track, x=0 de cada barra). The sweep starts HALF A PLOT BEFORE the first
+  // date, so every bar begins at 0 and each date's amount accumulates into the
+  // bars exactly when its gridline crosses the Y axis. The first grid appears
+  // at the CENTER of the plot; the last one ends TOUCHING the axis.
+  const anchorWorld = 0;
+  const nowWorld = (guideT * 1.5 - 0.5) * BAR_MAX_W;
+  const scrollX = anchorWorld - nowWorld; // = -nowWorld
+  const nowFrac = Math.max(0, Math.min(1, guideT * 1.5 - 0.5)); // clamp del "now" al primer dato
+  const nowWorldValue = valueAtX(nowFrac);
   const nowLabel = axisUnit === 'date' ? fmtDate(nowWorldValue, dateFormat) : fmtValue(Math.round(nowWorldValue), valueFormat, currencySymbol);
 
   // ---- Winner reveal + outro ----
@@ -530,9 +538,6 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
 
   const leaderOf = visibleActive.reduce<Participant | null>((m, p) => (m === null || p.current > m.current ? p : m), null);
   const isLeader = (p: Participant) => leaderOf !== null && p.current === leaderOf.current && p.current > 0;
-
-  // Fixed "now" line on screen, over the bar track (right of the entity axis).
-  const anchorXPx = BAR_TRACK_X + anchorWorld;
 
   // ---- Grid bands + markers: the part that scrolls (the "plane") ----
   const MARKER_SIZE = markerSize ?? (isPortrait ? Math.round(W * 0.055) : 26);
@@ -764,14 +769,11 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
       />
 
       {/* Static rows: the ENTITY AXIS is fixed. Only the grid bands (positional
-          + optional cardinality) scroll; the now-guide and header stay fixed.
+          + optional cardinality) scroll; the header area stays fixed.
           `barsX`/`barsY` translate the WHOLE anchored block (rows + avatars +
-          labels, scroll plane with its gridlines/markers/date labels, the
-          permanent Y axis and the now-guide) in px. */}
+          labels, scroll plane with its gridlines/markers/date labels and the
+          permanent Y axis) in px. */}
       <div style={{flex: 1, position: 'relative', marginTop: isPortrait ? H * 0.03 : 36, overflow: 'hidden', transform: `translate(${barsX ?? 0}px, ${barsY ?? 0}px)`}}>
-        {/* Now-guide line */}
-        <div style={{position: 'absolute', left: anchorXPx, top: plotTop, height: bottomEnd, width: 2, borderRadius: 1, backgroundColor: accentColor, opacity: 0.45, zIndex: 1, boxShadow: `0 0 10px ${accentColor}66`}} />
-
         {/* Rows container — static, aligned to the left of the plane */}
         <div style={{position: 'absolute', left: PAD_L, top: rowsTopY, width: innerW, height: Math.max(rowsHeight, 1), zIndex: 2}}>
           {renderPool.map((p) => renderRow(p))}
