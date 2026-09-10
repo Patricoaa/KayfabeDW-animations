@@ -591,7 +591,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
     }
     return (
       <div style={{position: 'absolute', left: p.curX * BAR_MAX_W, top: '50%', transform: `translateX(${scrollX}px) translate(-50%, -50%)`, ...textStyle(markerText, {color: '#ffffff', size: AXIS_FONT + 2, weight: 700}), fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap'}}>
-        {fmtValue(Math.round(p.current), valueFormat, currencySymbol)}
+        {fmtValue(Math.round(p.currentDelta), valueFormat, currencySymbol)}
       </div>
     );
   };
@@ -660,7 +660,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
           <div style={{position: 'absolute', left: 0, top: '50%', width: Math.max(0, w), height: BAR_H, transform: `translateY(-50%) scaleY(${scale})`, backgroundColor: barFill, borderRadius: barRadius ?? 999, boxShadow: isLeader(p) && podiumEffect ? `0 0 ${18 * scale}px ${accentColor}99` : 'none'}} />
           <div style={{position: 'absolute', right: BAR_MAX_W - Math.max(0, w) + 12, top: 0, bottom: 0, maxWidth: Math.max(0, w - 24), minWidth: 0, display: 'flex', alignItems: 'center', overflow: 'hidden', pointerEvents: 'none', opacity: pop}}>
             <span style={{fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textShadow: '0 1px 2px rgba(0,0,0,0.45)', ...textStyle(valueText, {color: '#ffffff', size: ROW_FONT, weight: 800})}}>
-{fmtValue(Math.round(p.currentDelta), valueFormat, currencySymbol)}
+{fmtValue(Math.round(p.current), valueFormat, currencySymbol)}
             </span>
           </div>
           {/* Markers ride the tape but are clipped at the plot box (this lane's

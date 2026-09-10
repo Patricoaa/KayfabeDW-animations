@@ -313,6 +313,12 @@ a representar no es el total sino el de esa fecha en particular."
    renderiza `Math.round(p.currentDelta)`. Las BARRAS siguen creciendo con el
    total acumulado (solo cambia el número del marcador).
 
+> **Fix post-commit:** en la primera implementación el cambio de
+> `p.current → p.currentDelta` se aplicó por error al label del EXTREMO de la
+> barra (ambos labels usaban el string idéntico) en vez del marcador. Swap
+> corregido: `markerFor` (modo número) muestra `p.currentDelta` y el label de
+> la barra vuelve a `p.current`.
+
 Changed: `src/remotion/templates/race-scrolling/index.tsx`,
 `src/components/builder/animation-config-panel.tsx`, `src/lib/viz-to-remotion.ts`,
 `src/lib/animation-config.ts`, this plan. Gate `npx tsc --noEmit` clean.
