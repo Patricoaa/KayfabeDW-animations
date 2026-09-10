@@ -925,6 +925,19 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           </p>
         </div>
         <div className="pt-2 mt-1 border-t border-border-subtle">
+          <SliderNumberInput
+            label="Máximo de filas en pantalla"
+            value={value.maxVisibleRows ?? 0}
+            min={0}
+            max={50}
+            step={1}
+            onChange={(v) => update({maxVisibleRows: v || undefined})}
+          />
+          <p className="text-[10px] text-muted mt-0.5">
+            Cuántas filas muestra el plot A LA VEZ (la altura del plot siempre cabe). En 0 (por defecto) sin tope: se ven tantas como entidades corran. Ajustado, las de menor rango quedan FUERA de pantalla y entran al cambiar los valores con "Reordenar filas según valor" encendido.
+          </p>
+        </div>
+        <div className="pt-2 mt-1 border-t border-border-subtle">
           <SwitchControl
             label="Reordenar filas según valor (temporizado)"
             checked={value.reorderByValue ?? false}
@@ -1282,6 +1295,22 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
 
       {/* ============ AVATAR ============ */}
       <AvatarSection value={value} onChange={update} participants={participants} withBarColor />
+      <Collapsible title="Entrada de avatares">
+        <SelectControl
+          label="Entrada inicial"
+          value={value.avatarEntry ?? 'top'}
+          onChange={(e) => update({avatarEntry: (e.target.value as RaceScrollingConfig['avatarEntry']) || undefined})}
+          className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+        >
+          <option value="top">Desde arriba (caen)</option>
+          <option value="left">Desde la izquierda (desde los nombres)</option>
+          <option value="bottom">Desde abajo (suben)</option>
+          <option value="none">Sin entrada</option>
+        </SelectControl>
+        <p className="text-[10px] text-muted mt-0.5">
+          Al iniciar la cinta, los avatares se deslizan y aparecen escalonados por fila (una sola vez). "Sin entrada" los muestra estáticos como antes.
+        </p>
+      </Collapsible>
 
       {/* ============ ADICIONALES ============ */}
       <OverlaysSection value={value} update={update} />

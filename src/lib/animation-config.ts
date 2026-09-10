@@ -282,6 +282,17 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
   // (default) keeps the rows in a fixed static order (alphabetical by label).
   reorderByValue?: boolean;
 
+  // Max rows the plot shows AT ONCE (on-screen lane capacity), independent from
+  // `maxRows` (which picks the racing set by final value). 0/undefined = no
+  // cap. With a cap the plot always fits its lanes; lower-ranked rows stay
+  // off-screen and swap in as values change when `reorderByValue` is on.
+  maxVisibleRows?: number;
+
+  // Initial entrance animation for the avatars when the tape starts: slide/fade
+  // in from above ('top'), from the left name column ('left') or from below
+  // ('bottom'), staggered per lane. 'none' disables it (default 'top').
+  avatarEntry?: 'none' | 'top' | 'left' | 'bottom';
+
   // Show the entity name label on the fixed left axis (default true). When
   // false the name column collapses and the bar track / plot expands left.
   showLabels?: boolean;

@@ -68,6 +68,11 @@ export type RaceScrollingProps = {
   dateFormat?: 'day' | 'month' | 'year';
   axisUnit?: 'date' | 'number';
   maxRows?: number;
+  // Max rows the plot shows AT ONCE (on-screen lane capacity), independent
+  // from `maxRows` (which picks the racing set by final value). 0/undefined =
+  // no cap. When set, the plot fits that many lanes and lower-ranked rows stay
+  // off-screen (they swap in as values change when `reorderByValue` is on).
+  maxVisibleRows?: number;
   holdFinalSeconds?: number;
   raceDurationSeconds?: number;
   podiumEffect?: boolean;
@@ -91,6 +96,10 @@ export type RaceScrollingProps = {
   // (classic race-chart behavior, animated by the SWAP machinery). false
   // (default) keeps the lanes in a fixed alphabetical order.
   reorderByValue?: boolean;
+  // Initial entrance animation for the avatars when the tape starts: slide/fade
+  // in from above ('top'), from the left name column ('left') or from below
+  // ('bottom'), staggered per lane. 'none' (or undefined = 'top') disables it.
+  avatarEntry?: 'none' | 'top' | 'left' | 'bottom';
   // Show the entity name label on the fixed left axis (default true). When
   // false the name column collapses and the bar track / plot expands left.
   showLabels?: boolean;
@@ -244,6 +253,8 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   gridlineWidth,
   gridlineOpacity,
   reorderByValue,
+  maxVisibleRows,
+  avatarEntry,
   barsX,
   barsY,
   titleText,
@@ -542,6 +553,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
     window: Set<string>;
     listIndex: Map<string, number>;
     fullIndex: Map<string, number>;
+    cap: number;
   };
 
   const buildSnap = (t: number): RankSnap => {
@@ -563,17 +575,21 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
     }
     const full = reorderByValue ? [...list].sort((a, b) => b.current - a.current || staticOrder.indexOf(a.label) - staticOrder.indexOf(b.label)) : list;
     const all = maxRows && maxRows > 0 ? full.slice(0, maxRows) : full;
+    // On-screen lane capacity: `maxRows` picks WHICH entities race, this picks
+    // how many rows the plot shows at once. Rows beyond the cap stay OFF-screen
+    // and slide in/out via the boundary machinery below.
+    const cap = maxVisibleRows && maxVisibleRows > 0 ? Math.min(maxVisibleRows, all.length) : all.length;
     const visActive = all.filter((p) => p.active);
     const visInactive = all.filter((p) => !p.active);
     const window = new Set<string>();
     const listIndex = new Map<string, number>();
     const fullIndex = new Map<string, number>();
     all.forEach((p, i) => {
-      window.add(p.label);
+      if (i < cap) window.add(p.label);
       listIndex.set(p.label, i);
     });
     full.forEach((p, i) => fullIndex.set(p.label, i));
-    return {list: all, full, visActive, visInactive, window, listIndex, fullIndex};
+    return {list: all, full, visActive, visInactive, window, listIndex, fullIndex, cap};
   };
 
   const snapCache = new Map<number, RankSnap>();
@@ -588,7 +604,10 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
 
   const currentRank = rankAtFrame(frame);
   const {visActive: visibleActive, visInactive: visibleInactive} = currentRank;
-  const rowCount = Math.max(visibleActive.length + visibleInactive.length, 1);
+  // Geometry uses the ON-SCREEN lane capacity (`cap`), so the plot always fits
+  // its lanes: when a `maxVisibleRows` cap is set, rows beyond it are off-screen
+  // and the rows block never overflows the canvas.
+  const rowCount = Math.max(currentRank.cap, 1);
 
   const rankNow = (label: string) => currentRank.listIndex.get(label) ?? rowCount;
   const SWAP = 24;
@@ -770,6 +789,26 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const barFillOf = (p: Participant): string =>
     barColors?.[p.label] ?? (p.image ? barColors?.[p.image] : undefined) ?? palColor(p.label) ?? (isLeader(p) ? accentColor : '#3f3f46');
 
+  // Initial avatar entrance: when the tape starts, the avatars slide/fade in
+  // staggered by lane (one wave, ~30 frames). Direction mirrors `avatarEntry`:
+  // 'top' drops from above, 'left' slides in from the name column, 'bottom'
+  // rises from below — 'none' (or default) skips the animation.
+  const avatarEntranceStyle = (p: Participant): React.CSSProperties => {
+    const dir = avatarEntry ?? 'top';
+    if (dir === 'none') return {};
+    const t = spring({
+      fps,
+      frame: frame - Math.min(rankNow(p.label), 12) * 2,
+      config: {damping: 16, stiffness: 90},
+      durationInFrames: 30,
+    });
+    const off = 1 - t;
+    const distY = off * AVATAR_W * 1.2;
+    const distX = off * AVATAR_W * 1.4;
+    const translate = dir === 'top' ? `translateY(${-distY}px)` : dir === 'bottom' ? `translateY(${distY}px)` : `translateX(${-distX}px)`;
+    return {transform: translate, opacity: t};
+  };
+
   const renderRow = (p: Participant) => {
     // Eased discrete bar length: the bar only increases when a date's marker
     // crosses the Y axis, animating over ~STEP_EASE_FRAMES and holding flat
@@ -841,7 +880,11 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
       ),
       avatar: (
         <div style={{width: AVATAR_W, flexShrink: 0, textAlign: 'right', position: 'relative', zIndex: 2}}>
-          {showAvatar && p.image && <Avatar src={p.image} size={AVATAR_W} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(p.label, p.image)} bg={avatarBgFromBar ? barFill : avatarBg} borderColor={avatarBorderColor} borderWidth={avatarBorderWidth} />}
+          {showAvatar && p.image && (
+            <div style={avatarEntranceStyle(p)}>
+              <Avatar src={p.image} size={AVATAR_W} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(p.label, p.image)} bg={avatarBgFromBar ? barFill : avatarBg} borderColor={avatarBorderColor} borderWidth={avatarBorderWidth} />
+            </div>
+          )}
         </div>
       ),
     };
@@ -858,8 +901,11 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
     );
   };
 
+  // Only prune the rendered rows when a limiter (Top N or on-screen cap) makes
+  // the window a strict subset: rows currently in it, plus rows that crossed
+  // its boundary within the last swap frames (enter/exit animation).
   const renderPool =
-    maxRows && maxRows > 0
+    (maxRows && maxRows > 0) || (maxVisibleRows && maxVisibleRows > 0)
       ? currentRank.full.filter((q) => {
           if (currentRank.window.has(q.label)) return true;
           const from = frame - SWAP > 0 ? frame - SWAP : 0;

@@ -628,3 +628,38 @@ Changed: `src/remotion/templates/race-scrolling/index.tsx`,
 `src/components/builder/animation-config-panel.tsx`,
 `src/lib/animation-config.ts`, `src/lib/viz-to-remotion.ts`, this plan. Gate
 `npx tsc --noEmit` clean.
+
+## Feedback round (2026-09-10) — entrada inicial de avatares + máximo de filas en pantalla
+User requirement: "Que los avatar tengan entrada iniciales (configurables desde
+arriba, desde la izquierda, desde abajo). Tiene que existir un control adicional
+a Limitar a Top N, que tiene que ver con las filas que permite el plot."
+User answers (question): on-screen cap = "Máximo de filas en pantalla" (número
+fijo, independiente del Top-N por valor); entrance at tape-start (staggered);
+scope = Race Scrolling only.
+
+1. **Entrada inicial de avatares** (`avatarEntry?: 'none'|'top'|'left'|'bottom'`,
+   default 'top'): al iniciar la cinta los avatares se deslizan y aparecen
+   escalonados por fila (spring ~30f, delay = min(rankNow, 12)*2). Dirección:
+   'top' cae desde arriba (−1.2·AVATAR_W en Y), 'left' entra desde la columna de
+   nombres (−1.4·AVATAR_W en X), 'bottom' sube desde abajo (+1.2·AVATAR_W).
+   Wrapper solo sobre el avatar (transform + opacity), sin tocar la fila → sin
+   conflicto con SWAP/boundary. Control en el panel Race Scrolling: Collapsible
+   "Entrada de avatares" (SelectControl: caen / desde los nombres / suben / sin
+   entrada).
+2. **Máximo de filas en pantalla** (`maxVisibleRows?: number`, 0 = sin límite):
+   cuántas filas muestra el plot A LA VEZ, independiente de `maxRows` (Top N =
+   qué entidades corren por valor final). En `buildSnap` el `window` (on-screen)
+   pasa a ser las primeras `cap = min(maxVisibleRows, all.length)` filas del
+   orden (`all`); el resto queda fuera de pantalla y entra/sale con la maquinaria
+   boundary existente. `rowCount` (geometría ROW_H/rowsHeight/`belowLane`) deriva
+   de `cap`, así el plot SIEMPRE cabe y no hay jitter. `renderPool` poda también
+   cuando SOLO hay `maxVisibleRows` (antes solo podaba con Top N). Con
+   "Reordenar filas según valor" las que ocupan pantalla son las mejores en cada
+   momento (intercambios animados).
+3. Panel: `SliderNumberInput "Máximo de filas en pantalla"` (0-50, 0 = sin tope)
+   en Ranking, entre el toggle Top N y "Reordenar filas según valor".
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`,
+`src/components/builder/animation-config-panel.tsx`,
+`src/lib/animation-config.ts`, `src/lib/viz-to-remotion.ts`, this plan. Gate
+`npx tsc --noEmit` clean.
