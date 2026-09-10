@@ -293,6 +293,11 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
   // ('bottom'), staggered per lane. 'none' disables it (default 'top').
   avatarEntry?: 'none' | 'top' | 'left' | 'bottom';
 
+  // When the avatar entrance plays: 'start' (default) = one staggered wave as
+  // the tape begins; 'first-data' = each avatar enters when its FIRST data
+  // crosses the axis (same trigger as the bar pop).
+  avatarEntryTiming?: 'start' | 'first-data';
+
   // Show the entity name label on the fixed left axis (default true). When
   // false the name column collapses and the bar track / plot expands left.
   showLabels?: boolean;

@@ -100,6 +100,10 @@ export type RaceScrollingProps = {
   // in from above ('top'), from the left name column ('left') or from below
   // ('bottom'), staggered per lane. 'none' (or undefined = 'top') disables it.
   avatarEntry?: 'none' | 'top' | 'left' | 'bottom';
+  // When the avatar entrance plays: 'start' (default) = one staggered wave as
+  // the tape begins; 'first-data' = each avatar enters when its FIRST data
+  // crosses the axis (same trigger as the bar pop).
+  avatarEntryTiming?: 'start' | 'first-data';
   // Show the entity name label on the fixed left axis (default true). When
   // false the name column collapses and the bar track / plot expands left.
   showLabels?: boolean;
@@ -255,6 +259,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   reorderByValue,
   maxVisibleRows,
   avatarEntry,
+  avatarEntryTiming,
   barsX,
   barsY,
   titleText,
@@ -792,13 +797,21 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // Initial avatar entrance: when the tape starts, the avatars slide/fade in
   // staggered by lane (one wave, ~30 frames). Direction mirrors `avatarEntry`:
   // 'top' drops from above, 'left' slides in from the name column, 'bottom'
-  // rises from below — 'none' (or default) skips the animation.
+  // rises from below — 'none' (or default) skips the animation. Timing mirrors
+  // `avatarEntryTiming`: 'start' (default) staggers the whole wave at the tape
+  // start; 'first-data' triggers each avatar when its FIRST data crosses the
+  // axis (the same trigger the bar pop uses).
   const avatarEntranceStyle = (p: Participant): React.CSSProperties => {
     const dir = avatarEntry ?? 'top';
     if (dir === 'none') return {};
+    const timing = avatarEntryTiming ?? 'start';
+    const start =
+      timing === 'first-data'
+        ? Math.max(0, Math.floor((p.firstX / 1.001) * sweepFrames))
+        : Math.min(rankNow(p.label), 12) * 2;
     const t = spring({
       fps,
-      frame: frame - Math.min(rankNow(p.label), 12) * 2,
+      frame: frame - start,
       config: {damping: 16, stiffness: 90},
       durationInFrames: 30,
     });

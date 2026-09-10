@@ -663,3 +663,28 @@ Changed: `src/remotion/templates/race-scrolling/index.tsx`,
 `src/components/builder/animation-config-panel.tsx`,
 `src/lib/animation-config.ts`, `src/lib/viz-to-remotion.ts`, this plan. Gate
 `npx tsc --noEmit` clean.
+
+## Feedback round (2026-09-10) — entrada de avatares bajo el radio + tipo "primer dato"
+User requirement: "El control de entrada de avatares debería incluirse como un
+control más dentro de la sección de avatares (bajo el radio); incorporar un tipo
+de entrada que entre cuando su dato se visualice por primera vez."
+
+1. **Control dentro de la sección Avatar**: la compartida `AvatarSection` recibe
+   un slot `extra?: React.ReactNode` renderizado justo bajo el radio de esquina
+   (antes de "Fondo del avatar"). Solo Race Scrolling lo puebla (alcance sigue
+   siendo solo RS; Timeline Race / Ranking no ven el control). Se elimina el
+   `Collapsible "Entrada de avatares"` de la ronda anterior.
+2. **Nuevo timing "Cuando aparece su primer dato"** (`avatarEntryTiming?:
+   'start' | 'first-data'`, default 'start'): en `avatarEntranceStyle` el delay
+   del spring pasa a ser `max(0, floor((firstX/1.001)*sweepFrames))` — el MISMO
+   disparador que el pop de la barra — para que el avatar entre exactamente
+   cuando su primer dato cruza el eje. 'start' conserva la ola escalonada por
+   fila al iniciar la cinta. Dirección (top/left/bottom) y transform sin cambios.
+3. Panel: dos Select bajo el radio — "Entrada inicial" (dirección) y "Cuándo"
+   (visible salvo "Sin entrada") + hint contextual. Config/passthrough añaden
+   `avatarEntryTiming`.
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`,
+`src/components/builder/animation-config-panel.tsx`,
+`src/lib/animation-config.ts`, `src/lib/viz-to-remotion.ts`, this plan. Gate
+`npx tsc --noEmit` clean.

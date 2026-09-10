@@ -462,6 +462,7 @@ function convertRaceScrolling(
     reorderByValue: t?.reorderByValue,
     maxVisibleRows: t?.maxVisibleRows,
     avatarEntry: t?.avatarEntry,
+    avatarEntryTiming: t?.avatarEntryTiming,
     showLabels: t?.showLabels,
     showMarkers: t?.showMarkers,
     markerMode: t?.markerMode,

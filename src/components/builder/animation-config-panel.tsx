@@ -217,11 +217,12 @@ type AvatarFields = {
 
 // Per-template Avatar section (size, shape, radius + per-entity crop). Shared
 // by both animated templates so the controls stay identical.
-function AvatarSection({value, onChange, participants = [], withBarColor = false}: {
+function AvatarSection({value, onChange, participants = [], withBarColor = false, extra}: {
   value: AvatarFields;
   onChange: (patch: Partial<AvatarFields>) => void;
   participants?: Participant[];
   withBarColor?: boolean;
+  extra?: React.ReactNode;
 }) {
   const [avatarQ, setAvatarQ] = useState('');
   const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -267,6 +268,7 @@ function AvatarSection({value, onChange, participants = [], withBarColor = false
       {(value.avatarShape ?? 'circle') === 'rounded' && (
         <NumberControl label="Radio de esquina (vacío = auto)" value={value.avatarRadius} min={0} max={60} step={1} onChange={(v) => onChange({avatarRadius: v})} />
       )}
+      {extra}
       <div>
         <label className="text-sm font-medium mb-1 block">Fondo del avatar</label>
         <div className="flex gap-2 items-center">
@@ -1294,23 +1296,47 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
       <CanvasSection value={value} update={update} />
 
       {/* ============ AVATAR ============ */}
-      <AvatarSection value={value} onChange={update} participants={participants} withBarColor />
-      <Collapsible title="Entrada de avatares">
-        <SelectControl
-          label="Entrada inicial"
-          value={value.avatarEntry ?? 'top'}
-          onChange={(e) => update({avatarEntry: (e.target.value as RaceScrollingConfig['avatarEntry']) || undefined})}
-          className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-        >
-          <option value="top">Desde arriba (caen)</option>
-          <option value="left">Desde la izquierda (desde los nombres)</option>
-          <option value="bottom">Desde abajo (suben)</option>
-          <option value="none">Sin entrada</option>
-        </SelectControl>
-        <p className="text-[10px] text-muted mt-0.5">
-          Al iniciar la cinta, los avatares se deslizan y aparecen escalonados por fila (una sola vez). "Sin entrada" los muestra estáticos como antes.
-        </p>
-      </Collapsible>
+      <AvatarSection
+        value={value}
+        onChange={update}
+        participants={participants}
+        withBarColor
+        extra={
+          <div className="mt-1">
+            <SelectControl
+              label="Entrada inicial"
+              value={value.avatarEntry ?? 'top'}
+              onChange={(e) => update({avatarEntry: (e.target.value as RaceScrollingConfig['avatarEntry']) || undefined})}
+              className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+            >
+              <option value="top">Desde arriba (caen)</option>
+              <option value="left">Desde la izquierda (desde los nombres)</option>
+              <option value="bottom">Desde abajo (suben)</option>
+              <option value="none">Sin entrada</option>
+            </SelectControl>
+            {(value.avatarEntry ?? 'top') !== 'none' && (
+              <>
+                <SelectControl
+                  label="Cuándo"
+                  value={value.avatarEntryTiming ?? 'start'}
+                  onChange={(e) => update({avatarEntryTiming: (e.target.value as RaceScrollingConfig['avatarEntryTiming']) || undefined})}
+                  className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+                >
+                  <option value="start">Al iniciar la cinta (escalonada por fila)</option>
+                  <option value="first-data">Cuando aparece su primer dato</option>
+                </SelectControl>
+              </>
+            )}
+            <p className="text-[10px] text-muted mt-0.5">
+              {value.avatarEntry && value.avatarEntry !== 'none' && value.avatarEntryTiming === 'first-data'
+                ? 'Cada avatar entra cuando su primer dato cruza el eje (a la vez que su barra). "Al iniciar la cinta" los desliza escalonados por fila, una sola vez.'
+                : value.avatarEntry && value.avatarEntry !== 'none'
+                  ? 'Al iniciar la cinta, los avatares se deslizan y aparecen escalonados por fila (una sola vez).'
+                  : '"Sin entrada" los muestra estáticos como antes.'}
+            </p>
+          </div>
+        }
+      />
 
       {/* ============ ADICIONALES ============ */}
       <OverlaysSection value={value} update={update} />
