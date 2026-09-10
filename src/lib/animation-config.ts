@@ -265,9 +265,10 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
   // entry/exit animation keep their behavior.
   axisDirection?: 'asc' | 'desc';
 
-  // Min horizontal distance (px, 0-320, default 0 = no thinning) between
-  // consecutive positional gridlines/labels on the plane. 0 keeps EVERY date;
-  // a value > 0 skips dates closer than that many px to the previous gridline.
+  // Fixed separation in px between consecutive positional gridlines on the
+  // plane (0-320). 0 (default) = every date at its real value-proportional
+  // position; > 0 = every date EQUIDISTANT, that many px apart. Either way NO
+  // date is ever skipped — only the spacing between gridlines changes.
   gridSpacing?: number;
 
   // Show the entity name label on the fixed left axis (default true). When

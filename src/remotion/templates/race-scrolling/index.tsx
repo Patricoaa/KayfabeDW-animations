@@ -369,10 +369,10 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // this: the permanent Y axis, the plot box and the scrolling tape all start
   // here, so gridlines slide under it and hide exactly at the axis.
   const BAR_TRACK_X = PAD_L + NAME_W + ROW_GAP_PX + AVATAR_W;
-  // The bar is pulled an extra 2px left (on top of canceling the flex gap) so
-  // it tucks a couple of pixels under the avatar's right edge instead of
-  // landing exactly on it (see `renderRow`).
-  const BAR_TOUCH_PX = 2;
+  // The bar is pulled an extra 6px left (on top of canceling the flex gap) so
+  // it tucks a few pixels under the avatar's right edge (rendered BEHIND the
+  // avatar, see `renderRow`) instead of landing exactly on it.
+  const BAR_TOUCH_PX = 6;
   const EASE = 26;
   const OUTRO = Math.min(45, Math.max(0, Math.floor(durationInFrames * 0.12)));
   const sweepBudget = Math.max(0, durationInFrames - EASE * 2 - OUTRO);
@@ -389,10 +389,37 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const raw = interpolate(frame, [EASE, EASE + sweepFrames], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
   const guideT = raw * raw * (3 - 2 * raw);
 
+  // ---- Distinct axis positions + spacing policy ----
+  // `positions` is the sorted list of every distinct real value bucket/date;
+  // ALL of them are always drawn (a date is never skipped to thin density).
+  const positions = [...new Map(items.map((r) => [r.pos, r])).keys()].filter((v) => Number.isFinite(v)).sort((a, b) => a - b);
+  const nPos = positions.length;
+  // `gridSpacing` (px, default 0) sets a FIXED separation between consecutive
+  // gridlines: when > 0 every date is drawn EQUIDISTANT (`gridSpacing` px apart
+  // — the "separación entre ejes"), on a tape that may run longer than one
+  // plot. 0/undefined keeps the real value-proportional positions. Either way
+  // NO date is skipped.
+  const gridSpacingPx = gridSpacing ?? 0;
+  const uniformAxis = gridSpacingPx > 0;
+  const ribbonLen = uniformAxis && nPos > 1 ? (nPos - 1) * gridSpacingPx : BAR_MAX_W;
+  // Fraction (0..1) of the tape for an axis value: proportional to its real
+  // position by default, or its index grid (`k/(n-1)`) on a uniform axis.
+  const fracFor = (v: number) => {
+    if (uniformAxis && nPos > 1) {
+      const k = positions.indexOf(v);
+      return k >= 0 ? k / (nPos - 1) : posToX(v);
+    }
+    return posToX(v);
+  };
+  // Tape px position for a 0..1 fraction (the uniform axis may exceed the
+  // plot width, so fixed positions can go past the clip).
+  const xPx = (frac: number) => frac * ribbonLen;
+  const planeW = Math.max(BAR_MAX_W, ribbonLen);
+
   // ---- Group steps by entity ----
   const byLabel = new Map<string, {image?: string | null; steps: {x: number; value: number}[]}>();
   for (const r of rows) {
-    const x = Math.min(Math.max(posToX(r.pos), 0), 1);
+    const x = Math.min(Math.max(fracFor(r.pos), 0), 1);
     let entry = byLabel.get(r.label);
     if (!entry) {
       entry = {image: r.image, steps: []};
@@ -578,16 +605,24 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
 
   // ---- Scrolling plane geometry ----
   // Fixed "now" line: pinned to the PERMANENT Y AXIS (the left edge of the bar
-  // track, x=0 de cada barra). The sweep starts HALF A PLOT BEFORE the first
+  // track, x=0 de cada barra). The sweep starts HALF A TAPE BEFORE the first
   // date, so every bar begins at 0 and each date's amount accumulates into the
   // bars exactly when its gridline crosses the Y axis. The first grid appears
-  // at the CENTER of the plot; the last one ends TOUCHING the axis.
+  // at the CENTER of the plot; the last one ends TOUCHING the axis. On a
+  // uniform axis the tape length is `ribbonLen` (may differ from the plot
+  // width), so all positions scale with it.
   const anchorWorld = 0;
-  const nowWorld = (guideT * 1.5 - 0.5) * BAR_MAX_W;
+  const nowWorld = (guideT * 1.5 - 0.5) * ribbonLen;
   const scrollX = anchorWorld - nowWorld; // = -nowWorld
   const nowFrac = Math.max(0, Math.min(1, guideT * 1.5 - 0.5)); // clamp del "now" al primer dato
-  const nowWorldValue = valueAtX(nowFrac);
-  const nowLabel = axisUnit === 'date' ? fmtDate(nowWorldValue, dateFormat) : fmtValue(Math.round(nowWorldValue), valueFormat, currencySymbol);
+  // Value sitting at the permanent axis: on the uniform axis it snaps to the
+  // nearest date grid; on the proportional axis it maps back through the real
+  // value scale (as before).
+  const nowAxisValue =
+    uniformAxis && nPos > 1
+      ? positions[Math.max(0, Math.min(nPos - 1, Math.round(nowFrac * (nPos - 1))))]
+      : valueAtX(nowFrac);
+  const nowLabel = axisUnit === 'date' ? fmtDate(nowAxisValue, dateFormat) : fmtValue(Math.round(nowAxisValue), valueFormat, currencySymbol);
 
   // ---- Winner reveal + outro ----
   const raceFinished = guideT >= 0.99;
@@ -629,25 +664,12 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const bottomEnd = rowsHeight + PLOT_PAD_Y * 2;
 
   const tickLabels = (t: number) => (axisUnit === 'date' ? fmtDate(t, dateFormat) : fmtValue(t, valueFormat, currencySymbol));
-  // Positional band: ONE tick/gridline per EVERY distinct real position (date
-  // bucket / numeric axis value) at its exact spot. `gridSpacing` (default 0)
-  // can thin DENSE dates — a date closer than that many px to the previous kept
-  // gridline is skipped; otherwise no date is skipped and the tape carries
-  // whichever fall outside the plot clip.
-  const ticks = (() => {
-    const seen = new Set<number>();
-    for (const r of items) if (Number.isFinite(r.pos)) seen.add(r.pos);
-    const spacing = gridSpacing ?? 0;
-    const out: {label: string; x: number; pos: number}[] = [];
-    for (const p of [...seen].sort((a, b) => a - b)) {
-      const x = posToX(p) * BAR_MAX_W;
-      // `gridSpacing` thins DENSE dates: a date closer than `spacing` px to the
-      // previous kept gridline is skipped. 0/undefined keeps EVERY date.
-      if (spacing > 0 && out.length > 0 && x - out[out.length - 1].x < spacing) continue;
-      out.push({label: tickLabels(p), x, pos: p});
-    }
-    return out;
-  })();
+  // Positional band: ONE tick/gridline ALWAYS for EVERY distinct real position
+  // (date bucket / numeric axis value) — no date is ever skipped. Each sits at
+  // its real spot by default; with a fixed `gridSpacing` (px) the gridlines are
+  // evenly spaced (`fracFor`/`xPx`), and whichever fall outside the plot clip
+  // are simply carried off-screen by the tape.
+  const ticks = positions.map((p) => ({label: tickLabels(p), x: xPx(fracFor(p)), pos: p}));
 
   // Every tick gets its date label above the gridline, even if two labels
   // touch/overlap when dates are very close together (dense dates may look
@@ -777,7 +799,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
 
     const segments: Record<'bar' | 'avatar', React.ReactNode> = {
       bar: (
-        <div style={{flexShrink: 0, width: BAR_MAX_W, height: BAR_H, position: 'relative', display: 'flex', alignItems: 'center', marginLeft: -(ROW_GAP_PX + BAR_TOUCH_PX)}}>
+        <div style={{flexShrink: 0, width: BAR_MAX_W, height: BAR_H, position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', marginLeft: -(ROW_GAP_PX + BAR_TOUCH_PX)}}>
           {showRail !== false && <div style={{position: 'absolute', left: 0, right: 0, top: '50%', height: GROOVE_H, transform: 'translateY(-50%)', backgroundColor: '#171717', borderRadius: barRadius ?? 999, opacity: pop}} />}
           <div style={{position: 'absolute', left: 0, top: '50%', width: Math.max(0, w), height: BAR_H, transform: `translateY(-50%) scaleY(${scale})`, backgroundColor: barFill, borderRadius: barRadius ?? 999, boxShadow: isLeader(p) && podiumEffect ? `0 0 ${18 * scale}px ${accentColor}99` : 'none'}} />
           <div style={{position: 'absolute', right: BAR_MAX_W - Math.max(0, w) + 12, top: 0, bottom: 0, maxWidth: Math.max(0, w - 24), minWidth: 0, display: 'flex', alignItems: 'center', overflow: 'hidden', pointerEvents: 'none', opacity: pop}}>
@@ -788,7 +810,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
         </div>
       ),
       avatar: (
-        <div style={{width: AVATAR_W, flexShrink: 0, textAlign: 'right'}}>
+        <div style={{width: AVATAR_W, flexShrink: 0, textAlign: 'right', position: 'relative', zIndex: 2}}>
           {showAvatar && p.image && <Avatar src={p.image} size={AVATAR_W} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(p.label, p.image)} bg={avatarBgFromBar ? barFill : avatarBg} borderColor={avatarBorderColor} borderWidth={avatarBorderWidth} />}
         </div>
       ),
@@ -855,7 +877,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
             plot box. Dates whose value is 0 draw nothing. */}
         {showXAxis && showMarkers && (
           <div style={{position: 'absolute', left: BAR_TRACK_X, top: plotTop, width: BAR_MAX_W, height: bottomEnd, overflow: 'hidden', zIndex: 3, pointerEvents: 'none'}}>
-            <div style={{position: 'absolute', left: 0, top: 0, width: BAR_MAX_W, height: bottomEnd, transform: `translateX(${scrollX}px)`}}>
+            <div style={{position: 'absolute', left: 0, top: 0, width: planeW, height: bottomEnd, transform: `translateX(${scrollX}px)`}}>
               {ticks.map((tick) => {
                 const ents = markersByPos.get(tick.pos);
                 if (!ents || ents.length === 0) return null;
@@ -882,12 +904,12 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
             se desplaza"). The box starts above the rows (label band) and ends
             at the bottom padding. */}
         <div style={{position: 'absolute', left: BAR_TRACK_X, top: PLOT_PAD_Y, width: BAR_MAX_W, height: bottomEnd + DATE_BAND_H, overflow: 'hidden', zIndex: 1}}>
-          <div style={{position: 'absolute', left: 0, top: 0, width: BAR_MAX_W, height: bottomEnd + DATE_BAND_H, transform: `translateX(${scrollX}px)`}}>
+          <div style={{position: 'absolute', left: 0, top: 0, width: planeW, height: bottomEnd + DATE_BAND_H, transform: `translateX(${scrollX}px)`}}>
             {/* Date labels: one DIRECTLY ABOVE each date gridline, inside the
                 same fixed clip as the gridlines so they hide at the Y axis too.
                 Every date shows its label (dense dates may overlap). */}
             {showXAxis && (
-              <div style={{position: 'absolute', left: 0, top: 0, width: BAR_MAX_W, height: DATE_BAND_H}}>
+              <div style={{position: 'absolute', left: 0, top: 0, width: planeW, height: DATE_BAND_H}}>
                 {dateLabels.map((tick, i) => (
                   <span key={i} style={{position: 'absolute', top: 4, left: tick.x, transform: 'translateX(-50%)', whiteSpace: 'nowrap', fontSize: AXIS_FONT, color: '#e2e8f0', fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.7)', fontVariantNumeric: 'tabular-nums'}}>{tick.label}</span>
                 ))}
@@ -895,7 +917,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
             )}
             {/* Vertical gridlines: one per real date/value, aligned to the rows area */}
             {showXAxis && (
-              <div style={{position: 'absolute', left: 0, top: DATE_BAND_H, width: BAR_MAX_W, height: rowsHeight}}>
+              <div style={{position: 'absolute', left: 0, top: DATE_BAND_H, width: planeW, height: rowsHeight}}>
                 {ticks.map((tick, i) => (
                   <div key={i} style={{position: 'absolute', left: tick.x, top: 0, bottom: 0, width: 1, backgroundColor: 'rgba(51, 65, 85, 0.35)'}} />
                 ))}

@@ -556,3 +556,33 @@ del eje sobrepasa el eje y permanente".
 Changed: `src/remotion/templates/race-scrolling/index.tsx`,
 `src/components/builder/animation-config-panel.tsx`, this plan. Gate
 `npx tsc --noEmit` clean.
+
+## Feedback round (2026-09-10) — separación uniforme entre gridlines + barras 6px detrás del avatar
+User requirement: "El control de Separación mínima entre gridlines (px) no
+debe modificar el hecho de que las fechas se deben siempre visualizar todas.
+La barra muévela unos cuantos px a la izquierda del canvas y asegúrate de que
+la barra quede por detrás del avatar."
+
+1. **`gridSpacing` = separación FIJA entre gridlines, sin omitir nunca fechas**
+   (usuario eligió "Espaciado uniforme"):
+   - `positions` = lista ordenada única de valores del eje (todas se dibujan
+     siempre). `fracFor(v)`: 0/∅ → `posToX(v)` (posición real según valor);
+     con `gridSpacing > 0` → índice `k/(n−1)` (fechas EQUIDISTANTES; la cinta
+     mide `ribbonLen = (n−1)*px` y puede exceder el ancho del plot — las que
+     queden fuera las arrastra el clip).
+   - `ticks` ya no descarta nada (`ticks = positions.map(...)`); gridlines,
+     etiquetas y marcadores usan `xPx(fracFor(p))`.
+   - `nowAxisValue`: en modo uniforme se ajusta a la fecha del gridline en el
+     eje (`positions[round(nowFrac*(n−1))]`); en modo proporcional, `valueAtX`.
+   - `buildSnap`/`barDisplayValue`/`axisReachFrame` siguen por fracciones, así
+     que los saltos al cruzar el eje Y no cambian.
+2. **Barras 6px a la izquierda y detrás del avatar**: `BAR_TOUCH_PX` 2 → 6 y
+   apilamiento del segmento (barra `zIndex: 1`, avatar `position: relative;
+   zIndex: 2` → el avatar pinta por encima).
+3. Escena/pantallas: slider relabelado "Separación entre gridlines (px)" y
+   hints del panel actualizados; comentarios de interfaz y `animation-config.ts`
+   reescritos.
+
+Nota de diseño: el modo uniforme pierde la proporción temporal/valor del eje
+(los puntos quedan igualmente espaciados); la acumulación y los saltos se
+mantienen. Gate `npx tsc --noEmit` clean.
