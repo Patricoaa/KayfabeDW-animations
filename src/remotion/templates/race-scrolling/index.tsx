@@ -633,6 +633,9 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const rowCount = Math.max(currentRank.cap, 1);
 
   const rankNow = (label: string) => currentRank.listIndex.get(label) ?? rowCount;
+  // Entrance order is anchored once at frame 0 (leader first) so live rank swaps
+  // during the race never reshuffle who enters when.
+  const introOrder = new Map<string, number>(rankAtFrame(0).listIndex);
   const SWAP = 24;
 
   const evalChange = (label: string) => {
@@ -851,13 +854,16 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const barFillOf = (p: Participant): string =>
     barColors?.[p.label] ?? (p.image ? barColors?.[p.image] : undefined) ?? palColor(p.label) ?? (isLeader(p) ? accentColor : '#3f3f46');
 
-  // Initial avatar entrance: when the tape starts, the avatars slide/fade in
-  // staggered by lane (one wave, ~30 frames). Direction mirrors `avatarEntry`:
-  // 'top' drops from above, 'left' slides in from the name column, 'bottom'
-  // rises from below — 'none' (or default) skips the animation. Timing mirrors
-  // `avatarEntryTiming`: 'start' (default) staggers the whole wave at the tape
-  // start; 'first-data' triggers each avatar when its FIRST data crosses the
+  // Initial avatar entrance: when the tape starts, the avatars slide/fade in in a
+  // STAGGERED CASCADE by lane (leader first). With 'start' timing every row gets
+  // its own slot `AVATAR_ENTRY_STAGGER` frames after the previous one — no cap,
+  // so the whole roster cascades one after another (a dramatic wave; with many
+  // rows it overlaps the first moments of the race). Direction mirrors
+  // `avatarEntry`: 'top' drops from above, 'left' slides in from the name
+  // column, 'bottom' rises from below — 'none' (or default) skips the animation.
+  // 'first-data' timing triggers each avatar when its FIRST data crosses the
   // axis (the same trigger the bar pop uses).
+  const AVATAR_ENTRY_STAGGER = 8;
   const avatarEntranceStyle = (p: Participant): React.CSSProperties => {
     const dir = avatarEntry ?? 'top';
     if (dir === 'none') return {};
@@ -865,7 +871,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
     const start =
       timing === 'first-data'
         ? Math.max(0, Math.floor((p.firstX / 1.001) * sweepFrames))
-        : Math.min(rankNow(p.label), 12) * 2;
+        : (introOrder.get(p.label) ?? rowCount) * AVATAR_ENTRY_STAGGER;
     const t = spring({
       fps,
       frame: frame - start,

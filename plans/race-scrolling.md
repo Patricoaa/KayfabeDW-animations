@@ -796,3 +796,18 @@ User requirements:
 
 Changed: `src/remotion/templates/race-scrolling/index.tsx`,
 `src/components/builder/animation-config-panel.tsx`, this plan. Gate `npx tsc --noEmit` clean.
+
+## Feedback round 3 (2026-09-10) — entrada de avatares escalonada (cascada dramática)
+User: la animación de entrada de los avatares debe ser UNA ENTRADA ESCALONADA.
+Confirmed: cubre TODAS las filas (sin tope), separación dramática (8 frames/fila),
+orden líder primero.
+
+- `avatarEntranceStyle` ('start' timing): `start = introOrder * AVATAR_ENTRY_STAGGER(8)`
+  reemplaza al viejo `min(rank, 12)*2` (que capaba en 12 filas y separaba ~50ms/fila).
+- Nuevo `introOrder` capturado una vez desde `rankAtFrame(0).listIndex` para anclar el
+  orden al inicio y evitar que los swaps de ranking en vivo reordenen la cascada.
+- Rama 'first-data' y dirección top/left/bottom/none intactas. Comentario de cabecera
+  actualizado. Sin cambios de panel (la opción ya describía "escalonada por fila").
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`, this plan.
+Gate `npx tsc --noEmit` clean. Nota: con muchas filas la cascada solapa el arranque.
