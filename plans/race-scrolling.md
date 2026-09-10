@@ -353,3 +353,30 @@ Decisions (clarified with the user):
 Changed: `src/remotion/templates/race-scrolling/index.tsx`,
 `src/components/builder/animation-config-panel.tsx`, `src/lib/animation-config.ts`,
 this plan. Gate `npx tsc --noEmit` clean.
+
+## Feedback round (2026-09-09) — eje Y junto al avatar + desplazamiento X/Y del bloque
+User feedback: "La posición del eje Y permanente debe estar a la derecha del avatar
+con un mínimo de padding. Añade un control de posición de eje Y y X en píxeles para
+mover las barras y todos sus elementos anclados (eje Y permanente, gridline, avatar,
+etiquetas, etc)."
+
+1. **Eje Y a la derecha del avatar** — la línea permanente del eje Y se mueve del
+   borde derecho del plot (`BAR_TRACK_X + BAR_MAX_W`) al ORIGEN del carril de
+   barras (`BAR_TRACK_X`), justo a la derecha de la columna de avatares; el
+   "minimum padding" es el hueco horizontal del row (`ROW_GAP_PX`). Sigue siendo
+   UNA línea vertical (escala implícita 0 → máximo acumulado), ahora el origen
+   desde el que crecen las barras (mismo criterio que timeline-race).
+2. **Controles X/Y (px) en "Barras"** — se reintroduce `barsX`/`barsY`
+   (heredados de `TimelineRaceConfig`, ya no se omiten en `RaceScrollingConfig` y
+   pasan por `presentationOf` en viz-to-remotion). El contenedor del bloque
+   anclado (`flex:1`) aplica `translate(barsX, barsY)`, moviendo JUNTOS: barras,
+   avatares, etiquetas de entidad, ejes Y permanente, la cinta (gridlines,
+   etiquetas de fecha y marcadores) y la línea de "ahora". Controles "X (px)" /
+   "Y (px)" al final del collapsible "Barras" (mismo patrón que timeline-race).
+3. **Textos actualizados** — hints del panel ("Gridline", "Eje Y") y comentarios
+   del renderer/`animation-config.ts` describen el eje junto al avatar en lugar
+   del borde derecho del plot.
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`,
+`src/components/builder/animation-config-panel.tsx`, `src/lib/viz-to-remotion.ts`,
+`src/lib/animation-config.ts`, this plan. Gate `npx tsc --noEmit` clean.

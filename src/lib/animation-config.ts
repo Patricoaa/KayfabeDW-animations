@@ -242,11 +242,14 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
   // `barColors`, `barPalette` and the row/avatar controls are shared with the
   // timeline race.
   //
-  // NOTE: `axisPosition`/`rowOrder`/`barsX`/`barsY` still exist on the shared
+  // NOTE: `axisPosition`/`rowOrder` still exist on the shared
   // TimelineRaceConfig (the timeline-race uses them) but are OMITTED here: for
   // race-scrolling the row segments are fixed (avatar first, no camera anchor,
-  // no row-group offset).
-  export type RaceScrollingConfig = Omit<TimelineRaceConfig, 'axisPosition' | 'rowOrder' | 'barsX' | 'barsY'> & {
+  // no row-group ordering). `barsX`/`barsY` are INHERITED from it: they offset
+  // the whole anchored block in px from its default placement — bars, avatars,
+  // row labels, the permanent Y axis and the scrolling grid/date labels move
+  // together (see the "Barras" panel section).
+  export type RaceScrollingConfig = Omit<TimelineRaceConfig, 'axisPosition' | 'rowOrder'> & {
   // Cardinality axis column: dates OR plain numbers (years, rounds, days...).
   // The unit is auto-detected from the actual values; this is what the "Eje de
   // la carrera" field in the Datos tab writes. Legacy `dateField` is still

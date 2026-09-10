@@ -1060,6 +1060,13 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
             También define el inicio y fin del plot: el eje Y y las gridlines de fecha abarcan el bloque de filas (incluidos los huecos) más un padding proporcional.
           </p>
           <SliderNumberInput label="Separación horizontal (px)" value={value.rowGapH ?? 0} min={0} max={80} step={2} onChange={(v) => update({rowGapH: v || undefined})} />
+          <div className="pt-2 mt-1 border-t border-border-subtle">
+            <p className="text-[10px] text-muted mb-1.5">Posición del grupo de filas y del eje (offset en px desde su lugar por defecto). Mueve juntos las barras, los avatares y las etiquetas, el eje Y permanente, las gridlines de fecha y la línea de "ahora".</p>
+            <div className="grid grid-cols-2 gap-2">
+              <NumberControl label="X (px)" value={value.barsX} step={4} onChange={(v) => update({barsX: v})} />
+              <NumberControl label="Y (px)" value={value.barsY} step={4} onChange={(v) => update({barsY: v})} />
+            </div>
+          </div>
         </Collapsible>
       )}
 
@@ -1097,7 +1104,7 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           onChange={(v) => update({showXAxis: v})}
         />
         <p className="text-[10px] text-muted mt-0.5">
-          Cada fecha real dibuja una gridline vertical con su etiqueta justo encima (colisión-safe: las etiquetas que se juntarían se omiten). Solo el eje de fechas se desplaza; el eje Y es la línea permanente al borde derecho del plot.
+          Cada fecha real dibuja una gridline vertical con su etiqueta justo encima (colisión-safe: las etiquetas que se juntarían se omiten). Solo el eje de fechas se desplaza; el eje Y es la línea permanente justo a la derecha del avatar.
         </p>
         <SelectControl
           label="Formato del valor acumulado"
@@ -1116,7 +1123,7 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           </div>
         )}
         <p className="text-[10px] text-muted">
-          El plot es la caja que delimita los ejes: cada fecha real de "campo fecha" (o valor del eje numérico) dibuja una gridline con su etiqueta justo encima; la cinta se desliza y se recorta al cruzar los límites del plot. El eje Y es la línea permanente en el borde derecho (escala implícita 0 → máximo acumulado), marcando hasta dónde se ve el scroll de las fechas. Las marcas por entidad desaparecen al sobrepasar los límites. La fecha en pantalla se muestra abajo a la derecha.
+          El plot es la caja que delimita los ejes: cada fecha real de "campo fecha" (o valor del eje numérico) dibuja una gridline con su etiqueta justo encima; la cinta se desliza y se recorta al cruzar los límites del plot. El eje Y es la línea permanente a la derecha del avatar (escala implícita 0 → máximo acumulado), el origen desde el que crecen las barras. Las marcas por entidad desaparecen al sobrepasar los límites. La fecha en pantalla se muestra abajo a la derecha.
         </p>
       </Collapsible>
 
@@ -1186,7 +1193,7 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
         <ColorPickerControl label="Color del eje" value={value.yAxisColor ?? '#334155'} onChange={(v) => update({yAxisColor: v || undefined})} />
         <SliderNumberInput label="Grosor del eje (px)" value={value.yAxisWidth ?? 2} min={1} max={12} step={1} onChange={(v) => update({yAxisWidth: v || undefined})} />
         <p className="text-[10px] text-muted">
-          Eje Y permanente en el borde derecho del plot: una sola línea vertical (escala implícita 0 → máximo acumulado) que corta visualmente la cinta. Su grosor y color definen hasta dónde se ve el scrolling de las fechas.
+          Eje Y permanente a la derecha del avatar (con el mínimo padding del hueco horizontal): una sola línea vertical en el origen del carril de barras (escala implícita 0 → máximo acumulado), desde la que crecen las barras. Su grosor y color definen el origen del scrolling de las fechas.
         </p>
       </Collapsible>
 

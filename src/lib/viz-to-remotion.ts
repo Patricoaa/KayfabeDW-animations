@@ -490,6 +490,8 @@ function convertRaceScrolling(
     showYAxis: t?.showYAxis,
     yAxisColor: t?.yAxisColor,
     yAxisWidth: t?.yAxisWidth,
+    barsX: t?.barsX,
+    barsY: t?.barsY,
     dateText: t?.dateText,
     labelText: t?.labelText,
     valueText: t?.valueText,

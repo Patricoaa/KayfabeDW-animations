@@ -28,11 +28,16 @@ import {textStyle} from '../shared/text';
 //     no marker.
 // Everything on the tape (labels, gridlines, markers) is clipped at the plot
 // box, so it visibly slides out and disappears as it crosses the plot's limits
-// — exactly like a moving ribbon.
+// — exactly like a moving ribbon. The PERMANENT Y axis is a static vertical
+// line right AFTER the avatar column (the origin of the bar track, padded by
+// the row gap) that the bars grow from.
 // `axisDirection` flips the sweep (Mayor→Menor only reverses the value→position
 // mapping). Markers show the per-period amount that date adds (the delta, not
 // the running total) as a number, an icon (ICON_GLYPHS) or a reference image
 // (avatar URL), hidden when that date's value is 0.
+// `barsX`/`barsY` (px) shift the whole anchored block — bars, avatars, row
+// labels, the permanent Y axis, the scrolling grid/date labels and the
+// now-guide — from its default placement.
 //
 // The layout is fully responsive: it reads the composition width/height via
 // `useVideoConfig()` and re-flows for landscape, portrait (9:16), post (4:5),
@@ -120,6 +125,11 @@ export type RaceScrollingProps = {
   backgroundAnimSpeed?: number;
   yAxisColor?: string;
   yAxisWidth?: number;
+  // Offset (px) of the whole anchored block from its default placement: bars +
+  // avatars + row labels + the permanent Y axis + the scrolling grid/date
+  // labels move together.
+  barsX?: number;
+  barsY?: number;
   titleText?: RaceTextStyle;
   dateText?: RaceTextStyle;
   labelText?: RaceTextStyle;
@@ -203,6 +213,8 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   backgroundAnimSpeed = 60,
   yAxisColor = '#334155',
   yAxisWidth = 2,
+  barsX,
+  barsY,
   titleText,
   dateText,
   labelText,
@@ -521,8 +533,9 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const AXIS_FONT = isPortrait ? Math.round(W * 0.026) : 13;
 
   // Date labels live in a reserved strip DIRECTLY ABOVE each date gridline and
-  // scroll with it. The value scale is the PERMANENT static Y axis at the right
-  // edge of the plot (see below), so there are no extra traveling bands.
+  // scroll with it. The value scale is the PERMANENT static Y axis, a vertical
+  // line right after the avatar column at the origin of the bar track (see
+  // below), so there are no extra traveling bands.
   const rowsTopY = DATE_BAND_H + PLOT_PAD_Y;
   const plotTop = rowsTopY - PLOT_PAD_Y;
   const bottomEnd = rowsHeight + PLOT_PAD_Y * 2;
@@ -562,9 +575,10 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
     return out;
   })();
 
-  // Permanent Y axis: the single vertical line at the right edge of the plot
-  // (the scale is implied 0 → current max), marking where the scrolling date
-  // tape is cut off.
+  // Permanent Y axis: a single vertical line right AFTER the avatar column,
+  // at the origin of the bar track (BAR_TRACK_X, the "minimum padding" from
+  // the avatar is the horizontal row gap). The scale is implied 0 → current
+  // max, so it stands as the value-axis origin the bars grow from.
 
   // Markers are pinned to the DATE GRIDS (the "caja eje"): each kept tick
   // carries the markers of every entity that contributes a NON-ZERO value at
@@ -737,8 +751,11 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
       />
 
       {/* Static rows: the ENTITY AXIS is fixed. Only the grid bands (positional
-          + optional cardinality) scroll; the now-guide and header stay fixed. */}
-      <div style={{flex: 1, position: 'relative', marginTop: isPortrait ? H * 0.03 : 36, overflow: 'hidden'}}>
+          + optional cardinality) scroll; the now-guide and header stay fixed.
+          `barsX`/`barsY` translate the WHOLE anchored block (rows + avatars +
+          labels, scroll plane with its gridlines/markers/date labels, the
+          permanent Y axis and the now-guide) in px. */}
+      <div style={{flex: 1, position: 'relative', marginTop: isPortrait ? H * 0.03 : 36, overflow: 'hidden', transform: `translate(${barsX ?? 0}px, ${barsY ?? 0}px)`}}>
         {/* Now-guide line */}
         <div style={{position: 'absolute', left: anchorXPx, top: plotTop, height: bottomEnd, width: 2, borderRadius: 1, backgroundColor: accentColor, opacity: 0.45, zIndex: 1, boxShadow: `0 0 10px ${accentColor}66`}} />
 
@@ -763,11 +780,11 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
           </div>
         )}
 
-        {/* Permanent Y axis: the static line at the RIGHT edge of the plot (no
-            numeric ticks; the scale is implied 0 → current max). Its
-            thickness/color frame the region where the scrolling date tape is
-            visible on screen. */}
-        <div style={{position: 'absolute', left: BAR_TRACK_X + BAR_MAX_W, top: plotTop, height: bottomEnd, zIndex: 3}}>
+        {/* Permanent Y axis: the static line right after the avatar column, at
+            the STATIONARY origin of the bar track (no numeric ticks; the scale
+            is implied 0 → current max). It frames the region where the bars
+            grow and where the scrolling date tape starts on screen. */}
+        <div style={{position: 'absolute', left: BAR_TRACK_X, top: plotTop, height: bottomEnd, zIndex: 3}}>
           <div style={{position: 'absolute', left: -(yAxisWidth ?? 2) / 2, top: 0, bottom: 0, width: yAxisWidth ?? 2, borderRadius: 1, backgroundColor: yAxisColor ?? '#334155'}} />
         </div>
 
