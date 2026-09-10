@@ -210,16 +210,18 @@ type AvatarFields = {
   avatarRadius?: number;
   avatarCrops?: Record<string, AvatarCrop>;
   avatarBg?: string;
+  avatarBgFromBar?: boolean;
   avatarBorderColor?: string;
   avatarBorderWidth?: number;
 };
 
 // Per-template Avatar section (size, shape, radius + per-entity crop). Shared
 // by both animated templates so the controls stay identical.
-function AvatarSection({value, onChange, participants = []}: {
+function AvatarSection({value, onChange, participants = [], withBarColor = false}: {
   value: AvatarFields;
   onChange: (patch: Partial<AvatarFields>) => void;
   participants?: Participant[];
+  withBarColor?: boolean;
 }) {
   const [avatarQ, setAvatarQ] = useState('');
   const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -287,6 +289,16 @@ function AvatarSection({value, onChange, participants = []}: {
           </button>
         </div>
       </div>
+      {withBarColor && (
+        <>
+          <SwitchControl
+            label="Fondo desde color de barra"
+            checked={value.avatarBgFromBar ?? false}
+            onChange={(v) => onChange({avatarBgFromBar: v})}
+          />
+          <p className="text-[10px] text-muted">Cada avatar usa el color de su barra como fondo (ignora el color anterior).</p>
+        </>
+      )}
       <div>
         <label className="text-sm font-medium mb-1 block">Borde del avatar</label>
         <div className="flex gap-2 items-center">
@@ -724,7 +736,7 @@ function TimelineRacePanel({templateId, columns, fieldMeta, value, onChange, par
       <CanvasSection value={value} update={update} />
 
       {/* ============ AVATAR ============ */}
-      <AvatarSection value={value} onChange={update} participants={participants} />
+      <AvatarSection value={value} onChange={update} participants={participants} withBarColor />
 
       {/* ============ ADICIONALES ============ */}
       <OverlaysSection value={value} update={update} />
@@ -1241,7 +1253,7 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
       <CanvasSection value={value} update={update} />
 
       {/* ============ AVATAR ============ */}
-      <AvatarSection value={value} onChange={update} participants={participants} />
+      <AvatarSection value={value} onChange={update} participants={participants} withBarColor />
 
       {/* ============ ADICIONALES ============ */}
       <OverlaysSection value={value} update={update} />

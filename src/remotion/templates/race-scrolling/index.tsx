@@ -108,6 +108,8 @@ export type RaceScrollingProps = {
   avatarRadius?: number;
   avatarCrops?: Record<string, {zoom?: number; focusX?: number; focusY?: number}>;
   avatarBg?: string;
+  // Base the avatar background on its entity's bar color (overrides `avatarBg`).
+  avatarBgFromBar?: boolean;
   avatarBorderColor?: string;
   avatarBorderWidth?: number;
   barColors?: Record<string, string>;
@@ -168,7 +170,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   holdFinalSeconds = 2,
   raceDurationSeconds,
   podiumEffect = true,
-  showRail = true,
+  showRail = false,
   showDateLabel = true,
   showXAxis = true,
   axisDirection = 'asc',
@@ -197,6 +199,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   avatarRadius,
   avatarCrops,
   avatarBg,
+  avatarBgFromBar,
   avatarBorderColor,
   avatarBorderWidth,
   barColors,
@@ -317,7 +320,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
             const barFill = barColors?.[item.label] ?? (isLeader ? accentColor : '#475569');
             return (
               <div key={`${item.label}-${index}`} style={{opacity: rowOpacity, transform: `translateX(${labelX}px) scale(${isLeader ? winnerScale : 1})`, display: 'flex', alignItems: 'center', gap: isPortrait ? 12 : 18}}>
-                <div style={{flexShrink: 0}}>{showAvatar && item.image && <Avatar src={item.image} size={COMPAT_AVATAR} shape={avatarShape} radius={avatarRadius} bg={avatarBg} borderColor={avatarBorderColor} borderWidth={avatarBorderWidth} />}</div>
+                <div style={{flexShrink: 0}}>{showAvatar && item.image && <Avatar src={item.image} size={COMPAT_AVATAR} shape={avatarShape} radius={avatarRadius} bg={avatarBgFromBar ? barFill : avatarBg} borderColor={avatarBorderColor} borderWidth={avatarBorderWidth} />}</div>
                 <div style={{flex: 1, height: ROW_H * 0.5, backgroundColor: showRail !== false ? '#1a1a1a' : 'transparent', borderRadius: 999, overflow: 'hidden', display: 'flex'}}>
                   <div style={{width: Math.max(0, barWidthPx), height: '100%', backgroundColor: barFill, borderRadius: barRadius ?? 999}} />
                 </div>
@@ -481,8 +484,10 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const insideAt = (f: number, label: string) => rankAtFrame(f).window.has(label);
   const rankFullAt = (f: number, label: string) => rankAtFrame(f).fullIndex.get(label) ?? -1;
 
-  // Dynamic value max over the active entities (recalibrates as the race advances).
-  const currentMax = Math.max(...visibleActive.map((p) => p.current), 0) || 1;
+  // Fixed GLOBAL bar scale computed once from the whole dataset: the maximum
+  // accumulated value reached by any entity at any date. The bars grow toward
+  // this stable maximum from the start — never recalibrated mid-race.
+  const maxAccum = Math.max(...[...byLabel.values()].flatMap((e) => e.steps.map((s) => s.value)), 0) || 1;
 
   // Vertical plot geometry derives from the rows block (its height sums every
   // row gap from the "Separación vertical entre filas" control) plus a padding
@@ -653,7 +658,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
 
   const renderRow = (p: Participant) => {
     const display = p.current;
-    const rawW = Math.max(0, (display / currentMax) * BAR_MAX_W);
+    const rawW = Math.max(0, (display / maxAccum) * BAR_MAX_W);
     const pop = p.active
       ? spring({
           fps,
@@ -719,7 +724,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
       ),
       avatar: (
         <div style={{width: AVATAR_W, flexShrink: 0, textAlign: 'right'}}>
-          {showAvatar && p.image && <Avatar src={p.image} size={AVATAR_W} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(p.label, p.image)} bg={avatarBg} borderColor={avatarBorderColor} borderWidth={avatarBorderWidth} />}
+          {showAvatar && p.image && <Avatar src={p.image} size={AVATAR_W} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(p.label, p.image)} bg={avatarBgFromBar ? barFill : avatarBg} borderColor={avatarBorderColor} borderWidth={avatarBorderWidth} />}
         </div>
       ),
     };
@@ -795,11 +800,13 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
           </div>
         )}
 
-        {/* Permanent Y axis: the static line right after the avatar column, at
-            the STATIONARY origin of the bar track (no numeric ticks; the scale
-            is implied 0 → current max). It frames the region where the bars
-            grow and where the scrolling date tape starts on screen. */}
-        <div style={{position: 'absolute', left: BAR_TRACK_X, top: plotTop, height: bottomEnd, zIndex: 3}}>
+{/* Permanent Y axis: the static line right after the avatar column, at the
+            STATIONARY origin of the bar track (no numeric ticks; the scale is
+            implied 0 → global accumulated max). It spans EXACTLY the rows block
+            (from the top of the first row to the bottom of the last), starting
+            right where the bars begin — the accumulation boundary the date
+            grids slide into. */}
+        <div style={{position: 'absolute', left: BAR_TRACK_X, top: rowsTopY, height: rowsHeight, zIndex: 3}}>
           <div style={{position: 'absolute', left: -(yAxisWidth ?? 2) / 2, top: 0, bottom: 0, width: yAxisWidth ?? 2, borderRadius: 1, backgroundColor: yAxisColor ?? '#334155'}} />
         </div>
 

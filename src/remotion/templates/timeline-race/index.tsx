@@ -62,6 +62,7 @@ export type TimelineRaceProps = {
   avatarRadius?: number;
   avatarCrops?: Record<string, {zoom?: number; focusX?: number; focusY?: number}>;
   avatarBg?: string;
+  avatarBgFromBar?: boolean;
   avatarBorderColor?: string;
   avatarBorderWidth?: number;
   barColors?: Record<string, string>;
@@ -147,6 +148,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   avatarRadius,
   avatarCrops,
   avatarBg,
+  avatarBgFromBar,
   avatarBorderColor,
   avatarBorderWidth,
   barColors,
@@ -297,7 +299,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
               ),
               avatar: (
                 <div style={{flexShrink: 0}}>
-                  {showAvatar && item.image && <Avatar src={item.image} size={COMPAT_AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(item.label, item.image)} bg={avatarBg} borderColor={avatarBorderColor} borderWidth={avatarBorderWidth} />}
+                  {showAvatar && item.image && <Avatar src={item.image} size={COMPAT_AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(item.label, item.image)} bg={avatarBgFromBar ? barFill : avatarBg} borderColor={avatarBorderColor} borderWidth={avatarBorderWidth} />}
                 </div>
               ),
             };
@@ -644,7 +646,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
       ),
       avatar: (
         <div style={{width: AVATAR, flexShrink: 0, textAlign: 'right'}}>
-          {showAvatar && p.image && <Avatar src={p.image} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(p.label, p.image)} bg={avatarBg} borderColor={avatarBorderColor} borderWidth={avatarBorderWidth} />}
+          {showAvatar && p.image && <Avatar src={p.image} size={AVATAR} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(p.label, p.image)} bg={avatarBgFromBar ? barFill : avatarBg} borderColor={avatarBorderColor} borderWidth={avatarBorderWidth} />}
         </div>
       ),
     };

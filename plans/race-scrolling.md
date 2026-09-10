@@ -425,3 +425,32 @@ visualmente cuando el grid con la fecha toque el eje y permanente".
 
 Changed: `src/remotion/templates/race-scrolling/index.tsx`, this plan.
 Gate `npx tsc --noEmit` clean.
+
+## Feedback round (2026-09-09) — camino invisible, escala global, fondo del avatar y eje Y
+User requirements: "el camino de las barras debe ser invisible"; "desde el inicio
+se debe calcular el máximo acumulado y a partir de eso hacer crecer las barras";
+"añade una opción de heredar el color de fondo del avatar según el color de la
+barra"; "el eje permanente Y debe comenzar justo donde comienzan las barras".
+
+1. **Camino/rail invisible** — el groove tras las barras por defecto ya no se
+   dibuja (`showRail` pasa a false en race-scrolling); solo quedan las barras.
+2. **Escala global fija** — `currentMax` dinámico (recalibrado durante la
+   carrera) se reemplaza por `maxAccum`: el máximo valor acumulado de TODO el
+   dataset (todas las entidades × todas las fechas), calculado una vez al
+   inicio. Las barras crecen hacia ese máximo estable sin reescalar en mitad
+   del video (`rawW = display / maxAccum * BAR_MAX_W`).
+3. **Fondo del avatar desde el color de barra** — nueva opción
+   `avatarBgFromBar` (campo nuevo en `TimelineRaceConfig`, switch "Fondo desde
+   color de barra" en la sección Avatar del panel, habilitado para timeline-race
+   y race-scrolling; ranking no lo muestra). Cada avatar usa `barFill` como
+   fondo (per-entity override → palette → leader/neutro) e ignora `avatarBg`.
+4. **Eje Y alineado con las barras** — el eje permanente ahora ocupa
+   exactamente el bloque de filas (`top: rowsTopY, height: rowsHeight`) en vez
+   de extenderse en el padding del plot: comienza justo donde comienzan las
+   barras y termina donde terminan.
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`,
+`src/remotion/templates/timeline-race/index.tsx`,
+`src/lib/viz-to-remotion.ts`, `src/lib/animation-config.ts`,
+`src/components/builder/animation-config-panel.tsx`, this plan.
+Gate `npx tsc --noEmit` clean.

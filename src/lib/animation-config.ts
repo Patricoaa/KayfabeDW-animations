@@ -174,6 +174,8 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
   avatarRadius?: number;
   avatarCrops?: Record<string, AvatarCrop>;
   avatarBg?: string;
+  // Base the avatar background on its entity's bar color (overrides `avatarBg`).
+  avatarBgFromBar?: boolean;
   avatarBorderColor?: string;
   avatarBorderWidth?: number;
 
