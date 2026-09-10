@@ -688,3 +688,26 @@ Changed: `src/remotion/templates/race-scrolling/index.tsx`,
 `src/components/builder/animation-config-panel.tsx`,
 `src/lib/animation-config.ts`, `src/lib/viz-to-remotion.ts`, this plan. Gate
 `npx tsc --noEmit` clean.
+
+## Feedback round (2026-09-10) — gridlines punteadas, eje Y pegado al avatar, ejes hasta el fondo
+User requirement: ejes de cada fecha punteados; el eje Y permanente pegado al
+costado de los avatares; los ejes (Y/gridlines) hasta el extremo inferior del canvas.
+
+1. **Gridlines punteadas** (`gridlineStyle?: 'solid'|'dashed'|'dotted'`, default
+   'dotted'): se dibujan con `borderLeft` (width 0, centrada en tick.x) en vez de
+   `backgroundColor`; color/grosor/opacidad intactos. Select "Estilo de gridlines"
+   en "Apariencia de las gridlines" (Punteado / Guiones / Línea continua).
+2. **Eje Y pegado a los avatares**: nueva const `axisX = PAD_L + NAME_W + AVATAR_W`
+   (= BAR_TRACK_X − ROW_GAP_PX). `axisX` reemplaza a BAR_TRACK_X en la caja de
+   marcadores, en el contenedor del eje y en la caja del plot → el eje queda a la
+   derecha del avatar y las gridlines se ocultan exactamente ahí.
+3. **Ejes hasta el extremo inferior del canvas**: la caja del plot pasa a
+   `bottom: 0` (plano `bottom: 0`), el contenedor de gridlines a
+   `top: DATE_BAND_H + bottom: 0`, y el eje permanente a `top: rowsTopY + bottom: 0`;
+   las líneas punteadas de fecha y el eje Y recorren hasta el borde inferior del
+   área composable (bajo la fila de barras).
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`,
+`src/components/builder/animation-config-panel.tsx`,
+`src/lib/animation-config.ts`, `src/lib/viz-to-remotion.ts`, this plan. Gate
+`npx tsc --noEmit` clean.

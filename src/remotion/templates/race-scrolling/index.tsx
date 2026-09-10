@@ -92,6 +92,9 @@ export type RaceScrollingProps = {
   gridlineColor?: string;
   gridlineWidth?: number;
   gridlineOpacity?: number;
+  // Date gridline line style: 'dotted' is the default (dotted vertical axis),
+  // 'dashed' dashes it, 'solid' keeps a continuous line.
+  gridlineStyle?: 'solid' | 'dashed' | 'dotted';
   // Reorder the lanes by the CURRENT accumulated value at every snapshot
   // (classic race-chart behavior, animated by the SWAP machinery). false
   // (default) keeps the lanes in a fixed alphabetical order.
@@ -256,6 +259,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   gridlineColor,
   gridlineWidth,
   gridlineOpacity,
+  gridlineStyle,
   reorderByValue,
   maxVisibleRows,
   avatarEntry,
@@ -402,6 +406,10 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // this: the permanent Y axis, the plot box and the scrolling tape all start
   // here, so gridlines slide under it and hide exactly at the axis.
   const BAR_TRACK_X = PAD_L + NAME_W + ROW_GAP_PX + AVATAR_W;
+  // The permanent Y axis and the plot clip are GLUED to the avatar's right
+  // edge (the flex gap between avatar and bar track is stripped), so the axis
+  // reads as attached to the avatars — the boundary where gridlines hide.
+  const axisX = PAD_L + NAME_W + AVATAR_W;
   // The bar is pulled an extra 12px left (on top of canceling the flex gap) so
   // it tucks well under the avatar's right edge (rendered BEHIND the avatar,
   // see `renderRow`) instead of landing on its edge.
@@ -730,10 +738,10 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // crowded — that is the point of "show all dates, no skips").
   const dateLabels = ticks.map((t) => ({label: t.label, x: t.x}));
 
-  // Permanent Y axis: a single vertical line right AFTER the avatar column,
-  // at the origin of the bar track (BAR_TRACK_X, the "minimum padding" from
-  // the avatar is the horizontal row gap). The scale is implied 0 → current
-  // max, so it stands as the value-axis origin the bars grow from.
+  // Permanent Y axis: a single vertical line GLUED to the avatar's right edge,
+  // at the origin of the bar track (axisX = BAR_TRACK_X − row gap, so the
+  // horizontal gap between avatar and bars is stripped). The scale is implied
+  // 0 → current max, so it stands as the value-axis origin the bars grow from.
 
   // Markers are pinned to the DATE GRIDS (the "caja eje"): each kept tick
   // carries the markers of every entity that CHANGES its accumulated value at
@@ -965,7 +973,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
             that date, at its lane's height, scrolling with the tape inside the
             plot box. Dates whose value is 0 draw nothing. */}
         {showXAxis && showMarkers && (
-          <div style={{position: 'absolute', left: BAR_TRACK_X, top: plotTop, width: BAR_MAX_W, height: bottomEnd, overflow: 'hidden', zIndex: 3, pointerEvents: 'none'}}>
+          <div style={{position: 'absolute', left: axisX, top: plotTop, width: BAR_MAX_W, height: bottomEnd, overflow: 'hidden', zIndex: 3, pointerEvents: 'none'}}>
             <div style={{position: 'absolute', left: 0, top: 0, width: planeW, height: bottomEnd, transform: `translateX(${scrollX}px)`}}>
               {ticks.map((tick) => {
                 const ents = markersByPos.get(tick.pos);
@@ -976,24 +984,24 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
           </div>
         )}
 
-{/* Permanent Y axis: the static line right after the avatar column, at the
+{/* Permanent Y axis: the static line glued to the avatar's right edge, at the
             STATIONARY origin of the bar track (no numeric ticks; the scale is
-            implied 0 → global accumulated max). It spans EXACTLY the rows block
-            (from the top of the first row to the bottom of the last), starting
-            right where the bars begin — the accumulation boundary the date
-            grids slide into. */}
-        <div style={{position: 'absolute', left: BAR_TRACK_X, top: rowsTopY, height: rowsHeight, zIndex: 3}}>
+            implied 0 → global accumulated max). It starts at the top of the
+            rows block and runs down to the CANVAS BOTTOM — the accumulation
+            boundary the date grids slide into. */}
+        <div style={{position: 'absolute', left: axisX, top: rowsTopY, bottom: 0, zIndex: 3}}>
           <div style={{position: 'absolute', left: -(yAxisWidth ?? 2) / 2, top: 0, bottom: 0, width: yAxisWidth ?? 2, borderRadius: 1, backgroundColor: yAxisColor ?? '#334155'}} />
         </div>
 
         {/* Plot box — fixed clip viewport over the bar track. The scrolling
             tape (date gridlines + their labels + markers) lives INSIDE it, and
-            it clips at the permanent Y axis (BAR_TRACK_X), so everything slides
-            out and disappears EXACTLY at the axis as it crosses it ("cinta que
-            se desplaza"). The box starts above the rows (label band) and ends
-            at the bottom padding. */}
-        <div style={{position: 'absolute', left: BAR_TRACK_X, top: PLOT_PAD_Y, width: BAR_MAX_W, height: bottomEnd + DATE_BAND_H, overflow: 'hidden', zIndex: 1}}>
-          <div style={{position: 'absolute', left: 0, top: 0, width: planeW, height: bottomEnd + DATE_BAND_H, transform: `translateX(${scrollX}px)`}}>
+            it clips at the permanent Y axis (axisX, glued to the avatars), so
+            everything slides out and disappears EXACTLY at the axis as it
+            crosses it ("cinta que se desplaza"). The box starts above the rows
+            (label band) and extends down to the CANVAS BOTTOM, so the date
+            axes reach the lower edge too. */}
+        <div style={{position: 'absolute', left: axisX, top: PLOT_PAD_Y, width: BAR_MAX_W, bottom: 0, overflow: 'hidden', zIndex: 1}}>
+          <div style={{position: 'absolute', left: 0, top: 0, width: planeW, bottom: 0, transform: `translateX(${scrollX}px)`}}>
             {/* Date labels: one DIRECTLY ABOVE each date gridline, inside the
                 same fixed clip as the gridlines so they hide at the Y axis too.
                 Every date shows its label (dense dates may overlap). */}
@@ -1004,11 +1012,12 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
                 ))}
               </div>
             )}
-            {/* Vertical gridlines: one per real date/value, aligned to the rows area */}
+            {/* Vertical gridlines: one per real date/value — DOTTED (default),
+                running from under the labels down to the CANVAS BOTTOM. */}
             {showXAxis && (
-              <div style={{position: 'absolute', left: 0, top: DATE_BAND_H, width: planeW, height: rowsHeight}}>
+              <div style={{position: 'absolute', left: 0, top: DATE_BAND_H, width: planeW, bottom: 0}}>
                 {ticks.map((tick, i) => (
-                  <div key={i} style={{position: 'absolute', left: tick.x, top: 0, bottom: 0, width: gridlineWidth ?? 1, backgroundColor: gridlineColor ?? '#334155', opacity: gridlineOpacity ?? 0.35}} />
+                  <div key={i} style={{position: 'absolute', left: tick.x, top: 0, bottom: 0, width: 0, borderLeft: `${gridlineWidth ?? 1}px ${gridlineStyle ?? 'dotted'} ${gridlineColor ?? '#334155'}`, opacity: gridlineOpacity ?? 0.35}} />
                 ))}
               </div>
             )}

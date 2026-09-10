@@ -459,6 +459,7 @@ function convertRaceScrolling(
     gridlineColor: t?.gridlineColor,
     gridlineWidth: t?.gridlineWidth,
     gridlineOpacity: t?.gridlineOpacity,
+    gridlineStyle: t?.gridlineStyle,
     reorderByValue: t?.reorderByValue,
     maxVisibleRows: t?.maxVisibleRows,
     avatarEntry: t?.avatarEntry,

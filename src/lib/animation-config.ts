@@ -277,6 +277,10 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
   gridlineWidth?: number;
   gridlineOpacity?: number;
 
+  // Date gridline line style: 'dotted' (default; the puzzle-book dotted axis),
+  // 'dashed', or 'solid' for a continuous line.
+  gridlineStyle?: 'solid' | 'dashed' | 'dotted';
+
   // Reorder the row lanes by the CURRENT accumulated value at every snapshot
   // (classic race-chart behavior, animated by the lane-swap machinery). false
   // (default) keeps the rows in a fixed static order (alphabetical by label).

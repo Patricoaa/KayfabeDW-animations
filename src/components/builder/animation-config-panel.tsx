@@ -1157,6 +1157,16 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
         </p>
         <div className="pt-2 mt-1 border-t border-border-subtle">
           <p className="text-[10px] text-muted mb-1.5">Apariencia de las gridlines (intervalos verticales de fecha).</p>
+          <SelectControl
+            label="Estilo de gridlines"
+            value={value.gridlineStyle ?? 'dotted'}
+            onChange={(e) => update({gridlineStyle: (e.target.value as RaceScrollingConfig['gridlineStyle']) || undefined})}
+            className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+          >
+            <option value="dotted">Punteado</option>
+            <option value="dashed">Guiones</option>
+            <option value="solid">Línea continua</option>
+          </SelectControl>
           <ColorPickerControl label="Color de gridlines" value={value.gridlineColor ?? '#334155'} onChange={(v) => update({gridlineColor: v || undefined})} />
           <SliderNumberInput label="Grosor de gridlines (px)" value={value.gridlineWidth ?? 1} min={1} max={8} step={1} onChange={(v) => update({gridlineWidth: v || undefined})} />
           <SliderNumberInput label="Opacidad de gridlines (%)" value={Math.round((value.gridlineOpacity ?? 0.35) * 100)} min={0} max={100} step={5} onChange={(v) => update({gridlineOpacity: v === 0 ? 0 : (v || 35) / 100})} />
