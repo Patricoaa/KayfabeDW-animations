@@ -743,3 +743,32 @@ Changed: `src/remotion/templates/race-scrolling/index.tsx`,
 `src/components/builder/animation-config-panel.tsx`,
 `src/lib/animation-config.ts`, `src/lib/viz-to-remotion.ts`, this plan. Gate
 `npx tsc --noEmit` clean.
+
+## Feedback round (2026-09-10) — sonido al aumentar la barra + scroll constante con pausa final
+User requirements:
+1. Poder cargar un sonido que suene cada vez que la barra aumenta.
+2. Que al final el scroll NO disminuya velocidad; en su lugar dejar unos segundos
+   adicionales congelados para visualizar el resultado final.
+Confirmed: tick UNA vez por fecha (cada cruce de grid con crecimiento), UN sonido
+global (upload en el panel), pausa final exponible en el panel (default 2s).
+
+1. **Sonido por fecha**: `barSoundSrc?: string` en `RaceScrollingConfig` (url/datáURI)
+   + passthrough en `presentationOf`. Nuevo control `AudioUploadInput`
+   (`src/components/ui/controls/audio-upload-input.tsx`, accept="audio/*", FileReader→
+   dataURL, preview <audio controls> + "Quitar sonido", exportado en el index de
+   controles) al final del Collapsible "Marcadores del eje". El renderer monta un
+   `<Sequence from={cruceFrame}><Audio src={barSoundSrc}/></Sequence>` por cada `pos`
+   en `markersByPos` (mismo criterio delta≠0 que los marcadores), con
+   `frame = axisReachFrame(fracFor(pos))`. Solo si `barSoundSrc` está cargado.
+2. **Scroll a velocidad constante**: `guideTAt`/`guideT` pasan de `smoothstep` a
+   interpolación LINEAL (la cinta nunca frena al final); `invSmooth` pasa a identidad
+   (los cruces de fecha mantienen cadencia proporcional exacta).
+3. **Pausa final exponible**: nuevo `SliderNumberInput "Pausa final (s)"` en Ranking
+   (ligado a `holdFinalSeconds`, default 2, 0-10, paso 0.5); `holdFinalFrames` ya
+   congelaba la cinta tras `raceEndFrame`.
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`,
+`src/components/builder/animation-config-panel.tsx`,
+`src/components/ui/controls/audio-upload-input.tsx` (nuevo) e `index.ts`,
+`src/lib/animation-config.ts`, `src/lib/viz-to-remotion.ts`, this plan. Gate
+`npx tsc --noEmit` clean.

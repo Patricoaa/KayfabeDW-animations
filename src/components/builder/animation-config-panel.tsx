@@ -1,7 +1,7 @@
 'use client';
 
 import React, {useState} from 'react';
-import { SelectControl, NumberControl, ColorPickerControl, SwitchControl, Collapsible, Tabs, TextStyleControls, SliderNumberInput, FileUploadInput, FieldSelect, EntitySearch, PalettePicker, OverlayEditor } from '@/components/ui/controls';
+import { SelectControl, NumberControl, ColorPickerControl, SwitchControl, Collapsible, Tabs, TextStyleControls, SliderNumberInput, FileUploadInput, FieldSelect, EntitySearch, PalettePicker, OverlayEditor, AudioUploadInput } from '@/components/ui/controls';
 import type {ColumnMeta} from '@/components/builder/chart-config-panel';
 import type {TimelineRaceConfig, RaceScrollingConfig, RankingConfig, DateFormat, AvatarShape, AvatarCrop, RaceTextStyle, ValueFormat, RowEntryElement, CommonHeaderConfig, CommonCanvasConfig} from '@/lib/animation-config';
 import {avatarCropRect, VALUE_FORMATS} from '@/lib/animation-config';
@@ -1024,6 +1024,17 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
         <p className="text-[10px] text-muted mt-0.5">
           Tiempo del recorrido del eje. 0 = automático (la carrera ocupa todo el tiempo disponible). Al fijarla, el tiempo sobrante queda congelado en el resultado final.
         </p>
+        <SliderNumberInput
+          label="Pausa final (s)"
+          value={value.holdFinalSeconds ?? 2}
+          min={0}
+          max={10}
+          step={0.5}
+          onChange={(v) => update({holdFinalSeconds: v >= 0 ? v : undefined})}
+        />
+        <p className="text-[10px] text-muted mt-0.5">
+          El scroll viaja a velocidad constante; al llegar a la última fecha, la cinta se congela estos segundos para visualizar el resultado final antes del fade de salida.
+        </p>
         <SwitchControl
           label="Efecto podio al final"
           checked={value.podiumEffect ?? true}
@@ -1263,6 +1274,17 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
                 En modo ícono e imagen de referencia, el marcador apila HORIZONTALMENTE tantos glifos como unidades aporta esa fecha (el delta): delta=3 → 3 en fila, con tope de 6 y un chip «+N» para el excedente.
               </p>
             )}
+            <div className="pt-2 mt-1 border-t border-border-subtle">
+              <AudioUploadInput
+                label="Sonido al aumentar la barra (por fecha)"
+                value={value.barSoundSrc}
+                onLoad={(v) => update({barSoundSrc: v})}
+                onClear={() => update({barSoundSrc: undefined})}
+              />
+              <p className="text-[10px] text-muted mt-0.5">
+                Suena UNA vez cada vez que un grid de fecha cruza el eje Y y al menos una barra crece (el mismo disparo que los marcadores). Se exporta en el video.
+              </p>
+            </div>
             <NumberControl label="Tamaño del marcador (px)" value={value.markerSize} min={12} max={120} step={2} onChange={(v) => update({markerSize: v})} />
             {markerMode === 'number' && (
               <div className="pt-2 mt-1 border-t border-border-subtle">

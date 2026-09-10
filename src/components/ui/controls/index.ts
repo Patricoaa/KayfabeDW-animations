@@ -7,6 +7,7 @@ export { Tabs } from './tabs';
 export { TextStyleControls } from './text-style-controls';
 export { SliderNumberInput } from './slider-number-input';
 export { FileUploadInput } from './file-upload-input';
+export { AudioUploadInput } from './audio-upload-input';
 export { AutoColorInput } from './auto-color-input';
 export { EntitySearch } from './entity-search';
 export { FieldSelect } from './field-select';

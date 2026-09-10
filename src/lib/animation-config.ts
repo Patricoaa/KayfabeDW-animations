@@ -324,6 +324,9 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
   // image; overrides the avatar photo (`imageField`) in image mode and falls
   // back to it when a row has no value here.
   markerImageField?: string;
+  // Tick sound (uploaded audio / remote URL): plays ONCE each time a date grid
+  // crosses the Y axis where at least one bar grows (same rule as the markers).
+  barSoundSrc?: string;
 
   // Which participant set runs the race (alongside `maxRows`):
   // - 'final-value' (default): keep exactly the `maxRows` entities with the

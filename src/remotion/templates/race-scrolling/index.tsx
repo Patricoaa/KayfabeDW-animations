@@ -1,5 +1,5 @@
 import React from 'react';
-import {useCurrentFrame, useVideoConfig, interpolate, spring, Easing, Img} from 'remotion';
+import {useCurrentFrame, useVideoConfig, interpolate, spring, Easing, Img, Audio, Sequence} from 'remotion';
 import type {RaceTextStyle, ValueFormat} from '../../../lib/animation-config';
 import {ICON_GLYPHS} from '../../../lib/chart-icons';
 import {Header} from '../shared/Header';
@@ -21,7 +21,11 @@ import {textStyle} from '../shared/text';
 // whose gridline is touching the axis at any moment is the "now", and the bars
 // increase ONLY when a date's axis MARKER crosses the axis (they jump to that
 // date's total with a short ease and hold flat until the next crossing — no
-// continuous ramp). The sweep starts ONE LEAD-IN before the first date: on the
+// continuous ramp). The SWEEP IS LINEAR: the tape scrolls at CONSTANT speed
+// across the whole race (it never decelerates at the end); `holdFinalSeconds`
+// ("Pausa final (s)" in the panel) just freezes the ribbon at the final result
+// for extra viewing time before the fade-out. The sweep starts ONE LEAD-IN
+// before the first date: on the
 // uniform gridline axis that is exactly one `gridSpacing` (so the first grid
 // enters with the same cadence as the rest); on the proportional axis it is
 // half a plot. Every bar begins at 0 and the first date grid appears at the
@@ -127,6 +131,7 @@ export type RaceScrollingProps = {
   // capped at `MARKER_STACK_MAX` with an overflow "+N" chip; a delta of 1 keeps
   // the single-glyph look. The reference image comes from `item.markerImage`
   // (model field) falling back to the entity avatar `item.image`.
+  barSoundSrc?: string;
   rowGapH?: number;
   rowGap?: number;
   barWidth?: number;
@@ -217,6 +222,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   markerIcon = 'star',
   markerSize,
   markerText,
+  barSoundSrc,
   rowGapH,
   rowGap,
   barWidth,
@@ -430,12 +436,12 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
     ? Math.max(1, Math.min(Math.max(1, Math.round(raceDurationSeconds * fps)), sweepBudget))
     : Math.max(sweepBudget - holdFinalFrames, 1);
   const raceEndFrame = EASE + sweepFrames;
-  const guideTAt = (f: number) => {
-    const r = interpolate(f, [EASE, EASE + sweepFrames], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
-    return r * r * (3 - 2 * r); // smoothstep
-  };
-  const raw = interpolate(frame, [EASE, EASE + sweepFrames], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
-  const guideT = raw * raw * (3 - 2 * raw);
+  // The sweep is LINEAR: the tape travels at CONSTANT speed from the first
+  // frame to the last (the extra seconds to view the result live in the
+  // trailing hold, `holdFinalFrames`, where the tape is frozen at the end).
+  const guideTAt = (f: number) =>
+    interpolate(f, [EASE, EASE + sweepFrames], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
+  const guideT = guideTAt(frame);
 
   // ---- Distinct axis positions + spacing policy ----
   // `positions` is the sorted list of every distinct real value bucket/date;
@@ -519,18 +525,10 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // is half a plot.
   const nowFracAt = (f: number) => Math.max(0, Math.min(1, guideTAt(f) * tapeSpan - leadFrac));
 
-  // Invert the smoothstep in `guideTAt` so we know the exact frame each date's
-  // gridline touches the axis (Newton; smoothstep is monotonic in the sweep).
-  const invSmooth = (g: number) => {
-    let t = g;
-    for (let n = 0; n < 12; n++) {
-      const f0 = t * t * (3 - 2 * t) - g;
-      if (Math.abs(f0) < 1e-6) break;
-      const f1 = 6 * t * (1 - t);
-      t = Math.max(0, Math.min(1, t - f0 / Math.max(f1, 1e-6)));
-    }
-    return t;
-  };
+  // Invert the linear sweep in `guideTAt` so we know the exact frame each
+  // date's gridline touches the axis (with constant speed the time map is the
+  // identity: a date sits proportionally where it does on the tape).
+  const invSmooth = (g: number) => Math.max(0, Math.min(1, g));
   const fracFrameCache = new Map<number, number>();
   const axisReachFrame = (frac: number) => {
     const fx = Math.max(0, Math.min(1, frac));
@@ -776,6 +774,16 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
     }
     return map;
   })();
+
+  // Optional tick sound: plays ONCE every time a date grid crosses the Y axis
+  // with at least one growing bar (the same delta≠0 rule as the markers), at
+  // that date's exact crossing frame (linear sweep = constant cadence).
+  const barSoundEvents = barSoundSrc
+    ? Array.from(markersByPos.keys())
+        .filter((pos) => Number.isFinite(pos))
+        .map((pos) => ({key: pos, frame: Math.round(axisReachFrame(fracFor(pos)))}))
+        .sort((a, b) => a.frame - b.frame)
+    : [];
 
   const markerGlyph = ICON_GLYPHS[markerIcon ?? 'star'] ?? ICON_GLYPHS.star;
   const markerColorOf = (label: string, image?: string | null): string =>
@@ -1105,6 +1113,13 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
           {nowLabel}
         </div>
       )}
+
+      {/* Audio-only tick (non-visual): one playback per date crossing */}
+      {barSoundEvents.map((ev) => (
+        <Sequence key={ev.key} from={Math.max(0, ev.frame)} name={`bar-sound-${ev.key}`}>
+          <Audio src={barSoundSrc!} />
+        </Sequence>
+      ))}
     </div>
   );
 };
