@@ -839,3 +839,17 @@ panel (default ON); ritmo PROPORCIONAL a la pausa final.
 Changed: `src/remotion/templates/race-scrolling/index.tsx`,
 `src/components/builder/animation-config-panel.tsx`, `src/lib/animation-config.ts`,
 `src/lib/viz-to-remotion.ts`, this plan. Gate `npx tsc --noEmit` clean.
+
+## Feedback round 4b (2026-09-10) — barra se encoge en armonía con el avatar
+User: cuando el avatar se mueve, la barra se encoge en la MISMA proporción que el
+movimiento del avatar y se queda de ese tamaño hasta el final.
+
+- El encogido de la barra deja de ser cascada independiente: `width = w·(1 − finaleAvatarT)`,
+  idéntico y sincronizado con el `translateX` del avatar (mismo eased t), así la barra se
+  retrae a la vez que el avatar viaja al centro y queda a ese tamaño (0) hasta el final.
+- El valor numérico de la barra se hunde con el mismo factor. La entrada de las etiquetas
+  por la izquierda sigue escalonada por ranking final.
+- `finaleStateFor` ya solo devuelve `labelT` (se elimina `barShrink` de la cascada).
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`, this plan.
+Gate `npx tsc --noEmit` clean.

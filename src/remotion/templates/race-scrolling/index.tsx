@@ -642,10 +642,11 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
 
   // ---- Finale reveal (only when entity labels are HIDDEN) ----
   // During the final pause: the permanent Y axis fades out, the avatars slide
-  // right to the CENTER of the plot (freeing the left side), the bars shrink
-  // staggered from LARGEST to SMALLEST, and the entity name labels slide in
-  // from the LEFT. All phases/staggers are proportional to the pause left
-  // (`finaleWin`), so the whole sequence compresses or breathes with it.
+  // right to the CENTER of the plot (freeing the left side), each bar shrinks
+  // by the SAME proportion as its avatar's movement (lockstep) and stays at
+  // that size until the end, and the entity name labels slide in from the LEFT
+  // staggered by final rank. All phases/staggers are proportional to the pause
+  // left (`finaleWin`), so the whole sequence compresses or breathes with it.
   const finaleStart = raceEndFrame;
   const finaleWin = Math.max(1, durationInFrames - OUTRO - raceEndFrame);
   const finaleActive = finaleAnimation && !(showLabels ?? true) && raceEndFrame < durationInFrames - OUTRO;
@@ -657,12 +658,10 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const avatarDx = finaleActive ? Math.min((AVATAR_W + BAR_MAX_W) / 2, Math.max(0, innerW - AVATAR_W)) : 0;
   const axisFade = finaleActive ? 1 - finaleEase(interpolate(ft, [0, 0.18], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'})) : 1;
   const finaleStateFor = (label: string) => {
-    if (!finaleActive) return {barShrink: 0, labelT: 0};
+    if (!finaleActive) return {labelT: 0};
     const i = finaleFinalOrder.get(label) ?? 0;
-    const barStart = 0.3 + (0.55 * i) / finaleCount;
     const labelStart = 0.4 + (0.55 * i) / finaleCount;
     return {
-      barShrink: finaleEase(interpolate(ft, [barStart, barStart + 0.35], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'})),
       labelT: finaleEase(interpolate(ft, [labelStart, labelStart + 0.22], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'})),
     };
   };
@@ -932,7 +931,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
           durationInFrames: 28,
         })
       : 1;
-    const w = rawW * pop * (1 - finale.barShrink);
+    const w = rawW * pop * (1 - finaleAvatarT);
     const scale = finaleActive ? 1 : isLeader(p) ? winnerScale : 1;
 
     const yNow = laneY(rankNow(p.label));
@@ -979,7 +978,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
         <div style={{flexShrink: 0, width: BAR_MAX_W, height: BAR_H, position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', marginLeft: -(ROW_GAP_PX + BAR_TOUCH_PX)}}>
           {showRail !== false && <div style={{position: 'absolute', left: 0, right: 0, top: '50%', height: GROOVE_H, transform: 'translateY(-50%)', backgroundColor: '#171717', borderRadius: barRadius ?? 999, opacity: pop}} />}
           <div style={{position: 'absolute', left: 0, top: '50%', width: Math.max(0, w), height: BAR_H, transform: `translateY(-50%) scaleY(${scale})`, backgroundColor: barFill, borderRadius: barRadius ?? 999, boxShadow: isLeader(p) && podiumEffect ? `0 0 ${18 * scale}px ${accentColor}99` : 'none'}} />
-          <div style={{position: 'absolute', right: BAR_MAX_W - Math.max(0, w) + 12, top: 0, bottom: 0, maxWidth: Math.max(0, w - 24), minWidth: 0, display: 'flex', alignItems: 'center', overflow: 'hidden', pointerEvents: 'none', opacity: pop * (1 - finale.barShrink)}}>
+          <div style={{position: 'absolute', right: BAR_MAX_W - Math.max(0, w) + 12, top: 0, bottom: 0, maxWidth: Math.max(0, w - 24), minWidth: 0, display: 'flex', alignItems: 'center', overflow: 'hidden', pointerEvents: 'none', opacity: pop * (1 - finaleAvatarT)}}>
             <span style={{fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textShadow: '0 1px 2px rgba(0,0,0,0.45)', ...textStyle(valueText, {color: '#ffffff', size: ROW_FONT, weight: 800})}}>
 {fmtValue(Math.round(display), valueFormat, currencySymbol)}
             </span>
