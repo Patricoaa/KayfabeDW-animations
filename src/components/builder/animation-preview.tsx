@@ -154,6 +154,19 @@ export function AnimationPreview({
     [templateId, config, data, templateConfig],
   );
 
+  // Race-scrolling tick sound mounts one <Audio> per date crossing. The Player
+  // pre-mounts a LIMITED pool of shared audio tags (default 5) and THROWS when
+  // more <Audio> tags are mounted at once, replacing the whole canvas with an
+  // error icon. Size the pool to the actual event count (distinct axis
+  // positions) whenever a tick sound is set.
+  const numberOfSharedAudioTags = useMemo(() => {
+    if (templateId !== 'race-scrolling') return undefined;
+    const p = remotionProps as {barSoundSrc?: string; items?: {pos?: unknown}[]} | null;
+    if (!p?.barSoundSrc || !Array.isArray(p.items)) return undefined;
+    const eventCount = new Set(p.items.map((it) => it.pos)).size;
+    return Math.max(5, eventCount + 1);
+  }, [templateId, remotionProps]);
+
   const changeDuration = (d: number) => {
     setDuration(d);
     onDurationChange?.(d);
@@ -255,6 +268,7 @@ export function AnimationPreview({
                   fps={fps}
                   compositionWidth={compW}
                   compositionHeight={compH}
+                  numberOfSharedAudioTags={numberOfSharedAudioTags}
                   style={{width: '100%', height: '100%'}}
                   controls
                   acknowledgeRemotionLicense

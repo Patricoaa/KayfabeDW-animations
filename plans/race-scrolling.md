@@ -897,3 +897,21 @@ EN SINCRONÍA y escalonados por fila de mayor a menor.
 
 Changed: `src/remotion/templates/race-scrolling/index.tsx`, this plan.
 Gate `npx tsc --noEmit` clean.
+
+## Feedback round 4f (2026-09-10) — crash del canvas al cargar sonido de tick
+Bug: al cargar un sonido de tick, el preview mostraba solo el icono '⚠️' (el
+errorFallback por defecto del Player) y TODO el contenido desaparecía.
+
+Causa raíz: el template monta un `<Audio>` por cada fecha que cruza el eje
+(`barSoundEvents`). El `<Player>` de Remotion pre-monta un pool LIMITADO de tags
+de audio compartidos (default 5) y LANZA "Tried to simultaneously mount N+1 tags
+at the same time" cuando hay más tags montados a la vez → el Player reemplaza el
+canvas completo por el fallback '⚠️'. El render/export NO se ve afectado (usa
+`AudioForRendering`, sin pool).
+
+Fix: `animation-preview.tsx` ahora pasa `numberOfSharedAudioTags` al Player
+dimensionado al conteo real de eventos (fechas únicas de `items`) cuando hay
+`barSoundSrc`; para el resto, `undefined` (default 5).
+
+Changed: `src/components/builder/animation-preview.tsx`, this plan.
+Gate `npx tsc --noEmit` clean.
