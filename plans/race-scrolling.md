@@ -880,3 +880,20 @@ User: deben encogerse hasta el inicio del avatar (manteniendo la distancia solap
 
 Changed: `src/remotion/templates/race-scrolling/index.tsx`, this plan.
 Gate `npx tsc --noEmit` clean.
+
+## Feedback round 4e (2026-09-10) — extremo derecho fijo + coreografía POR FILA sincronizada
+User: (1) el extremo derecho debe mantenerse SIN encoger; (2) el movimiento de las
+etiquetas más el traslado del avatar y el encogimiento de la barra deben ser por fila,
+EN SINCRONÍA y escalonados por fila de mayor a menor.
+
+- Barra: el borde DERECHO queda fijo en `raceW` (su largo al final de la carrera) —
+  `valueRight`/`valueMaxW` se anclan ahí y el dato nunca se mueve ni se encoge. Solo el
+  borde izquierdo retrae hacia la derecha en lockstep con su fila.
+- Coreografía por fila: `finaleRowStart(i) = 0.15 + 0.6·i/count` (i por ranking FINAL,
+  mayor→menor) y `rowT` único por fila que mueve a la vez avatar (`translateX rowT·avatarDx`),
+  barra (`width raceW·(1−rowT)`) y etiqueta (`opacity/translateX rowT`). El eje Y sigue
+  desvaneciéndose primero (global).
+- `finaleStateFor` ahora devuelve `rowT`; se elimina `finaleAvatarT` global.
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`, this plan.
+Gate `npx tsc --noEmit` clean.

@@ -641,12 +641,12 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const SWAP = 24;
 
   // ---- Finale reveal (only when entity labels are HIDDEN) ----
-  // During the final pause: the permanent Y axis fades out, the avatars slide
-  // right to the CENTER of the plot (freeing the left side), each bar shrinks
-  // by the SAME proportion as its avatar's movement (lockstep) and stays at
-  // that size until the end, and the entity name labels slide in from the LEFT
-  // staggered by final rank. All phases/staggers are proportional to the pause
-  // left (`finaleWin`), so the whole sequence compresses or breathes with it.
+  // During the final pause: the permanent Y axis fades out, and then every row
+  // plays a SYNCHRONIZED move in STAGGERED order (largest final rank first):
+  // its avatar slides to the center of the plot, its bar retracts (LEFT edge
+  // shrinks rightward; the RIGHT edge and its value stay fixed and visible) and
+  // its label slides in from the left — all within that row's slot. Phases and
+  // staggers are proportional to the pause left (`finaleWin`).
   const finaleStart = raceEndFrame;
   const finaleWin = Math.max(1, durationInFrames - OUTRO - raceEndFrame);
   const finaleActive = finaleAnimation && !(showLabels ?? true) && raceEndFrame < durationInFrames - OUTRO;
@@ -654,15 +654,18 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const finaleEase = (x: number) => Easing.out(Easing.cubic)(Math.max(0, Math.min(1, x)));
   const finaleFinalOrder = !finaleActive ? new Map<string, number>() : new Map<string, number>(rankAtFrame(raceEndFrame).listIndex);
   const finaleCount = Math.max(finaleFinalOrder.size, 1);
-  const finaleAvatarT = finaleActive ? finaleEase(interpolate(ft, [0.08, 0.4], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'})) : 0;
   const avatarDx = finaleActive ? Math.min((AVATAR_W + BAR_MAX_W) / 2, Math.max(0, innerW - AVATAR_W)) : 0;
   const axisFade = finaleActive ? 1 - finaleEase(interpolate(ft, [0, 0.18], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'})) : 1;
+  // Per-row SYNCHRONIZED choreography, staggered from the LARGEST to the
+  // SMALLEST final rank: for each row its avatar translate + bar shrink + label
+  // slide all run TOGETHER, and the whole row moves as one.
+  const finaleRowStart = (i: number) => 0.15 + (0.6 * i) / finaleCount;
   const finaleStateFor = (label: string) => {
-    if (!finaleActive) return {labelT: 0};
+    if (!finaleActive) return {rowT: 0};
     const i = finaleFinalOrder.get(label) ?? 0;
-    const labelStart = 0.4 + (0.55 * i) / finaleCount;
+    const s = finaleRowStart(i);
     return {
-      labelT: finaleEase(interpolate(ft, [labelStart, labelStart + 0.22], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'})),
+      rowT: finaleEase(interpolate(ft, [s, s + 0.32], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'})),
     };
   };
 
@@ -915,8 +918,10 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
 
   const renderRow = (p: Participant) => {
     // Finale overrides the podium: whole rows un-dim and the leader's height pop
-    // recedes so the shrink cascade and the label slide-in read cleanly.
+    // recedes so the retraction and the label slide-in read cleanly. Each row's
+    // avatar translate + bar shrink + label slide run in sync (`rowT`).
     const finale = finaleStateFor(p.label);
+    const rowT = finale.rowT;
     const dim = finaleActive ? 1 : isLeader(p) ? 1 : dimOthers;
     // Eased discrete bar length: the bar only increases when a date's marker
     // crosses the Y axis, animating over ~STEP_EASE_FRAMES and holding flat
@@ -932,14 +937,14 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
         })
       : 1;
     const raceW = rawW * pop;
-    const w = raceW * (1 - finaleAvatarT);
-    // Finale: the bar's LEFT edge stays tucked UNDER the avatar (the overlap is
-    // kept), so it travels right in lockstep with the avatar while the bar
-    // shortens — the right end retracts toward the avatar's start, carrying the
-    // value with it (still visible) until the bar is fully collapsed at the end.
-    const barLeft = finaleActive ? Math.min(BAR_MAX_W, finaleAvatarT * avatarDx) : 0;
-    const valueRight = BAR_MAX_W - (barLeft + Math.max(0, w)) + 12;
-    const valueMaxW = Math.max(0, w - 24);
+    const w = raceW * (1 - rowT);
+    // Finale: the bar's RIGHT edge stays FIXED (at the length it had at the end
+    // of the race, so the value never moves or shrinks away) and only the LEFT
+    // edge retracts rightward, in lockstep with that row's avatar travel.
+    const barLeft = finaleActive ? Math.max(0, raceW - w) : 0;
+    const anchorW = finaleActive ? raceW : Math.max(0, w);
+    const valueRight = BAR_MAX_W - anchorW + 12;
+    const valueMaxW = Math.max(0, anchorW - 24);
     const scale = finaleActive ? 1 : isLeader(p) ? winnerScale : 1;
 
     const yNow = laneY(rankNow(p.label));
@@ -994,7 +999,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
         </div>
       ),
       avatar: (
-        <div style={{width: AVATAR_W, flexShrink: 0, textAlign: 'right', position: 'relative', zIndex: 2, transform: finaleActive ? `translateX(${finaleAvatarT * avatarDx}px)` : undefined}}>
+        <div style={{width: AVATAR_W, flexShrink: 0, textAlign: 'right', position: 'relative', zIndex: 2, transform: finaleActive ? `translateX(${rowT * avatarDx}px)` : undefined}}>
           {showAvatar && p.image && (
             <div style={avatarEntranceStyle(p)}>
               <Avatar src={p.image} size={AVATAR_W} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(p.label, p.image)} bg={avatarBgFromBar ? barFill : avatarBg} borderColor={avatarBorderColor} borderWidth={avatarBorderWidth} />
@@ -1011,8 +1016,8 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
             <span style={{whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', ...textStyle(labelText, {color: '#e4e4e7', size: LABEL_FONT, weight: 700}), opacity: pop}}>{p.label}</span>
           </div>
         )}
-        {finaleActive && finale.labelT > 0.001 && (
-          <div style={{position: 'absolute', left: 0, top: 0, height: ROW_H, width: NAME_W_FULL, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: ROW_GAP_PX * 0.5, opacity: finale.labelT, transform: `translateX(${-(1 - finale.labelT) * NAME_W_FULL * 0.8}px)`, zIndex: 2}}>
+        {finaleActive && rowT > 0.001 && (
+          <div style={{position: 'absolute', left: 0, top: 0, height: ROW_H, width: NAME_W_FULL, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: ROW_GAP_PX * 0.5, opacity: rowT, transform: `translateX(${-(1 - rowT) * NAME_W_FULL * 0.8}px)`, zIndex: 2}}>
             <span style={{whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', ...textStyle(labelText, {color: '#e4e4e7', size: LABEL_FONT, weight: 700})}}>{p.label}</span>
           </div>
         )}
