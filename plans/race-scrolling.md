@@ -853,3 +853,17 @@ movimiento del avatar y se queda de ese tamaño hasta el final.
 
 Changed: `src/remotion/templates/race-scrolling/index.tsx`, this plan.
 Gate `npx tsc --noEmit` clean.
+
+## Feedback round 4c (2026-09-10) — el encogido retrae a la DERECHA, el dato queda visible
+User: la barra debe encogerse A LA DERECHA para que el dato se mantenga visible.
+
+- `raceW = rawW·pop` (largo exacto que tenía la barra al terminar la carrera). En la
+  secuencia, la barra mantiene fijo su borde DERECHO en `raceW` y solo su borde
+  IZQUIERDO se mueve hacia la derecha (`left = raceW − w`, width = `raceW·(1−t)`), en
+  lockstep con el avatar: la barra "se retrae a la derecha" mientras el dato continúa.
+- El valor numérico se ancla a la posición final (`right: BAR_MAX_W − raceW + 12`) y ya
+  NO se desvanece (opacity `pop` fija): permanece visible en el mismo punto mientras la
+  barra se acorta. Sin salto en la transición (en t=0 `left=0`, width=`raceW`).
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`, this plan.
+Gate `npx tsc --noEmit` clean.

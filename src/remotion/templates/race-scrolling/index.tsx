@@ -931,7 +931,15 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
           durationInFrames: 28,
         })
       : 1;
-    const w = rawW * pop * (1 - finaleAvatarT);
+    const raceW = rawW * pop;
+    const w = raceW * (1 - finaleAvatarT);
+    // In the finale the bar RETRACTS TO THE RIGHT: it keeps the length it had at
+    // the end of the race on its right side, and shrinks moving its LEFT edge
+    // rightward (in lockstep with the avatar), so the value/data stays put and
+    // visible in the same spot as the bar shortens.
+    const barLeft = finaleActive ? Math.max(0, raceW - w) : 0;
+    const valueRight = finaleActive ? BAR_MAX_W - raceW + 12 : BAR_MAX_W - Math.max(0, w) + 12;
+    const valueMaxW = finaleActive ? Math.max(0, raceW - 24) : Math.max(0, w - 24);
     const scale = finaleActive ? 1 : isLeader(p) ? winnerScale : 1;
 
     const yNow = laneY(rankNow(p.label));
@@ -977,8 +985,8 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
       bar: (
         <div style={{flexShrink: 0, width: BAR_MAX_W, height: BAR_H, position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', marginLeft: -(ROW_GAP_PX + BAR_TOUCH_PX)}}>
           {showRail !== false && <div style={{position: 'absolute', left: 0, right: 0, top: '50%', height: GROOVE_H, transform: 'translateY(-50%)', backgroundColor: '#171717', borderRadius: barRadius ?? 999, opacity: pop}} />}
-          <div style={{position: 'absolute', left: 0, top: '50%', width: Math.max(0, w), height: BAR_H, transform: `translateY(-50%) scaleY(${scale})`, backgroundColor: barFill, borderRadius: barRadius ?? 999, boxShadow: isLeader(p) && podiumEffect ? `0 0 ${18 * scale}px ${accentColor}99` : 'none'}} />
-          <div style={{position: 'absolute', right: BAR_MAX_W - Math.max(0, w) + 12, top: 0, bottom: 0, maxWidth: Math.max(0, w - 24), minWidth: 0, display: 'flex', alignItems: 'center', overflow: 'hidden', pointerEvents: 'none', opacity: pop * (1 - finaleAvatarT)}}>
+          <div style={{position: 'absolute', left: barLeft, top: '50%', width: Math.max(0, w), height: BAR_H, transform: `translateY(-50%) scaleY(${scale})`, backgroundColor: barFill, borderRadius: barRadius ?? 999, boxShadow: isLeader(p) && podiumEffect ? `0 0 ${18 * scale}px ${accentColor}99` : 'none'}} />
+          <div style={{position: 'absolute', right: valueRight, top: 0, bottom: 0, maxWidth: valueMaxW, minWidth: 0, display: 'flex', alignItems: 'center', overflow: 'hidden', pointerEvents: 'none', opacity: pop}}>
             <span style={{fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textShadow: '0 1px 2px rgba(0,0,0,0.45)', ...textStyle(valueText, {color: '#ffffff', size: ROW_FONT, weight: 800})}}>
 {fmtValue(Math.round(display), valueFormat, currencySymbol)}
             </span>
