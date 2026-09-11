@@ -328,6 +328,13 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
   // crosses the Y axis where at least one bar grows (same rule as the markers).
   barSoundSrc?: string;
 
+  // Finale reveal played during the FINAL PAUSE when entity labels are HIDDEN
+  // (`showLabels` false): the permanent Y axis fades out, the avatars slide to
+  // the center of the plot, the bars shrink staggered (largest first) and the
+  // entity labels slide in from the left. Timing scales proportionally with the
+  // final pause; off by default only if `showLabels` is true.
+  finaleAnimation?: boolean;
+
   // Which participant set runs the race (alongside `maxRows`):
   // - 'final-value' (default): keep exactly the `maxRows` entities with the
   //   LARGEST ('top') or SMALLEST ('bottom') accumulated value at the END of

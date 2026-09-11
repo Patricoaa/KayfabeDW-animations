@@ -132,6 +132,8 @@ export type RaceScrollingProps = {
   // the single-glyph look. The reference image comes from `item.markerImage`
   // (model field) falling back to the entity avatar `item.image`.
   barSoundSrc?: string;
+  // Finale reveal during the final pause when labels are hidden (see config).
+  finaleAnimation?: boolean;
   rowGapH?: number;
   rowGap?: number;
   barWidth?: number;
@@ -209,6 +211,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   axisUnit = 'date',
   maxRows,
   holdFinalSeconds = 2,
+  finaleAnimation = true,
   podiumEffect = true,
   showRail = false,
   showDateLabel = true,
@@ -402,9 +405,8 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // When `showLabels` is off the column collapses (NAME_W = 0) and the plot /
   // bar track expands to the left.
   const LABEL_FONT = Math.max(12, Math.round(ROW_FONT * 0.8));
-  const NAME_W = (showLabels ?? true)
-    ? Math.min(innerW * 0.34, Math.max(110, Math.max(...items.map((r) => r.label.length), 1) * LABEL_FONT * 0.52 + 16))
-    : 0;
+  const NAME_W_FULL = Math.min(innerW * 0.34, Math.max(110, Math.max(...items.map((r) => r.label.length), 1) * LABEL_FONT * 0.52 + 16));
+  const NAME_W = (showLabels ?? true) ? NAME_W_FULL : 0;
   // Bars grow IN PLACE from this column, so only the track to its right scrolls.
   const BAR_MAX_W = Math.max((innerW - NAME_W - ROW_GAP_PX * 2) * BAR_RATIO, 1);
   // Explicit `avatarSize` wins (mirrors the timeline-race); otherwise the avatar
@@ -637,6 +639,33 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // during the race never reshuffle who enters when.
   const introOrder = new Map<string, number>(rankAtFrame(0).listIndex);
   const SWAP = 24;
+
+  // ---- Finale reveal (only when entity labels are HIDDEN) ----
+  // During the final pause: the permanent Y axis fades out, the avatars slide
+  // right to the CENTER of the plot (freeing the left side), the bars shrink
+  // staggered from LARGEST to SMALLEST, and the entity name labels slide in
+  // from the LEFT. All phases/staggers are proportional to the pause left
+  // (`finaleWin`), so the whole sequence compresses or breathes with it.
+  const finaleStart = raceEndFrame;
+  const finaleWin = Math.max(1, durationInFrames - OUTRO - raceEndFrame);
+  const finaleActive = finaleAnimation && !(showLabels ?? true) && raceEndFrame < durationInFrames - OUTRO;
+  const ft = finaleActive ? Math.max(0, Math.min(1, (frame - finaleStart) / finaleWin)) : 0;
+  const finaleEase = (x: number) => Easing.out(Easing.cubic)(Math.max(0, Math.min(1, x)));
+  const finaleFinalOrder = !finaleActive ? new Map<string, number>() : new Map<string, number>(rankAtFrame(raceEndFrame).listIndex);
+  const finaleCount = Math.max(finaleFinalOrder.size, 1);
+  const finaleAvatarT = finaleActive ? finaleEase(interpolate(ft, [0.08, 0.4], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'})) : 0;
+  const avatarDx = finaleActive ? Math.min((AVATAR_W + BAR_MAX_W) / 2, Math.max(0, innerW - AVATAR_W)) : 0;
+  const axisFade = finaleActive ? 1 - finaleEase(interpolate(ft, [0, 0.18], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'})) : 1;
+  const finaleStateFor = (label: string) => {
+    if (!finaleActive) return {barShrink: 0, labelT: 0};
+    const i = finaleFinalOrder.get(label) ?? 0;
+    const barStart = 0.3 + (0.55 * i) / finaleCount;
+    const labelStart = 0.4 + (0.55 * i) / finaleCount;
+    return {
+      barShrink: finaleEase(interpolate(ft, [barStart, barStart + 0.35], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'})),
+      labelT: finaleEase(interpolate(ft, [labelStart, labelStart + 0.22], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'})),
+    };
+  };
 
   const evalChange = (label: string) => {
     const from = frame - SWAP > 0 ? frame - SWAP : 0;
@@ -886,6 +915,10 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   };
 
   const renderRow = (p: Participant) => {
+    // Finale overrides the podium: whole rows un-dim and the leader's height pop
+    // recedes so the shrink cascade and the label slide-in read cleanly.
+    const finale = finaleStateFor(p.label);
+    const dim = finaleActive ? 1 : isLeader(p) ? 1 : dimOthers;
     // Eased discrete bar length: the bar only increases when a date's marker
     // crosses the Y axis, animating over ~STEP_EASE_FRAMES and holding flat
     // between dates (see `barDisplayValue`).
@@ -899,9 +932,8 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
           durationInFrames: 28,
         })
       : 1;
-    const w = rawW * pop;
-    const scale = isLeader(p) ? winnerScale : 1;
-    const dim = isLeader(p) ? 1 : dimOthers;
+    const w = rawW * pop * (1 - finale.barShrink);
+    const scale = finaleActive ? 1 : isLeader(p) ? winnerScale : 1;
 
     const yNow = laneY(rankNow(p.label));
     const change = evalChange(p.label);
@@ -947,7 +979,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
         <div style={{flexShrink: 0, width: BAR_MAX_W, height: BAR_H, position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', marginLeft: -(ROW_GAP_PX + BAR_TOUCH_PX)}}>
           {showRail !== false && <div style={{position: 'absolute', left: 0, right: 0, top: '50%', height: GROOVE_H, transform: 'translateY(-50%)', backgroundColor: '#171717', borderRadius: barRadius ?? 999, opacity: pop}} />}
           <div style={{position: 'absolute', left: 0, top: '50%', width: Math.max(0, w), height: BAR_H, transform: `translateY(-50%) scaleY(${scale})`, backgroundColor: barFill, borderRadius: barRadius ?? 999, boxShadow: isLeader(p) && podiumEffect ? `0 0 ${18 * scale}px ${accentColor}99` : 'none'}} />
-          <div style={{position: 'absolute', right: BAR_MAX_W - Math.max(0, w) + 12, top: 0, bottom: 0, maxWidth: Math.max(0, w - 24), minWidth: 0, display: 'flex', alignItems: 'center', overflow: 'hidden', pointerEvents: 'none', opacity: pop}}>
+          <div style={{position: 'absolute', right: BAR_MAX_W - Math.max(0, w) + 12, top: 0, bottom: 0, maxWidth: Math.max(0, w - 24), minWidth: 0, display: 'flex', alignItems: 'center', overflow: 'hidden', pointerEvents: 'none', opacity: pop * (1 - finale.barShrink)}}>
             <span style={{fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textShadow: '0 1px 2px rgba(0,0,0,0.45)', ...textStyle(valueText, {color: '#ffffff', size: ROW_FONT, weight: 800})}}>
 {fmtValue(Math.round(display), valueFormat, currencySymbol)}
             </span>
@@ -955,7 +987,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
         </div>
       ),
       avatar: (
-        <div style={{width: AVATAR_W, flexShrink: 0, textAlign: 'right', position: 'relative', zIndex: 2}}>
+        <div style={{width: AVATAR_W, flexShrink: 0, textAlign: 'right', position: 'relative', zIndex: 2, transform: finaleActive ? `translateX(${finaleAvatarT * avatarDx}px)` : undefined}}>
           {showAvatar && p.image && (
             <div style={avatarEntranceStyle(p)}>
               <Avatar src={p.image} size={AVATAR_W} shape={avatarShape} radius={avatarRadius} crop={avatarCropFor(p.label, p.image)} bg={avatarBgFromBar ? barFill : avatarBg} borderColor={avatarBorderColor} borderWidth={avatarBorderWidth} />
@@ -970,6 +1002,11 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
         {(showLabels ?? true) && (
           <div style={{width: NAME_W, flexShrink: 0, overflow: 'hidden', textAlign: 'right', paddingRight: ROW_GAP_PX * 0.5, display: 'flex', alignItems: 'center', justifyContent: 'flex-end'}}>
             <span style={{whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', ...textStyle(labelText, {color: '#e4e4e7', size: LABEL_FONT, weight: 700}), opacity: pop}}>{p.label}</span>
+          </div>
+        )}
+        {finaleActive && finale.labelT > 0.001 && (
+          <div style={{position: 'absolute', left: 0, top: 0, height: ROW_H, width: NAME_W_FULL, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: ROW_GAP_PX * 0.5, opacity: finale.labelT, transform: `translateX(${-(1 - finale.labelT) * NAME_W_FULL * 0.8}px)`, zIndex: 2}}>
+            <span style={{whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', ...textStyle(labelText, {color: '#e4e4e7', size: LABEL_FONT, weight: 700})}}>{p.label}</span>
           </div>
         )}
         {SEG_ORDER.map((seg) => segments[seg])}
@@ -1044,7 +1081,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
             implied 0 → global accumulated max). It starts at the top of the
             rows block and runs down to the CANVAS BOTTOM — the accumulation
             boundary the date grids slide into. */}
-        <div style={{position: 'absolute', left: axisX, top: rowsTopY, bottom: 0, zIndex: 3}}>
+        <div style={{position: 'absolute', left: axisX, top: rowsTopY, bottom: 0, zIndex: 3, opacity: axisFade}}>
           <div style={{position: 'absolute', left: -(yAxisWidth ?? 2) / 2, top: 0, bottom: 0, width: yAxisWidth ?? 2, borderRadius: 1, backgroundColor: yAxisColor ?? '#334155'}} />
         </div>
 

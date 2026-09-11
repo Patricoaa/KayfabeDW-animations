@@ -811,3 +811,31 @@ orden líder primero.
 
 Changed: `src/remotion/templates/race-scrolling/index.tsx`, this plan.
 Gate `npx tsc --noEmit` clean. Nota: con muchas filas la cascada solapa el arranque.
+
+## Feedback round 4 (2026-09-10) — animación de cierre en la pausa final
+User: como pausa final añadir una animación: fade out del eje Y permanente, traslado
+de los avatares hacia el centro del plot, encogido de las barras (escalonado de mayor a
+menor) y entrada de las etiquetas de las entidades por la izquierda.
+Confirmed: avatares van al CENTRO del plot (para que quepan las etiquetas); la entrada de
+etiquetas SOLO aplica con "Mostrar etiqueta de la entidad" apagada; nuevo switch en el
+panel (default ON); ritmo PROPORCIONAL a la pausa final.
+
+- Config `finaleAnimation?: boolean` + passthrough + prop del renderer (default true).
+- `finaleActive = finaleAnimation && !(showLabels ?? true) && (durationInFrames - OUTRO) > raceEndFrame`.
+  Con etiquetas visibles (default) o switch apagado → pausa congelada como hasta ahora.
+- Línea de tiempo normalizada `ft` sobre la ventana real de la pausa
+  (`finaleWin = durationInFrames - OUTRO - raceEndFrame`):
+  - eje Y: opacity 1→0 en ft 0.00→0.18
+  - avatares: translateX→`avatarDx ≈ (AVATAR_W + BAR_MAX_W)/2` (centro del plot, clamp a innerW) en ft 0.08→0.40
+  - barras: `width·(1 − shrink)` con rampa ease-out; cada fila por ranking FINAL
+    (`rankAtFrame(raceEndFrame)`) arranca en `0.30 + 0.55·i/count`, dura 0.35
+  - etiquetas: overlay absoluto en la columna izquierda (`NAME_W_FULL`, width real de
+    columna aunque `NAME_W`=0 con labels ocultas), `translateX(−0.8·NAME_W_FULL→0)` +
+    opacity 0→1, escalonadas igual que las barras (ft 0.40 + 0.55·i/count)
+- Durante la secuencia: `winnerScale`→1 y `dim`→1 (filas sin atenuar) para leer limpio;
+  el valor numérico de la barra se hunde con ella; el eje ya no atenúa.
+- Panel: switch "Animación de cierre" junto a "Pausa final (s)" + texto de ayuda.
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`,
+`src/components/builder/animation-config-panel.tsx`, `src/lib/animation-config.ts`,
+`src/lib/viz-to-remotion.ts`, this plan. Gate `npx tsc --noEmit` clean.

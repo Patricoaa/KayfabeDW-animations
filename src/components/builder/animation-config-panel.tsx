@@ -1025,6 +1025,14 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           El scroll viaja a velocidad constante; al llegar a la última fecha (que se desplaza un poco más allá del eje), la cinta se congela estos segundos antes del fade de salida. A mayor pausa, más rápido se desplaza la cinta para ocupar el resto del tiempo.
         </p>
         <SwitchControl
+          label="Animación de cierre"
+          checked={value.finaleAnimation ?? true}
+          onChange={(v) => update({finaleAnimation: v})}
+        />
+        <p className="text-[10px] text-muted mt-0.5">
+          Solo cuando "Mostrar etiqueta de la entidad" está apagada: durante la pausa final el eje Y se desvanece, los avatares van al centro, las barras se encogen (mayor a menor) y las etiquetas entran desde la izquierda. Con etiquetas visibles o el switch apagado, la pausa queda congelada como hasta ahora. La secuencia se comprime o respira con la duración de la pausa.
+        </p>
+        <SwitchControl
           label="Efecto podio al final"
           checked={value.podiumEffect ?? true}
           onChange={(v) => update({podiumEffect: v})}
