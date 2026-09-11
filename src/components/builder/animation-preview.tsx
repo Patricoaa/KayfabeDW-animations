@@ -154,15 +154,23 @@ export function AnimationPreview({
     [templateId, config, data, templateConfig],
   );
 
-  // Race-scrolling tick sound mounts one <Audio> per date crossing. The Player
-  // pre-mounts a LIMITED pool of shared audio tags (default 5) and THROWS when
-  // more <Audio> tags are mounted at once, replacing the whole canvas with an
-  // error icon. Size the pool to the actual event count (distinct axis
-  // positions) whenever a tick sound is set.
+  // Race-scrolling tick sound mounts ONE <Audio> per date crossing, and each
+  // crossing's <Sequence> stays active until the end of the video, so the tags
+  // remain mounted simultaneously. The Player pre-mounts a LIMITED pool of
+  // shared audio tags (default 5) and THROWS when more tags are mounted at once,
+  // replacing the whole canvas with an error icon. Size the pool to the actual
+  // event count (distinct axis positions) whenever a tick sound is set.
+  //
+  // Remotion additionally THROWS "number of shared audio tags has changed
+  // dynamically" if this value ever differs between renders of the same Player
+  // instance — so it must be constant for the Player's lifetime. The value only
+  // changes when the template or the event count changes; remounting the Player
+  // (via `key`) with a fresh pool whenever it does keeps the pool exact while
+  // never tripping the dynamic-change guard.
   const numberOfSharedAudioTags = useMemo(() => {
-    if (templateId !== 'race-scrolling') return undefined;
+    if (templateId !== 'race-scrolling') return 5;
     const p = remotionProps as {barSoundSrc?: string; items?: {pos?: unknown}[]} | null;
-    if (!p?.barSoundSrc || !Array.isArray(p.items)) return undefined;
+    if (!p?.barSoundSrc || !Array.isArray(p.items)) return 5;
     const eventCount = new Set(p.items.map((it) => it.pos)).size;
     return Math.max(5, eventCount + 1);
   }, [templateId, remotionProps]);
@@ -262,6 +270,7 @@ export function AnimationPreview({
                 }
               >
                 <Player
+                  key={`${templateId}:${numberOfSharedAudioTags}`}
                   component={Comp}
                   inputProps={remotionProps}
                   durationInFrames={duration * fps}

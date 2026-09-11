@@ -929,3 +929,25 @@ anclado y visible en el extremo fijo.
 
 Changed: `src/remotion/templates/race-scrolling/index.tsx`, this plan.
 Gate `npx tsc --noEmit` clean.
+
+## Feedback round 4h (2026-09-10) — "number of shared audio tags changed dynamically" al seleccionar otro template
+Bug: el usuario reportó un error en producción al seleccionar las plantillas
+Timeline Race y Ranking: `Uncaught Error: The number of shared audio tags has
+changed dynamically. Once you have set this property, you cannot change it
+afterwards.`
+
+Causa raíz: `SharedAudioTagsContextProvider` de Remotion compara el valor de
+`numberOfAudioTags` recibido con el inicial (`useState`); si DIFFIERE entre
+renders del MISMO Player, lanza el error y el Player muestra el fallback '⚠️'.
+En 4f nosotros pasábamos `undefined` (default 5 para race-scrolling) o un conteo
+dinámico; cambiar de template (race-scrolling → ranking/timeline-race) o editar
+datos cambiaba el valor → throw.
+
+Fix (`animation-preview.tsx`): el valor ahora es SIEMPRE un número — min 5 — y se
+le añade `key={templateId:count}` al `<Player>`: al cambiar template o el tamaño
+necesario del pool, React DESMONTA y remonta el Player con un provider fresco
+(valor estable), evitando el guard dinámico. Ranking y TimelineRace (sin audio)
+se quedan en 5; race-scrolling sigue dimensionando el pool al conteo de eventos.
+
+Changed: `src/components/builder/animation-preview.tsx`, this plan.
+Gate `npx tsc --noEmit` clean.
