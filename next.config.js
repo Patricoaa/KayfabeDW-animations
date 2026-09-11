@@ -5,7 +5,6 @@ const nextConfig = {
     'remotion',
     '@remotion/renderer',
     '@remotion/bundler',
-    '@remotion/cli',
     '@remotion/compositor-linux-x64-gnu',
     '@remotion/compositor-linux-x64-musl',
     '@remotion/compositor-linux-arm64-gnu',

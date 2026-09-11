@@ -39,6 +39,7 @@ import type {TemplateId} from '@/remotion/generated/registry';
 import type {AnimationTemplateConfig} from '@/lib/animation-config';
 import {emptyAnimationConfig} from '@/lib/animation-config';
 import {loadSafeZones, saveSafeZones, safeZonesFromConfig, type SafeZoneSettings} from '@/lib/safe-zones';
+import {paginateRows, PAGE_SIZE, ABS_MAX_ROWS} from '@/lib/paginate';
 import {useToast} from '@/components/ui/toast';
 import {useResizableWidth} from '@/hooks/use-resizable-width';
 import {DEFAULT_EXPORT_PRESET, EXPORT_PRESETS, getExportPreset} from '@/lib/export-presets';
@@ -162,34 +163,30 @@ function BuilderContent() {
       // Capture the full result set by walking OFFSET pages. A user-set
       // `limit` caps the total captured; otherwise we page through everything
       // up to a safety ceiling (ABS_MAX) to avoid memory blowups.
-      const PAGE = 1000;
-      const ABS_MAX = 50000;
       const userLimit = q.limit && q.limit > 0 ? q.limit : Infinity;
-      const cap = Math.min(ABS_MAX, userLimit);
-      const pageSize = Number.isFinite(cap) ? Math.min(PAGE, cap) : PAGE;
+      const cap = Math.min(ABS_MAX_ROWS, userLimit);
+      const pageSize = Math.min(PAGE_SIZE, cap);
 
-      const all: Record<string, unknown>[] = [];
-      let offset = 0;
-      while (all.length < cap) {
-        const res = await fetch('/api/query', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({spec: {...q, limit: pageSize, offset}}),
-        });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error ?? 'Error executing query');
-        const rows: Record<string, unknown>[] = json.data ?? [];
-        all.push(...rows);
-        // Natural end of data.
-        if (rows.length < pageSize) break;
-        offset += pageSize;
-      }
+      const {rows, truncated} = await paginateRows(
+        async (pageSize, offset) => {
+          const res = await fetch('/api/query', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({spec: {...q, limit: pageSize, offset}}),
+          });
+          const json = await res.json();
+          if (!res.ok) throw new Error(json.error ?? 'Error executing query');
+          return {rows: (json.data ?? []) as Record<string, unknown>[], ok: true};
+        },
+        cap,
+        pageSize,
+      );
 
       // Warn only when we hit the safety ceiling, not when the user chose a limit.
-      if (!Number.isFinite(userLimit) && all.length >= ABS_MAX) {
+      if (!Number.isFinite(userLimit) && truncated) {
         setResultTruncated(true);
       }
-      setData(all);
+      setData(rows);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -316,7 +313,7 @@ function BuilderContent() {
       debounceRef.current = setTimeout(() => {
         executeQuery(newSpec);
         setPendingQuery(false);
-      }, 800);
+      }, 2500);
     },
     [executeQuery],
   );
@@ -420,7 +417,7 @@ function BuilderContent() {
     if (autosaveRef.current) clearTimeout(autosaveRef.current);
     autosaveRef.current = setTimeout(() => {
       void persistDraft();
-    }, 3000);
+    }, 12000);
     return () => {
       if (autosaveRef.current) clearTimeout(autosaveRef.current);
     };
@@ -443,7 +440,7 @@ function BuilderContent() {
     return () => window.removeEventListener('beforeunload', handler);
   }, [dirty]);
 
-  // Flush pending changes on unload so the 3 s autosave window can't lose the
+  // Flush pending changes on unload so the longer autosave window can't lose the
   // last edit. `keepalive` lets the request survive the page being torn down.
   useEffect(() => {
     const flush = () => {

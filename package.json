@@ -7,13 +7,11 @@
     "build:templates": "node --experimental-strip-types scripts/build-templates.ts",
     "build": "npm run build:templates && next build",
     "start": "next start",
-    "lint": "eslint .",
-    "remotion": "remotion studio",
-    "render": "remotion render"
+    "test": "vitest run",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@remotion/bundler": "^4.0.0",
-    "@remotion/google-fonts": "^4.0.0",
     "@remotion/player": "^4.0.0",
     "@remotion/renderer": "^4.0.0",
     "@remotion/tailwind-v4": "^4.0.0",
@@ -30,7 +28,6 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@remotion/cli": "^4.0.0",
     "@remotion/eslint-plugin": "^4.0.0",
     "@tailwindcss/postcss": "^4.2.0",
     "@types/node": "^20",
@@ -41,6 +38,7 @@
     "eslint-config-next": "^16.2.0",
     "postcss": "^8.5.0",
     "tailwindcss": "^4.2.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.11"
   }
 }
