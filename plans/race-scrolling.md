@@ -915,3 +915,17 @@ dimensionado al conteo real de eventos (fechas únicas de `items`) cuando hay
 
 Changed: `src/components/builder/animation-preview.tsx`, this plan.
 Gate `npx tsc --noEmit` clean.
+
+## Feedback round 4g (2026-09-10) — el extremo IZQUIERDO de la barra se traslada igual que el avatar
+User: la barra en la animación final debe trasladarse (su extremo IZQUIERDO) lo
+MISMO que se traslada el avatar.
+
+Antes (4e) el borde izquierdo avanzaba `rowT·raceW` (no seguía al avatar). Ahora:
+`trackL = rowT·avatarDx` — el borde izquierdo viaja EXACTAMENTE con el avatar de su
+fila — y el derecho sigue anclado en su posición de fin de carrera (`raceW`). La
+barra se colapsa de derecha a izquierda manteniéndose bajo el avatar
+(`w = max(0, raceW − trackL)`, `barLeft = min(trackL, raceW)`) y el valor queda
+anclado y visible en el extremo fijo.
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`, this plan.
+Gate `npx tsc --noEmit` clean.

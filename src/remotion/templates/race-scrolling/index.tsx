@@ -643,10 +643,11 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // ---- Finale reveal (only when entity labels are HIDDEN) ----
   // During the final pause: the permanent Y axis fades out, and then every row
   // plays a SYNCHRONIZED move in STAGGERED order (largest final rank first):
-  // its avatar slides to the center of the plot, its bar retracts (LEFT edge
-  // shrinks rightward; the RIGHT edge and its value stay fixed and visible) and
-  // its label slides in from the left — all within that row's slot. Phases and
-  // staggers are proportional to the pause left (`finaleWin`).
+  // its avatar slides to the center of the plot, its bar's LEFT edge rides along
+  // with the avatar EXACTLY (right edge stays pinned, so the bar collapses
+  // right-to-left, value visible on the fixed end) and its label slides in from
+  // the left — all within that row's slot. Phases and staggers are proportional
+  // to the pause left (`finaleWin`).
   const finaleStart = raceEndFrame;
   const finaleWin = Math.max(1, durationInFrames - OUTRO - raceEndFrame);
   const finaleActive = finaleAnimation && !(showLabels ?? true) && raceEndFrame < durationInFrames - OUTRO;
@@ -937,11 +938,14 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
         })
       : 1;
     const raceW = rawW * pop;
-    const w = raceW * (1 - rowT);
-    // Finale: the bar's RIGHT edge stays FIXED (at the length it had at the end
-    // of the race, so the value never moves or shrinks away) and only the LEFT
-    // edge retracts rightward, in lockstep with that row's avatar travel.
-    const barLeft = finaleActive ? Math.max(0, raceW - w) : 0;
+    // Finale: the bar's LEFT edge rides EXACTLY with its row's avatar
+    // (translate = rowT * avatarDx), while the RIGHT edge stays pinned at its
+    // race-end position (`raceW`) — so the bar collapses right-to-left, always
+    // staying tucked under the avatar, and the value stays anchored/visible on
+    // the fixed right end.
+    const trackL = rowT * avatarDx;
+    const w = finaleActive ? Math.max(0, raceW - trackL) : raceW;
+    const barLeft = finaleActive ? Math.min(trackL, raceW) : 0;
     const anchorW = finaleActive ? raceW : Math.max(0, w);
     const valueRight = BAR_MAX_W - anchorW + 12;
     const valueMaxW = Math.max(0, anchorW - 24);
