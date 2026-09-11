@@ -933,13 +933,13 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
       : 1;
     const raceW = rawW * pop;
     const w = raceW * (1 - finaleAvatarT);
-    // In the finale the bar RETRACTS TO THE RIGHT: it keeps the length it had at
-    // the end of the race on its right side, and shrinks moving its LEFT edge
-    // rightward (in lockstep with the avatar), so the value/data stays put and
-    // visible in the same spot as the bar shortens.
-    const barLeft = finaleActive ? Math.max(0, raceW - w) : 0;
-    const valueRight = finaleActive ? BAR_MAX_W - raceW + 12 : BAR_MAX_W - Math.max(0, w) + 12;
-    const valueMaxW = finaleActive ? Math.max(0, raceW - 24) : Math.max(0, w - 24);
+    // Finale: the bar's LEFT edge stays tucked UNDER the avatar (the overlap is
+    // kept), so it travels right in lockstep with the avatar while the bar
+    // shortens — the right end retracts toward the avatar's start, carrying the
+    // value with it (still visible) until the bar is fully collapsed at the end.
+    const barLeft = finaleActive ? Math.min(BAR_MAX_W, finaleAvatarT * avatarDx) : 0;
+    const valueRight = BAR_MAX_W - (barLeft + Math.max(0, w)) + 12;
+    const valueMaxW = Math.max(0, w - 24);
     const scale = finaleActive ? 1 : isLeader(p) ? winnerScale : 1;
 
     const yNow = laneY(rankNow(p.label));

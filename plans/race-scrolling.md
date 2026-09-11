@@ -867,3 +867,16 @@ User: la barra debe encogerse A LA DERECHA para que el dato se mantenga visible.
 
 Changed: `src/remotion/templates/race-scrolling/index.tsx`, this plan.
 Gate `npx tsc --noEmit` clean.
+
+## Feedback round 4d (2026-09-10) — la barra se encoge hasta el inicio del avatar
+User: deben encogerse hasta el inicio del avatar (manteniendo la distancia solapada).
+
+- La barra ya no ancla su borde derecho: su borde IZQUIERDO viaja con el avatar
+  (`barLeft = t·avatarDx`), manteniendo SIEMPRE el solape de 12 px bajo el borde
+  derecho del avatar, y se encoge en la misma proporción que el trayecto (`width = raceW·(1−t)`).
+- El extremo derecho (con el dato) se retrae hacia el inicio del avatar llevando el
+  valor consigo (visible mientras se acorta) hasta colapsarla por completo al llegar.
+- `valueRight`/`valueMaxW` pasan a una única fórmula (el label cabalga el extremo).
+
+Changed: `src/remotion/templates/race-scrolling/index.tsx`, this plan.
+Gate `npx tsc --noEmit` clean.
