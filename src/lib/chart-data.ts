@@ -531,7 +531,16 @@ export function prepareMultiSeries(
     if (li && typeof li.label === 'string' && li.color) legendColors.set(li.label, li.color);
   }
 
-  const series: MultiSeriesDatum[] = seriesOrder.map((name, i) => ({
+  // El orden de las series (apilado / agrupado / leyenda) sigue `legendItems`
+  // cuando está definido, de modo que el control "Orden de series" del panel
+  // reordena el gráfico. Las series no listadas se anexan al final (orden de
+  // aparición) para que ninguna se pierda.
+  const liNames = (config.legendItems ?? []).map((li) => li.label);
+  const orderedNames = [
+    ...liNames.filter((n) => seriesOrder.includes(n)),
+    ...seriesOrder.filter((n) => !liNames.includes(n)),
+  ];
+  const series: MultiSeriesDatum[] = orderedNames.map((name, i) => ({
     name,
     values: categories.map((cat) => reduceVals(cellVals.get(cellKey(name, cat)) ?? [], agg)),
     color: legendColors.get(name) ?? pickColor(config.colors, i),

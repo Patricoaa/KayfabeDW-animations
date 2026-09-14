@@ -83,6 +83,14 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
     else items[index] = {...items[index], color};
     update({legendItems: items});
   };
+  const moveSeries = (index: number, delta: -1 | 1) => {
+    const items = [...(config.legendItems ?? [])];
+    const target = index + delta;
+    if (target < 0 || target >= items.length) return;
+    const [it] = items.splice(index, 1);
+    items.splice(target, 0, it);
+    update({legendItems: items});
+  };
 
 const setLegendTextOverride = (label: string, value?: string) => {
     const next = {...(config.legendTextOverrides ?? {})};
@@ -572,6 +580,35 @@ const setLegendTextOverride = (label: string, value?: string) => {
             <NumberControl label="Gap entre barras" value={config.barGap} min={0} max={20} onChange={(v) => update({barGap: v})} />
             <NumberControl label="Gap de categoría" value={config.barCategoryGap} min={0} max={0.4} step={0.01} onChange={(v) => update({barCategoryGap: v})} />
           </div>
+          {hasSeries && (
+            <div className="pt-1">
+              <label className="text-sm font-medium mb-1 block">Orden de series</label>
+              <p className="text-[10px] text-muted mb-1.5">Afecta al apilado, al agrupado y a la leyenda.</p>
+              <div className="space-y-1">
+                {legendItems.map((li, i) => (
+                  <div key={li.label} className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => moveSeries(i, -1)}
+                      disabled={i === 0}
+                      title="Subir"
+                      className="px-1.5 rounded bg-elevated text-secondary hover:bg-card-hover disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      onClick={() => moveSeries(i, 1)}
+                      disabled={i === legendItems.length - 1}
+                      title="Bajar"
+                      className="px-1.5 rounded bg-elevated text-secondary hover:bg-card-hover disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      ↓
+                    </button>
+                    <span className="min-w-0 flex-1 text-xs text-secondary truncate">{li.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </Collapsible>
         )}
 
