@@ -267,8 +267,8 @@ const textWidth = (s: string, fs: number) => Math.min(s.length, 24) * fs * 0.58;
 // cap) with a generous 0.62·fontSize factor so proportional fonts never let a
 // neighbor item underlap; pad/gap give each entry comfortable internal room.
 const LEGEND_PAD = 7;        // swatch → label
-const LEGEND_ITEM_GAP = 16;  // between items
-const LEGEND_CHAR_W = 0.62;  // average glyph width factor
+const LEGEND_ITEM_GAP = 18;  // between items
+const LEGEND_CHAR_W = 0.72;  // average glyph width factor
 const legendTextW = (s: string, fs: number) => s.length * fs * LEGEND_CHAR_W;
 const legendItemW = (label: string, fs: number, sw: number) =>
   sw + LEGEND_PAD + legendTextW(label, fs) + LEGEND_ITEM_GAP;
