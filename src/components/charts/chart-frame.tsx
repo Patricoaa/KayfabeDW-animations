@@ -564,15 +564,19 @@ export function SvgLegend({
         opacity={layout.opacity ?? 1}
         transform={layout.rotation ? `rotate(${layout.rotation}, ${refX}, ${baseY})` : undefined}
       >
-        {items.map((it, i) => {
-          const x = startX + i * slotFor(it);
-          return (
-            <g key={it.label} transform={`translate(${x}, ${baseY})`}>
-              <rect x={0} y={-sw / 2} width={sw} height={sw} fill={it.color} />
-              <text x={sw + LEGEND_PAD} y={0} dominantBaseline="central" fontSize={fs} fill={colorFor(it)} fontWeight={weight} letterSpacing={ls}>{labelOf(it.label, 24)}</text>
-            </g>
-          );
-        })}
+        {(() => {
+          let x = startX;
+          return items.map((it) => {
+            const el = (
+              <g key={it.label} transform={`translate(${x}, ${baseY})`}>
+                <rect x={0} y={-sw / 2} width={sw} height={sw} fill={it.color} />
+                <text x={sw + LEGEND_PAD} y={0} dominantBaseline="central" fontSize={fs} fill={colorFor(it)} fontWeight={weight} letterSpacing={ls}>{labelOf(it.label, 24)}</text>
+              </g>
+            );
+            x += slotFor(it);
+            return el;
+          });
+        })()}
       </g>
     );
   }
