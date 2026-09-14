@@ -14,7 +14,8 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = await createClient();
-    const {data, error} = await supabase.rpc('query_builder', {spec});
+    const ttlSeconds = Number.isFinite(body.ttlSeconds) ? body.ttlSeconds : 60;
+    const {data, error} = await supabase.rpc('query_builder_cached', {spec, ttl_seconds: ttlSeconds});
     if (error) {
       return NextResponse.json({error: error.message, code: error.code, details: error.details}, {status: 500});
     }
