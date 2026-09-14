@@ -2,7 +2,7 @@
 
 import type {ReactNode} from 'react';
 import type {ChartConfig, NumberFormat, TextOverflow, TextAlign, AvatarCrop} from '@/lib/chart-config';
-import {prepareSeries, prepareMultiSeries, formatValue, colorFor, resolvedCategoryLabel, resolvedCategorySub, resolveChartStyle, resolveYDomain, type PreparedMultiSeries} from '@/lib/chart-data';
+import {prepareSeries, prepareMultiSeries, formatValue, colorFor, resolvedCategoryLabel, resolvedCategorySub, resolveChartStyle, resolveYDomain, percentShareParts, type PreparedMultiSeries} from '@/lib/chart-data';
 import {ICON_GLYPHS} from '@/lib/chart-icons';
 import {SvgHeader, SvgLegend, ChartOverlays, roundedRectPath, headerHeight, legendReserve, frameRect, Zone, legendItemsFrom, XAxisTitle, YAxisTitle, type LegendItem, type CornerRadii} from './chart-frame';
 
@@ -705,29 +705,31 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                         <text x={marginAdj.left + plotW - 4} y={cy + 3} textAnchor={labelAnchor(dlAlign, 'end')} fontSize={dlSize} fill={dlColor} pointerEvents="none">
                           {formatValue(total, numFmt)}
                         </text>
-                      ) : (
-                        multi.series.map((s, si) => {
-                          const rawVal = s.values[ci] ?? 0;
-                          const val = groupedPercent ? Math.max(rawVal, 0) : rawVal;
-                          let labelVal = val;
-                          let bw: number;
-                          if (groupedPercent) {
-                            const segTotal = stackTotal![ci] || 1;
-                            bw = (val / segTotal) * plotW;
-                            labelVal = Math.round((val / segTotal) * 100 * 10) / 10 / 100;
-                          } else {
-                            bw = Math.max((Math.abs(val) / yRange) * plotW, 0);
-                          }
-                          const offset = (catBandH - barH * nS) / 2;
-                          const y = bandY + offset + si * (barH + barGap) + barH / 2 + 3;
-                          const endX = marginAdj.left + bw;
-                          return (
-                            <text key={`dl-${ci}-${si}`} x={endX + 6} y={y} textAnchor={labelAnchor(dlAlign, 'start')} fontSize={dlSize} fill={dlColor} pointerEvents="none">
-                              {formatValue(labelVal, numFmt, pctDecimals)}
-                            </text>
-                          );
-                        })
-                      )
+) : (
+                    (() => {
+                      const pctParts = groupedPercent ? percentShareParts(multi.series.map((sn) => Math.max(sn.values[ci] ?? 0, 0)), pctDecimals) : null;
+                      return multi.series.map((s, si) => {
+                        const rawVal = s.values[ci] ?? 0;
+                        const val = groupedPercent ? Math.max(rawVal, 0) : rawVal;
+                        let labelVal = val;
+                        let bw: number;
+                        if (groupedPercent) {
+                          const segTotal = stackTotal![ci] || 1;
+                          bw = (val / segTotal) * plotW;
+                        } else {
+                          bw = Math.max((Math.abs(val) / yRange) * plotW, 0);
+                        }
+                        const offset = (catBandH - barH * nS) / 2;
+                        const y = bandY + offset + si * (barH + barGap) + barH / 2 + 3;
+                        const endX = marginAdj.left + bw;
+                        return (
+                          <text key={`dl-${ci}-${si}`} x={endX + 6} y={y} textAnchor={labelAnchor(dlAlign, 'start')} fontSize={dlSize} fill={dlColor} pointerEvents="none">
+                            {pctParts ? pctParts[si] : formatValue(labelVal, numFmt, pctDecimals)}
+                          </text>
+                        );
+                      });
+                    })()
+                  )
                     )}
                     {iconMode === 'icons' && iconShowValue && (stacked || stackedPercent || groupedPercent) && (
                       (() => {
@@ -740,6 +742,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                         
                         if (stackedPercent || groupedPercent) {
                           // Mostrar % / % en los extremos con los colores de cada categoría
+                          const parts = percentShareParts(multi.series.map((s) => Math.max(s.values[ci] ?? 0, 0)), pctDecimals);
                           const end = catTotal / pc;
                           const col = end % iconMaxPerRow;
                           const row = Math.floor(end / iconMaxPerRow);
@@ -749,8 +752,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                           return (
                             <g key={`pct-lbl-${ci}`}>
                               {multi.series.map((s, si) => {
-                                const raw = Math.max(s.values[ci] ?? 0, 0);
-                                const pctVal = ((raw / catTotal) * 100).toFixed(pctDecimals);
+                                const pctVal = parts[si];
                                 const color = barFill(s.color, config, false);
                                 return (
                                   <text
@@ -763,7 +765,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                                     textAnchor="start"
                                     pointerEvents="none"
                                   >
-                                    {pctVal}%{si < multi.series.length - 1 ? ' /' : ''}
+                                    {pctVal}{si < multi.series.length - 1 ? ' /' : ''}
                                   </text>
                                 );
                               })}
@@ -1060,19 +1062,22 @@ const fill = barFill(s.color, config, val < 0);
                 );
             })}
                 {iconMode !== 'icons' && config.showDataLabels !== false && stackedPercent && stackTotal && stackBase && (
-                  multi.series.map((s, si) => {
-                    const val = Math.max(s.values[ci] ?? 0, 0);
-                    const segTotal = stackTotal[ci] || 1;
-                    const segH = (val / segTotal) * plotH;
-                    if (segH < dlSize * 1.8 || val === 0) return null;
-                    const segY = marginAdj.top + plotH - (stackBase[ci][si] / segTotal) * plotH - segH / 2;
-                    const ds = slotAlign(bandX + barBandX, bandX + barBandX + barBlockW, 'middle', dlAlign);
-                    return (
-                      <text key={`dl-${ci}-${si}`} x={ds.x} y={segY + dlSize / 2} textAnchor={ds.anchor} fontSize={dlSize} fill="#fff" pointerEvents="none">
-                        {formatValue(Math.round((val / segTotal) * 100 * 10) / 10 / 100, numFmt, pctDecimals)}
-                      </text>
-                    );
-                  })
+                  (() => {
+                    const parts = percentShareParts(multi.series.map((s) => Math.max(s.values[ci] ?? 0, 0)), pctDecimals);
+                    return multi.series.map((s, si) => {
+                      const val = Math.max(s.values[ci] ?? 0, 0);
+                      const segTotal = stackTotal[ci] || 1;
+                      const segH = (val / segTotal) * plotH;
+                      if (segH < dlSize * 1.8 || val === 0) return null;
+                      const segY = marginAdj.top + plotH - (stackBase[ci][si] / segTotal) * plotH - segH / 2;
+                      const ds = slotAlign(bandX + barBandX, bandX + barBandX + barBlockW, 'middle', dlAlign);
+                      return (
+                        <text key={`dl-${ci}-${si}`} x={ds.x} y={segY + dlSize / 2} textAnchor={ds.anchor} fontSize={dlSize} fill="#fff" pointerEvents="none">
+                          {parts[si]}
+                        </text>
+                      );
+                    });
+                  })()
                 )}
                 {iconMode !== 'icons' && config.showDataLabels !== false && !stackedPercent && (
                   stacked ? (
@@ -1085,28 +1090,30 @@ const fill = barFill(s.color, config, val < 0);
                       );
                     })()
                   ) : (
-                    multi.series.map((s, si) => {
-                      const rawVal = s.values[ci] ?? 0;
-                      const val = groupedPercent ? Math.max(rawVal, 0) : rawVal;
-                      let labelVal = val;
-                      let h: number;
-                      if (groupedPercent) {
-                        const segTotal = stackTotal![ci] || 1;
-                        h = (val / segTotal) * plotH;
-                        labelVal = Math.round((val / segTotal) * 100 * 10) / 10 / 100;
-                      } else {
-                        h = Math.max((Math.abs(val) / yRange) * plotH, 0);
-                      }
-                      const offset = (catBand - barW * nS) / 2;
-                      const bx = bandX + offset + si * (barW + barGap);
-                      const ds = slotAlign(bx, bx + barW, 'middle', dlAlign);
-                      if (groupedPercent && (h < dlSize * 1.8 || val === 0)) return null;
-                      return (
-                        <text key={`dl-${ci}-${si}`} x={ds.x} y={marginAdj.top + plotH - h - 5} textAnchor={ds.anchor} fontSize={dlSize} fill={groupedPercent ? '#fff' : dlColor} pointerEvents="none">
-                          {formatValue(labelVal, numFmt, pctDecimals)}
-                        </text>
-                      );
-                    })
+                    (() => {
+                      const pctParts = groupedPercent ? percentShareParts(multi.series.map((sn) => Math.max(sn.values[ci] ?? 0, 0)), pctDecimals) : null;
+                      return multi.series.map((s, si) => {
+                        const rawVal = s.values[ci] ?? 0;
+                        const val = groupedPercent ? Math.max(rawVal, 0) : rawVal;
+                        let labelVal = val;
+                        let h: number;
+                        if (groupedPercent) {
+                          const segTotal = stackTotal![ci] || 1;
+                          h = (val / segTotal) * plotH;
+                        } else {
+                          h = Math.max((Math.abs(val) / yRange) * plotH, 0);
+                        }
+                        const offset = (catBand - barW * nS) / 2;
+                        const bx = bandX + offset + si * (barW + barGap);
+                        const ds = slotAlign(bx, bx + barW, 'middle', dlAlign);
+                        if (groupedPercent && (h < dlSize * 1.8 || val === 0)) return null;
+                        return (
+                          <text key={`dl-${ci}-${si}`} x={ds.x} y={marginAdj.top + plotH - h - 5} textAnchor={ds.anchor} fontSize={dlSize} fill={groupedPercent ? '#fff' : dlColor} pointerEvents="none">
+                            {pctParts ? pctParts[si] : formatValue(labelVal, numFmt, pctDecimals)}
+                          </text>
+                        );
+                      });
+                    })()
                   )
                 )}
                 {iconMode === 'icons' && iconShowValue && (stacked || stackedPercent || groupedPercent) && (
@@ -1134,11 +1141,11 @@ const fill = barFill(s.color, config, val < 0);
                     const ly = originY - rowsCount * iconStep - 8;
 
                     if (stackedPercent || groupedPercent) {
+                      const parts = percentShareParts(multi.series.map((s) => Math.max(s.values[ci] ?? 0, 0)), pctDecimals);
                       return (
                         <g key={`pct-lbl-v-${ci}`}>
                           {multi.series.map((s, si) => {
-                            const raw = Math.max(s.values[ci] ?? 0, 0);
-                            const pctVal = ((raw / catTotal) * 100).toFixed(pctDecimals);
+                            const pctVal = parts[si];
                             const color = barFill(s.color, config, false);
                             return (
                               <text
@@ -1151,7 +1158,7 @@ const fill = barFill(s.color, config, val < 0);
                                 textAnchor="middle"
                                 pointerEvents="none"
                               >
-                                {pctVal}%{si < multi.series.length - 1 ? ' /' : ''}
+                                {pctVal}{si < multi.series.length - 1 ? ' /' : ''}
                               </text>
                             );
                           })}

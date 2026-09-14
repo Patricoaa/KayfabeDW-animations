@@ -179,6 +179,35 @@ export function formatValue(value: number, format: NumberFormat, percentDigits?:
   }
 }
 
+// Distribuye las cuotas de una categoría como strings de porcentaje que SUMAN
+// 100 a la precisión elegida (método del mayor residuo). El redondeo
+// independiente (`toFixed`) no garantiza la suma (33.3×3 = 99.9); aquí se
+// trunca cada parte al piso y las unidades sobrantes hasta 100 se asignan a
+// las partes con mayor residuo fraccional (empates resueltos por orden de
+// serie, así el reparto es determinista).
+export function percentShareParts(weights: number[], decimals = 0): string[] {
+  const p = Math.max(0, Math.min(6, Math.floor(decimals) || 0));
+  const scale = 10 ** p;
+  const zero = `0${p > 0 ? '.' + '0'.repeat(p) : ''}%`;
+  const positive = weights.map((w) => (Number.isFinite(w) && w > 0 ? w : 0));
+  const total = positive.reduce((a, b) => a + b, 0);
+  if (total <= 0) return weights.map(() => zero);
+  const scaled = positive.map((w) => (w / total) * 100 * scale);
+  const floor = scaled.map((x) => Math.floor(x));
+  const buckets = Math.round(scaled.reduce((a, b) => a + b, 0));
+  let rem = buckets - floor.reduce((a, b) => a + b, 0);
+  const order = scaled
+    .map((x, i) => ({i, frac: x - floor[i]}))
+    .sort((a, b) => (b.frac - a.frac) || (a.i - b.i));
+  const out = [...floor];
+  for (const {i} of order) {
+    if (rem <= 0) break;
+    out[i] += 1;
+    rem -= 1;
+  }
+  return out.map((v) => `${(v / scale).toFixed(p)}%`);
+}
+
 export function pickColor(colors: string[] | undefined, index: number): string {
   const palette = colors && colors.length ? colors : ['#6366f1'];
   return palette[index % palette.length];
