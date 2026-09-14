@@ -223,6 +223,14 @@ const setLegendTextOverride = (label: string, value?: string) => {
           onChange={(v) => update({categoryDescriptionField: v || undefined})}
           optional
         />
+        <FieldSelect
+          label="Etiqueta corta (opcional)"
+          value={config.categoryLabelField ?? ''}
+          options={fieldMeta}
+          fallback={columns}
+          onChange={(v) => update({categoryLabelField: v || undefined})}
+          optional
+        />
         <FieldSelect label="Eje Y / Valor" value={config.yField ?? ''} options={fieldMeta} fallback={columns} role="numeric" onChange={(v) => update({yField: v})} />
         <FieldSelect
           label="Serie (opcional)"

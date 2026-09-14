@@ -796,7 +796,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                 const img = multi.categoryImages?.[ci] ?? null;
                 const hasImg = avatarActive && !!img;
                 const showText = catLabelsVisible;
-                const label = resolvedCategoryLabel(config, cat);
+                const label = resolvedCategoryLabel(config, cat, multi.categoryLabels?.[ci]);
                 const desc = descOf(resolvedCategorySub(config, cat, multi.categoryDescriptions?.[ci]));
                 const colStart = marginAdj.left;
                 const colEnd = stacked || stackedPercent
@@ -1184,7 +1184,7 @@ const fill = barFill(s.color, config, val < 0);
             const img = multi.categoryImages?.[ci] ?? null;
             const hasImg = avatarActive && !!img;
             const showText = catLabelsVisible;
-            const label = resolvedCategoryLabel(config, cat);
+            const label = resolvedCategoryLabel(config, cat, multi.categoryLabels?.[ci]);
             const desc = descOf(resolvedCategorySub(config, cat, multi.categoryDescriptions?.[ci]));
 
             let barTop = marginAdj.top + plotH;
@@ -1407,7 +1407,7 @@ function SingleBar({data, config}: Props) {
             // plot left edge at the row center. Global X/Y offsets shift it.
             const labelAt = {x: marginAdj.left + catLabelOffX, y: labelY + catLabelOffY, anchor: 'start' as const};
             const labelExtra = avatarActive && !!img ? avatarSize + 10 : 6;
-            const label = resolvedCategoryLabel(config, d.label);
+            const label = resolvedCategoryLabel(config, d.label, descOfRow(config.categoryLabelField, d.raw));
             const desc = descOf(resolvedCategorySub(config, d.label, descOfRow(config.categoryDescriptionField, d.raw)));
             const renderLabel = (p: {x: number; y: number; anchor: 'start' | 'middle' | 'end'} | null) => {
               if (!p || !showText) return null;
@@ -1514,7 +1514,7 @@ function SingleBar({data, config}: Props) {
             const slot = slotAlign(x, x + barWidth, 'middle', config.xLabelFont?.align);
             return {x: slot.x + catLabelOffX, y: colBottom + catLabelOffY, anchor: slot.anchor};
           })();
-          const label = resolvedCategoryLabel(config, d.label);
+          const label = resolvedCategoryLabel(config, d.label, descOfRow(config.categoryLabelField, d.raw));
           const desc = descOf(resolvedCategorySub(config, d.label, descOfRow(config.categoryDescriptionField, d.raw)));
           const renderLabel = (p: {x: number; y: number; anchor: 'start' | 'middle' | 'end'} | null) => {
             if (!p || !showText) return null;

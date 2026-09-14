@@ -209,8 +209,19 @@ export function resolveCategoryTextOverride(
 }
 
 // Display label for a category after applying per-category text overrides.
-export function resolvedCategoryLabel(config: ChartConfig, category: string | number | null | undefined): string {
-  const fallback = category === null || category === undefined ? '(vacío)' : String(category);
+// `rowLabel` is an optional short label read from the dataset via
+// `categoryLabelField`; it sits between the override and the raw key.
+export function resolvedCategoryLabel(
+  config: ChartConfig,
+  category: string | number | null | undefined,
+  rowLabel?: string | null,
+): string {
+  const key = category === null || category === undefined ? '' : String(category);
+  const fallback = rowLabel && rowLabel.trim() !== ''
+    ? rowLabel
+    : key !== ''
+      ? key
+      : '(vacío)';
   const ov = resolveCategoryTextOverride(config, category);
   return ov?.label && ov.label.trim() !== '' ? ov.label : fallback;
 }
@@ -392,6 +403,7 @@ export type PreparedMultiSeries = {
   categoryTotals: number[];
   categoryImages?: (string | null)[];
   categoryDescriptions?: (string | null)[];
+  categoryLabels?: (string | null)[];
   categoryIcons?: (string | null)[];
 };
 
@@ -454,6 +466,8 @@ export function prepareMultiSeries(
   const categoryImages = new Map<string, string | null>();
   const descField = config.categoryDescriptionField;
   const categoryDescriptions = new Map<string, string | null>();
+  const labelField = config.categoryLabelField;
+  const categoryLabels = new Map<string, string | null>();
   const iconField = config.iconField;
   const categoryIcons = new Map<string, string | null>();
 
@@ -485,6 +499,13 @@ export function prepareMultiSeries(
       const rawDesc = row[descField];
       const desc = rawDesc === null || rawDesc === undefined ? null : String(rawDesc);
       categoryDescriptions.set(cat, desc ? desc : null);
+    }
+    // Capture the first non-empty display label for the category (short column
+    // name shown on the axis; the category key itself stays `xField`).
+    if (labelField && !categoryLabels.has(cat)) {
+      const rawLabel = row[labelField];
+      const lab = rawLabel === null || rawLabel === undefined ? null : String(rawLabel);
+      categoryLabels.set(cat, lab ? lab : null);
     }
     if (isNaN(val)) continue;
     if (!catIndex.has(cat)) {
@@ -558,6 +579,7 @@ export function prepareMultiSeries(
     categoryTotals: orderedTotals.slice(0, limit),
     categoryImages: kept.map((cat) => categoryImages.get(cat) ?? null),
     categoryDescriptions: kept.map((cat) => categoryDescriptions.get(cat) ?? null),
+    categoryLabels: kept.map((cat) => categoryLabels.get(cat) ?? null),
     categoryIcons: kept.map((cat) => categoryIcons.get(cat) ?? null),
   };
 }

@@ -346,6 +346,13 @@ export type ChartConfig = {
   categoryDescriptionField?: string;
   categoryDescriptionFont?: SectionFont;
 
+  // V21: optional dataset column whose value becomes the short DISPLAY label for
+  // each category. The category KEY stays `xField`; this only affects the text
+  // rendered on the axis, so events can be keyed individually (e.g. one bar per
+  // `event_name`) while showing a short name (e.g. their series). Priority:
+  // `categoryTextOverrides` > column value > raw key.
+  categoryLabelField?: string;
+
   // F6: granular bar styling (Flourish-like editor).
   barRadius?: number;              // corner radius of bars (px), applied to all corners
   // Per-corner radius overrides for stacked bars (stacked / stacked-percent):
