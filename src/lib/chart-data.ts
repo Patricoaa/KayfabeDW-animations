@@ -153,11 +153,11 @@ function passesFilter(raw: unknown, f: ChartFilter): boolean {
   }
 }
 
-export function formatValue(value: number, format: NumberFormat): string {
+export function formatValue(value: number, format: NumberFormat, percentDigits?: number): string {
   if (isNaN(value)) return '0';
   switch (format) {
     case 'percent':
-      return `${Math.round(value * 100)}%`;
+      return `${(value * 100).toFixed(percentDigits ?? 0)}%`;
     case 'currency':
       return value.toLocaleString('es', {style: 'currency', currency: 'USD', maximumFractionDigits: 0});
     case 'decimal':

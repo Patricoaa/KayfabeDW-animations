@@ -399,6 +399,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
   const dlFamily = dlFont?.fontFamily ?? config.dataLabelFontFamily;
   const dlAlign = config.dataLabelFont?.align;
   const dlWeight = dlFont?.weight ?? 400;
+  const pctDecimals = config.percentDecimals ?? 0;
 
   const tickValues = domain.ticks;
 
@@ -722,7 +723,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                           const endX = marginAdj.left + bw;
                           return (
                             <text key={`dl-${ci}-${si}`} x={endX + 6} y={y} textAnchor={labelAnchor(dlAlign, 'start')} fontSize={dlSize} fill={dlColor} pointerEvents="none">
-                              {formatValue(labelVal, numFmt)}
+                              {formatValue(labelVal, numFmt, pctDecimals)}
                             </text>
                           );
                         })
@@ -749,7 +750,7 @@ function MultiBar({multi, config}: {multi: PreparedMultiSeries; config: ChartCon
                             <g key={`pct-lbl-${ci}`}>
                               {multi.series.map((s, si) => {
                                 const raw = Math.max(s.values[ci] ?? 0, 0);
-                                const pctVal = Math.round((raw / catTotal) * 100);
+                                const pctVal = ((raw / catTotal) * 100).toFixed(pctDecimals);
                                 const color = barFill(s.color, config, false);
                                 return (
                                   <text
@@ -1068,7 +1069,7 @@ const fill = barFill(s.color, config, val < 0);
                     const ds = slotAlign(bandX + barBandX, bandX + barBandX + barBlockW, 'middle', dlAlign);
                     return (
                       <text key={`dl-${ci}-${si}`} x={ds.x} y={segY + dlSize / 2} textAnchor={ds.anchor} fontSize={dlSize} fill="#fff" pointerEvents="none">
-                        {formatValue(Math.round((val / segTotal) * 100 * 10) / 10 / 100, numFmt)}
+                        {formatValue(Math.round((val / segTotal) * 100 * 10) / 10 / 100, numFmt, pctDecimals)}
                       </text>
                     );
                   })
@@ -1102,7 +1103,7 @@ const fill = barFill(s.color, config, val < 0);
                       if (groupedPercent && (h < dlSize * 1.8 || val === 0)) return null;
                       return (
                         <text key={`dl-${ci}-${si}`} x={ds.x} y={marginAdj.top + plotH - h - 5} textAnchor={ds.anchor} fontSize={dlSize} fill={groupedPercent ? '#fff' : dlColor} pointerEvents="none">
-                          {formatValue(labelVal, numFmt)}
+                          {formatValue(labelVal, numFmt, pctDecimals)}
                         </text>
                       );
                     })
@@ -1137,7 +1138,7 @@ const fill = barFill(s.color, config, val < 0);
                         <g key={`pct-lbl-v-${ci}`}>
                           {multi.series.map((s, si) => {
                             const raw = Math.max(s.values[ci] ?? 0, 0);
-                            const pctVal = Math.round((raw / catTotal) * 100);
+                            const pctVal = ((raw / catTotal) * 100).toFixed(pctDecimals);
                             const color = barFill(s.color, config, false);
                             return (
                               <text

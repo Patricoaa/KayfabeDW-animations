@@ -949,7 +949,10 @@ const setLegendTextOverride = (label: string, value?: string) => {
           <div className="pt-1 border-t border-border-subtle">
               <label className="text-sm font-medium mb-1 block">Formato de números</label>
               {isStackedPercent ? (
-                <p className="text-[10px] text-muted py-1">Forzado a porcentaje en modo %.</p>
+                <>
+                  <p className="text-[10px] text-muted py-1">Forzado a porcentaje en modo %.</p>
+                  <NumberControl label="Decimales en etiquetas %" value={config.percentDecimals ?? 0} min={0} max={2} step={1} onChange={(v) => update({percentDecimals: v})} />
+                </>
               ) : (
                 <SelectControl
                   value={config.numberFormat ?? 'short'}

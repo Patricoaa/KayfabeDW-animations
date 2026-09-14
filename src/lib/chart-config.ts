@@ -278,6 +278,9 @@ export type ChartConfig = {
   lineSmooth?: boolean;
   showDataLabels?: boolean;
   groupMode?: GroupMode;
+  // Decimales de las etiquetas de datos en modos % (stacked-percent /
+  // grouped-percent). null/undefined = 0 (comportamiento actual).
+  percentDecimals?: number;
   aggregate?: 'sum' | 'avg' | 'count' | 'min' | 'max' | 'count_distinct';
   // F1: multi-series. `seriesField` groups rows into named series (grouped by
   // xField category); when unset the chart renders a single series using
@@ -502,6 +505,7 @@ export const DEFAULT_CHART_CONFIG: ChartConfig = {
   showDataLabels: true,
   showMarkers: true,
   groupMode: 'grouped',
+  percentDecimals: 0,
   avatarShape: 'rounded',
   avatarSize: 24,
   avatarOffsetX: 0,
