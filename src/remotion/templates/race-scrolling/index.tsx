@@ -60,6 +60,8 @@ export type RaceScrollingItem = {
   image?: string | null;      // optional avatar + marker image (url / data: / root-relative)
   markerImage?: string | null; // optional REFERENCE image (url / data:) loaded from a model
                               // field for the 'image' marker mode; falls back to `image`.
+  markerImages?: (string | null)[]; // per-datapoint REFERENCE images that landed in this
+                              // period: the axis marker shows each one, not just the first.
   pos: number;                // position on the scrolling axis (date ms or plain number)
   value: number;              // accumulated numeric shown once activated
   delta?: number;             // (informational) per-period amount that date adds; the number marker computes its own delta from `value`
@@ -130,7 +132,10 @@ export type RaceScrollingProps = {
   // icons / reference images as the amount that date adds (the marker's delta),
   // capped at `MARKER_STACK_MAX` with an overflow "+N" chip; a delta of 1 keeps
   // the single-glyph look. The reference image comes from `item.markerImage`
-  // (model field) falling back to the entity avatar `item.image`.
+  // (model field) falling back to the entity avatar `item.image`; when a period
+  // carries per-datapoint references (`item.markerImages`), the marker renders
+  // EACH datapoint's own reference (e.g. every title won that period) instead
+  // of repeating only the entity's first image.
   barSoundSrc?: string;
   // Finale reveal during the final pause when labels are hidden (see config).
   finaleAnimation?: boolean;
@@ -796,7 +801,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // acumulado en la fecha anterior" (in 'period' mode `value` already IS the
   // period amount, so delta = value). A date whose delta is 0 draws no marker.
   const markersByPos = (() => {
-    const map = new Map<number, {label: string; image?: string | null; markerImage?: string | null; delta: number}[]>();
+    const map = new Map<number, {label: string; image?: string | null; markerImage?: string | null; markerImages?: (string | null)[]; delta: number}[]>();
     const prevValue = new Map<string, {value: number; started: boolean}>();
     const isRunning = (accumulateMode ?? 'running') === 'running';
     for (const r of rows) {
@@ -810,7 +815,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
         list = [];
         map.set(r.pos, list);
       }
-      list.push({label: r.label, image: r.image, markerImage: r.markerImage, delta});
+      list.push({label: r.label, image: r.image, markerImage: r.markerImage, markerImages: r.markerImages, delta});
     }
     return map;
   })();
@@ -835,7 +840,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const MARKER_GAP = Math.max(2, Math.round(MARKER_SIZE * 0.18));
 
   // One marker per entity at the grid of its date, centered on its lane.
-  const markerOnGrid = (tick: {x: number}, ent: {label: string; image?: string | null; markerImage?: string | null; delta: number}) => {
+  const markerOnGrid = (tick: {x: number}, ent: {label: string; image?: string | null; markerImage?: string | null; markerImages?: (string | null)[]; delta: number}) => {
     if (!currentRank.window.has(ent.label)) return null;
     const laneTop = PLOT_PAD_Y + laneY(rankNow(ent.label)) + ROW_H / 2;
     // The stacked count = the amount this date adds (delta), 1..MARKER_STACK_MAX;
@@ -851,17 +856,44 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
       </div>
     );
     const refImage = ent.markerImage ?? ent.image;
-    if (markerMode === 'image' && refImage) {
-      return (
-        <div key={ent.label} style={{position: 'absolute', left: tick.x, top: laneTop - MARKER_SIZE / 2, transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: MARKER_GAP}}>
-          {Array.from({length: shown}, (_, i) => (
-            <div key={i} style={{width: MARKER_SIZE, height: MARKER_SIZE, borderRadius: Math.max(2, MARKER_SIZE * 0.18), overflow: 'hidden', border: '1px solid rgba(255,255,255,0.28)', flexShrink: 0}}>
-              <Img src={refImage} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
-            </div>
-          ))}
-          {chip}
-        </div>
-      );
+    if (markerMode === 'image') {
+      // Reference-image mode: each PERIOD keeps its own reference images (the
+      // datapoints that landed in that bucket), so a marker shows the actual
+      // reference(s) that represent its data — e.g. every title won that period —
+      // instead of always repeating the entity's FIRST image. Fall back to the
+      // single glyph repeated `shown` times when the period has no reference.
+      const periodRefs = (ent.markerImages ?? []).filter((i): i is string => !!i);
+      if (periodRefs.length > 0) {
+        const refsShown = periodRefs.slice(0, MARKER_STACK_MAX);
+        const refsOverflow = periodRefs.length - refsShown.length;
+        const refsChip = refsOverflow > 0 && (
+          <div style={{display: 'inline-flex', alignItems: 'center', height: MARKER_SIZE, padding: '0 6px', borderRadius: 5, background: 'rgba(2,6,23,0.85)', border: '1px solid rgba(255,255,255,0.2)', ...textStyle(markerText, {color: '#ffffff', size: chipFont, weight: 700}), fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap'}}>
+            +{refsOverflow}
+          </div>
+        );
+        return (
+          <div key={ent.label} style={{position: 'absolute', left: tick.x, top: laneTop - MARKER_SIZE / 2, transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: MARKER_GAP}}>
+            {refsShown.map((src, i) => (
+              <div key={src + i} style={{width: MARKER_SIZE, height: MARKER_SIZE, borderRadius: Math.max(2, MARKER_SIZE * 0.18), overflow: 'hidden', border: '1px solid rgba(255,255,255,0.28)', flexShrink: 0}}>
+                <Img src={src} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+              </div>
+            ))}
+            {refsChip}
+          </div>
+        );
+      }
+      if (refImage) {
+        return (
+          <div key={ent.label} style={{position: 'absolute', left: tick.x, top: laneTop - MARKER_SIZE / 2, transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: MARKER_GAP}}>
+            {Array.from({length: shown}, (_, i) => (
+              <div key={i} style={{width: MARKER_SIZE, height: MARKER_SIZE, borderRadius: Math.max(2, MARKER_SIZE * 0.18), overflow: 'hidden', border: '1px solid rgba(255,255,255,0.28)', flexShrink: 0}}>
+                <Img src={refImage} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+              </div>
+            ))}
+            {chip}
+          </div>
+        );
+      }
     }
     if (markerMode === 'icon') {
       const color = markerColorOf(ent.label, ent.image);

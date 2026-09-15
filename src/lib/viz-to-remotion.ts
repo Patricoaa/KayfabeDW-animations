@@ -618,7 +618,7 @@ function convertRaceScrolling(
   };
   const bucketOf = (pos: number): number => (dateMode ? periodStart(pos, fmt) : pos);
 
-  const byLabel = new Map<string, {image: string | null; markerImage: string | null; map: Map<number, {value: number; count: number; raws: number[]}>}>();
+  const byLabel = new Map<string, {image: string | null; markerImage: string | null; map: Map<number, {value: number; count: number; raws: number[]; markerImages: (string | null)[]}>}>();
   for (const it of positioned) {
     if (it.label === '' || isNaN(it.pos)) continue;
     let entry = byLabel.get(it.label);
@@ -629,11 +629,12 @@ function convertRaceScrolling(
     const bucket = bucketOf(it.pos);
     let b = entry.map.get(bucket);
     if (!b) {
-      b = {value: it.value, count: 1, raws: [it.value]};
+      b = {value: it.value, count: 1, raws: [it.value], markerImages: [it.markerImage]};
       entry.map.set(bucket, b);
     } else {
       b.count += 1;
       b.raws.push(it.value);
+      b.markerImages.push(it.markerImage);
       b.value += it.value;
     }
   }
@@ -641,7 +642,7 @@ function convertRaceScrolling(
   const agg = tc?.valueAgg ?? 'sum';
   const accumulate = tc?.accumulateMode !== 'period';
 
-  const steps: {label: string; image: string | null; markerImage: string | null; pos: number; value: number; delta: number}[] = [];
+  const steps: {label: string; image: string | null; markerImage: string | null; markerImages: (string | null)[]; pos: number; value: number; delta: number}[] = [];
   for (const [label, entry] of byLabel) {
     const ordered = Array.from(entry.map.entries()).sort((a, b) => a[0] - b[0]);
     let running = 0;
@@ -661,7 +662,11 @@ function convertRaceScrolling(
         periodValue = bucket.raws.reduce((s, v) => s + v, 0);
       }
       running += periodValue;
-      steps.push({label, image: entry.image, markerImage: entry.markerImage, pos: period, value: accumulate ? running : periodValue, delta: periodValue});
+      // The per-period reference images: every datapoint that lands in this
+      // bucket contributes its own marker image, so the axis marker of that
+      // period shows the actual reference(s) it represents (e.g. each title
+      // won), not just the entity's first image.
+      steps.push({label, image: entry.image, markerImage: entry.markerImage, markerImages: bucket.markerImages, pos: period, value: accumulate ? running : periodValue, delta: periodValue});
     }
   }
 
