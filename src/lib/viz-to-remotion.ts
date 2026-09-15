@@ -280,7 +280,7 @@ function convertTimelineRace(
   // Explicit per-template column mapping wins; otherwise fall back to the
   // inherited static xField plus heuristic detection (never an image-URL column).
   const labelField = resolveLabelField(rows, config, tc);
-  const valueField = tc?.valueField ?? config.yField;
+  const valueField = resolveValueField(rows, config, tc);
   const imageField = tc?.imageField;
   const startField =
     tc?.dateField ??
@@ -517,7 +517,7 @@ function convertRaceScrolling(
   }
 
   const labelField = resolveLabelField(rows, config, tc);
-  const valueField = tc?.valueField ?? config.yField;
+  const valueField = resolveValueField(rows, config, tc);
   const imageField = tc?.imageField;
   const markerImageField = tc?.markerImageField;
   // The cardinality axis column: explicit `axisField` first, then legacy
@@ -831,7 +831,7 @@ function resolveKey(rows: Record<string, unknown>[], field: string | undefined |
 function resolveValueField(
   rows: Record<string, unknown>[],
   config: ChartConfig,
-  tc?: RankingConfig,
+  tc?: {valueField?: string} | null,
 ): string {
   const explicit = resolveKey(rows, tc?.valueField);
   if (explicit) return explicit;
