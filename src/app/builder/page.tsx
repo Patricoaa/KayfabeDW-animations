@@ -15,6 +15,7 @@ import {
   Database,
   ArrowLeft,
   Download,
+  Waypoints,
 } from 'lucide-react';
 import type {QuerySpec} from '@/lib/query-spec';
 import {defaultQuerySpec} from '@/lib/query-spec';
@@ -34,6 +35,7 @@ import {AnimationPreview} from '@/components/builder/animation-preview';
 import {AnimationConfigPanel} from '@/components/builder/animation-config-panel';
 import {BuilderNav} from '@/components/builder/builder-nav';
 import {ExportPanel} from '@/components/builder/export-panel';
+import {DataTable} from '@/components/builder/data-table';
 import {TEMPLATES} from '@/remotion/generated/registry';
 import type {TemplateId} from '@/remotion/generated/registry';
 import type {AnimationTemplateConfig} from '@/lib/animation-config';
@@ -92,6 +94,7 @@ function BuilderContent() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [view, setView] = useState<View>('data');
+  const [dataView, setDataView] = useState<'model' | 'table'>('model');
   const [resultStep, setResultStep] = useState<2 | 3>(2);
   const {width: configWidth, onHandlePointerDown: onConfigHandlePointerDown} = useResizableWidth(352, {min: 320, max: 640, edge: 'left'});
   const {width: exportWidth, onHandlePointerDown: onExportHandlePointerDown} = useResizableWidth(352, {min: 320, max: 640, edge: 'left'});
@@ -737,6 +740,34 @@ function BuilderContent() {
               )}
             </span>
             <div className="flex items-center gap-3">
+              {view === 'data' && (
+                <div role="group" aria-label="Vista de datos" className="flex bg-elevated rounded-lg p-0.5 border border-border-default h-7">
+                  <button
+                    onClick={() => setDataView('model')}
+                    aria-pressed={dataView === 'model'}
+                    className={`cursor-pointer px-2.5 rounded-md text-[11px] font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                      dataView === 'model'
+                        ? 'bg-amber-500 text-black shadow-sm'
+                        : 'text-secondary hover:text-primary hover:bg-card-hover'
+                    }`}
+                  >
+                    <Waypoints size={12} />
+                    Modelo
+                  </button>
+                  <button
+                    onClick={() => setDataView('table')}
+                    aria-pressed={dataView === 'table'}
+                    className={`cursor-pointer px-2.5 rounded-md text-[11px] font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                      dataView === 'table'
+                        ? 'bg-amber-500 text-black shadow-sm'
+                        : 'text-secondary hover:text-primary hover:bg-card-hover'
+                    }`}
+                  >
+                    <Table2 size={12} />
+                    Tabla
+                  </button>
+                </div>
+              )}
               {resultTruncated && <span className="text-amber-600">Se capturaron hasta 50.000 filas</span>}
               {loading && <span className="text-amber-500">Consultando...</span>}
               {error && <span className="text-red-500">{error}</span>}
@@ -747,7 +778,19 @@ function BuilderContent() {
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
             {view === 'data' ? (
               meta ? (
-                <QueryCanvas spec={spec} onChange={handleSpecChange} meta={meta.tables} />
+                <div className="relative flex-1 min-h-0 overflow-hidden">
+                  <QueryCanvas spec={spec} onChange={handleSpecChange} meta={meta.tables} />
+                  {dataView === 'table' && (
+                    <div className="absolute inset-0 z-10 bg-background">
+                      <DataTable
+                        data={data}
+                        loading={loading}
+                        truncated={resultTruncated}
+                        tableName={spec.table}
+                      />
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div className="h-full flex items-center justify-center">
                   <div className="space-y-3 animate-pulse w-full max-w-sm px-6">
