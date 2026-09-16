@@ -1170,7 +1170,11 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           <p className="text-[10px] text-muted mt-0.5 mb-1">
             También define el inicio y fin del plot: el eje Y y las gridlines de fecha abarcan el bloque de filas (incluidos los huecos) más un padding proporcional.
           </p>
-          <SliderNumberInput label="Separación horizontal (px)" value={value.rowGapH ?? 0} min={0} max={80} step={2} onChange={(v) => update({rowGapH: v || undefined})} />
+<SliderNumberInput label="Separación horizontal (px)" value={value.rowGapH ?? 0} min={0} max={80} step={2} onChange={(v) => update({rowGapH: v || undefined})} />
+          <SliderNumberInput label="Separación etiqueta → avatar (px)" value={value.labelAvatarGap ?? 0} min={0} max={120} step={2} onChange={(v) => update({labelAvatarGap: v || undefined})} />
+          <p className="text-[10px] text-muted mt-0.5 mb-1">
+            Separa solo el nombre del avatar sin mover barras ni ejes. Vacío = separación estándar.
+          </p>
           <div className="pt-2 mt-1 border-t border-border-subtle">
             <p className="text-[10px] text-muted mb-1.5">Posición del grupo de filas y del eje (offset en px desde su lugar por defecto). Mueve juntos las barras, los avatares y las etiquetas, el eje Y permanente, las gridlines de fecha y la línea de "ahora".</p>
             <div className="grid grid-cols-2 gap-2">

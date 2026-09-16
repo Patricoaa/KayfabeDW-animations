@@ -509,6 +509,7 @@ function convertRaceScrolling(
     showRail: t?.showRail,
     rowGapH: t?.rowGapH,
     rowGap: t?.rowGap,
+    labelAvatarGap: t?.labelAvatarGap,
     barWidth: t?.barWidth,
     dateX: t?.dateX,
     dateY: t?.dateY,

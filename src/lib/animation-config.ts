@@ -373,6 +373,12 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
   // as the race sweeps, not a static per-entity attribute).
   labelExtraFields?: RaceScrollingExtraField[];
 
+  // Dedicated gap (px) between the entity label column and the avatar, on top
+  // of the default spacing. Empty = the standard separation (auto). Unlike
+  // `rowGapH`, this only moves the label away from the avatar: bars, axes and
+  // plots stay put.
+  labelAvatarGap?: number;
+
   // Which participant set runs the race (alongside `maxRows`):
   // - 'final-value' (default): keep exactly the `maxRows` entities with the
   //   LARGEST ('top') or SMALLEST ('bottom') accumulated value at the END of

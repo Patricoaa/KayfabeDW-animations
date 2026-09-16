@@ -153,6 +153,7 @@ export type RaceScrollingProps = {
   finaleAnimation?: boolean;
   rowGapH?: number;
   rowGap?: number;
+  labelAvatarGap?: number;
   barWidth?: number;
   titleX?: number;
   titleY?: number;
@@ -259,6 +260,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   barSoundSrc,
   rowGapH,
   rowGap,
+  labelAvatarGap,
   barWidth,
   titleX,
   titleY,
@@ -438,6 +440,11 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
 
   const innerW = W - PAD_L - PAD_R;
   const ROW_GAP_PX = rowGapH ?? innerW * 0.03;
+  // Extra padding on the name column that widens the label→avatar gap on top of
+  // the flex gap: default keeps the standard 1.5×ROW_GAP_PX separation, and the
+  // dedicated `labelAvatarGap` control adds (or trims) from there without
+  // touching the bar/axis geometry.
+  const NAME_PAD_R = Math.max(0, (labelAvatarGap ?? ROW_GAP_PX * 1.5) - ROW_GAP_PX);
   const BAR_RATIO = Math.min(Math.max(barWidth ?? 0.75, 0.1), 0.95);
   // Static entity axis: a fixed name column on the left of every row. Its
   // width fits the longest entity label (approx. char width for the label font).
@@ -1151,13 +1158,13 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
     return (
       <div key={p.label} style={{position: 'absolute', left: 0, right: 0, height: ROW_H, top, display: 'flex', alignItems: 'center', gap: ROW_GAP_PX, opacity: rowOpacity}}>
         {(showLabels ?? true) && (
-          <div style={{width: NAME_W, flexShrink: 0, overflow: 'hidden', textAlign: 'right', paddingRight: ROW_GAP_PX * 0.5, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center'}}>
+          <div style={{width: NAME_W, flexShrink: 0, overflow: 'hidden', textAlign: 'right', paddingRight: NAME_PAD_R, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center'}}>
             <span style={{...labelOverflowCss(labelText?.overflow), ...textStyle(labelText, {color: '#e4e4e7', size: LABEL_FONT, weight: 700}), opacity: pop}}>{p.label}</span>
             {renderExtraRow(p.extra, pop)}
           </div>
         )}
         {finaleActive && rowT > 0.001 && (
-          <div style={{position: 'absolute', left: 0, top: 0, height: ROW_H, width: NAME_W_FULL, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center', paddingRight: ROW_GAP_PX * 0.5, opacity: rowT, transform: `translateX(${-(1 - rowT) * NAME_W_FULL * 0.8}px)`, zIndex: 2}}>
+          <div style={{position: 'absolute', left: 0, top: 0, height: ROW_H, width: NAME_W_FULL, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center', paddingRight: NAME_PAD_R, opacity: rowT, transform: `translateX(${-(1 - rowT) * NAME_W_FULL * 0.8}px)`, zIndex: 2}}>
             <span style={{...labelOverflowCss(labelText?.overflow), ...textStyle(labelText, {color: '#e4e4e7', size: LABEL_FONT, weight: 700})}}>{p.label}</span>
             {renderExtraRow(p.extra, 1)}
           </div>
