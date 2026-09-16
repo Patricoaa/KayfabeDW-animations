@@ -20,6 +20,12 @@ const nextConfig = {
   outputFileTracingIncludes: {
     "/api/render": [
       "./src/remotion/**/*",
+      // Lib modules that the templates VALUE-import (the runtime remotion
+      // bundler resolves them inside the serverless function). Type-only
+      // imports are erased at build and don't need to be traced; these do.
+      "./src/lib/chart-icons.ts",
+      "./src/lib/chart-config.ts",
+      "./src/lib/animation-config.ts",
       "./node_modules/remotion/**/*",
       "./node_modules/@remotion/**/*",
       "./node_modules/@rspack/**/*",
