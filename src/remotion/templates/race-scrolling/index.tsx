@@ -207,6 +207,7 @@ export type RaceScrollingProps = {
   backgroundAnimSpeed?: number;
   yAxisColor?: string;
   yAxisWidth?: number;
+  showYAxis?: boolean;
   // Offset (px) of the whole anchored block from its default placement: bars +
   // avatars + row labels + the permanent Y axis + the scrolling grid/date
   // labels move together.
@@ -309,6 +310,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   designHeight,
   yAxisColor = '#334155',
   yAxisWidth = 2,
+  showYAxis = true,
   gridSpacing,
   gridlineColor,
   gridlineWidth,
@@ -1242,9 +1244,11 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
             implied 0 → global accumulated max). It starts at the top of the
             rows block and runs down to the CANVAS BOTTOM — the accumulation
             boundary the date grids slide into. */}
+        {showYAxis && (
         <div style={{position: 'absolute', left: axisX, top: rowsTopY, bottom: 0, zIndex: 3, opacity: axisFade}}>
           <div style={{position: 'absolute', left: -(yAxisWidth ?? 2) / 2, top: 0, bottom: 0, width: yAxisWidth ?? 2, borderRadius: 1, backgroundColor: yAxisColor ?? '#334155'}} />
         </div>
+        )}
 
         {/* Plot box — fixed clip viewport over the bar track. The scrolling
             tape (date gridlines + their labels + markers) lives INSIDE it, and

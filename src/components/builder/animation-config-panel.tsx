@@ -1348,6 +1348,11 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
 
       {/* ============ EJE Y ============ */}
       <Collapsible title="Eje Y">
+        <SwitchControl
+          label="Mostrar eje Y"
+          checked={value.showYAxis ?? true}
+          onChange={(v) => update({showYAxis: v || undefined})}
+        />
         <ColorPickerControl label="Color del eje" value={value.yAxisColor ?? '#334155'} onChange={(v) => update({yAxisColor: v || undefined})} />
         <SliderNumberInput label="Grosor del eje (px)" value={value.yAxisWidth ?? 2} min={1} max={12} step={1} onChange={(v) => update({yAxisWidth: v || undefined})} />
         <p className="text-[10px] text-muted">
