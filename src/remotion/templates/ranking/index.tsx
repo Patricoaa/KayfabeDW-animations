@@ -1,9 +1,11 @@
 import React from 'react';
 import {useCurrentFrame, useVideoConfig, Easing, Img} from 'remotion';
 import type {RaceTextStyle, ValueFormat, RowEntryElement} from '../../../lib/animation-config';
+import type {ChartOverlay} from '../../../lib/chart-config';
 import {Header} from '../shared/Header';
 import {BackgroundLayer} from '../shared/Background';
 import {Avatar} from '../shared/Avatar';
+import {Overlays} from '../shared/Overlays';
 import {textStyle} from '../shared/text';
 import {fmtValue} from '../shared/fmt';
 
@@ -109,6 +111,11 @@ export type RankingProps = {
   backgroundFit?: 'cover' | 'contain' | 'fill';
   backgroundAnim?: 'none' | 'mirror';
   backgroundAnimSpeed?: number;
+  // Free-form overlays (text/image/shape) drawn over the canvas. Coordinates
+  // are in the static chart design space (`designWidth` x `designHeight`).
+  overlays?: ChartOverlay[];
+  designWidth?: number;
+  designHeight?: number;
 };
 
 export const Ranking: React.FC<RankingProps> = ({
@@ -188,6 +195,9 @@ export const Ranking: React.FC<RankingProps> = ({
   backgroundFit = 'cover',
   backgroundAnim = 'none',
   backgroundAnimSpeed = 60,
+  overlays,
+  designWidth,
+  designHeight,
 }) => {
   const frame = useCurrentFrame();
   const {fps, durationInFrames, width: W, height: H} = useVideoConfig();
@@ -596,6 +606,7 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
         backgroundAnim={backgroundAnim}
         backgroundAnimSpeed={backgroundAnimSpeed}
       />
+      <Overlays overlays={overlays} designWidth={designWidth} designHeight={designHeight} zIndexFilter="back" />
       <Header
         title={title}
         titleX={titleX}
@@ -631,6 +642,7 @@ const rows = items.filter((it) => !isNaN(it.value) && it.label !== '');
           {activeItem && frameLayer(activeItem, activeIndex, framePan)}
         </div>
       )}
+      <Overlays overlays={overlays} designWidth={designWidth} designHeight={designHeight} zIndexFilter="front" />
     </div>
   );
 };

@@ -1,10 +1,12 @@
 import React from 'react';
 import {useCurrentFrame, useVideoConfig, interpolate, spring, Easing, Img, Audio, Sequence} from 'remotion';
 import type {RaceTextStyle, ValueFormat} from '../../../lib/animation-config';
+import type {ChartOverlay} from '../../../lib/chart-config';
 import {ICON_GLYPHS} from '../../../lib/chart-icons';
 import {Header} from '../shared/Header';
 import {BackgroundLayer} from '../shared/Background';
 import {Avatar} from '../shared/Avatar';
+import {Overlays} from '../shared/Overlays';
 import {fmtValue} from '../shared/fmt';
 import {textStyle} from '../shared/text';
 
@@ -213,6 +215,11 @@ export type RaceScrollingProps = {
   dateText?: RaceTextStyle;
   labelText?: RaceTextStyle;
   valueText?: RaceTextStyle;
+  // Free-form overlays (text/image/shape) drawn over the canvas. Coordinates
+  // are in the static chart design space (`designWidth` x `designHeight`).
+  overlays?: ChartOverlay[];
+  designWidth?: number;
+  designHeight?: number;
 };
 
 function fmtDate(t: number, fmt: RaceScrollingProps['dateFormat'] = 'day'): string {
@@ -295,6 +302,9 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   backgroundFit = 'cover',
   backgroundAnim = 'none',
   backgroundAnimSpeed = 60,
+  overlays,
+  designWidth,
+  designHeight,
   yAxisColor = '#334155',
   yAxisWidth = 2,
   gridSpacing,
@@ -372,6 +382,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
     return (
       <div style={{width: '100%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", padding: `${PAD_T}px ${PAD_R}px ${PAD_B}px ${PAD_L}px`, boxSizing: 'border-box', overflow: 'hidden'}}>
         {bgLayer}
+        <Overlays overlays={overlays} designWidth={designWidth} designHeight={designHeight} zIndexFilter="back" />
         <Header
           title={title}
           titleX={titleX}
@@ -410,6 +421,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
             );
           })}
         </div>
+        <Overlays overlays={overlays} designWidth={designWidth} designHeight={designHeight} zIndexFilter="front" />
       </div>
     );
   }
@@ -1173,6 +1185,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   return (
     <div style={{width: '100%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", padding: `${PAD_T}px ${PAD_R}px ${PAD_B}px ${PAD_L}px`, boxSizing: 'border-box', overflow: 'hidden'}}>
       {bgLayer}
+      <Overlays overlays={overlays} designWidth={designWidth} designHeight={designHeight} zIndexFilter="back" />
       <Header
         title={title}
         titleX={titleX}
@@ -1309,6 +1322,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
           <Audio src={barSoundSrc!} />
         </Sequence>
       ))}
+      <Overlays overlays={overlays} designWidth={designWidth} designHeight={designHeight} zIndexFilter="front" />
     </div>
   );
 };

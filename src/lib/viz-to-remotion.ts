@@ -194,8 +194,10 @@ function parseDateValue(value: unknown): number | null {
 
 // Fields shared by every template (header + canvas background), mapped
 // straight through from the per-template config so the Remotion components
-// receive the same flat prop names they already render.
-function commonPropsOf(t: CommonAnimationConfig | undefined): Record<string, unknown> {
+// receive the same flat prop names they already render. Design size comes from
+// the static chart config (where overlay coordinates are authored) so the
+// templates can scale overlays proportionally into the composition.
+function commonPropsOf(t: CommonAnimationConfig | undefined, config?: ChartConfig): Record<string, unknown> {
   return {
     title: t?.title,
     titleX: t?.titleX,
@@ -205,6 +207,9 @@ function commonPropsOf(t: CommonAnimationConfig | undefined): Record<string, unk
     subtitleText: t?.subtitleText,
     subtitleX: t?.subtitleX,
     subtitleY: t?.subtitleY,
+    overlays: t?.overlays,
+    designWidth: config?.width,
+    designHeight: config?.height,
     backgroundType: t?.backgroundType,
     background: t?.background,
     backgroundSecondary: t?.backgroundSecondary,
@@ -232,7 +237,7 @@ function convertTimelineRace(
 ): Record<string, unknown> {
   // Race-specific presentation fields (offset geometry, avatar/bar styling).
   const presentationOf = (t: TimelineRaceConfig | undefined) => ({
-    ...commonPropsOf(t),
+    ...commonPropsOf(t, config),
     showDateLabel: t?.showDateLabel,
     showXAxis: t?.showXAxis,
     axisPosition: t?.axisPosition,
@@ -468,7 +473,7 @@ function convertRaceScrolling(
   // Race-specific presentation fields (offset geometry, avatar/bar styling,
   // scrolling axis + per-entity markers).
   const presentationOf = (t: RaceScrollingConfig | undefined) => ({
-    ...commonPropsOf(t),
+    ...commonPropsOf(t, config),
     showDateLabel: t?.showDateLabel,
     showXAxis: t?.showXAxis,
     axisDirection: t?.axisDirection,
@@ -917,7 +922,7 @@ function convertRanking(
   rc?: RankingConfig,
 ): Record<string, unknown> {
   const presentationOf = (t: RankingConfig | undefined) => ({
-    ...commonPropsOf(t),
+    ...commonPropsOf(t, config),
     maxRows: t?.maxRows,
     revealDirection: t?.revealDirection,
     countUp: t?.countUp,

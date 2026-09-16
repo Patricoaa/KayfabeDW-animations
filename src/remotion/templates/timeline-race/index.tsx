@@ -1,9 +1,11 @@
 import React from 'react';
 import {useCurrentFrame, useVideoConfig, interpolate, spring, Easing} from 'remotion';
 import type {RaceTextStyle, ValueFormat} from '../../../lib/animation-config';
+import type {ChartOverlay} from '../../../lib/chart-config';
 import {Header} from '../shared/Header';
 import {BackgroundLayer} from '../shared/Background';
 import {Avatar} from '../shared/Avatar';
+import {Overlays} from '../shared/Overlays';
 import {fmtValue} from '../shared/fmt';
 import {textStyle} from '../shared/text';
 
@@ -101,6 +103,11 @@ export type TimelineRaceProps = {
   dateText?: RaceTextStyle;
   labelText?: RaceTextStyle;
   valueText?: RaceTextStyle;
+  // Free-form overlays (text/image/shape) drawn over the canvas. Coordinates
+  // are in the static chart design space (`designWidth` x `designHeight`).
+  overlays?: ChartOverlay[];
+  designWidth?: number;
+  designHeight?: number;
 };
 
 function fmtDate(t: number, fmt: TimelineRaceProps['dateFormat'] = 'day'): string {
@@ -174,6 +181,9 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   backgroundFit = 'cover',
   backgroundAnim = 'none',
   backgroundAnimSpeed = 60,
+  overlays,
+  designWidth,
+  designHeight,
   showYAxis = false,
   yAxisColor = '#334155',
   yAxisWidth = 2,
@@ -261,6 +271,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
     return (
       <div style={{width: '100%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", padding: `${PAD_T}px ${PAD_R}px ${PAD_B}px ${PAD_L}px`, boxSizing: 'border-box'}}>
         {bgLayer}
+        <Overlays overlays={overlays} designWidth={designWidth} designHeight={designHeight} zIndexFilter="back" />
         <Header
           title={title}
           titleX={titleX}
@@ -317,6 +328,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
             ))}
           </div>
         )}
+        <Overlays overlays={overlays} designWidth={designWidth} designHeight={designHeight} zIndexFilter="front" />
       </div>
     );
   }
@@ -691,6 +703,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
   return (
     <div style={{width: '100%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", padding: `${PAD_T}px ${PAD_R}px ${PAD_B}px ${PAD_L}px`, boxSizing: 'border-box', overflow: 'hidden'}}>
       {bgLayer}
+      <Overlays overlays={overlays} designWidth={designWidth} designHeight={designHeight} zIndexFilter="back" />
       <Header
         title={title}
         titleX={titleX}
@@ -726,6 +739,7 @@ export const TimelineRace: React.FC<TimelineRaceProps> = ({
           {dateLabelText}
         </div>
       )}
+      <Overlays overlays={overlays} designWidth={designWidth} designHeight={designHeight} zIndexFilter="front" />
     </div>
   );
 

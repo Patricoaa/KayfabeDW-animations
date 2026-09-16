@@ -169,9 +169,8 @@ export function OverlayEditor({overlay: ov, index, variant, onPatch, onRemove}: 
             placeholder="Texto"
             className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
           />
-          <div className="grid grid-cols-2 gap-2">
+          <div className={variant === 'animation' ? 'space-y-2.5' : 'grid grid-cols-2 gap-2'}>
             <TextStyleControls
-              label={variant === 'animation' ? 'Texto' : undefined}
               value={ov.font}
               onChange={(patch) => setAssigned({font: {...(ov.font ?? {}), ...patch}})}
               showOverflow={variant === 'static'}
@@ -181,16 +180,14 @@ export function OverlayEditor({overlay: ov, index, variant, onPatch, onRemove}: 
               showUnderline={variant === 'animation'}
               maxSize={variant === 'animation' ? 160 : 40}
             />
-            <div className="space-y-2">
-              {variant === 'static' ? (
-                <>
-                  <FullTextLayout value={ov.layout} onChange={patchLayout} />
-                  <NumberControl label="Ancho máx. (px)" value={ov.maxWidth} min={0} max={2000} onChange={(v) => setAssigned({maxWidth: v})} />
-                </>
-              ) : (
-                <CompactPosition value={ov.layout} onChange={patchLayout} />
-              )}
-            </div>
+            {variant === 'static' ? (
+              <div className="space-y-2">
+                <FullTextLayout value={ov.layout} onChange={patchLayout} />
+                <NumberControl label="Ancho máx. (px)" value={ov.maxWidth} min={0} max={2000} onChange={(v) => setAssigned({maxWidth: v})} />
+              </div>
+            ) : (
+              <CompactPosition value={ov.layout} onChange={patchLayout} />
+            )}
           </div>
         </>
       ) : ov.type === 'shape' ? (
