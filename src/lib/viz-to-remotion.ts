@@ -2,7 +2,7 @@ import type {ChartConfig} from './chart-config';
 import {TEMPLATES} from '@/remotion/generated/registry';
 import type {TemplateId} from '@/remotion/generated/registry';
 import {matchTemplates} from './profile-matcher';
-import type {AnimationTemplateConfig, CommonAnimationConfig, RaceScrollingConfig, RankingConfig, TimelineRaceConfig} from './animation-config';
+import type {AnimationTemplateConfig, CommonAnimationConfig, RaceScrollingConfig, RaceScrollingExtraField, RankingConfig, TimelineRaceConfig} from './animation-config';
 
 export type RemotionInputProps = {
   templateId: string;
@@ -447,6 +447,24 @@ function convertRaceScrolling(
   config: ChartConfig,
   tc?: RaceScrollingConfig,
 ): Record<string, unknown> {
+  const rows = data ?? [];
+
+  // Secondary label fields: resolved once against the real column names, then
+  // every period bucket accumulates each field's RAW row values so the step's
+  // extra pair can aggregate them per period ('last' default, or sum/avg/min/
+  // max for strictly-numeric fields, or the row count). A legacy string
+  // (`labelExtraFields` used to be `string[]`) is treated as {field}: no title,
+  // default text, 'last' aggregation.
+  const extraFieldMeta = ((tc?.labelExtraFields ?? []) as (string | RaceScrollingExtraField)[]).flatMap((raw) => {
+    const isLegacy = typeof raw === 'string';
+    const f = isLegacy ? {field: raw} : raw;
+    const key = resolveKey(rows, isLegacy ? raw : f.field);
+    if (key === '') return [];
+    const title = f.title?.trim() || (isLegacy ? raw.trim() : f.field?.trim()) || key;
+    return [{key, title: title.trim() === '' ? key : title, text: f.text, agg: f.agg ?? 'last'}];
+  });
+  const extraFields = extraFieldMeta.map((f) => f.key);
+
   // Race-specific presentation fields (offset geometry, avatar/bar styling,
   // scrolling axis + per-entity markers).
   const presentationOf = (t: RaceScrollingConfig | undefined) => ({
@@ -511,9 +529,13 @@ function convertRaceScrolling(
     dateText: t?.dateText,
     labelText: t?.labelText,
     valueText: t?.valueText,
+    // Secondary label metadata for the template, index-aligned with
+    // `items[].extra`: the display title (defaults to the resolved column) and
+    // the per-element text control. The template lays the pairs out as one
+    // continuous wrapping row under the entity name.
+    labelExtraFields: extraFieldMeta.map((f) => ({title: f.title, text: f.text})),
   });
 
-  const rows = data ?? [];
   if (rows.length === 0) {
     return {title: (tc?.title || config.title) ?? '', items: [], accentColor: config.colors?.[0] ?? '#FFD700', dateMode: false, ...presentationOf(tc)};
   }
@@ -522,10 +544,6 @@ function convertRaceScrolling(
   const valueField = resolveValueField(rows, config, tc);
   const imageField = tc?.imageField;
   const markerImageField = tc?.markerImageField;
-  // Secondary label fields: resolved once against the real column names, then
-  // each period step carries that field's value (from the LAST row that lands
-  // in the bucket) to render under the entity label as it sweeps.
-  const extraFields = (tc?.labelExtraFields ?? []).map((f) => resolveKey(rows, f)).filter((k) => k !== '');
   const cellText = (v: unknown): string | null => {
     if (v === null || v === undefined) return null;
     const s = String(v);
@@ -630,7 +648,7 @@ function convertRaceScrolling(
   };
   const bucketOf = (pos: number): number => (dateMode ? periodStart(pos, fmt) : pos);
 
-  const byLabel = new Map<string, {image: string | null; markerImage: string | null; map: Map<number, {value: number; count: number; raws: number[]; markerImages: (string | null)[]; extra: (string | null)[]}>}>();
+  const byLabel = new Map<string, {image: string | null; markerImage: string | null; map: Map<number, {value: number; count: number; raws: number[]; markerImages: (string | null)[]; extraRaw: unknown[][]}>}>();
   for (const it of positioned) {
     if (it.label === '' || isNaN(it.pos)) continue;
     let entry = byLabel.get(it.label);
@@ -641,19 +659,42 @@ function convertRaceScrolling(
     const bucket = bucketOf(it.pos);
     let b = entry.map.get(bucket);
     if (!b) {
-      b = {value: it.value, count: 1, raws: [it.value], markerImages: [it.markerImage], extra: extraFields.map((k) => cellText(it.row[k]))};
+      b = {value: it.value, count: 1, raws: [it.value], markerImages: [it.markerImage], extraRaw: extraFields.map((k) => [it.row[k]])};
       entry.map.set(bucket, b);
     } else {
       b.count += 1;
       b.raws.push(it.value);
       b.markerImages.push(it.markerImage);
-      b.extra = extraFields.map((k) => cellText(it.row[k]));
       b.value += it.value;
+      const current = b;
+      b.extraRaw = extraFields.map((k, i) => [...current.extraRaw[i], it.row[k]]);
     }
   }
 
   const agg = tc?.valueAgg ?? 'sum';
   const accumulate = tc?.accumulateMode !== 'period';
+
+  // Per-field aggregation of the secondary labels over a period bucket
+  // (index-aligned with `extraFieldMeta`): 'last' (default) keeps the value of
+  // the last row that landed in the period; 'sum'/'avg'/'min'/'max' aggregate
+  // the strictly-numeric values (falling back to 'last' when any cell is not
+  // numeric); 'count' is the number of rows in the period.
+  const extraOf = (bucket: {count: number; extraRaw: unknown[][]}, field: number): string | null => {
+    const meta = extraFieldMeta[field];
+    const raws = bucket.extraRaw[field] ?? [];
+    if (raws.length === 0) return null;
+    if (meta.agg === 'count') return String(bucket.count);
+    if (meta.agg !== 'last') {
+      const nums = raws.map((v) => toNumeric(v));
+      if (nums.every((n) => !isNaN(n))) {
+        if (meta.agg === 'sum') return cellText(Math.round((nums.reduce((s, v) => s + v, 0)) * 1e6) / 1e6);
+        if (meta.agg === 'avg') return cellText(Math.round((nums.reduce((s, v) => s + v, 0) / nums.length) * 1e6) / 1e6);
+        if (meta.agg === 'min') return cellText(Math.min(...nums));
+        if (meta.agg === 'max') return cellText(Math.max(...nums));
+      }
+    }
+    return cellText(raws[raws.length - 1]);
+  };
 
   const steps: {label: string; image: string | null; markerImage: string | null; markerImages: (string | null)[]; pos: number; value: number; delta: number; extra: (string | null)[]}[] = [];
   for (const [label, entry] of byLabel) {
@@ -679,7 +720,7 @@ function convertRaceScrolling(
       // bucket contributes its own marker image, so the axis marker of that
       // period shows the actual reference(s) it represents (e.g. each title
       // won), not just the entity's first image.
-      steps.push({label, image: entry.image, markerImage: entry.markerImage, markerImages: bucket.markerImages, pos: period, value: accumulate ? running : periodValue, delta: periodValue, extra: extraFields.length > 0 ? bucket.extra : []});
+      steps.push({label, image: entry.image, markerImage: entry.markerImage, markerImages: bucket.markerImages, pos: period, value: accumulate ? running : periodValue, delta: periodValue, extra: extraFieldMeta.length > 0 ? extraFieldMeta.map((_, i) => extraOf(bucket, i)) : []});
     }
   }
 

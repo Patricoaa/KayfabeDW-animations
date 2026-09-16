@@ -66,8 +66,9 @@ export type RaceScrollingItem = {
   value: number;              // accumulated numeric shown once activated
   delta?: number;             // (informational) per-period amount that date adds; the number marker computes its own delta from `value`
   // Secondary data under the entity label: one entry per configured
-  // `labelExtraFields` model column, holding that period's field value (the
-  // row that just crossed the axis). Empty array = no secondary lines.
+  // `labelExtraFields` model column, holding that period's aggregated value.
+  // Empty array = no secondary row. Each entry pairs with the matching
+  // `labelExtraFields` metadata ({title, text}) index-aligned.
   extra?: (string | null)[];
 };
 
@@ -122,6 +123,11 @@ export type RaceScrollingProps = {
   // Show the entity name label on the fixed left axis (default true). When
   // false the name column collapses and the bar track / plot expands left.
   showLabels?: boolean;
+  // Secondary label metadata, index-aligned with `items[].extra`: each pair's
+  // display title (defaults to the resolved model column) and its own text
+  // control. The pairs render as one continuous «title:value» row under the
+  // entity name that wraps inside the name column.
+  labelExtraFields?: {title: string; text?: RaceTextStyle}[];
   // 'running' (default): `value` is the accumulated total up to that pos;
   // 'period': `value` is the per-period amount. Only the grid markers consume
   // this (to derive the delta from `value`); the bars just interpolate `value`.
@@ -236,6 +242,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   showXAxis = true,
   axisDirection = 'asc',
   showLabels = true,
+  labelExtraFields,
   accumulateMode,
   showMarkers = true,
   markerMode = 'number',
@@ -439,8 +446,19 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // Name column: its width must also fit the widest secondary value, so a
   // longer sub-line is never cut before the label is.
   const labelTextMax = Math.max(1, ...items.map((r) => r.label.length));
-  const subTextMax = Math.max(0, ...items.map((r) => Math.max(0, ...(r.extra ?? []).map((x) => (x ?? '').length))));
-  const NAME_W_FULL = Math.min(innerW * 0.34, Math.max(110, Math.max(labelTextMax * LABEL_FONT * 0.52, subTextMax * LABEL_SUB_FONT * 0.52) + 16));
+  // The name column must fit the widest secondary PAIR «title:value»: each
+  // element is measured with its own display title and effective font size
+  // (per-element text control may override LABEL_SUB_FONT), so the row wraps
+  // without ever cutting the widest pair before the label is.
+  const subTextMax = Math.max(0, ...items.map((r) =>
+    Math.max(0, ...(r.extra ?? []).map((x, i) => {
+      if (x === null || x === undefined) return 0;
+      const meta = labelExtraFields?.[i];
+      const size = meta?.text?.size ?? LABEL_SUB_FONT;
+      return ((meta?.title ?? '').length + 1 + x.length) * size * 0.52;
+    })),
+  ));
+  const NAME_W_FULL = Math.min(innerW * 0.34, Math.max(110, Math.max(labelTextMax * LABEL_FONT * 0.52, subTextMax) + 16));
   const NAME_W = (showLabels ?? true) ? NAME_W_FULL : 0;
   // Bars grow IN PLACE from this column, so only the track to its right scrolls.
   const BAR_MAX_W = Math.max((innerW - NAME_W - ROW_GAP_PX * 2) * BAR_RATIO, 1);
@@ -980,6 +998,30 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
     return {transform: translate, opacity: t};
   };
 
+  // The secondary labels as ONE continuous wrapping row of «title:value»
+  // pairs under the entity name. Each pair keeps its own text control (per
+  // `labelExtraFields` metadata) and its own overflow; empty pairs are skipped.
+  const renderExtraRow = (extra: (string | null)[] | undefined, opacity: number) => {
+    const pairs = (extra ?? [])
+      .map((v, i) => ({v, i}))
+      .filter(({v}) => v !== null && v !== undefined && String(v).trim() !== '');
+    if (pairs.length === 0) return null;
+    return (
+      <div style={{display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', columnGap: 8, rowGap: 2}}>
+        {pairs.map(({v, i}) => {
+          const meta = labelExtraFields?.[i];
+          const text = meta?.text;
+          const title = meta?.title ?? '';
+          return (
+            <span key={i} style={{...labelOverflowCss(text?.overflow), ...textStyle(text, {color: '#71717a', size: LABEL_SUB_FONT, weight: 500}), opacity}}>
+              {title ? `${title}:${v}` : String(v)}
+            </span>
+          );
+        })}
+      </div>
+    );
+  };
+
   const renderRow = (p: Participant) => {
     // Finale overrides the podium: whole rows un-dim and the leader's height pop
     // recedes so the retraction and the label slide-in read cleanly. Each row's
@@ -1099,21 +1141,13 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
         {(showLabels ?? true) && (
           <div style={{width: NAME_W, flexShrink: 0, overflow: 'hidden', textAlign: 'right', paddingRight: ROW_GAP_PX * 0.5, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center'}}>
             <span style={{...labelOverflowCss(labelText?.overflow), ...textStyle(labelText, {color: '#e4e4e7', size: LABEL_FONT, weight: 700}), opacity: pop}}>{p.label}</span>
-            {(p.extra ?? []).map((v, i) =>
-              v === null || v === undefined || String(v).trim() === '' ? null : (
-                <span key={i} style={{...labelOverflowCss(labelText?.overflow), ...textStyle(labelText, {color: '#71717a', size: LABEL_SUB_FONT, weight: 500}), opacity: pop}}>{v}</span>
-              ),
-            )}
+            {renderExtraRow(p.extra, pop)}
           </div>
         )}
         {finaleActive && rowT > 0.001 && (
           <div style={{position: 'absolute', left: 0, top: 0, height: ROW_H, width: NAME_W_FULL, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center', paddingRight: ROW_GAP_PX * 0.5, opacity: rowT, transform: `translateX(${-(1 - rowT) * NAME_W_FULL * 0.8}px)`, zIndex: 2}}>
             <span style={{...labelOverflowCss(labelText?.overflow), ...textStyle(labelText, {color: '#e4e4e7', size: LABEL_FONT, weight: 700})}}>{p.label}</span>
-            {(p.extra ?? []).map((v, i) =>
-              v === null || v === undefined || String(v).trim() === '' ? null : (
-                <span key={i} style={{...labelOverflowCss(labelText?.overflow), ...textStyle(labelText, {color: '#71717a', size: LABEL_SUB_FONT, weight: 500})}}>{v}</span>
-              ),
-            )}
+            {renderExtraRow(p.extra, 1)}
           </div>
         )}
         {SEG_ORDER.map((seg) => segments[seg])}

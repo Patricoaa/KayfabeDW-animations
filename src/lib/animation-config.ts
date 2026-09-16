@@ -253,6 +253,22 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
   // the whole anchored block in px from its default placement — bars, avatars,
   // row labels, the permanent Y axis and the scrolling grid/date labels move
   // together (see the "Barras" panel section).
+  // One secondary-data pair shown under the entity label («title:value»), part
+  // of the continuous wrapping row. The value aggregates the configured model
+  // `field` over the period currently crossing the axis:
+  // - 'last' (default): the last value of the period (pre-period behavior).
+  // - 'sum' | 'avg' | 'min' | 'max': aggregate the numeric values of the
+  //   period; fields that are not strictly numeric fall back to 'last'.
+  // - 'count': number of rows that land in the period.
+  // `title` overrides the displayed prefix (defaults to the configured field),
+  // `text` gives the element a full text control of its own.
+  export type RaceScrollingExtraField = {
+    field: string;
+    title?: string;
+    text?: RaceTextStyle;
+    agg?: 'sum' | 'count' | 'avg' | 'min' | 'max' | 'last';
+  };
+
   export type RaceScrollingConfig = Omit<TimelineRaceConfig, 'axisPosition' | 'rowOrder'> & {
   // Cardinality axis column: dates OR plain numbers (years, rounds, days...).
   // The unit is auto-detected from the actual values; this is what the "Eje de
@@ -347,11 +363,14 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
   // end-of-bar number gets cut). Default true when the finale runs.
   minBarWidthClose?: boolean;
 
-  // Secondary data shown under the entity label, one line per selected model
-  // column. The value follows the PERIOD: the line shows the field value of
-  // the period currently crossing the axis for that entity (it updates as the
-  // race sweeps, not a static per-entity attribute).
-  labelExtraFields?: string[];
+  // Secondary data under the entity label: one continuous row of «title:value»
+  // pairs that wraps inside the name column, one pair per selected model
+  // column. Each pair has its own display title (defaults to the configured
+  // field name), its own text control, and its own period aggregation. The
+  // value follows the PERIOD: it aggregates that field over the period
+  // currently crossing the axis for that entity (it updates as the race
+  // sweeps, not a static per-entity attribute).
+  labelExtraFields?: RaceScrollingExtraField[];
 
   // Which participant set runs the race (alongside `maxRows`):
   // - 'final-value' (default): keep exactly the `maxRows` entities with the

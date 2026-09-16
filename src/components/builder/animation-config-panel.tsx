@@ -3,7 +3,7 @@
 import React, {useState} from 'react';
 import { SelectControl, NumberControl, ColorPickerControl, SwitchControl, Collapsible, Tabs, TextStyleControls, SliderNumberInput, FileUploadInput, FieldSelect, EntitySearch, PalettePicker, OverlayEditor, AudioUploadInput } from '@/components/ui/controls';
 import type {ColumnMeta} from '@/components/builder/chart-config-panel';
-import type {TimelineRaceConfig, RaceScrollingConfig, RankingConfig, DateFormat, AvatarShape, AvatarCrop, RaceTextStyle, ValueFormat, RowEntryElement, CommonHeaderConfig, CommonCanvasConfig} from '@/lib/animation-config';
+import type {TimelineRaceConfig, RaceScrollingConfig, RaceScrollingExtraField, RankingConfig, DateFormat, AvatarShape, AvatarCrop, RaceTextStyle, ValueFormat, RowEntryElement, CommonHeaderConfig, CommonCanvasConfig} from '@/lib/animation-config';
 import {avatarCropRect, VALUE_FORMATS} from '@/lib/animation-config';
 import {ICON_GLYPHS, ICON_GLYPH_NAMES} from '@/lib/chart-icons';
 
@@ -775,21 +775,44 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
   const setEntitySelection = (mode: Exclude<RaceScrollingConfig['entitySelection'], undefined>) => {
     update({entitySelection: mode});
   };
+  // Normalized secondary-label fields. Legacy configs (saved before the object
+  // shape) may carry plain strings; they are read as {field} and rewritten in
+  // canonical object form on the first edit.
+  const labelExtraFieldList: RaceScrollingExtraField[] = ((value.labelExtraFields ?? []) as unknown[])
+    .map((f) => (typeof f === 'string' ? {field: f} : f))
+    .filter((f): f is RaceScrollingExtraField => !!f && typeof f === 'object');
+  const writeLabelExtraFields = (list: RaceScrollingExtraField[]) =>
+    update({labelExtraFields: list.length > 0 ? list : undefined});
   const addLabelExtraField = () => {
-    const used = new Set(value.labelExtraFields ?? []);
+    const used = new Set(labelExtraFieldList.map((f) => f.field));
     const pool = fieldMeta.length > 0 ? fieldMeta.map((o) => o.alias) : columns;
     const next = pool.find((c) => !used.has(c));
-    if (next) update({labelExtraFields: [...(value.labelExtraFields ?? []), next]});
+    if (next) writeLabelExtraFields([...labelExtraFieldList, {field: next}]);
   };
   const setLabelExtraField = (index: number, field: string) => {
-    const next = [...(value.labelExtraFields ?? [])];
-    next[index] = field;
-    update({labelExtraFields: next});
+    const next = [...labelExtraFieldList];
+    next[index] = {...next[index], field};
+    writeLabelExtraFields(next);
+  };
+  const setLabelExtraTitle = (index: number, title: string) => {
+    const next = [...labelExtraFieldList];
+    next[index] = {...next[index], title: title.trim()};
+    writeLabelExtraFields(next);
+  };
+  const setLabelExtraAgg = (index: number, agg: RaceScrollingExtraField['agg']) => {
+    const next = [...labelExtraFieldList];
+    next[index] = {...next[index], agg};
+    writeLabelExtraFields(next);
+  };
+  const setLabelExtraText = (index: number, patch: Partial<RaceTextStyle>) => {
+    const next = [...labelExtraFieldList];
+    next[index] = {...next[index], text: {...(next[index].text ?? {}), ...patch}};
+    writeLabelExtraFields(next);
   };
   const removeLabelExtraField = (index: number) => {
-    const next = [...(value.labelExtraFields ?? [])];
+    const next = [...labelExtraFieldList];
     next.splice(index, 1);
-    update({labelExtraFields: next.length > 0 ? next : undefined});
+    writeLabelExtraFields(next);
   };
   const fmt = (value.dateFormat ?? 'day') as DateFormat;
   const setBarColor = (label: string, color?: string) => {
@@ -1372,29 +1395,54 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
             </button>
           </div>
           <p className="text-[10px] text-muted mb-1.5">
-            Columnas del modelo que se muestran como línea secundaria bajo el nombre de cada entidad. El valor SIGUE AL PERIODO: se actualiza según la fecha que está cruzando el eje en ese momento.
+            Columnas del modelo que se muestran en una fila continua «Título:dato» bajo el nombre de cada entidad. Cada dato SIGUE AL PERIODO: agrega esa columna sobre la fecha que está cruzando el eje en ese momento.
           </p>
-          {(value.labelExtraFields ?? []).map((f, i) => (
-            <div key={i} className="flex items-center gap-1 mb-1.5">
+          {labelExtraFieldList.map((f, i) => (
+            <div key={i} className="mb-2 border border-border-default rounded-lg p-2">
+              <div className="flex items-center gap-1 mb-1.5">
+                <SelectControl
+                  value={f.field}
+                  onChange={(e) => setLabelExtraField(i, e.target.value)}
+                  className="flex-1 bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+                >
+                  {(fieldMeta.length > 0 ? fieldMeta.map((o) => o.alias) : columns).map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </SelectControl>
+                <button
+                  onClick={() => removeLabelExtraField(i)}
+                  className="text-muted hover:text-red-500 px-1 text-xs"
+                  aria-label="Quitar campo secundario"
+                >
+                  ✕
+                </button>
+              </div>
+              <label className="block text-[10px] text-muted mb-0.5">Título mostrado (vacío = nombre de la columna)</label>
+              <input
+                value={f.title ?? ''}
+                onChange={(e) => setLabelExtraTitle(i, e.target.value)}
+                placeholder={f.field}
+                className="w-full bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500 mb-1.5"
+              />
+              <label className="block text-[10px] text-muted mb-0.5">Agregación por periodo</label>
               <SelectControl
-                value={f}
-                onChange={(e) => setLabelExtraField(i, e.target.value)}
-                className="flex-1 bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+                value={f.agg ?? 'last'}
+                onChange={(e) => setLabelExtraAgg(i, e.target.value as RaceScrollingExtraField['agg'])}
+                className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500 mb-1.5"
               >
-                {(fieldMeta.length > 0 ? fieldMeta.map((o) => o.alias) : columns).map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
+                <option value="last">Último valor</option>
+                <option value="sum">Suma</option>
+                <option value="count">Conteo</option>
+                <option value="avg">Promedio</option>
+                <option value="min">Mínimo</option>
+                <option value="max">Máximo</option>
               </SelectControl>
-              <button
-                onClick={() => removeLabelExtraField(i)}
-                className="text-muted hover:text-red-500 px-1 text-xs"
-                aria-label="Quitar campo secundario"
-              >
-                ✕
-              </button>
+              <div className="pt-1 mt-1 border-t border-border-subtle">
+                <TextStyleControls label="Texto del dato" value={f.text} onChange={(patch) => setLabelExtraText(i, patch)} showOverflow showTextTransform showSpacing showHighlight showUnderline maxSize={120}/>
+              </div>
             </div>
           ))}
-          {(value.labelExtraFields?.length ?? 0) === 0 && (
+          {labelExtraFieldList.length === 0 && (
             <p className="text-[10px] text-muted">Sin datos secundarios. Pulsa «+ Agregar campo» para seleccionar columnas del modelo.</p>
           )}
         </div>
