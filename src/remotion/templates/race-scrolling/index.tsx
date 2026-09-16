@@ -659,11 +659,12 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // ---- Finale reveal (only when entity labels are HIDDEN) ----
   // During the final pause: the permanent Y axis fades out, and then every row
   // plays a SYNCHRONIZED move in STAGGERED order (largest final rank first):
-  // its avatar slides to the center of the plot, its bar's LEFT edge rides along
-  // with the avatar EXACTLY (right edge stays pinned, so the bar collapses
-  // right-to-left, value visible on the fixed end) and its label slides in from
-  // the left — all within that row's slot. Phases and staggers are proportional
-  // to the pause left (`finaleWin`).
+  // its avatar slides to the center of the plot, its bar's left edge rides
+  // along with the avatar EXACTLY (the bar collapses as a whole and keeps
+  // traveling with the avatar past its race-end position, the value pinned to
+  // the bar's moving tip) and its label slides in from the left — all within
+  // that row's slot. Phases and staggers are proportional to the pause left
+  // (`finaleWin`).
   const finaleStart = raceEndFrame;
   const finaleWin = Math.max(1, durationInFrames - OUTRO - raceEndFrame);
   const finaleActive = finaleAnimation && !(showLabels ?? true) && raceEndFrame < durationInFrames - OUTRO;
@@ -1000,10 +1001,16 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
     // the floor instead of shrinking below the value and cutting its number.
     const closeMin = finaleActive && minBarWidthClose !== false ? minW : 0;
     const w = finaleActive ? Math.max(Math.max(0, raceW - trackL), closeMin) : raceW;
-    const barLeft = finaleActive ? Math.min(trackL, raceW) : 0;
-    const anchorW = finaleActive ? Math.max(closeMin, raceW) : Math.max(0, w);
+    // The bar's left edge rides EXACTLY with its row's avatar and keeps
+    // traveling with it past the race-end position, so the whole bar (and the
+    // number pinned to its moving tip) stays tucked under the avatar and ends
+    // up next to the revealing label — it never floats detached at the old end.
+    const barLeft = finaleActive ? Math.min(Math.max(0, trackL), Math.max(0, BAR_MAX_W - w)) : 0;
+    // Both modes anchor the value to the bar's CURRENT right tip (normal:
+    // barLeft=0 so tip = w, the full bar; finale: the tip follows the avatars).
+    const anchorW = barLeft + w;
     const valueRight = BAR_MAX_W - anchorW + 12;
-    const valueMaxW = Math.max(0, anchorW - 24);
+    const valueMaxW = Math.max(0, w - 24);
     const scale = finaleActive ? 1 : isLeader(p) ? winnerScale : 1;
 
     const yNow = laneY(rankNow(p.label));
