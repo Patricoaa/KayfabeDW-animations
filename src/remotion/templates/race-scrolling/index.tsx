@@ -441,10 +441,10 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const innerW = W - PAD_L - PAD_R;
   const ROW_GAP_PX = rowGapH ?? innerW * 0.03;
   // Extra padding on the name column that widens the label→avatar gap on top of
-  // the flex gap: default keeps the standard 1.5×ROW_GAP_PX separation, and the
-  // dedicated `labelAvatarGap` control adds (or trims) from there without
-  // touching the bar/axis geometry.
-  const NAME_PAD_R = Math.max(0, (labelAvatarGap ?? ROW_GAP_PX * 1.5) - ROW_GAP_PX);
+  // the row's flex gap: 0 (or empty) leaves the label tight against the avatar,
+  // and the dedicated `labelAvatarGap` control adds separation from there
+  // without touching the bar/axis geometry.
+  const NAME_PAD_R = Math.max(0, labelAvatarGap ?? 0);
   const BAR_RATIO = Math.min(Math.max(barWidth ?? 0.75, 0.1), 0.95);
   // Static entity axis: a fixed name column on the left of every row. Its
   // width fits the longest entity label (approx. char width for the label font).
