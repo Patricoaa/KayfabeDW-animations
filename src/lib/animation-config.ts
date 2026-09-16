@@ -335,6 +335,18 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
   // final pause; off by default only if `showLabels` is true.
   finaleAnimation?: boolean;
 
+  // Minimum bar length (px). The bar never draws shorter than the end-of-bar
+  // number (the value label at the bar tip), so the datum is never truncated or
+  // clipped by a tiny bar. Empty = automatic: the bar's floor is the width of
+  // the current value text (never cuts the number); a number overrides that
+  // floor upward.
+  minBarWidth?: number;
+
+  // Keep the bar at its minimum length too while the bar COLLAPSES during the
+  // finale close (otherwise the shrinking bar can dip below the value and the
+  // end-of-bar number gets cut). Default true when the finale runs.
+  minBarWidthClose?: boolean;
+
   // Which participant set runs the race (alongside `maxRows`):
   // - 'final-value' (default): keep exactly the `maxRows` entities with the
   //   LARGEST ('top') or SMALLEST ('bottom') accumulated value at the END of

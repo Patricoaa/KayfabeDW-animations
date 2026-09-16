@@ -166,6 +166,15 @@ export type RaceScrollingProps = {
   barThickness?: number;
   valueFormat?: ValueFormat;
   currencySymbol?: string;
+  // Minimum bar length (px). The bar never draws shorter than the end-of-bar
+  // number (the value label at the bar tip), so the datum is never truncated or
+  // clipped by a tiny bar. Empty = automatic: the floor is the width of the
+  // current value text (never cuts the number); a number overrides upward.
+  minBarWidth?: number;
+  // Keep the bar at its minimum length too while it COLLAPSES during the
+  // finale close (so the shrinking bar never dips below the value and the
+  // end-of-bar number gets cut). Default true when the finale runs.
+  minBarWidthClose?: boolean;
   backgroundType?: 'color' | 'pattern' | 'gradient' | 'image';
   background?: string;
   backgroundSecondary?: string;
@@ -256,6 +265,8 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   barThickness,
   valueFormat = 'number',
   currencySymbol = '$',
+  minBarWidth,
+  minBarWidthClose = true,
   backgroundType = 'color',
   background = '#0a0a0a',
   backgroundSecondary = '#1f2937',
@@ -960,6 +971,13 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
     // crosses the Y axis, animating over ~STEP_EASE_FRAMES and holding flat
     // between dates (see `barDisplayValue`).
     const display = barDisplayValue(p.label, frame);
+    // Min bar floor: the end-of-bar number must never be truncated by the bar
+    // size, so the bar is at least as wide as the current value label (plus the
+    // built-in tip padding already reserved by `valueMaxW`). Empty = automatic:
+    // floor = the value text width. A manual `minBarWidth` raises it further.
+    const valueLabel = fmtValue(Math.round(display), valueFormat, currencySymbol);
+    const autoMinW = valueLabel.length * ROW_FONT * 0.62 + 24;
+    const minW = Math.min(BAR_MAX_W, Math.max(minBarWidth ?? autoMinW, autoMinW));
     const rawW = Math.max(0, (display / maxAccum) * BAR_MAX_W);
     const pop = p.active
       ? spring({
@@ -969,16 +987,21 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
           durationInFrames: 28,
         })
       : 1;
-    const raceW = rawW * pop;
+    // The floor scales with the entrance pop too, so a not-yet-pop'd bar grows
+    // from 0 while the number itself has not faded in (`opacity: pop`).
+    const raceW = Math.max(rawW, minW) * pop;
     // Finale: the bar's LEFT edge rides EXACTLY with its row's avatar
     // (translate = rowT * avatarDx), while the RIGHT edge stays pinned at its
     // race-end position (`raceW`) — so the bar collapses right-to-left, always
     // staying tucked under the avatar, and the value stays anchored/visible on
     // the fixed right end.
     const trackL = rowT * avatarDx;
-    const w = finaleActive ? Math.max(0, raceW - trackL) : raceW;
+    // When the close keeps the minimum (default), the collapsing bar stops at
+    // the floor instead of shrinking below the value and cutting its number.
+    const closeMin = finaleActive && minBarWidthClose !== false ? minW : 0;
+    const w = finaleActive ? Math.max(Math.max(0, raceW - trackL), closeMin) : raceW;
     const barLeft = finaleActive ? Math.min(trackL, raceW) : 0;
-    const anchorW = finaleActive ? raceW : Math.max(0, w);
+    const anchorW = finaleActive ? Math.max(closeMin, raceW) : Math.max(0, w);
     const valueRight = BAR_MAX_W - anchorW + 12;
     const valueMaxW = Math.max(0, anchorW - 24);
     const scale = finaleActive ? 1 : isLeader(p) ? winnerScale : 1;

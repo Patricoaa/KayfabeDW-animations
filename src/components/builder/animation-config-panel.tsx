@@ -1033,6 +1033,14 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           Solo cuando "Mostrar etiqueta de la entidad" está apagada: durante la pausa final el eje Y se desvanece, los avatares van al centro, las barras se encogen (mayor a menor) y las etiquetas entran desde la izquierda. Con etiquetas visibles o el switch apagado, la pausa queda congelada como hasta ahora. La secuencia se comprime o respira con la duración de la pausa.
         </p>
         <SwitchControl
+          label="Mantener el mínimo de la barra al cerrar"
+          checked={value.minBarWidthClose ?? true}
+          onChange={(v) => update({minBarWidthClose: v})}
+        />
+        <p className="text-[10px] text-muted mt-0.5 mb-1">
+          Al encogerse, la barra no baja del mínimo (ancho del número del extremo o el valor manual), así el dato nunca se corta al cerrar.
+        </p>
+        <SwitchControl
           label="Efecto podio al final"
           checked={value.podiumEffect ?? true}
           onChange={(v) => update({podiumEffect: v})}
@@ -1115,6 +1123,10 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
           </p>
           <NumberControl label="Radio de esquina de la barra (vacío = píldora)" value={value.barRadius} min={0} max={60} step={1} onChange={(v) => update({barRadius: v})} />
           <NumberControl label="Grosor de la barra (px, vacío = automático)" value={value.barThickness} min={4} max={120} step={2} onChange={(v) => update({barThickness: v})} />
+          <NumberControl label="Mínimo de la barra (px, vacío = ancho del número)" value={value.minBarWidth} min={0} max={120} step={2} onChange={(v) => update({minBarWidth: v})} />
+          <p className="text-[10px] text-muted mt-0.5 mb-1">
+            La barra nunca es más corta que el número de su extremo (no se trunca). Vacío = automático (igual al ancho del número); un valor manual lo sube aún más.
+          </p>
           <SliderNumberInput label="Separación vertical entre filas (px)" value={value.rowGap ?? 0} min={0} max={120} step={2} onChange={(v) => update({rowGap: v || undefined})} />
           <p className="text-[10px] text-muted mt-0.5 mb-1">
             También define el inicio y fin del plot: el eje Y y las gridlines de fecha abarcan el bloque de filas (incluidos los huecos) más un padding proporcional.

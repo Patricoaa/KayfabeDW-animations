@@ -473,6 +473,8 @@ function convertRaceScrolling(
     markerImageField: t?.markerImageField,
     barSoundSrc: t?.barSoundSrc,
     finaleAnimation: t?.finaleAnimation,
+    minBarWidth: t?.minBarWidth,
+    minBarWidthClose: t?.minBarWidthClose,
     maxRows: t?.maxRows,
     entitySelection: t?.entitySelection,
     finalValueDirection: t?.finalValueDirection,
