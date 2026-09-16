@@ -347,6 +347,12 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
   // end-of-bar number gets cut). Default true when the finale runs.
   minBarWidthClose?: boolean;
 
+  // Secondary data shown under the entity label, one line per selected model
+  // column. The value follows the PERIOD: the line shows the field value of
+  // the period currently crossing the axis for that entity (it updates as the
+  // race sweeps, not a static per-entity attribute).
+  labelExtraFields?: string[];
+
   // Which participant set runs the race (alongside `maxRows`):
   // - 'final-value' (default): keep exactly the `maxRows` entities with the
   //   LARGEST ('top') or SMALLEST ('bottom') accumulated value at the END of

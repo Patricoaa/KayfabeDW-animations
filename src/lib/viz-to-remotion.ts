@@ -522,6 +522,15 @@ function convertRaceScrolling(
   const valueField = resolveValueField(rows, config, tc);
   const imageField = tc?.imageField;
   const markerImageField = tc?.markerImageField;
+  // Secondary label fields: resolved once against the real column names, then
+  // each period step carries that field's value (from the LAST row that lands
+  // in the bucket) to render under the entity label as it sweeps.
+  const extraFields = (tc?.labelExtraFields ?? []).map((f) => resolveKey(rows, f)).filter((k) => k !== '');
+  const cellText = (v: unknown): string | null => {
+    if (v === null || v === undefined) return null;
+    const s = String(v);
+    return s.trim() === '' ? null : s;
+  };
   // The cardinality axis column: explicit `axisField` first, then legacy
   // `dateField`, then an auto-detected date-ish column by name.
   const explicitAxis = tc?.axisField ? resolveKey(rows, tc.axisField) : '';
@@ -539,6 +548,7 @@ function convertRaceScrolling(
       markerImage: markerImageField ? avatarUrlOf(row[markerImageField]) : null,
       date: startField ? parseDateValue(row[startField]) : null,
       value: Number(row[valueField ?? Object.keys(row)[1] ?? ''] ?? 0),
+      extra: extraFields.length > 0 ? extraFields.map((k) => cellText(row[k])) : undefined,
       row,
     }))
     .filter((it) => !isNaN(it.value));
@@ -596,7 +606,7 @@ function convertRaceScrolling(
     const sorted = [...items.filter((it) => it.date == null)].sort((a, b) => b.value - a.value);
     return {
       title: (tc?.title || config.title) ?? '',
-      items: sorted.map(({label, image, value}) => ({label, image, value})),
+      items: sorted.map(({label, image, value, extra}) => ({label, image, value, extra})),
       accentColor: config.colors?.[0] ?? '#FFD700',
       dateMode: false,
       ...presentationOf(tc),
@@ -620,7 +630,7 @@ function convertRaceScrolling(
   };
   const bucketOf = (pos: number): number => (dateMode ? periodStart(pos, fmt) : pos);
 
-  const byLabel = new Map<string, {image: string | null; markerImage: string | null; map: Map<number, {value: number; count: number; raws: number[]; markerImages: (string | null)[]}>}>();
+  const byLabel = new Map<string, {image: string | null; markerImage: string | null; map: Map<number, {value: number; count: number; raws: number[]; markerImages: (string | null)[]; extra: (string | null)[]}>}>();
   for (const it of positioned) {
     if (it.label === '' || isNaN(it.pos)) continue;
     let entry = byLabel.get(it.label);
@@ -631,12 +641,13 @@ function convertRaceScrolling(
     const bucket = bucketOf(it.pos);
     let b = entry.map.get(bucket);
     if (!b) {
-      b = {value: it.value, count: 1, raws: [it.value], markerImages: [it.markerImage]};
+      b = {value: it.value, count: 1, raws: [it.value], markerImages: [it.markerImage], extra: extraFields.map((k) => cellText(it.row[k]))};
       entry.map.set(bucket, b);
     } else {
       b.count += 1;
       b.raws.push(it.value);
       b.markerImages.push(it.markerImage);
+      b.extra = extraFields.map((k) => cellText(it.row[k]));
       b.value += it.value;
     }
   }
@@ -644,7 +655,7 @@ function convertRaceScrolling(
   const agg = tc?.valueAgg ?? 'sum';
   const accumulate = tc?.accumulateMode !== 'period';
 
-  const steps: {label: string; image: string | null; markerImage: string | null; markerImages: (string | null)[]; pos: number; value: number; delta: number}[] = [];
+  const steps: {label: string; image: string | null; markerImage: string | null; markerImages: (string | null)[]; pos: number; value: number; delta: number; extra: (string | null)[]}[] = [];
   for (const [label, entry] of byLabel) {
     const ordered = Array.from(entry.map.entries()).sort((a, b) => a[0] - b[0]);
     let running = 0;
@@ -668,7 +679,7 @@ function convertRaceScrolling(
       // bucket contributes its own marker image, so the axis marker of that
       // period shows the actual reference(s) it represents (e.g. each title
       // won), not just the entity's first image.
-      steps.push({label, image: entry.image, markerImage: entry.markerImage, markerImages: bucket.markerImages, pos: period, value: accumulate ? running : periodValue, delta: periodValue});
+      steps.push({label, image: entry.image, markerImage: entry.markerImage, markerImages: bucket.markerImages, pos: period, value: accumulate ? running : periodValue, delta: periodValue, extra: extraFields.length > 0 ? bucket.extra : []});
     }
   }
 

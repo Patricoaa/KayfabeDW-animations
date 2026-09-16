@@ -65,6 +65,10 @@ export type RaceScrollingItem = {
   pos: number;                // position on the scrolling axis (date ms or plain number)
   value: number;              // accumulated numeric shown once activated
   delta?: number;             // (informational) per-period amount that date adds; the number marker computes its own delta from `value`
+  // Secondary data under the entity label: one entry per configured
+  // `labelExtraFields` model column, holding that period's field value (the
+  // row that just crossed the axis). Empty array = no secondary lines.
+  extra?: (string | null)[];
 };
 
 export type RaceScrollingProps = {
@@ -421,7 +425,22 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   // When `showLabels` is off the column collapses (NAME_W = 0) and the plot /
   // bar track expands to the left.
   const LABEL_FONT = Math.max(12, Math.round(ROW_FONT * 0.8));
-  const NAME_W_FULL = Math.min(innerW * 0.34, Math.max(110, Math.max(...items.map((r) => r.label.length), 1) * LABEL_FONT * 0.52 + 16));
+  // Secondary data under the entity label: smaller strict font, muted default.
+  const LABEL_SUB_FONT = Math.max(10, Math.round(LABEL_FONT * 0.72));
+  // CSS for the entity label honoring its overflow setting: 'truncate' (default,
+  // ellipsis on overflow), 'wrap' (multi-line within the name column) or 'none'
+  // (full text, no ellipsis).
+  const LABEL_OVERFLOWS: Record<'truncate' | 'wrap' | 'none', React.CSSProperties> = {
+    truncate: {whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%'},
+    wrap: {whiteSpace: 'normal', overflow: 'hidden', wordBreak: 'break-word', maxWidth: '100%'},
+    none: {whiteSpace: 'nowrap', overflow: 'visible', maxWidth: '100%'},
+  };
+  const labelOverflowCss = (ov?: RaceTextStyle['overflow']): React.CSSProperties => LABEL_OVERFLOWS[ov ?? 'truncate'];
+  // Name column: its width must also fit the widest secondary value, so a
+  // longer sub-line is never cut before the label is.
+  const labelTextMax = Math.max(1, ...items.map((r) => r.label.length));
+  const subTextMax = Math.max(0, ...items.map((r) => Math.max(0, ...(r.extra ?? []).map((x) => (x ?? '').length))));
+  const NAME_W_FULL = Math.min(innerW * 0.34, Math.max(110, Math.max(labelTextMax * LABEL_FONT * 0.52, subTextMax * LABEL_SUB_FONT * 0.52) + 16));
   const NAME_W = (showLabels ?? true) ? NAME_W_FULL : 0;
   // Bars grow IN PLACE from this column, so only the track to its right scrolls.
   const BAR_MAX_W = Math.max((innerW - NAME_W - ROW_GAP_PX * 2) * BAR_RATIO, 1);
@@ -502,7 +521,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   const guideT = guideTAt(frame);
 
   // ---- Group steps by entity ----
-  const byLabel = new Map<string, {image?: string | null; steps: {x: number; value: number}[]}>();
+  const byLabel = new Map<string, {image?: string | null; steps: {x: number; value: number; extra?: (string | null)[]}[]}>();
   for (const r of rows) {
     const x = Math.min(Math.max(fracFor(r.pos), 0), 1);
     let entry = byLabel.get(r.label);
@@ -510,7 +529,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
       entry = {image: r.image, steps: []};
       byLabel.set(r.label, entry);
     }
-    entry.steps.push({x, value: r.value});
+    entry.steps.push({x, value: r.value, extra: r.extra});
   }
   for (const e of byLabel.values()) e.steps.sort((a, b) => a.x - b.x);
 
@@ -585,7 +604,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
   };
 
   // ---- Live ranking snapshots, shared per sweep position (see timeline-race) ----
-  type Participant = {label: string; image?: string | null; active: boolean; firstX: number; current: number};
+  type Participant = {label: string; image?: string | null; active: boolean; firstX: number; current: number; extra?: (string | null)[]};
   type RankSnap = {
     list: Participant[];
     full: Participant[];
@@ -612,7 +631,7 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
       // axis (no interpolation between dates). The smooth mini-ease of the
       // rendered bar lives in `barDisplayValue`, not here.
       const current = active ? targetValueAt(steps, i) : 0;
-      list.push({label, image: e.image, active, firstX: steps[0]?.x ?? 1, current});
+      list.push({label, image: e.image, active, firstX: steps[0]?.x ?? 1, current, extra: active ? steps[i].extra : []});
     }
     const full = reorderByValue ? [...list].sort((a, b) => b.current - a.current || staticOrder.indexOf(a.label) - staticOrder.indexOf(b.label)) : list;
     const all = maxRows && maxRows > 0 ? full.slice(0, maxRows) : full;
@@ -1078,13 +1097,23 @@ export const RaceScrolling: React.FC<RaceScrollingProps> = ({
     return (
       <div key={p.label} style={{position: 'absolute', left: 0, right: 0, height: ROW_H, top, display: 'flex', alignItems: 'center', gap: ROW_GAP_PX, opacity: rowOpacity}}>
         {(showLabels ?? true) && (
-          <div style={{width: NAME_W, flexShrink: 0, overflow: 'hidden', textAlign: 'right', paddingRight: ROW_GAP_PX * 0.5, display: 'flex', alignItems: 'center', justifyContent: 'flex-end'}}>
-            <span style={{whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', ...textStyle(labelText, {color: '#e4e4e7', size: LABEL_FONT, weight: 700}), opacity: pop}}>{p.label}</span>
+          <div style={{width: NAME_W, flexShrink: 0, overflow: 'hidden', textAlign: 'right', paddingRight: ROW_GAP_PX * 0.5, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center'}}>
+            <span style={{...labelOverflowCss(labelText?.overflow), ...textStyle(labelText, {color: '#e4e4e7', size: LABEL_FONT, weight: 700}), opacity: pop}}>{p.label}</span>
+            {(p.extra ?? []).map((v, i) =>
+              v === null || v === undefined || String(v).trim() === '' ? null : (
+                <span key={i} style={{...labelOverflowCss(labelText?.overflow), ...textStyle(labelText, {color: '#71717a', size: LABEL_SUB_FONT, weight: 500}), opacity: pop}}>{v}</span>
+              ),
+            )}
           </div>
         )}
         {finaleActive && rowT > 0.001 && (
-          <div style={{position: 'absolute', left: 0, top: 0, height: ROW_H, width: NAME_W_FULL, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: ROW_GAP_PX * 0.5, opacity: rowT, transform: `translateX(${-(1 - rowT) * NAME_W_FULL * 0.8}px)`, zIndex: 2}}>
-            <span style={{whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', ...textStyle(labelText, {color: '#e4e4e7', size: LABEL_FONT, weight: 700})}}>{p.label}</span>
+          <div style={{position: 'absolute', left: 0, top: 0, height: ROW_H, width: NAME_W_FULL, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center', paddingRight: ROW_GAP_PX * 0.5, opacity: rowT, transform: `translateX(${-(1 - rowT) * NAME_W_FULL * 0.8}px)`, zIndex: 2}}>
+            <span style={{...labelOverflowCss(labelText?.overflow), ...textStyle(labelText, {color: '#e4e4e7', size: LABEL_FONT, weight: 700})}}>{p.label}</span>
+            {(p.extra ?? []).map((v, i) =>
+              v === null || v === undefined || String(v).trim() === '' ? null : (
+                <span key={i} style={{...labelOverflowCss(labelText?.overflow), ...textStyle(labelText, {color: '#71717a', size: LABEL_SUB_FONT, weight: 500})}}>{v}</span>
+              ),
+            )}
           </div>
         )}
         {SEG_ORDER.map((seg) => segments[seg])}

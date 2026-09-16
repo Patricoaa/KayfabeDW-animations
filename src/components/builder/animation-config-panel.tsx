@@ -775,6 +775,22 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
   const setEntitySelection = (mode: Exclude<RaceScrollingConfig['entitySelection'], undefined>) => {
     update({entitySelection: mode});
   };
+  const addLabelExtraField = () => {
+    const used = new Set(value.labelExtraFields ?? []);
+    const pool = fieldMeta.length > 0 ? fieldMeta.map((o) => o.alias) : columns;
+    const next = pool.find((c) => !used.has(c));
+    if (next) update({labelExtraFields: [...(value.labelExtraFields ?? []), next]});
+  };
+  const setLabelExtraField = (index: number, field: string) => {
+    const next = [...(value.labelExtraFields ?? [])];
+    next[index] = field;
+    update({labelExtraFields: next});
+  };
+  const removeLabelExtraField = (index: number) => {
+    const next = [...(value.labelExtraFields ?? [])];
+    next.splice(index, 1);
+    update({labelExtraFields: next.length > 0 ? next : undefined});
+  };
   const fmt = (value.dateFormat ?? 'day') as DateFormat;
   const setBarColor = (label: string, color?: string) => {
     const next = {...(value.barColors ?? {})};
@@ -1341,10 +1357,47 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
         <p className="text-[10px] text-muted mt-0.5">
           El nombre de la entidad en el eje fijo de la izquierda. Al ocultarlo la columna se colapsa y el plot/banda de barras se expande hacia la izquierda.
         </p>
-        <TextStyleControls label="Texto de la etiqueta" value={value.labelText} onChange={(patch) => update({labelText: {...(value.labelText ?? {}), ...patch}})}  showTextTransform showSpacing showHighlight showUnderline maxSize={160}/>
+        <TextStyleControls label="Texto de la etiqueta" value={value.labelText} onChange={(patch) => update({labelText: {...(value.labelText ?? {}), ...patch}})} showOverflow showTextTransform showSpacing showHighlight showUnderline maxSize={160}/>
         <p className="text-[10px] text-muted mt-0.5">
-          El nombre de la entidad en el eje fijo de la izquierda.
+          El nombre de la entidad en el eje fijo de la izquierda. «Desbordamiento» controla si el texto se recorta (…), se envuelve en varias líneas o se muestra completo.
         </p>
+        <div className="pt-2 mt-1 border-t border-border-subtle">
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-sm font-medium block">Datos secundarios por fila</label>
+            <button
+              onClick={addLabelExtraField}
+              className="text-xs text-amber-500 hover:text-amber-400 font-medium"
+            >
+              + Agregar campo
+            </button>
+          </div>
+          <p className="text-[10px] text-muted mb-1.5">
+            Columnas del modelo que se muestran como línea secundaria bajo el nombre de cada entidad. El valor SIGUE AL PERIODO: se actualiza según la fecha que está cruzando el eje en ese momento.
+          </p>
+          {(value.labelExtraFields ?? []).map((f, i) => (
+            <div key={i} className="flex items-center gap-1 mb-1.5">
+              <SelectControl
+                value={f}
+                onChange={(e) => setLabelExtraField(i, e.target.value)}
+                className="flex-1 bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+              >
+                {(fieldMeta.length > 0 ? fieldMeta.map((o) => o.alias) : columns).map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </SelectControl>
+              <button
+                onClick={() => removeLabelExtraField(i)}
+                className="text-muted hover:text-red-500 px-1 text-xs"
+                aria-label="Quitar campo secundario"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+          {(value.labelExtraFields?.length ?? 0) === 0 && (
+            <p className="text-[10px] text-muted">Sin datos secundarios. Pulsa «+ Agregar campo» para seleccionar columnas del modelo.</p>
+          )}
+        </div>
         <div className="h-px bg-border-default my-3" />
         <TextStyleControls label="Texto del dato (dentro de la barra)" value={value.valueText} onChange={(patch) => update({valueText: {...(value.valueText ?? {}), ...patch}})}  showTextTransform showSpacing showHighlight showUnderline maxSize={160}/>
         <p className="text-[10px] text-muted mt-0.5">
