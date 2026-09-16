@@ -1395,7 +1395,7 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
             </button>
           </div>
           <p className="text-[10px] text-muted mb-1.5">
-            Columnas del modelo que se muestran en una fila continua «Título:dato» bajo el nombre de cada entidad. Cada dato SIGUE AL PERIODO: agrega esa columna sobre la fecha que está cruzando el eje en ese momento.
+            Columnas del modelo que se muestran en una fila continua «Título:dato» bajo el nombre de cada entidad. Cada dato SIGUE AL BARRIO: agrega esa columna sobre la TOTALIDAD de periodos hasta el que cruza el eje (un total acumulado por entidad, no solo el periodo actual).
           </p>
           {labelExtraFieldList.map((f, i) => (
             <div key={i} className="mb-2 border border-border-default rounded-lg p-2">
@@ -1424,7 +1424,7 @@ function RaceScrollingPanel({templateId, columns, fieldMeta, value, onChange, pa
                 placeholder={f.field}
                 className="w-full bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500 mb-1.5"
               />
-              <label className="block text-[10px] text-muted mb-0.5">Agregación por periodo</label>
+              <label className="block text-[10px] text-muted mb-0.5">Agregación (acumulada)</label>
               <SelectControl
                 value={f.agg ?? 'last'}
                 onChange={(e) => setLabelExtraAgg(i, e.target.value as RaceScrollingExtraField['agg'])}

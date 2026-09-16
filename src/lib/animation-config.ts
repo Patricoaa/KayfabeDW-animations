@@ -255,11 +255,12 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
   // together (see the "Barras" panel section).
   // One secondary-data pair shown under the entity label («title:value»), part
   // of the continuous wrapping row. The value aggregates the configured model
-  // `field` over the period currently crossing the axis:
-  // - 'last' (default): the last value of the period (pre-period behavior).
-  // - 'sum' | 'avg' | 'min' | 'max': aggregate the numeric values of the
-  //   period; fields that are not strictly numeric fall back to 'last'.
-  // - 'count': number of rows that land in the period.
+  // `field` over ALL periods up to the one currently crossing the axis (a
+  // running total per entity, not just the period alone):
+  // - 'last' (default): the last value seen up to that period.
+  // - 'sum' | 'avg' | 'min' | 'max': aggregate the numeric values of the whole
+  //   history; fields that are not strictly numeric fall back to 'last'.
+  // - 'count': number of rows seen up to that period.
   // `title` overrides the displayed prefix (defaults to the configured field),
   // `text` gives the element a full text control of its own.
   export type RaceScrollingExtraField = {
@@ -366,10 +367,10 @@ export type TimelineRaceConfig = CommonAnimationConfig & {
   // Secondary data under the entity label: one continuous row of «title:value»
   // pairs that wraps inside the name column, one pair per selected model
   // column. Each pair has its own display title (defaults to the configured
-  // field name), its own text control, and its own period aggregation. The
-  // value follows the PERIOD: it aggregates that field over the period
-  // currently crossing the axis for that entity (it updates as the race
-  // sweeps, not a static per-entity attribute).
+  // field name), its own text control, and its own aggregation. The value
+  // follows the sweep: it aggregates that field over ALL periods up to the one
+  // currently crossing the axis for that entity (a running total that updates
+  // as the race sweeps, not a static per-entity attribute).
   labelExtraFields?: RaceScrollingExtraField[];
 
   // Which participant set runs the race (alongside `maxRows`):

@@ -456,10 +456,11 @@ function convertRaceScrolling(
 
   // Secondary label fields: resolved once against the real column names, then
   // every period bucket accumulates each field's RAW row values so the step's
-  // extra pair can aggregate them per period ('last' default, or sum/avg/min/
-  // max for strictly-numeric fields, or the row count). A legacy string
-  // (`labelExtraFields` used to be `string[]`) is treated as {field}: no title,
-  // default text, 'last' aggregation.
+  // extra pair can aggregate them over ALL periods up to the one crossing the
+  // axis ('last' default, or running sum/avg/min/max over strictly-numeric
+  // values, or the running row count). A legacy string (`labelExtraFields`
+  // used to be `string[]`) is treated as {field}: no title, default text,
+  // 'last' aggregation.
   const extraFieldMeta = ((tc?.labelExtraFields ?? []) as (string | RaceScrollingExtraField)[]).flatMap((raw) => {
     const isLegacy = typeof raw === 'string';
     const f = isLegacy ? {field: raw} : raw;
@@ -679,32 +680,24 @@ function convertRaceScrolling(
   const agg = tc?.valueAgg ?? 'sum';
   const accumulate = tc?.accumulateMode !== 'period';
 
-  // Per-field aggregation of the secondary labels over a period bucket
-  // (index-aligned with `extraFieldMeta`): 'last' (default) keeps the value of
-  // the last row that landed in the period; 'sum'/'avg'/'min'/'max' aggregate
-  // the strictly-numeric values (falling back to 'last' when any cell is not
-  // numeric); 'count' is the number of rows in the period.
-  const extraOf = (bucket: {count: number; extraRaw: unknown[][]}, field: number): string | null => {
-    const meta = extraFieldMeta[field];
-    const raws = bucket.extraRaw[field] ?? [];
-    if (raws.length === 0) return null;
-    if (meta.agg === 'count') return String(bucket.count);
-    if (meta.agg !== 'last') {
-      const nums = raws.map((v) => toNumeric(v));
-      if (nums.every((n) => !isNaN(n))) {
-        if (meta.agg === 'sum') return cellText(Math.round((nums.reduce((s, v) => s + v, 0)) * 1e6) / 1e6);
-        if (meta.agg === 'avg') return cellText(Math.round((nums.reduce((s, v) => s + v, 0) / nums.length) * 1e6) / 1e6);
-        if (meta.agg === 'min') return cellText(Math.min(...nums));
-        if (meta.agg === 'max') return cellText(Math.max(...nums));
-      }
-    }
-    return cellText(raws[raws.length - 1]);
-  };
-
   const steps: {label: string; image: string | null; markerImage: string | null; markerImages: (string | null)[]; pos: number; value: number; delta: number; extra: (string | null)[]}[] = [];
   for (const [label, entry] of byLabel) {
     const ordered = Array.from(entry.map.entries()).sort((a, b) => a[0] - b[0]);
     let running = 0;
+    // Running per-field accumulator (index-aligned with `extraFieldMeta`): the
+    // secondary labels aggregate over ALL periods up to the one currently
+    // crossing the axis, not the period alone. 'last' (default) keeps the last
+    // value seen so far; 'sum'/'avg'/'min'/'max' aggregate the strictly-numeric
+    // historical values (falling back to 'last' when any cell is not numeric);
+    // 'count' is the number of rows seen so far.
+    const extraAcc = extraFieldMeta.map(() => ({
+      last: null as unknown,
+      rows: 0,
+      allNumeric: true,
+      sum: 0,
+      min: Infinity,
+      max: -Infinity,
+    }));
     for (const [period, bucket] of ordered) {
       let periodValue: number;
       if (agg === 'count') {
@@ -721,11 +714,37 @@ function convertRaceScrolling(
         periodValue = bucket.raws.reduce((s, v) => s + v, 0);
       }
       running += periodValue;
+      const extra = extraFieldMeta.map((_, field) => {
+        const st = extraAcc[field];
+        const raws = bucket.extraRaw[field] ?? [];
+        for (const r of raws) {
+          st.rows += 1;
+          st.last = r;
+          const n = toNumeric(r);
+          if (isNaN(n)) {
+            st.allNumeric = false;
+          } else {
+            st.sum += n;
+            if (n < st.min) st.min = n;
+            if (n > st.max) st.max = n;
+          }
+        }
+        const meta = extraFieldMeta[field];
+        if (st.rows === 0) return null;
+        if (meta.agg === 'count') return String(st.rows);
+        if (meta.agg !== 'last' && st.allNumeric) {
+          if (meta.agg === 'sum') return cellText(Math.round(st.sum * 1e6) / 1e6);
+          if (meta.agg === 'avg') return cellText(Math.round((st.sum / st.rows) * 1e6) / 1e6);
+          if (meta.agg === 'min') return cellText(st.min);
+          if (meta.agg === 'max') return cellText(st.max);
+        }
+        return cellText(st.last);
+      });
       // The per-period reference images: every datapoint that lands in this
       // bucket contributes its own marker image, so the axis marker of that
       // period shows the actual reference(s) it represents (e.g. each title
       // won), not just the entity's first image.
-      steps.push({label, image: entry.image, markerImage: entry.markerImage, markerImages: bucket.markerImages, pos: period, value: accumulate ? running : periodValue, delta: periodValue, extra: extraFieldMeta.length > 0 ? extraFieldMeta.map((_, i) => extraOf(bucket, i)) : []});
+      steps.push({label, image: entry.image, markerImage: entry.markerImage, markerImages: bucket.markerImages, pos: period, value: accumulate ? running : periodValue, delta: periodValue, extra: extraFieldMeta.length > 0 ? extra : []});
     }
   }
 
