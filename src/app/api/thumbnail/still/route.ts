@@ -79,7 +79,6 @@ export async function POST(request: NextRequest) {
       frame,
       output: null,
       browserExecutable: chromePath,
-      jpegQuality: 90,
     });
 
     if (!buffer || buffer.length === 0) {

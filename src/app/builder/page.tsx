@@ -589,7 +589,7 @@ function BuilderContent() {
       const compositionId = entry?.meta.componentId ?? activeTemplate;
       const fps = entry?.meta.fps ?? 30;
       try {
-        await fetch('/api/thumbnail/still', {
+        const res = await fetch('/api/thumbnail/still', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({
@@ -602,8 +602,12 @@ function BuilderContent() {
             specId,
           }),
         });
-      } catch {
-        // Best-effort: the history card falls back to the config preview.
+        if (!res.ok) {
+          const detail = await res.json().catch(() => null);
+          console.error('[still] Thumbnail failed:', res.status, detail?.error ?? '');
+        }
+      } catch (err) {
+        console.error('[still] Thumbnail request error:', err);
       }
     },
     [activeTemplate, remotionProps, filteredData.length, duration, exportSize.width, exportSize.height],

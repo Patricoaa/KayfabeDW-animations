@@ -34,6 +34,17 @@ const CHART_COLORS: Record<string, string> = {
   table: '#6366f1',
 };
 
+// Proper display names per chart type (scalable: any new type extends the
+// map instead of hardcoding labels per card).
+const CHART_TYPE_LABELS: Record<string, string> = {
+  bar: 'Barras',
+  line: 'Líneas',
+  area: 'Área',
+  pie: 'Torta',
+  scatter: 'Dispersión',
+  table: 'Tabla',
+};
+
 const STATUS_LABEL: Record<string, string> = {
   done: 'Listo',
   processing: 'Procesando',
@@ -317,11 +328,12 @@ export function HistoryClient({
         key={spec.id}
         className="group relative bg-card border border-border-default rounded-lg overflow-hidden hover:border-amber-500/50 transition-colors"
       >
-        {/* Whole card → edits the view (stretched link; secondary actions sit above it) */}
+        {/* Whole card → edits the view (stretched link sits ABOVE the content;
+            secondary action buttons raise above it). */}
         <Link
           href={`/builder?edit=${spec.id}`}
           aria-label={`Editar ${spec.name}`}
-          className="absolute inset-0 z-0 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500"
+          className="absolute inset-0 z-10 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500"
         />
 
         {/* Kicker + dateline */}
@@ -334,7 +346,7 @@ export function HistoryClient({
                 style={{backgroundColor: accentColor}}
               />
               <span className="text-micro font-display font-bold uppercase tracking-widest text-secondary truncate">
-                {chartType}
+                {CHART_TYPE_LABELS[chartType] ?? chartType}
               </span>
             </div>
             <span className="text-[10px] font-mono text-muted shrink-0">
@@ -356,21 +368,6 @@ export function HistoryClient({
             <div className="relative h-36 sm:h-44 w-full overflow-hidden rounded-md">
               <Thumb spec={spec} />
             </div>
-            <div className="pointer-events-none absolute top-2 right-2 flex items-center gap-1">
-              {spec.is_draft && (
-                <span className="text-[9px] text-amber-300 px-1.5 py-0.5 bg-black/60 backdrop-blur-sm border border-amber-500/40 rounded">
-                  borrador
-                </span>
-              )}
-              {typeof spec.version === 'number' && spec.version > 1 && (
-                <span
-                  title={`Versión ${spec.version}`}
-                  className="text-[9px] text-white/80 px-1.5 py-0.5 bg-black/60 backdrop-blur-sm border border-white/10 rounded"
-                >
-                  v{spec.version}
-                </span>
-              )}
-            </div>
           </div>
         </div>
 
@@ -386,7 +383,7 @@ export function HistoryClient({
               disabled={duplicating === spec.id}
               title="Duplicar visualización"
               aria-label="Duplicar visualización"
-              className="relative z-10 cursor-pointer px-2 py-1.5 text-muted hover:text-amber-500 hover:bg-card-hover rounded text-xs transition-colors"
+              className="relative z-20 cursor-pointer px-2 py-1.5 text-muted hover:text-amber-500 hover:bg-card-hover rounded text-xs transition-colors"
             >
               {duplicating === spec.id ? '...' : <Copy size={14} />}
             </button>
@@ -394,7 +391,7 @@ export function HistoryClient({
               onClick={() => setConfirmDeleteId(spec.id)}
               disabled={deleting === spec.id}
               aria-label="Eliminar visualización"
-              className="relative z-10 cursor-pointer px-2 py-1.5 text-muted hover:text-red-500 hover:bg-card-hover rounded text-xs transition-colors"
+              className="relative z-20 cursor-pointer px-2 py-1.5 text-muted hover:text-red-500 hover:bg-card-hover rounded text-xs transition-colors"
             >
               {deleting === spec.id ? '...' : <Trash2 size={14} />}
             </button>
