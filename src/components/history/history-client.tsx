@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {useRouter} from 'next/navigation';
 import {useToast} from '@/components/ui/toast';
 import {ConfirmDialog} from '@/components/ui/confirm-dialog';
-import {BarChart3, Search, ArrowUpDown, Copy, Trash2, Folder, Film, CheckCircle2, XCircle, Clock, Plus} from 'lucide-react';
+import {BarChart3, Search, ArrowUpDown, Copy, Trash2, Folder, Film, CheckCircle2, XCircle, Clock, Plus, ArrowRight} from 'lucide-react';
 
 // Display names mirror TEMPLATES in src/remotion/generated/registry.ts. Kept
 // as a static map so the client bundle doesn't pull in the registry's
@@ -27,11 +27,11 @@ const CHART_ICONS: Record<string, React.ComponentType<{size?: number; className?
 
 const CHART_COLORS: Record<string, string> = {
   bar: '#f59e0b',
-  line: '#f59e0b',
-  area: '#f59e0b',
-  pie: '#f59e0b',
-  scatter: '#f59e0b',
-  table: '#f59e0b',
+  line: '#3b82f6',
+  area: '#8b5cf6',
+  pie: '#10b981',
+  scatter: '#f97316',
+  table: '#6366f1',
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -150,7 +150,7 @@ function SpecPreview({spec}: {spec: VizSpec}) {
     <div
       role="img"
       aria-label={`Vista previa de ${spec.name}`}
-      className="relative h-40 w-full overflow-hidden border-b border-border-subtle bg-elevated"
+      className="relative h-full w-full overflow-hidden rounded-md bg-elevated"
     >
       <svg
         viewBox="0 0 320 160"
@@ -168,6 +168,29 @@ function SpecPreview({spec}: {spec: VizSpec}) {
       </div>
     </div>
   );
+}
+
+/**
+ * Real thumbnail with graceful degradation: if the blob URL fails or 404s,
+ * it falls back to the config-driven SpecPreview instead of showing a broken
+ * image.
+ */
+function Thumb({spec}: {spec: VizSpec}) {
+  const [failed, setFailed] = useState(false);
+
+  if (spec.thumbnail_url && !failed) {
+    return (
+      <img
+        src={spec.thumbnail_url}
+        alt={`Vista previa de ${spec.name}`}
+        loading="lazy"
+        decoding="async"
+        onError={() => setFailed(true)}
+        className="h-full w-full object-cover"
+      />
+    );
+  }
+  return <SpecPreview spec={spec} />;
 }
 
 export function HistoryClient({
@@ -288,72 +311,82 @@ export function HistoryClient({
 
   const renderCard = (spec: VizSpec) => {
     const chartType = spec.chart_type ?? 'bar';
-    const Icon = CHART_ICONS[chartType] ?? BarChart3;
-    const accentColor = CHART_COLORS[chartType] ?? '#6366f1';
+    const accentColor = CHART_COLORS[chartType] ?? '#f59e0b';
     return (
       <div
         key={spec.id}
-        className="bg-card border border-border-default rounded-lg overflow-hidden hover:border-amber-500/50 transition-colors"
+        className="group relative bg-card border border-border-default rounded-lg overflow-hidden hover:border-amber-500/50 transition-colors"
       >
-        <div className="h-1.5" style={{backgroundColor: accentColor}} />
+        {/* Whole card → edits the view (stretched link; secondary actions sit above it) */}
+        <Link
+          href={`/builder?edit=${spec.id}`}
+          aria-label={`Editar ${spec.name}`}
+          className="absolute inset-0 z-0 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500"
+        />
 
-        {spec.thumbnail_url ? (
-          <img
-            src={spec.thumbnail_url}
-            alt={`Vista previa de ${spec.name}`}
-            loading="lazy"
-            decoding="async"
-            className="w-full h-40 object-cover bg-elevated"
-          />
-        ) : (
-          <SpecPreview spec={spec} />
-        )}
-
-        <div className="p-4">
-          <div className="flex items-start justify-between mb-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <Icon size={20} className="text-amber-500 shrink-0" />
-              <h3 className="font-display font-semibold truncate">{spec.name}</h3>
+        {/* Kicker + dateline */}
+        <div className="relative px-4 pt-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span
+                aria-hidden
+                className="h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{backgroundColor: accentColor}}
+              />
+              <span className="text-micro font-display font-bold uppercase tracking-widest text-secondary truncate">
+                {chartType}
+              </span>
             </div>
-            <div className="flex items-center gap-1 shrink-0">
+            <span className="text-[10px] font-mono text-muted shrink-0">
+              {new Date(spec.created_at).toLocaleDateString('es', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+              })}
+            </span>
+          </div>
+          <h3 className="font-display font-semibold leading-snug mt-2 line-clamp-2 group-hover:text-amber-500/90 transition-colors">
+            {spec.name}
+          </h3>
+        </div>
+
+        {/* Framed preview plate */}
+        <div className="px-4 mt-3">
+          <div className="relative rounded-lg bg-card-hover p-1">
+            <div className="relative h-36 sm:h-44 w-full overflow-hidden rounded-md">
+              <Thumb spec={spec} />
+            </div>
+            <div className="pointer-events-none absolute top-2 right-2 flex items-center gap-1">
               {spec.is_draft && (
-                <span className="text-[9px] text-amber-500 px-1.5 py-0.5 bg-amber-500/10 border border-amber-500/40 rounded">
+                <span className="text-[9px] text-amber-300 px-1.5 py-0.5 bg-black/60 backdrop-blur-sm border border-amber-500/40 rounded">
                   borrador
                 </span>
               )}
               {typeof spec.version === 'number' && spec.version > 1 && (
-                <span title={`Versión ${spec.version}`} className="text-[9px] text-secondary px-1.5 py-0.5 bg-elevated border border-border-subtle rounded">
+                <span
+                  title={`Versión ${spec.version}`}
+                  className="text-[9px] text-white/80 px-1.5 py-0.5 bg-black/60 backdrop-blur-sm border border-white/10 rounded"
+                >
                   v{spec.version}
                 </span>
               )}
-              <span className="text-[10px] text-muted px-1.5 py-0.5 bg-elevated border border-border-subtle rounded">
-                {chartType}
-              </span>
             </div>
           </div>
-          <p className="text-[11px] text-secondary font-mono mb-1">
-            {getSummary(spec)}
-          </p>
-          <p className="text-[11px] text-muted">
-            {new Date(spec.created_at).toLocaleDateString('es', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-            })}
-          </p>
-          <div className="mt-3 flex gap-2">
-            <Link
-              href={`/builder?edit=${spec.id}`}
-              className="flex-1 text-center px-3 py-1.5 bg-amber-500 hover:bg-amber-400 rounded text-xs font-semibold text-black transition-colors font-display"
-            >
-              Editar
-            </Link>
+        </div>
+
+        {/* Footer: summary + primary affordance + secondary actions */}
+        <div className="flex items-center justify-between gap-2 border-t border-border-subtle px-4 py-2.5 mt-3">
+          <p className="text-[10px] font-mono text-muted truncate">{getSummary(spec)}</p>
+          <div className="flex items-center gap-1 shrink-0">
+            <span className="hidden sm:inline-flex items-center gap-1 text-xs font-semibold font-display text-amber-600 dark:text-amber-500/80 group-hover:text-amber-500 dark:group-hover:text-amber-400 transition-colors">
+              Editar <ArrowRight size={12} aria-hidden />
+            </span>
             <button
               onClick={() => handleDuplicate(spec)}
               disabled={duplicating === spec.id}
               title="Duplicar visualización"
               aria-label="Duplicar visualización"
-              className="cursor-pointer px-3 py-1.5 text-muted hover:text-amber-500 hover:bg-card-hover rounded text-xs transition-colors"
+              className="relative z-10 cursor-pointer px-2 py-1.5 text-muted hover:text-amber-500 hover:bg-card-hover rounded text-xs transition-colors"
             >
               {duplicating === spec.id ? '...' : <Copy size={14} />}
             </button>
@@ -361,7 +394,7 @@ export function HistoryClient({
               onClick={() => setConfirmDeleteId(spec.id)}
               disabled={deleting === spec.id}
               aria-label="Eliminar visualización"
-              className="cursor-pointer px-3 py-1.5 text-muted hover:text-red-500 hover:bg-card-hover rounded text-xs transition-colors"
+              className="relative z-10 cursor-pointer px-2 py-1.5 text-muted hover:text-red-500 hover:bg-card-hover rounded text-xs transition-colors"
             >
               {deleting === spec.id ? '...' : <Trash2 size={14} />}
             </button>
