@@ -30,6 +30,7 @@ import dynamic from 'next/dynamic';
 import {ChartConfigPanel} from '@/components/builder/chart-config-panel';
 import type {ColumnMeta} from '@/components/builder/chart-config-panel';
 import {StaticPreview} from '@/components/builder/static-preview';
+import {ChartPreview} from '@/components/charts/chart-preview';
 import {TemplatePicker} from '@/components/builder/template-picker';
 import {AnimationPreview} from '@/components/builder/animation-preview';
 import {AnimationConfigPanel} from '@/components/builder/animation-config-panel';
@@ -55,6 +56,22 @@ const QueryCanvas = dynamic(
     </div>
   )},
 );
+
+// Uploads a PNG data URL to Vercel Blob via /api/thumbnail and returns the
+// public URL. Shared by static and animated save-time thumbnail generation.
+async function uploadThumbnail(dataUrl: string): Promise<string | undefined> {
+  try {
+    const res = await fetch('/api/thumbnail', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({dataUrl}),
+    });
+    const json = await res.json();
+    return res.ok && json.url ? (json.url as string) : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 type OutputMode = 'static' | 'animated';
 type View = 'data' | 'result';
@@ -119,6 +136,8 @@ function BuilderContent() {
   const durationLoadedRef = useRef(false);
   const templateDeselectRef = useRef(false);
   const staticExportRef = useRef<HTMLDivElement | null>(null);
+  const thumbnailRef = useRef<HTMLDivElement | null>(null);
+  const [thumbnailBusy, setThumbnailBusy] = useState(false);
   const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosavedOnceRef = useRef(false);
   const lastPersistedKeyRef = useRef<string | null>(null);
@@ -471,6 +490,23 @@ function BuilderContent() {
     }
   }, [outputMode, templateParam, selectedTemplate]);
 
+  // Rasterizes the hidden chart surface (mounted only while busy) into a
+  // thumbnail for views saved in animated mode, which has no on-canvas static
+  // chart. Two animation frames: one for React to mount the node, one to lay
+  // out, so chartToDataUrl reads the real SVG geometry.
+  const rasterizeHiddenThumbnail = async (): Promise<string | undefined> => {
+    setThumbnailBusy(true);
+    try {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      const el = thumbnailRef.current;
+      if (!el) return undefined;
+      const dataUrl = await chartToDataUrl(el);
+      return dataUrl ? await uploadThumbnail(dataUrl) : undefined;
+    } finally {
+      setThumbnailBusy(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!spec.select || spec.select.length === 0) {
       addToast('Selecciona al menos una columna en el canvas antes de guardar', 'error');
@@ -478,20 +514,17 @@ function BuilderContent() {
     }
     setSaving(true);
     try {
-      // Best-effort thumbnail: rasterize the static chart (if visible) so the
-      // gallery can show a preview. Non-fatal on failure.
+      // Best-effort thumbnail so the history card has a real preview. Static
+      // mode rasterizes the on-canvas chart; animated mode mounts a hidden
+      // chart built from the same data/config the view animates. Non-fatal.
       let thumbnailUrl: string | undefined;
-      if (outputMode === 'static' && staticExportRef.current && filteredData.length > 0) {
+      if (filteredData.length > 0) {
         try {
-          const dataUrl = await chartToDataUrl(staticExportRef.current);
-          if (dataUrl) {
-            const thumbRes = await fetch('/api/thumbnail', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({dataUrl}),
-            });
-            const thumb = await thumbRes.json();
-            if (thumbRes.ok && thumb.url) thumbnailUrl = thumb.url;
+          if (outputMode === 'static' && staticExportRef.current) {
+            const dataUrl = await chartToDataUrl(staticExportRef.current);
+            if (dataUrl) thumbnailUrl = await uploadThumbnail(dataUrl);
+          } else {
+            thumbnailUrl = await rasterizeHiddenThumbnail();
           }
         } catch {
           // Thumbnail is best-effort
@@ -999,6 +1032,20 @@ function BuilderContent() {
           <BarChart3 size={14} /> Resultado
         </button>
       </div>
+
+      {/* Hidden chart surface: mounted only while a thumbnail rasterizes, so
+          animated-mode saves still produce a real preview (animated mode has
+          no on-canvas static chart). Offscreen-fixed keeps layout active. */}
+      {thumbnailBusy && (
+        <div
+          ref={thumbnailRef}
+          aria-hidden
+          className="fixed left-[-9999px] top-0 pointer-events-none"
+          style={{width: chartConfig.width ?? 600}}
+        >
+          {filteredData.length > 0 ? <ChartPreview data={filteredData} config={chartConfig} /> : null}
+        </div>
+      )}
     </div>
   );
 }
