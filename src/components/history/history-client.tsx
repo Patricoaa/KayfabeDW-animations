@@ -7,14 +7,23 @@ import {useToast} from '@/components/ui/toast';
 import {ConfirmDialog} from '@/components/ui/confirm-dialog';
 import {BarChart3, Search, ArrowUpDown, Copy, Trash2, Folder, Film, CheckCircle2, XCircle, Clock, Plus, ArrowRight} from 'lucide-react';
 
-// Display names mirror TEMPLATES in src/remotion/generated/registry.ts. Kept
-// as a static map so the client bundle doesn't pull in the registry's
-// queryData modules (@supabase/supabase-js) just to label a render row.
+// Display names for ANIMATED templates (keyed by template_id from
+// animation_config->>'templateId'). Promoted via output_mode === 'animated'.
+// Single source to add a row whenever a new animation template ships — the
+// badge falls back to a humanized id for unknown ones. Kept as a static map
+// so the client bundle doesn't pull in the registry's queryData modules
+// (@supabase/supabase-js) just to label a card.
 const TEMPLATE_NAMES: Record<string, string> = {
   'race-scrolling': 'Race Scrolling',
   'ranking': 'Ranking',
   'timeline-race': 'Timeline Race',
 };
+
+function templateLabel(templateId: string): string {
+  const known = TEMPLATE_NAMES[templateId];
+  if (known) return known;
+  return templateId.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 const CHART_ICONS: Record<string, React.ComponentType<{size?: number; className?: string}>> = {
   bar: BarChart3,
@@ -66,6 +75,8 @@ export type VizSpec = {
   id: string;
   name: string;
   chart_type?: string | null;
+  output_mode?: string | null;
+  template_id?: string | null;
   source_table?: string | null;
   select_count?: number | null;
   join_count?: number | null;
@@ -323,6 +334,13 @@ export function HistoryClient({
   const renderCard = (spec: VizSpec) => {
     const chartType = spec.chart_type ?? 'bar';
     const accentColor = CHART_COLORS[chartType] ?? '#f59e0b';
+    // Type label reflects the REAL kind of viz: the animation template name
+    // for animated views, the chart-type name for static ones. Falls back to
+    // the raw value if neither map has an entry (future types still label).
+    const typeLabel =
+      spec.output_mode === 'animated' && spec.template_id
+        ? templateLabel(spec.template_id)
+        : CHART_TYPE_LABELS[chartType] ?? chartType;
     return (
       <div
         key={spec.id}
@@ -346,7 +364,7 @@ export function HistoryClient({
                 style={{backgroundColor: accentColor}}
               />
               <span className="text-micro font-display font-bold uppercase tracking-widest text-secondary truncate">
-                {CHART_TYPE_LABELS[chartType] ?? chartType}
+                {typeLabel}
               </span>
             </div>
             <span className="text-[10px] font-mono text-muted shrink-0">
