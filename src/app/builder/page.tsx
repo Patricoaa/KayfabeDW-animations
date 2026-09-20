@@ -40,6 +40,7 @@ import {TEMPLATES} from '@/remotion/generated/registry';
 import type {TemplateId} from '@/remotion/generated/registry';
 import type {AnimationTemplateConfig} from '@/lib/animation-config';
 import {emptyAnimationConfig} from '@/lib/animation-config';
+import {deriveVizConfig} from '@/lib/viz-config';
 import {loadSafeZones, saveSafeZones, safeZonesFromConfig, type SafeZoneSettings} from '@/lib/safe-zones';
 import {paginateRows, PAGE_SIZE, ABS_MAX_ROWS} from '@/lib/paginate';
 import {useToast} from '@/components/ui/toast';
@@ -382,11 +383,8 @@ function BuilderContent() {
   // para que el modo se decida por columna y alternar estático <-> animado
   // no destruya la config animada (0125).
   const buildDraftPayload = useCallback(
-    () => ({
-      name: vizName,
-      query_spec: spec,
-      chart_config: chartConfig,
-      animation_config: {
+    () => {
+      const animationConfig = {
         outputMode,
         templateId: activeTemplate,
         duration,
@@ -394,10 +392,19 @@ function BuilderContent() {
         presetId: exportPresetId,
         customSize: exportPresetId === 'custom' ? customSize : null,
         safeZones,
-      },
-      output_mode: outputMode,
-      is_draft: true,
-    }),
+      };
+      return {
+        name: vizName,
+        query_spec: spec,
+        chart_config: chartConfig,
+        // Config canónica de 3 niveles (0178): la DB la persiste como tal y
+        // los blobs legacy viajan aparte como espejo del mismo store.
+        config: deriveVizConfig(chartConfig, animationConfig, outputMode),
+        animation_config: animationConfig,
+        output_mode: outputMode,
+        is_draft: true,
+      };
+    },
     [vizName, spec, chartConfig, outputMode, activeTemplate, duration, templateConfig, exportPresetId, customSize, safeZones],
   );
 

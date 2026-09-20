@@ -39,6 +39,7 @@ export async function PUT(
       p_is_draft: body.is_draft,
       p_version_bump: body.version_bump === true,
       p_thumbnail_url: body.thumbnail_url ?? null,
+      p_config: body.config ?? null,
     });
     if (error) throw error;
     return NextResponse.json(data);

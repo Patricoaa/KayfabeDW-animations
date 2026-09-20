@@ -306,6 +306,7 @@ export function HistoryClient({
           query_spec: full.query_spec,
           chart_config: full.chart_config,
           animation_config: full.animation_config ?? null,
+          config: full.config ?? null,
         }),
       });
       if (!res.ok) throw new Error('Error al duplicar');
