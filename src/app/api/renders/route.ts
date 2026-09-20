@@ -3,12 +3,6 @@ import {createClient} from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
-type RenderRow = {
-  id: string;
-  output_url?: string | null;
-  status?: string | null;
-};
-
 /**
  * Records a finished render into animation_render (via SECURITY DEFINER RPC,
  * so no anon policies are needed on the table itself). Best-effort: the
@@ -44,18 +38,10 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   try {
     const supabase = await createClient();
-    const {data, error} = await supabase.rpc('list_renders', {p_limit: 50});
+    const {data, error} = await supabase.rpc('list_renders_summary', {p_limit: 50});
     if (error) throw error;
 
-    const renders = (data ?? []) as RenderRow[];
-
-    // Only renders that finished and point to a file are candidates for the
-    // history view.
-    const candidates = renders.filter(
-      (r) => r.status === 'done' && typeof r.output_url === 'string' && r.output_url.length > 0,
-    );
-
-    return NextResponse.json(candidates);
+    return NextResponse.json(data ?? []);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({error: message}, {status: 500});
