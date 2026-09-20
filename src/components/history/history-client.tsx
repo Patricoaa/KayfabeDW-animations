@@ -78,6 +78,98 @@ function formatDate(iso: string | null | undefined): string {
   });
 }
 
+/**
+ * Config-driven preview shown when a saved view has no uploaded thumbnail.
+ * A deterministic SVG skeleton derived from chart_type / source_table / column
+ * count — instant, no blob, always available. The real thumbnail takes
+ * precedence whenever one exists.
+ */
+function SpecPreview({spec}: {spec: VizSpec}) {
+  const chartType = spec.chart_type ?? 'bar';
+  const accent = CHART_COLORS[chartType] ?? '#f59e0b';
+  const table = spec.source_table ?? 'tabla';
+  const cols = spec.select_count ?? 0;
+
+  let chart: React.ReactNode;
+  if (chartType === 'pie') {
+    chart = (
+      <>
+        <circle cx="160" cy="82" r="52" fill="none" stroke={accent} strokeWidth="34" opacity="0.3" />
+        <circle cx="160" cy="82" r="52" fill="none" stroke={accent} strokeWidth="34" strokeDasharray="163 327" strokeLinecap="round" />
+        <circle cx="160" cy="82" r="52" fill="none" stroke={accent} strokeWidth="34" strokeDasharray="81 409" strokeDashoffset="-185" opacity="0.6" />
+        <circle cx="160" cy="82" r="16" fill="var(--bg-elevated)" />
+      </>
+    );
+  } else if (chartType === 'table') {
+    chart = (
+      <g>
+        {[0, 1, 2, 3].map((i) => (
+          <rect
+            key={i}
+            x={24 + (i % 4) * 74}
+            y={24 + Math.floor(i / 4) * 58}
+            width={54}
+            height={38}
+            rx={3}
+            fill={accent}
+            opacity={0.3 + ((i * 37) % 55) / 100}
+          />
+        ))}
+      </g>
+    );
+  } else if (chartType === 'line' || chartType === 'area') {
+    const pts = '26,112 86,64 146,96 206,48 266,80 294,58';
+    chart = (
+      <g>
+        {chartType === 'area' && (
+          <path d={`M26,132 L${pts.replace(/ /g, ' L')} L294,132 Z`} fill={accent} opacity="0.16" />
+        )}
+        <polyline points={pts} fill="none" stroke={accent} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+      </g>
+    );
+  } else {
+    chart = (
+      <g>
+        {[0.9, 0.5, 0.72, 0.8, 0.4, 0.58, 0.86, 0.66].map((h, i) => (
+          <rect
+            key={i}
+            x={22 + i * 37}
+            y={134 - h * 104}
+            width={24}
+            height={h * 104}
+            rx={3}
+            fill={accent}
+            opacity={i === 3 ? 1 : 0.55}
+          />
+        ))}
+      </g>
+    );
+  }
+
+  return (
+    <div
+      role="img"
+      aria-label={`Vista previa de ${spec.name}`}
+      className="relative h-40 w-full overflow-hidden border-b border-border-subtle bg-elevated"
+    >
+      <svg
+        viewBox="0 0 320 160"
+        preserveAspectRatio={chartType === 'pie' ? 'xMidYMid meet' : 'none'}
+        className="h-full w-full"
+        aria-hidden
+      >
+        {chart}
+      </svg>
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-3 pt-6 pb-1.5">
+        <span className="block truncate text-[9px] font-mono text-slate-200">
+          {table}
+          {cols > 0 ? ` · ${cols} cols` : ''}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function HistoryClient({
   renders,
   specs,
@@ -205,7 +297,7 @@ export function HistoryClient({
       >
         <div className="h-1.5" style={{backgroundColor: accentColor}} />
 
-        {spec.thumbnail_url && (
+        {spec.thumbnail_url ? (
           <img
             src={spec.thumbnail_url}
             alt={`Vista previa de ${spec.name}`}
@@ -213,6 +305,8 @@ export function HistoryClient({
             decoding="async"
             className="w-full h-40 object-cover bg-elevated"
           />
+        ) : (
+          <SpecPreview spec={spec} />
         )}
 
         <div className="p-4">
@@ -303,72 +397,6 @@ export function HistoryClient({
           <span className="text-xs text-muted">{specItems.length} total</span>
         </div>
       </div>
-
-      {/* Renders recientes */}
-      <section>
-        <h2 className="text-micro font-display font-bold uppercase tracking-widest text-muted mb-3">
-          Renders recientes
-        </h2>
-        {renders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border-default bg-card px-6 py-10 text-center">
-            <Film size={20} className="text-muted" />
-            <p className="text-sm text-muted">
-              Todavía no hay renders. Generá un video desde el builder.
-            </p>
-            <Link href="/builder" className="mt-1 inline-flex items-center gap-1.5 text-sm font-semibold text-amber-500 hover:text-amber-400 transition-colors font-display">
-              <Plus size={14} /> Ir al Builder
-            </Link>
-          </div>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {renders.map((r) => {
-              const status = r.status ?? '';
-              const label = STATUS_LABEL[status] ?? status;
-              return (
-                <li key={r.id}>
-                  <Link
-                    href={`/render/${r.id}`}
-                    className="flex items-center gap-3 rounded-lg border border-border-default bg-card px-4 py-3 transition-colors hover:border-amber-500/50"
-                  >
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-elevated text-muted">
-                      <Film size={16} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-primary">
-                        {renderTemplateName(r.template_id)}
-                      </span>
-                      <span className="block truncate text-xs text-muted">
-                        {formatDate(r.created_at)}
-                        {typeof r.output_size === 'number' && r.output_size > 0
-                          ? ` · ${(r.output_size / 1024 / 1024).toFixed(1)} MB`
-                          : ''}
-                      </span>
-                    </span>
-                    <span
-                      className={`shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                        status === 'done'
-                          ? 'bg-emerald-500/10 text-emerald-400'
-                          : status === 'error'
-                            ? 'bg-red-500/10 text-red-400'
-                            : 'bg-slate-500/10 text-muted'
-                      }`}
-                    >
-                      {status === 'done' ? (
-                        <CheckCircle2 size={11} aria-hidden />
-                      ) : status === 'error' ? (
-                        <XCircle size={11} aria-hidden />
-                      ) : (
-                        <Clock size={11} aria-hidden />
-                      )}
-                      {label}
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
 
       {/* Visualizaciones guardadas (galería absorbida) */}
       <section>
@@ -489,6 +517,72 @@ export function HistoryClient({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredSpecs.map(renderCard)}
           </div>
+        )}
+      </section>
+
+      {/* Renders recientes */}
+      <section>
+        <h2 className="text-micro font-display font-bold uppercase tracking-widest text-muted mb-3">
+          Renders recientes
+        </h2>
+        {renders.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border-default bg-card px-6 py-10 text-center">
+            <Film size={20} className="text-muted" />
+            <p className="text-sm text-muted">
+              Todavía no hay renders. Generá un video desde el builder.
+            </p>
+            <Link href="/builder" className="mt-1 inline-flex items-center gap-1.5 text-sm font-semibold text-amber-500 hover:text-amber-400 transition-colors font-display">
+              <Plus size={14} /> Ir al Builder
+            </Link>
+          </div>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {renders.map((r) => {
+              const status = r.status ?? '';
+              const label = STATUS_LABEL[status] ?? status;
+              return (
+                <li key={r.id}>
+                  <Link
+                    href={`/render/${r.id}`}
+                    className="flex items-center gap-3 rounded-lg border border-border-default bg-card px-4 py-3 transition-colors hover:border-amber-500/50"
+                  >
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-elevated text-muted">
+                      <Film size={16} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-primary">
+                        {renderTemplateName(r.template_id)}
+                      </span>
+                      <span className="block truncate text-xs text-muted">
+                        {formatDate(r.created_at)}
+                        {typeof r.output_size === 'number' && r.output_size > 0
+                          ? ` · ${(r.output_size / 1024 / 1024).toFixed(1)} MB`
+                          : ''}
+                      </span>
+                    </span>
+                    <span
+                      className={`shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                        status === 'done'
+                          ? 'bg-emerald-500/10 text-emerald-400'
+                          : status === 'error'
+                            ? 'bg-red-500/10 text-red-400'
+                            : 'bg-slate-500/10 text-muted'
+                      }`}
+                    >
+                      {status === 'done' ? (
+                        <CheckCircle2 size={11} aria-hidden />
+                      ) : status === 'error' ? (
+                        <XCircle size={11} aria-hidden />
+                      ) : (
+                        <Clock size={11} aria-hidden />
+                      )}
+                      {label}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </section>
 

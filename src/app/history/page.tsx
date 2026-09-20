@@ -7,6 +7,25 @@ import {HistoryClient, type RenderRecord, type VizSpec} from '@/components/histo
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * Keep only renders whose video actually exists in Vercel Blob. The DB row can
+ * be 'done' with a non-empty output_url while the file was deleted/expired, so
+ * each URL is probed with a HEAD request in parallel. Fail-closed: on timeouts,
+ * network errors or non-2xx the render is dropped.
+ */
+async function filterRendersWithBlob(renders: RenderRecord[]): Promise<RenderRecord[]> {
+  if (renders.length === 0) return [];
+
+  const results = await Promise.allSettled(
+    renders.map((r) => {
+      if (!r.output_url) return Promise.resolve(false);
+      return fetch(r.output_url, {method: 'HEAD', cache: 'no-store'}).then((res) => res.ok);
+    }),
+  );
+
+  return renders.filter((_, i) => results[i]?.status === 'fulfilled' && results[i].value);
+}
+
 export default async function HistoryPage() {
   const supabase = await requireUser();
 
@@ -18,7 +37,7 @@ export default async function HistoryPage() {
   if (rendersRes.error) console.error('[history] list_renders_summary:', rendersRes.error);
   if (specsRes.error) console.error('[history] list_viz_specs_summary:', specsRes.error);
 
-  const renders = (rendersRes.data ?? []) as RenderRecord[];
+  const renders = await filterRendersWithBlob((rendersRes.data ?? []) as RenderRecord[]);
   const specs = (specsRes.data ?? []) as VizSpec[];
 
   return (
