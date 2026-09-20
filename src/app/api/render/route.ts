@@ -1,11 +1,11 @@
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
-import chromium from '@sparticuz/chromium';
 import {put} from '@vercel/blob';
 import {isValidCompId} from '@/remotion/generated/schema';
 import {TEMPLATES} from '@/remotion/generated/registry';
 import {createClient} from '@/lib/supabase/server';
+import {getBundleUrl, ensureChrome} from '@/lib/render-server';
 import type {RenderProgress} from './helpers';
 
 export const maxDuration = 300;
@@ -37,68 +37,11 @@ const RENDER_PROFILE_LANDSCAPE = {w: 1280, h: 720};
 const RENDER_PROFILE_FRAMES = 180;
 const RENDER_PROFILE_MAX_ITEMS = 1000;
 
-const ENTRY = path.join(process.cwd(), 'src', 'remotion', 'index.ts');
-
 function countRenderItems(inputProps: Record<string, unknown> | null | undefined): number {
   if (!inputProps || typeof inputProps !== 'object') return 0;
   const wrapped = inputProps.props as {items?: unknown[]} | undefined;
   const items = Array.isArray(wrapped?.items) ? wrapped.items : (inputProps.items as unknown[] | undefined);
   return Array.isArray(items) ? items.length : 0;
-}
-
-process.env.WEBPACK_CACHE_DIRECTORY = path.join(os.tmpdir(), 'webpack-cache');
-process.env.NODE_OPTIONS = (process.env.NODE_OPTIONS || '') + ' --no-experimental-require-module';
-
-let cachedBundleUrl: string | null = null;
-let cachedChromePath: string | null = null;
-
-async function getBundleUrl(): Promise<string> {
-  if (cachedBundleUrl) {
-    console.log('[render] Using cached bundle');
-    return cachedBundleUrl;
-  }
-  console.log('[render] Starting webpack bundle...');
-  const {bundle} = await import('@remotion/bundler');
-  cachedBundleUrl = await bundle({
-    entryPoint: ENTRY,
-    webpackOverride: (config) => ({
-      ...config,
-      resolve: {
-        ...config.resolve,
-        alias: {
-          ...config.resolve?.alias,
-          'zod': path.join(process.cwd(), 'node_modules', 'zod', 'index.cjs'),
-          'mediabunny': path.join(process.cwd(), 'src', 'remotion', 'mediabunny-stub.ts'),
-          '@mediabunny/aac-encoder': path.join(process.cwd(), 'src', 'remotion', 'empty-stub.ts'),
-          '@mediabunny/flac-encoder': path.join(process.cwd(), 'src', 'remotion', 'empty-stub.ts'),
-          '@mediabunny/mp3-encoder': path.join(process.cwd(), 'src', 'remotion', 'empty-stub.ts'),
-          '@jridgewell/trace-mapping': path.join(
-            process.cwd(), 'node_modules', '@jridgewell', 'trace-mapping',
-            'dist', 'trace-mapping.umd.js',
-          ),
-        },
-      },
-    }),
-    onProgress: (progress: number) => {
-      if (progress % 20 === 0 || progress === 100) {
-        console.log(`[render] Bundling: ${progress}%`);
-      }
-    },
-  });
-  console.log('[render] Bundle ready:', cachedBundleUrl);
-  return cachedBundleUrl;
-}
-
-async function ensureChrome(): Promise<string> {
-  if (cachedChromePath && fs.existsSync(/*turbopackIgnore: true*/ cachedChromePath)) {
-    console.log('[render] Using cached Chrome at', cachedChromePath);
-    return cachedChromePath;
-  }
-  console.log('[render] Resolving Chrome path via @sparticuz/chromium...');
-  const execPath = await chromium.executablePath();
-  console.log('[render] Chrome resolved at', execPath);
-  cachedChromePath = execPath;
-  return execPath;
 }
 
 export async function POST(req: Request) {

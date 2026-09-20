@@ -30,7 +30,6 @@ import dynamic from 'next/dynamic';
 import {ChartConfigPanel} from '@/components/builder/chart-config-panel';
 import type {ColumnMeta} from '@/components/builder/chart-config-panel';
 import {StaticPreview} from '@/components/builder/static-preview';
-import {ChartPreview} from '@/components/charts/chart-preview';
 import {TemplatePicker} from '@/components/builder/template-picker';
 import {AnimationPreview} from '@/components/builder/animation-preview';
 import {AnimationConfigPanel} from '@/components/builder/animation-config-panel';
@@ -136,8 +135,6 @@ function BuilderContent() {
   const durationLoadedRef = useRef(false);
   const templateDeselectRef = useRef(false);
   const staticExportRef = useRef<HTMLDivElement | null>(null);
-  const thumbnailRef = useRef<HTMLDivElement | null>(null);
-  const [thumbnailBusy, setThumbnailBusy] = useState(false);
   const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosavedOnceRef = useRef(false);
   const lastPersistedKeyRef = useRef<string | null>(null);
@@ -490,23 +487,6 @@ function BuilderContent() {
     }
   }, [outputMode, templateParam, selectedTemplate]);
 
-  // Rasterizes the hidden chart surface (mounted only while busy) into a
-  // thumbnail for views saved in animated mode, which has no on-canvas static
-  // chart. Two animation frames: one for React to mount the node, one to lay
-  // out, so chartToDataUrl reads the real SVG geometry.
-  const rasterizeHiddenThumbnail = async (): Promise<string | undefined> => {
-    setThumbnailBusy(true);
-    try {
-      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-      const el = thumbnailRef.current;
-      if (!el) return undefined;
-      const dataUrl = await chartToDataUrl(el);
-      return dataUrl ? await uploadThumbnail(dataUrl) : undefined;
-    } finally {
-      setThumbnailBusy(false);
-    }
-  };
-
   const handleSave = async () => {
     if (!spec.select || spec.select.length === 0) {
       addToast('Selecciona al menos una columna en el canvas antes de guardar', 'error');
@@ -515,17 +495,14 @@ function BuilderContent() {
     setSaving(true);
     try {
       // Best-effort thumbnail so the history card has a real preview. Static
-      // mode rasterizes the on-canvas chart; animated mode mounts a hidden
-      // chart built from the same data/config the view animates. Non-fatal.
+      // mode rasterizes the on-canvas chart right here. Animated mode renders
+      // the composition's last frame server-side AFTER the save succeeds
+      // (fireStillThumbnail below) — it can't be awaited without blocking.
       let thumbnailUrl: string | undefined;
-      if (filteredData.length > 0) {
+      if (outputMode === 'static' && staticExportRef.current && filteredData.length > 0) {
         try {
-          if (outputMode === 'static' && staticExportRef.current) {
-            const dataUrl = await chartToDataUrl(staticExportRef.current);
-            if (dataUrl) thumbnailUrl = await uploadThumbnail(dataUrl);
-          } else {
-            thumbnailUrl = await rasterizeHiddenThumbnail();
-          }
+          const dataUrl = await chartToDataUrl(staticExportRef.current);
+          if (dataUrl) thumbnailUrl = await uploadThumbnail(dataUrl);
         } catch {
           // Thumbnail is best-effort
         }
@@ -555,6 +532,11 @@ function BuilderContent() {
           editIdRef.current = created.id;
           window.history.replaceState(null, '', `/builder?edit=${created.id}`);
         }
+      }
+      // Animated mode: capture the composition's last frame as the thumbnail.
+      // Fire-and-forget so the UI isn't blocked by the server-side still.
+      if (outputMode === 'animated' && editIdRef.current) {
+        void fireStillThumbnail(editIdRef.current);
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -594,6 +576,37 @@ function BuilderContent() {
       ? convertToRemotionProps(chartConfig, filteredData, activeTemplate, templateConfig)?.props ?? null
       : null),
     [chartConfig, filteredData, activeTemplate, templateConfig],
+  );
+
+  // Animated views can't be screenshotted from the DOM, so the thumbnail is
+  // produced by the server: Remotion renders the composition's LAST frame
+  // (the animation's true final state) and persists it on the saved spec.
+  // Fire-and-forget after saving — never blocks the save toast or navigation.
+  const fireStillThumbnail = useCallback(
+    async (specId: string) => {
+      if (!activeTemplate || !remotionProps || filteredData.length === 0) return;
+      const entry = TEMPLATES[activeTemplate as TemplateId];
+      const compositionId = entry?.meta.componentId ?? activeTemplate;
+      const fps = entry?.meta.fps ?? 30;
+      try {
+        await fetch('/api/thumbnail/still', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            compositionId,
+            inputProps: remotionProps,
+            durationInFrames: Math.max(1, Math.round(duration * fps)),
+            width: exportSize.width,
+            height: exportSize.height,
+            fps,
+            specId,
+          }),
+        });
+      } catch {
+        // Best-effort: the history card falls back to the config preview.
+      }
+    },
+    [activeTemplate, remotionProps, filteredData.length, duration, exportSize.width, exportSize.height],
   );
 
   // Distinct participants (label + avatar) for the per-participant avatar crop
@@ -1032,20 +1045,6 @@ function BuilderContent() {
           <BarChart3 size={14} /> Resultado
         </button>
       </div>
-
-      {/* Hidden chart surface: mounted only while a thumbnail rasterizes, so
-          animated-mode saves still produce a real preview (animated mode has
-          no on-canvas static chart). Offscreen-fixed keeps layout active. */}
-      {thumbnailBusy && (
-        <div
-          ref={thumbnailRef}
-          aria-hidden
-          className="fixed left-[-9999px] top-0 pointer-events-none"
-          style={{width: chartConfig.width ?? 600}}
-        >
-          {filteredData.length > 0 ? <ChartPreview data={filteredData} config={chartConfig} /> : null}
-        </div>
-      )}
     </div>
   );
 }
