@@ -3,6 +3,7 @@
 import type {ChartConfig} from '@/lib/chart-config';
 import {DEFAULT_CHART_CONFIG} from '@/lib/chart-config';
 import {BarChart} from './bar-chart';
+import {PieChart} from './pie-chart';
 
 type ChartPreviewProps = {
   data: Record<string, unknown>[];
@@ -20,5 +21,5 @@ export function ChartPreview({data, config}: ChartPreviewProps) {
     );
   }
 
-  return <BarChart data={data} config={cfg} />;
+  return cfg.type === 'pie' ? <PieChart data={data} config={cfg} /> : <BarChart data={data} config={cfg} />;
 }

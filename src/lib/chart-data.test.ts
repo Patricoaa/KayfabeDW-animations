@@ -1,5 +1,8 @@
 import {describe, expect, it} from 'vitest';
-import {percentShareParts} from './chart-data';
+import type {ChartConfig} from './chart-config';
+import {percentShareParts, preparePie, type PieSlice} from './chart-data';
+
+const cfg = (partial?: Partial<ChartConfig>) => (partial ?? {}) as ChartConfig;
 
 const sumParts = (parts: string[]) =>
   Math.round(parts.reduce((acc, p) => acc + parseFloat(p), 0) * 1000);
@@ -59,5 +62,73 @@ describe('percentShareParts', () => {
     const a = percentShareParts([2, 2, 1, 5], 1);
     const b = percentShareParts([2, 2, 1, 5], 1);
     expect(a).toEqual(b);
+  });
+});
+
+const sweep = (s: PieSlice) => s.endAngle - s.startAngle;
+const sumValues = (s: PieSlice[]) => s.reduce((acc, x) => acc + x.value, 0);
+const sumPercents = (s: PieSlice[]) =>
+  Math.round(s.reduce((acc, x) => acc + parseFloat(x.percentLabel), 0) * 1000);
+
+describe('preparePie', () => {
+  it('parte en ángulos que suman 2π empezando en las 12 en punto', () => {
+    const slices = preparePie(
+      [
+        {cat: 'A', val: 3},
+        {cat: 'B', val: 1},
+      ],
+      {} as never,
+    );
+    expect(slices).toHaveLength(2);
+    expect(slices[0].startAngle).toBeCloseTo(-Math.PI / 2, 10);
+    expect(sweep(slices[0]) + sweep(slices[1])).toBeCloseTo(Math.PI * 2, 10);
+    expect(sweep(slices[0])).toBeCloseTo((3 / 4) * Math.PI * 2, 10);
+  });
+
+  it('etiquetas de porcentaje suman 100', () => {
+    const slices = preparePie([{cat: 'A', val: 7}, {cat: 'B', val: 2}, {cat: 'C', val: 1}], cfg());
+    expect(sumPercents(slices)).toBe(100000);
+  });
+
+  it('sliceLimit fusiona el exceso en un slice «Otros» (preserva el 100%)', () => {
+    const slices = preparePie(
+      [{cat: 'A', val: 4}, {cat: 'B', val: 2}, {cat: 'C', val: 1}, {cat: 'D', val: 1}],
+      cfg({sliceLimit: 2, sortBy: 'value-desc'}),
+    );
+    expect(slices.map((s) => s.label)).toEqual(['A', 'B', 'Otros']);
+    expect(slices[2].value).toBe(2);
+    expect(sumValues(slices)).toBe(8);
+    expect(sumPercents(slices)).toBe(100000);
+  });
+
+  it('sliceLimit 0 (o ausente) no fusiona nada', () => {
+    const slices = preparePie(
+      [{cat: 'A', val: 3}, {cat: 'B', val: 2}, {cat: 'C', val: 1}],
+      cfg(),
+    );
+    expect(slices.map((s) => s.label)).toEqual(['A', 'B', 'C']);
+  });
+
+  it('descarta valores cero y negativos', () => {
+    const slices = preparePie(
+      [{cat: 'A', val: 5}, {cat: 'B', val: 0}, {cat: 'C', val: -3}],
+      cfg(),
+    );
+    expect(slices.map((s) => s.label)).toEqual(['A']);
+    expect(slices[0].percentLabel).toBe('100%');
+  });
+
+  it('devuelve vacío si no hay valores positivos', () => {
+    const slices = preparePie([{cat: 'A', val: 0}, {cat: 'B', val: -1}], cfg());
+    expect(slices).toEqual([]);
+  });
+
+  it('aplica overrides de color por categoría (colorFor)', () => {
+    const slices = preparePie(
+      [{cat: 'A', val: 2}, {cat: 'B', val: 1}],
+      cfg({colorOverrides: {A: '#111111'}}),
+    );
+    expect(slices[0].color).toBe('#111111');
+    expect(slices[1].color).not.toBe('#111111');
   });
 });

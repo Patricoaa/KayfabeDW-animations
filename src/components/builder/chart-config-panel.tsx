@@ -50,6 +50,7 @@ function newOverlayId(): string {
 }
 
 export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, fanOutTables = [], fieldMeta = [], data}: ChartConfigPanelProps) {
+  const isPie = (config.type ?? 'bar') === 'pie';
   const update = (patch: Partial<ChartConfig>) => onChange({...config, ...patch});
   const setOverlay = (index: number, patch: Partial<ChartOverlay>) => {
     const next = [...(config.overlays ?? [])];
@@ -332,6 +333,29 @@ const setLegendTextOverride = (label: string, value?: string) => {
           
           {activeTab === 'design' && (
             <>
+      {/* ============ TIPO DE GRÁFICO ============ */}
+      <div>
+            <label className="text-sm font-medium mb-1 block">Tipo de gráfico</label>
+            <div className="flex gap-1">
+              {([
+                {value: 'bar' as const, label: 'Barras'},
+                {value: 'pie' as const, label: 'Torta'},
+              ] as const).map((m) => (
+                <button
+                  key={m.value}
+                  onClick={() => update({type: m.value})}
+                  className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                    (config.type ?? 'bar') === m.value
+                      ? 'bg-amber-500 text-black'
+                      : 'bg-elevated text-secondary hover:bg-card-hover'
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-muted mt-1.5">{isPie ? 'Torta: agrupa por categoría y suma sus valores; sin ejes ni orientación.' : 'Barras: comparación por categoría (agrupadas, apiladas o iconos).'}</p>
+          </div>
       {/* ============ FUENTE (familia compartida en "Configuración común") ============ */}
       <Collapsible title="Fuente">
           <ColorPickerControl label="Color de la fuente general" value={config.style?.textColor} onChange={(v) => updateStyle({textColor: v || undefined})} />
@@ -434,6 +458,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
         </Collapsible>
 
       {/* ============ VISUALIZACIÓN (barras / iconos) ============ */}
+      {!isPie && (
       <Collapsible title="Visualización">
           {/* Tipo: Barras / Iconos */}
           <div>
@@ -508,9 +533,39 @@ const setLegendTextOverride = (label: string, value?: string) => {
             </div>
           )}
         </Collapsible>
+      )}
+
+      {/* ============ TORTA (solo en modo torta) ============ */}
+      {isPie && (
+        <Collapsible title="Torta">
+          <NumberControl label="Agujero interior (donut)" value={config.innerRadius} min={0} max={80} step={5} onChange={(v) => update({innerRadius: v})} />
+          <p className="text-[10px] text-muted -mt-0.5 mb-1">0 = torta sólida · &gt;0 = donut (porcentaje del radio).</p>
+          <NumberControl label="Nº máx. de segmentos" value={config.sliceLimit} min={0} max={50} step={1} onChange={(v) => update({sliceLimit: v})} />
+          <p className="text-[10px] text-muted -mt-0.5 mb-1">0 = todos · el exceso se fusiona en un slice «Otros».</p>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Etiqueta de cada slice</label>
+            <div className="flex gap-1">
+              {([{value: 'none' as const, label: 'Nada'}, {value: 'value' as const, label: 'Valor'}, {value: 'percent' as const, label: 'Porcentaje'}, {value: 'both' as const, label: 'Valor + %'}] as const).map((m) => (
+                <button
+                  key={m.value}
+                  onClick={() => update({pieLabel: m.value})}
+                  className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                    (config.pieLabel ?? 'percent') === m.value
+                      ? 'bg-amber-500 text-black'
+                      : 'bg-elevated text-secondary hover:bg-card-hover'
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-muted mt-1">Fuente y formato en «Etiquetas».</p>
+          </div>
+        </Collapsible>
+      )}
 
       {/* ============ BARRAS — estilo (solo en modo barras) ============ */}
-      {(config.iconMode ?? 'bars') !== 'icons' && (
+      {!isPie && (config.iconMode ?? 'bars') !== 'icons' && (
         <Collapsible title="Barras">
           <NumberControl label="Radio de esquinas" value={config.barRadius} min={0} max={24} onChange={(v) => update({barRadius: v})} />
           {(config.groupMode === 'stacked' || config.groupMode === 'stacked-percent') && (
@@ -564,7 +619,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
         )}
 
       {/* ============ ICONOS (pictograma) ============ */}
-      {config.iconMode === 'icons' && (
+      {!isPie && config.iconMode === 'icons' && (
         <Collapsible title="Iconos">
           <div>
             <label className="text-sm font-medium mb-1 block">Icono base (SVG)</label>
@@ -650,6 +705,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
       )}
 
       {/* ============ EJE X / CATEGORÍA ============ */}
+      {!isPie && (
       <Collapsible title="Eje X / Categoría">
           <div>
               <label className="text-sm font-medium mb-1 block">Etiquetas de categoría</label>
@@ -744,8 +800,10 @@ const setLegendTextOverride = (label: string, value?: string) => {
             </div>
           )}
         </Collapsible>
+      )}
 
       {/* ============ EJE Y / DATOS ============ */}
+      {!isPie && (
       <Collapsible title="Eje Y / Valor">
           {isStackedPercent ? (
             <p className="text-[10px] text-muted py-1">Eje Y fijo en 0%–100% (modo %).</p>
@@ -868,6 +926,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
             ))}
           </div>
         </Collapsible>
+      )}
 
       {/* ============ ETIQUETAS ============ */}
       <Collapsible title="Etiquetas">
@@ -1035,6 +1094,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
       </Collapsible>
 
       {/* ============ AVATAR ============ */}
+      {!isPie && (
       <Collapsible title="Avatar">
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium block">Avatares (imágenes)</label>
@@ -1201,6 +1261,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
             </>
           )}
         </Collapsible>
+      )}
 
       {/* ============ ADICIONALES ============ */}
       <Collapsible title="Adicionales">

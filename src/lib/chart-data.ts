@@ -408,6 +408,66 @@ export function prepareSeries(
   };
 }
 
+export type PieSlice = {
+  label: string;
+  value: number;
+  color: string;
+  // Ángulo en radianes, empezando en las 12 en punto (-π/2) y girando en el
+  // sentido de las agujas del reloj. El renderer solo tiene que traducirlos a
+  // arcos SVG.
+  startAngle: number;
+  endAngle: number;
+  // Porcentaje numérico (0-100, sin redondeo) y su string formateado que SÍ
+  // suma 100 (percentShareParts). El renderer usa percentLabel como etiqueta.
+  percent: number;
+  percentLabel: string;
+};
+
+// Prepara los datos de una torta: categorías → ángulos que suman 2π y colores
+// del camino documentado para pie (colorOverrides → paleta). Reusa prepareSeries
+// para la detección/agregación de campos. `sliceLimit` muestra los top-N por
+// valor y fusiona el exceso en un slice sintético "Otros" (preserva el 100%).
+export function preparePie(data: Record<string, unknown>[], config: ChartConfig): PieSlice[] {
+  const prepared = prepareSeries(data, config);
+  let items = prepared.items;
+
+  const limit = config.sliceLimit ?? 0;
+  if (limit > 0 && items.length > limit) {
+    const sorted = [...items].sort((a, b) => b.value - a.value);
+    const top = sorted.slice(0, limit);
+    const rest = sorted.slice(limit);
+    const restValue = rest.reduce((s, r) => s + r.value, 0);
+    items = top.concat({
+      label: 'Otros',
+      value: restValue,
+      color: pickColor(config.colors, limit),
+      raw: undefined,
+    });
+  }
+
+  const positives = items.filter((d) => Number.isFinite(d.value) && d.value > 0);
+  if (positives.length === 0) return [];
+  const total = positives.reduce((a, b) => a + b.value, 0);
+  const percents = percentShareParts(positives.map((p) => p.value), 0);
+
+  const twoPi = Math.PI * 2;
+  let angle = -Math.PI / 2;
+  return positives.map((p, i) => {
+    const sweep = (p.value / (total || 1)) * twoPi;
+    const start = angle;
+    angle = angle + sweep;
+    return {
+      label: p.label,
+      value: p.value,
+      color: colorFor(config, p.label, i),
+      startAngle: start,
+      endAngle: angle,
+      percent: total ? (p.value / total) * 100 : 0,
+      percentLabel: percents[i] ?? '0%',
+    };
+  });
+}
+
 /**
  * Canonical minimal series shape shared by the static chart renderers and the
  * animated (Remotion) templates. Both consumers build it from the same

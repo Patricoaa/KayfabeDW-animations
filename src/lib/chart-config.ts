@@ -1,5 +1,5 @@
-// Static charts are bar charts only (pie/line/area/scatter/table were removed).
-export type ChartType = 'bar';
+// Static charts support bar and pie. line/area/scatter/table were removed.
+export type ChartType = 'bar' | 'pie';
 
 export type NumberFormat = 'none' | 'short' | 'percent' | 'currency' | 'decimal' | 'duration';
 
