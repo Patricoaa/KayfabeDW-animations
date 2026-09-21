@@ -1,7 +1,7 @@
 'use client';
 
 import React, {useEffect, useState} from 'react';
-import {BarChart3} from 'lucide-react';
+import {BarChart3, PieChart} from 'lucide-react';
 import type {ChartConfig, ChartOverlay, NumberFormat, SortBy, ChartFilter, ChartFilterOp, ChartStyle, AvatarShape, AvatarCrop, SectionFont, TextLayout} from '@/lib/chart-config';
 import {NUMBER_FORMATS} from '@/lib/chart-config';
 import {pickColor, colorFor} from '@/lib/chart-data';
@@ -211,27 +211,35 @@ const setLegendTextOverride = (label: string, value?: string) => {
           {activeTab === 'data' && (
             <>
       {/* ============ TIPO DE GRÁFICO ============ */}
-      <div>
-            <label className="text-sm font-medium mb-1 block">Tipo de gráfico</label>
-            <div className="flex gap-1">
+      <div className="space-y-2">
+            <label className="text-micro font-semibold text-secondary uppercase tracking-widest font-display">
+              Tipo de gráfico
+            </label>
+            <div className="grid grid-cols-2 gap-1">
               {([
                 {value: 'bar' as const, label: 'Barras'},
                 {value: 'pie' as const, label: 'Torta'},
-              ] as const).map((m) => (
-                <button
-                  key={m.value}
-                  onClick={() => update({type: m.value})}
-                  className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
-                    (config.type ?? 'bar') === m.value
-                      ? 'bg-amber-500 text-black'
-                      : 'bg-elevated text-secondary hover:bg-card-hover'
-                  }`}
-                >
-                  {m.label}
-                </button>
-              ))}
+              ] as const).map((m) => {
+                const Icon = m.value === 'pie' ? PieChart : BarChart3;
+                const isSelected = (config.type ?? 'bar') === m.value;
+                return (
+                  <button
+                    key={m.value}
+                    onClick={() => update({type: m.value})}
+                    aria-pressed={isSelected}
+                    className={`cursor-pointer flex flex-col items-center gap-0.5 p-2 rounded text-xs transition-colors ${
+                      isSelected
+                        ? 'bg-amber-500 text-black'
+                        : 'bg-elevated text-secondary hover:bg-card-hover hover:text-primary'
+                    }`}
+                  >
+                    <Icon size={16} />
+                    <span className="leading-tight text-center">{m.label}</span>
+                  </button>
+                );
+              })}
             </div>
-            <p className="text-[10px] text-muted mt-1.5">{isPie ? 'Torta: agrupa por categoría y suma sus valores; sin ejes ni orientación.' : 'Barras: comparación por categoría (agrupadas, apiladas o iconos).'}</p>
+            <p className="text-[10px] text-muted">{isPie ? 'Torta: agrupa por categoría y suma sus valores; sin ejes ni orientación.' : 'Barras: comparación por categoría (agrupadas, apiladas o iconos).'}</p>
           </div>
       {/* ============ DATOS ============ */}
       <Collapsible title="Datos" defaultOpen>
@@ -939,7 +947,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
           <SwitchControl label="Mostrar etiquetas de datos" checked={config.showDataLabels ?? true} onChange={(v) => update({showDataLabels: v})} />
           {(config.showDataLabels ?? true) && (
             <>
-              {config.iconMode !== 'icons' && (
+              {config.iconMode !== 'icons' && !isPie && (
                 <div>
                   <label className="text-sm font-medium mb-1 block">Posición</label>
                   <SelectControl
