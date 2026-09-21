@@ -87,6 +87,40 @@ export function applyBackground(target: Partial<ChartConfig>, bg: TransversalBac
   if (bg.fit !== undefined) target.backgroundFit = (bg.fit ?? undefined) as ChartConfig['backgroundFit'];
 }
 
+// Aplica el nivel transversal al config de UN template animado (header + lienzo),
+// respetando la prioridad local > transversal: un campo del template solo se pisa
+// cuando aún "hereda" (está indefinido o sigue igualando la base transversal previa).
+// Subtítulo y fondo no tienen fallback en los renderers animados, por eso la
+// sección UI común debe materializarlos en el template cuando no hay override.
+export function applyTransversalToTemplate<T extends object>(
+  template: T | undefined,
+  transversal: VizTransversal,
+  prev?: VizTransversal,
+): T {
+  const out: Record<string, unknown> = {...(template ?? {})};
+
+  const inherited = (cur: unknown, prevVal: unknown) =>
+    cur === undefined || (prevVal !== undefined && cur === prevVal);
+
+  if (transversal.title !== undefined && inherited(out.title, prev?.title ?? undefined)) {
+    out.title = transversal.title ?? undefined;
+  }
+  if (transversal.subtitle !== undefined && inherited(out.subtitle, prev?.subtitle ?? undefined)) {
+    out.subtitle = transversal.subtitle ?? undefined;
+  }
+
+  const bg = transversal.background;
+  if (
+    bg &&
+    bg.type !== undefined &&
+    bg.type !== 'none' &&
+    inherited(out.backgroundType, prev?.background?.type ?? undefined)
+  ) {
+    applyBackground(out as Partial<ChartConfig>, bg);
+  }
+  return out as T;
+}
+
 // Extrae el nivel transversal desde chart_config (el owner de la base estática).
 export function extractTransversalFromChart(chart: Partial<ChartConfig>): VizTransversal {
   const bg: TransversalBackground = {};

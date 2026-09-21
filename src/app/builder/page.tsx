@@ -24,7 +24,7 @@ import {DEFAULT_CHART_CONFIG, applyChartDefaults} from '@/lib/chart-config';
 import type {SchemaMetadata} from '@/lib/schema-metadata';
 import {getSchemaMetadata, getTableDepth, isNumericType} from '@/lib/schema-metadata';
 import {suggestBestTemplate, convertToRemotionProps, getTimelineRaceParticipants, getRankingParticipants, getRaceScrollingParticipants} from '@/lib/viz-to-remotion';
-import {applyChartFilters} from '@/lib/chart-data';
+import {applyChartFilters, pickColor} from '@/lib/chart-data';
 import {chartToDataUrl} from '@/lib/export-static';
 import dynamic from 'next/dynamic';
 import {ChartConfigPanel} from '@/components/builder/chart-config-panel';
@@ -33,6 +33,7 @@ import {StaticPreview} from '@/components/builder/static-preview';
 import {TemplatePicker} from '@/components/builder/template-picker';
 import {AnimationPreview} from '@/components/builder/animation-preview';
 import {AnimationConfigPanel} from '@/components/builder/animation-config-panel';
+import {CommonConfigPanel} from '@/components/builder/common-config-panel';
 import {BuilderNav} from '@/components/builder/builder-nav';
 import {ExportPanel} from '@/components/builder/export-panel';
 import {DataTable} from '@/components/builder/data-table';
@@ -40,13 +41,16 @@ import {TEMPLATES} from '@/remotion/generated/registry';
 import type {TemplateId} from '@/remotion/generated/registry';
 import type {AnimationTemplateConfig} from '@/lib/animation-config';
 import {emptyAnimationConfig} from '@/lib/animation-config';
-import {deriveVizConfig} from '@/lib/viz-config';
+import {deriveVizConfig, applyTransversalToChart, applyTransversalToTemplate, extractTransversalFromChart} from '@/lib/viz-config';
+import type {VizTransversal} from '@/lib/viz-config';
 import {loadSafeZones, saveSafeZones, safeZonesFromConfig, type SafeZoneSettings} from '@/lib/safe-zones';
 import {paginateRows, PAGE_SIZE, ABS_MAX_ROWS} from '@/lib/paginate';
 import {useToast} from '@/components/ui/toast';
 import {useResizableWidth} from '@/hooks/use-resizable-width';
 import {DEFAULT_EXPORT_PRESET, EXPORT_PRESETS, getExportPreset} from '@/lib/export-presets';
 import type {ExportPresetId} from '@/lib/export-presets';
+
+const TEMPLATE_IDS = Object.keys(TEMPLATES) as (keyof AnimationTemplateConfig)[];
 
 const QueryCanvas = dynamic(
   () => import('@/components/canvas/query-canvas').then((m) => m.QueryCanvas),
@@ -145,6 +149,41 @@ function BuilderContent() {
     ? suggestBestTemplate(chartConfig, data)
     : null;
   const activeTemplate = selectedTemplate ?? bestTemplate;
+
+  // Nivel transversal (visible en ambos modos). `chart_config` es el espejo
+  // estático del dueño de la base; los campos animados heredan vía templateConfig.
+  const common = useMemo(() => extractTransversalFromChart(chartConfig), [chartConfig]);
+
+  // Escritura en ambas capas: la sección común edita el nivel transversal y lo
+  // aplica a chart_config (owner estático) Y a cada template animado que no lo
+  // sobreescriba localmente (prioridad local > transversal). Se materializan
+  // entradas por template así un template nunca tocado hereda subtítulo/fondo.
+  const handleCommonChange = useCallback(
+    (next: VizTransversal) => {
+      const prev = common;
+      const paletteChanged = JSON.stringify(prev?.colors ?? null) !== JSON.stringify(next.colors ?? null);
+      setChartConfig((c) => {
+        const out = applyTransversalToChart(c, next) as ChartConfig;
+        // Espejo de applyPalette del panel estático: al cambiar la paleta y haber
+        // series (multi-serie), re-colorea los legendItems para que el estático
+        // muestre los nuevos colores (renderiza legendItems antes que colors).
+        if (paletteChanged && out.seriesField) {
+          const items = (out.legendItems ?? []).map((li, i) => ({...li, color: pickColor(next.colors ?? undefined, i)}));
+          out.legendItems = items;
+        }
+        return out;
+      });
+      setTemplateConfig((prevTc) => {
+        const out: AnimationTemplateConfig = {...prevTc};
+        const anyOut = out as Record<string, unknown>;
+        for (const id of TEMPLATE_IDS) {
+          anyOut[id] = applyTransversalToTemplate(prevTc[id] as object | undefined, next, prev);
+        }
+        return out;
+      });
+    },
+    [common],
+  );
 
   // Canonical key of everything that gets persisted (query, chart AND
   // animation config). Comparing it with the last persisted key tells us
@@ -940,7 +979,14 @@ function BuilderContent() {
             </div>
           </div>
 
-          <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            {/* Sección común: campos compartidos entre estático y animado */}
+            <div className="shrink-0 max-h-[40%] overflow-y-auto border-b border-border-default/60 bg-elevated/40">
+              <div className="p-3 space-y-4">
+                <CommonConfigPanel value={common} onChange={handleCommonChange} />
+              </div>
+            </div>
+            <div className="flex-1 min-h-0 overflow-hidden">
             {outputMode === 'static' && (
               <ChartConfigPanel
                 config={chartConfig}
@@ -953,7 +999,7 @@ function BuilderContent() {
               />
             )}
             {outputMode === 'animated' && (
-              <div className="flex flex-col flex-1 min-h-0">
+              <div className="flex flex-col h-full min-h-0">
                 <AnimationConfigPanel
                   templateId={activeTemplate || 'timeline-race'}
                   columns={columns}
@@ -981,6 +1027,7 @@ function BuilderContent() {
                 />
               </div>
             )}
+            </div>
 
           </div>
         </aside>

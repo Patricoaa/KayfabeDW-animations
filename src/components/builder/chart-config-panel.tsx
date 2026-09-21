@@ -3,10 +3,10 @@
 import React, {useEffect, useState} from 'react';
 import {BarChart3} from 'lucide-react';
 import type {ChartConfig, ChartOverlay, NumberFormat, SortBy, ChartFilter, ChartFilterOp, ChartStyle, AvatarShape, AvatarCrop, SectionFont, TextLayout} from '@/lib/chart-config';
-import {FONT_PRESETS, NUMBER_FORMATS} from '@/lib/chart-config';
+import {NUMBER_FORMATS} from '@/lib/chart-config';
 import {pickColor, colorFor} from '@/lib/chart-data';
 import {ICON_GLYPHS, ICON_GLYPH_NAMES} from '@/lib/chart-icons';
-import { Tabs, SelectControl, NumberControl, ColorPickerControl, SwitchControl, Collapsible, TextStyleControls, SliderNumberInput, FileUploadInput, FieldSelect, PalettePicker, OverlayEditor } from '@/components/ui/controls';
+import { Tabs, SelectControl, NumberControl, ColorPickerControl, SwitchControl, Collapsible, TextStyleControls, SliderNumberInput, FieldSelect, OverlayEditor } from '@/components/ui/controls';
 import type {ColumnMeta} from '@/lib/chart-config';
 export type {ColumnMeta};
 
@@ -67,16 +67,6 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
     update({filters: next});
   };
   const updateStyle = (patch: Partial<ChartStyle>) => update({style: {...(config.style ?? {}), ...patch}});
-  const applyPalette = (colors: string[]) => {
-    // Multi-series: re-color every configured series AND refresh the global
-    // palette, so both paths (empty legendItems vs populated) are covered.
-    if (config.seriesField) {
-      const items = (config.legendItems ?? []).map((li, i) => ({...li, color: colors[i % colors.length]}));
-      update({colors, legendItems: items});
-    } else {
-      update({colors});
-    }
-  };
   const setSeriesColor = (index: number, color: string) => {
     const items = [...(config.legendItems ?? [])];
     if (!items[index]) items[index] = {label: `Serie ${index + 1}`, color};
@@ -342,47 +332,14 @@ const setLegendTextOverride = (label: string, value?: string) => {
           
           {activeTab === 'design' && (
             <>
-      {/* ============ FUENTE ============ */}
+      {/* ============ FUENTE (familia compartida en "Configuración común") ============ */}
       <Collapsible title="Fuente">
-          <div>
-            <label className="text-sm font-medium mb-1 block">Fuente raíz del gráfico</label>
-            <SelectControl
-              value={config.style?.fontFamily ?? ''}
-              onChange={(e) => updateStyle({fontFamily: e.target.value || undefined})}
-              className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-            >
-              <option value="">Sistema (predeterminado)</option>
-              {FONT_PRESETS.map((f) => (
-                <option key={f.name} value={f.family}>{f.name}</option>
-              ))}
-            </SelectControl>
-          </div>
           <ColorPickerControl label="Color de la fuente general" value={config.style?.textColor} onChange={(v) => updateStyle({textColor: v || undefined})} />
         </Collapsible>
 
-      {/* ============ HEADER ============ */}
+      {/* ============ HEADER (título/subtítulo compartidos en "Configuración común") ============ */}
       <Collapsible title="Header">
           <div>
-            <label className="text-sm font-medium mb-1 block">Título</label>
-            <textarea
-              value={config.title ?? ''}
-              onChange={(e) => update({title: e.target.value})}
-              placeholder="Título del gráfico (Enter = nueva línea)"
-              rows={2}
-              className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium mb-1 block">Subtítulo</label>
-            <textarea
-              value={config.subtitle ?? ''}
-              onChange={(e) => update({subtitle: e.target.value})}
-              placeholder="Subtítulo opcional (Enter = nueva línea)"
-              rows={2}
-              className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-            />
-          </div>
-          <div className="pt-1 border-t border-border-subtle">
             <label className="text-xs font-semibold text-muted uppercase tracking-widest font-display">Fuente del título</label>
             <div className="mt-2">
               <TextStyleControls value={config.headerFont} onChange={setHeaderFont} showOverflow />
@@ -413,14 +370,8 @@ const setLegendTextOverride = (label: string, value?: string) => {
           />
         </Collapsible>
 
-      {/* ============ COLORES ============ */}
+      {/* ============ COLORES (paleta compartida en "Configuración común") ============ */}
       <Collapsible title="Colores">
-          {/* Palettes */}
-          <div>
-            <label className="text-sm font-medium mb-1 block">Paleta de colores</label>
-            <PalettePicker onSelect={applyPalette} />
-          </div>
-
           {/* Per-series color pickers (multi-series charts) */}
           {hasSeries && (
             <div className="pt-1">
@@ -1024,130 +975,15 @@ const setLegendTextOverride = (label: string, value?: string) => {
           )}
         </Collapsible>
 
-      {/* ============ LIENZO ============ */}
+      {/* ============ LIENZO (fondo compartido en "Configuración común") ============ */}
       <Collapsible title="Lienzo">
-        <div>
-          <label className="text-sm font-medium mb-1 block">Fondo del lienzo</label>
-          <div className="flex gap-1 flex-wrap">
-            {((['none', 'color', 'pattern', 'gradient', 'image'] as const)).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => update({backgroundType: t})}
-                className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
-                  (config.backgroundType ?? 'none') === t
-                    ? 'bg-amber-500 text-black'
-                    : 'bg-elevated text-secondary hover:bg-card-hover'
-                }`}
-              >
-                {({none: 'Ninguno', color: 'Color', pattern: 'Patrón', gradient: 'Degradado', image: 'Imagen'} as Record<string, string>)[t]}
-              </button>
-            ))}
-          </div>
+        <div className="grid grid-cols-2 gap-2">
+          <NumberControl label="Borde (grosor)" value={config.canvasBorderWidth} min={0} max={8} onChange={(v) => update({canvasBorderWidth: v})} />
+          {(config.canvasBorderWidth ?? 0) > 0 && (
+            <ColorPickerControl label="Borde (color)" value={config.canvasBorderColor} onChange={(v) => update({canvasBorderColor: v || undefined})} />
+          )}
         </div>
-
-        {(config.backgroundType ?? 'none') === 'color' && (
-          <ColorPickerControl label="Color de fondo" value={config.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
-        )}
-
-        {(config.backgroundType ?? 'none') === 'pattern' && (
-          <>
-            <div>
-              <label className="text-sm font-medium mb-1 block">Patrón</label>
-              <SelectControl
-                value={config.backgroundPattern ?? 'dots'}
-                onChange={(e) => update({backgroundPattern: e.target.value as NonNullable<ChartConfig['backgroundPattern']>})}
-                className="w-full bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-              >
-                <option value="dots">Puntos</option>
-                <option value="stripes">Rayas</option>
-                <option value="grid">Cuadrícula</option>
-                <option value="checkers">Cuadros</option>
-              </SelectControl>
-            </div>
-            {config.backgroundPattern === 'stripes' && (
-              <SliderNumberInput label="Ángulo (grados)" value={config.backgroundAngle ?? 45} min={0} max={360} step={15} onChange={(v) => update({backgroundAngle: v || undefined})} />
-            )}
-            <ColorPickerControl label="Color del patrón" value={config.background ?? '#3b82f6'} onChange={(v) => update({background: v || undefined})} />
-            <SliderNumberInput label="Opacidad (%)" value={Math.round((config.backgroundOpacity ?? 1) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundOpacity: v ? v / 100 : undefined})} />
-          </>
-        )}
-
-        {(config.backgroundType ?? 'none') === 'gradient' && (
-          <>
-            <div className="grid grid-cols-2 gap-2">
-              <ColorPickerControl label="Color inicial" value={config.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
-              <ColorPickerControl label="Color final" value={config.backgroundSecondary ?? '#1f2937'} onChange={(v) => update({backgroundSecondary: v || undefined})} />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-1 block">Forma</label>
-              <div className="flex gap-1">
-                {([
-                  {value: 'linear', label: 'Lineal'},
-                  {value: 'radial', label: 'Radial'},
-                ] as const).map((s) => (
-                  <button
-                    key={s.value}
-                    type="button"
-                    onClick={() => update({backgroundGradientShape: s.value})}
-                    className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
-                      (config.backgroundGradientShape ?? 'linear') === s.value
-                        ? 'bg-amber-500 text-black'
-                        : 'bg-elevated text-secondary hover:bg-card-hover'
-                    }`}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {(config.backgroundGradientShape ?? 'linear') === 'linear' ? (
-              <SliderNumberInput label="Ángulo (grados)" value={config.backgroundAngle ?? 135} min={0} max={360} step={15} onChange={(v) => update({backgroundAngle: v || undefined})} />
-            ) : (
-              <div className="grid grid-cols-3 gap-2">
-                <SliderNumberInput label="Centro X (%)" value={config.backgroundGradientCenterX ?? 50} min={0} max={100} step={5} onChange={(v) => update({backgroundGradientCenterX: v})} />
-                <SliderNumberInput label="Centro Y (%)" value={config.backgroundGradientCenterY ?? 50} min={0} max={100} step={5} onChange={(v) => update({backgroundGradientCenterY: v})} />
-                <SliderNumberInput label="Radio (%)" value={config.backgroundGradientRadius ?? 100} min={0} max={200} step={5} onChange={(v) => update({backgroundGradientRadius: v})} />
-              </div>
-            )}
-            <SliderNumberInput label="Intensidad (%)" value={Math.round((config.backgroundGradientBlend ?? 1) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundGradientBlend: v / 100})} />
-            <SliderNumberInput label="Suavizado (%)" value={Math.round((config.backgroundGradientSmooth ?? 1) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundGradientSmooth: v / 100})} />
-            <SliderNumberInput label="Distribución inicio→fin (%)" value={Math.round((config.backgroundGradientDist ?? 0) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundGradientDist: v / 100})} />
-            <SliderNumberInput label="Opacidad (%)" value={Math.round((config.backgroundOpacity ?? 1) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundOpacity: v ? v / 100 : undefined})} />
-          </>
-        )}
-
-        {(config.backgroundType ?? 'none') === 'image' && (
-          <>
-            <FileUploadInput label="Imagen de fondo" value={config.backgroundImage} onLoad={(dataUrl) => update({backgroundImage: dataUrl})} onClear={() => update({backgroundImage: undefined})} />
-            <div>
-              <label className="text-sm font-medium mb-1 block">Ajuste</label>
-              <SelectControl
-                value={config.backgroundFit ?? 'cover'}
-                onChange={(e) => update({backgroundFit: e.target.value as NonNullable<ChartConfig['backgroundFit']>})}
-                className="w-full bg-elevated border border-border-default rounded-lg px-2 py-1.5 text-xs font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
-              >
-                <option value="cover">Cubrir</option>
-                <option value="contain">Contener</option>
-                <option value="fill">Rellenar</option>
-              </SelectControl>
-            </div>
-            <ColorPickerControl label="Color base (debajo)" value={config.background ?? '#0a0a0a'} onChange={(v) => update({background: v || undefined})} />
-            <SliderNumberInput label="Opacidad (%)" value={Math.round((config.backgroundOpacity ?? 1) * 100)} min={0} max={100} step={5} onChange={(v) => update({backgroundOpacity: v ? v / 100 : undefined})} />
-          </>
-        )}
-
-        <SliderNumberInput label="Desenfoque del fondo (blur px)" value={config.backgroundBlur ?? 0} min={0} max={30} step={1} onChange={(v) => update({backgroundBlur: v || undefined})} />
-
-        <div className="pt-1 border-t border-border-subtle">
-          <div className="grid grid-cols-2 gap-2 mt-2">
-            <NumberControl label="Borde (grosor)" value={config.canvasBorderWidth} min={0} max={8} onChange={(v) => update({canvasBorderWidth: v})} />
-            {(config.canvasBorderWidth ?? 0) > 0 && (
-              <ColorPickerControl label="Borde (color)" value={config.canvasBorderColor} onChange={(v) => update({canvasBorderColor: v || undefined})} />
-            )}
-          </div>
-          <NumberControl label="Radio de esquinas del lienzo" value={config.canvasBorderRadius} min={0} max={40} onChange={(v) => update({canvasBorderRadius: v})} />
-        </div>
+        <NumberControl label="Radio de esquinas del lienzo" value={config.canvasBorderRadius} min={0} max={40} onChange={(v) => update({canvasBorderRadius: v})} />
       </Collapsible>
 
       {/* ============ ESPACIADO ============ */}

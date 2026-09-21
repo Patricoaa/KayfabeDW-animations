@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {deriveVizConfig, TRANSVERSAL_CHART_KEYS} from '@/lib/viz-config/derive';
-import {applyTransversalToChart, extractTransversalFromChart, applyBackground} from '@/lib/viz-config/fields';
+import {applyTransversalToChart, extractTransversalFromChart, applyBackground, applyTransversalToTemplate} from '@/lib/viz-config/fields';
 import {hydrateChartConfig, resolveOutputMode, resolveTemplateFields} from '@/lib/viz-config/resolve';
 import {VIZ_CONFIG_VERSION} from '@/lib/viz-config/types';
 import {DEFAULT_CHART_CONFIG} from '@/lib/chart-config';
@@ -103,6 +103,59 @@ describe('applyTransversalToChart / extractTransversalFromChart', () => {
     expect(target.backgroundType).toBe('color');
     expect(target.background).toBe('#fff');
     expect(target).not.toHaveProperty('backgroundBlur');
+  });
+});
+
+describe('applyTransversalToTemplate', () => {
+  type Template = {title?: string; subtitle?: string; backgroundType?: string; background?: string};
+  const transversal = {
+    title: 'Común',
+    subtitle: 'Sub común',
+    typography: {fontFamily: 'var(--font-inter)'},
+    background: {type: 'color' as const, color: '#0a0a0a'},
+  };
+
+  it('escribe campos presentativos en un template vacío', () => {
+    const out = applyTransversalToTemplate<Template>(undefined, transversal);
+    expect(out.title).toBe('Común');
+    expect(out.subtitle).toBe('Sub común');
+    expect(out.backgroundType).toBe('color');
+    expect(out.background).toBe('#0a0a0a');
+  });
+
+  it('respeta un override local que difiere del valor transversal previo', () => {
+    const template: Template = {title: 'Override local'};
+    const out = applyTransversalToTemplate<Template>(template, transversal, {title: 'Anterior común'});
+    expect(out.title).toBe('Override local');
+  });
+
+  it('actualiza un valor heredado cuando coincide con el transversal previo', () => {
+    const template: Template = {title: 'Anterior común'};
+    const out = applyTransversalToTemplate<Template>(template, transversal, {title: 'Anterior común'});
+    expect(out.title).toBe('Común');
+  });
+
+  it('no pisa un override local de subtítulo', () => {
+    const out = applyTransversalToTemplate<Template>({subtitle: 'Local'}, transversal, {subtitle: 'Anterior'});
+    expect(out.subtitle).toBe('Local');
+  });
+
+  it('omite el bloque de fondo si el tipo transversal es none', () => {
+    const out = applyTransversalToTemplate<Template>(undefined, {
+      ...transversal,
+      background: {type: 'none' as const},
+    });
+    expect(out).not.toHaveProperty('backgroundType');
+    expect(out).not.toHaveProperty('background');
+  });
+
+  it('respeta un backgroundType local definido', () => {
+    const template: Template = {backgroundType: 'pattern', background: '#222222'};
+    const out = applyTransversalToTemplate<Template>(template, transversal, {
+      background: {type: 'gradient' as const, color: '#000000'},
+    });
+    expect(out.backgroundType).toBe('pattern');
+    expect(out.background).toBe('#222222');
   });
 });
 

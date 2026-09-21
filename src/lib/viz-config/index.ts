@@ -25,6 +25,7 @@ export {
   applyBackground,
   applyTransversalToAnimationBlob,
   applyTransversalToChart,
+  applyTransversalToTemplate,
   extractTransversalFromChart,
 } from './fields';
 
