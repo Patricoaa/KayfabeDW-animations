@@ -86,16 +86,18 @@ export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, 
 
 const setLegendTextOverride = (label: string, value?: string) => {
     const next = {...(config.legendTextOverrides ?? {})};
-    if (value && value.trim()) next[label] = value.trim();
+    if (value && value.trim()) next[label] = value;
     else delete next[label];
     update({legendTextOverrides: next});
   };
 
   // Visible-title overrides keyed by the ORIGINAL label. Resolution matches
   // legendItemsFrom: legendTextOverrides > legendItems[].overrideLabel > label.
+  // No se recorta el texto guardado (solo decide vacío), para que el input
+  // controlado no pierda espacios mientras el usuario escribe.
   const legendOverrideValue = (label: string): string =>
-    config.legendTextOverrides?.[label]?.trim()
-    || (config.legendItems ?? []).find((li) => li.label === label)?.overrideLabel?.trim()
+    config.legendTextOverrides?.[label]
+    || (config.legendItems ?? []).find((li) => li.label === label)?.overrideLabel
     || '';
 
   const setAvatarCrop = (label: string, patch?: Partial<AvatarCrop>) => {
