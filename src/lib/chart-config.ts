@@ -302,6 +302,7 @@ export type ChartConfig = {
   sliceLimit?: number;         // pie: máx. segmentos a mostrar
   pieLabel?: 'none' | 'value' | 'percent' | 'both' | 'category'; // pie: modo de etiqueta
   categoryOrder?: string[];    // pie: orden manual de los slices (por label)
+  pieStartAngle?: number;      // pie: ángulo de inicio del primer slice en grados (0 = 12h, giro horario)
   trendline?: boolean;         // scatter: línea de tendencia lineal
   lineDash?: boolean;          // line/area: línea discontinua
   tableSearch?: string;        // table: filtro por texto

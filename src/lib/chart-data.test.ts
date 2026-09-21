@@ -155,4 +155,18 @@ describe('preparePie', () => {
     );
     expect(slices.map((s) => s.label)).toEqual(['B', 'A']);
   });
+
+  it('pieStartAngle desplaza el arranque del primer slice (0° = -π/2)', () => {
+    const base = preparePie([{cat: 'A', val: 1}], cfg());
+    const turned = preparePie([{cat: 'A', val: 1}], cfg({pieStartAngle: 90}));
+    const delta = turned[0].startAngle - base[0].startAngle;
+    expect(delta).toBeCloseTo(Math.PI / 2, 10);
+    expect(base[0].startAngle).toBeCloseTo(-Math.PI / 2, 10);
+  });
+
+  it('pieStartAngle 0 no altera la posición por defecto', () => {
+    const a = preparePie([{cat: 'A', val: 1}], cfg());
+    const b = preparePie([{cat: 'A', val: 1}], cfg({pieStartAngle: 0}));
+    expect(a[0].startAngle).toBe(b[0].startAngle);
+  });
 });

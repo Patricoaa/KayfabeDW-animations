@@ -467,7 +467,9 @@ export function preparePie(data: Record<string, unknown>[], config: ChartConfig)
   const percents = percentShareParts(positives.map((p) => p.value), 0);
 
   const twoPi = Math.PI * 2;
-  let angle = -Math.PI / 2;
+  // 0° = 12 en punto (-π/2); grados positivos giran en sentido horario (eje Y
+  // SVG hacia abajo). `pieStartAngle` desplaza el arranque del primer slice.
+  let angle = -Math.PI / 2 + (config.pieStartAngle ?? 0) * (Math.PI / 180);
   return positives.map((p, i) => {
     const sweep = (p.value / (total || 1)) * twoPi;
     const start = angle;

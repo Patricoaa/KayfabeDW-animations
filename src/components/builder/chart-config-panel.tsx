@@ -569,6 +569,8 @@ const setLegendTextOverride = (label: string, value?: string) => {
         <Collapsible title="Torta">
           <NumberControl label="Agujero interior (donut)" value={config.innerRadius} min={0} max={80} step={5} onChange={(v) => update({innerRadius: v})} />
           <p className="text-[10px] text-muted -mt-0.5 mb-1">0 = torta sólida · &gt;0 = donut (porcentaje del radio).</p>
+          <NumberControl label="Ángulo de inicio del primer slice" value={config.pieStartAngle ?? 0} min={0} max={360} step={15} onChange={(v) => update({pieStartAngle: v})} />
+          <p className="text-[10px] text-muted -mt-0.5 mb-1">0° = 12 h · 90° = 3 h · 180° = 6 h · 270° = 9 h (giro horario).</p>
           <NumberControl label="Nº máx. de segmentos" value={config.sliceLimit} min={0} max={50} step={1} onChange={(v) => update({sliceLimit: v})} />
           <p className="text-[10px] text-muted -mt-0.5 mb-1">0 = todos · el exceso se fusiona en un slice «Otros».</p>
 
