@@ -1,5 +1,5 @@
-// Static charts support bar and pie. line/area/scatter/table were removed.
-export type ChartType = 'bar' | 'pie';
+// Static charts support bar, pie and faceoff. line/area/scatter/table were removed.
+export type ChartType = 'bar' | 'pie' | 'faceoff';
 
 export type NumberFormat = 'none' | 'short' | 'percent' | 'currency' | 'decimal' | 'duration';
 
@@ -303,6 +303,27 @@ export type ChartConfig = {
   pieLabel?: 'none' | 'value' | 'percent' | 'both' | 'category'; // pie: modo de etiqueta
   categoryOrder?: string[];    // pie: orden manual de los slices (por label)
   pieStartAngle?: number;      // pie: ángulo de inicio del primer slice en grados (0 = 12h, giro horario)
+  // F10: faceoff ("cara a cara"). Compara 2 entidades lado a lado, cada una en
+  // la mitad del canvas. `faceEntityField` agrupa las filas (1 fila por logro/
+  // racha de esa entidad); de la primera fila de cada grupo se sacan nombre y
+  // foto (opcionales), y cada fila del grupo se convierte en un mosaico con
+  // icono (imagen), título y valor. `numberFormat` da formato al valor.
+  faceEntityField?: string;    // columna que identifica la entidad (agrupador)
+  faceNameField?: string;      // opcional: columna con el nombre para mostrar
+  faceImageField?: string;     // opcional: columna con la URL de la foto
+  faceIconField?: string;      // columna con la URL del icono del logro/racha
+  faceTitleField?: string;     // columna con el título del logro/racha
+  faceValueField?: string;     // columna numérica del logro/racha
+  faceTileColumns?: number;    // columnas del mosaico debajo de cada entidad
+  faceMaxTiles?: number;       // máx. de logros/rachas por entidad
+  facePhotoSize?: number;      // px de la foto de la entidad
+  facePhotoShape?: AvatarShape; // forma de la foto (rounded/circle)
+  facePhotoRadius?: number;    // radio de esquina de la foto (rounded)
+  faceIconSize?: number;       // px del icono de cada logro
+  faceTileGap?: number;        // px de separación entre mosaicos
+  faceTileRadius?: number;     // radio de esquina de cada mosaico
+  faceSwap?: boolean;          // intercambia izquierda/derecha
+  faceVsLabel?: string;        // texto del divisor central (default "VS")
   trendline?: boolean;         // scatter: línea de tendencia lineal
   lineDash?: boolean;          // line/area: línea discontinua
   tableSearch?: string;        // table: filtro por texto
@@ -508,6 +529,16 @@ export const DEFAULT_CHART_CONFIG: ChartConfig = {
   showMarkers: true,
   groupMode: 'grouped',
   percentDecimals: 0,
+  faceTileColumns: 2,
+  faceMaxTiles: 4,
+  facePhotoSize: 72,
+  facePhotoShape: 'rounded',
+  facePhotoRadius: 12,
+  faceIconSize: 18,
+  faceTileGap: 6,
+  faceTileRadius: 8,
+  faceSwap: false,
+  faceVsLabel: 'VS',
   avatarShape: 'rounded',
   avatarSize: 24,
   avatarOffsetX: 0,

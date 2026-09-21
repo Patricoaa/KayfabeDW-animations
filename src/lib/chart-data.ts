@@ -486,6 +486,81 @@ export function preparePie(data: Record<string, unknown>[], config: ChartConfig)
   });
 }
 
+export type FaceOffTile = {
+  icon: string;
+  title: string;
+  value: number;
+};
+
+export type FaceOffEntity = {
+  key: string;             // valor del campo de entidad (identidad)
+  name: string;            // nombre para mostrar (faceNameField o el valor de la entidad)
+  image: string | null;    // URL de la foto (faceImageField) o null
+  accent: string;          // color de acento de la entidad
+  tiles: FaceOffTile[];
+};
+
+// Prepara los datos del gráfico "cara a cara": agrupa las filas (1 fila por
+// logro/racha) por `faceEntityField`, toma las 2 primeras entidades en orden de
+// aparición (izquierda/derecha, salvo `faceSwap`), extrae nombre + foto de la
+// primera fila del grupo y convierte cada fila en un mosaico (icono + título +
+// valor). Las filas sin URL de icono o sin valor numérico finito se descartan;
+// cada entidad queda limitada a `faceMaxTiles`.
+export function prepareFaceOff(data: Record<string, unknown>[], config: ChartConfig): FaceOffEntity[] {
+  const rows = data ?? [];
+  const entityCol = config.faceEntityField;
+  const iconCol = config.faceIconField;
+  const valueCol = config.faceValueField;
+  const titleCol = config.faceTitleField;
+  if (!entityCol || !iconCol || !valueCol || rows.length === 0) return [];
+
+  const order: string[] = [];
+  const groups = new Map<string, Record<string, unknown>[]>();
+  for (const row of rows) {
+    const key = String(row[entityCol] ?? '');
+    if (!key) continue;
+    if (!groups.has(key)) {
+      groups.set(key, []);
+      order.push(key);
+    }
+    groups.get(key)!.push(row);
+  }
+
+  let keys = order.slice(0, 2);
+  if (config.faceSwap) keys = [...keys].reverse();
+
+  const maxTiles = Math.max(0, config.faceMaxTiles ?? 4);
+  return keys.map((key, i) => {
+    const group = groups.get(key)!;
+    const first = group[0] ?? {};
+    const nameRaw = config.faceNameField ? first[config.faceNameField] : undefined;
+    const name =
+      nameRaw !== null && nameRaw !== undefined && String(nameRaw).trim() !== ''
+        ? String(nameRaw)
+        : key;
+    const imgRaw = config.faceImageField ? first[config.faceImageField] : undefined;
+    const image = typeof imgRaw === 'string' && imgRaw.trim() ? imgRaw.trim() : null;
+
+    const tiles: FaceOffTile[] = [];
+    for (const row of group) {
+      if (tiles.length >= maxTiles) break;
+      const iconRaw = row[iconCol];
+      const icon = typeof iconRaw === 'string' && iconRaw.trim() ? iconRaw.trim() : '';
+      if (!icon) continue;
+      const value = Number(row[valueCol]);
+      if (!Number.isFinite(value)) continue;
+      const titleRaw = titleCol ? row[titleCol] : undefined;
+      const title =
+        titleRaw !== null && titleRaw !== undefined && String(titleRaw).trim() !== ''
+          ? String(titleRaw)
+          : '';
+      tiles.push({icon, title, value});
+    }
+
+    return {key, name, image, accent: colorFor(config, key, i), tiles};
+  });
+}
+
 /**
  * Canonical minimal series shape shared by the static chart renderers and the
  * animated (Remotion) templates. Both consumers build it from the same

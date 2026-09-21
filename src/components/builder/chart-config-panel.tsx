@@ -1,7 +1,7 @@
 'use client';
 
 import React, {useEffect, useState} from 'react';
-import {BarChart3, PieChart, ChevronUp, ChevronDown} from 'lucide-react';
+import {BarChart3, PieChart, Swords, ChevronUp, ChevronDown} from 'lucide-react';
 import type {ChartConfig, ChartOverlay, NumberFormat, SortBy, ChartFilter, ChartFilterOp, ChartStyle, AvatarShape, AvatarCrop, SectionFont, TextLayout} from '@/lib/chart-config';
 import {NUMBER_FORMATS} from '@/lib/chart-config';
 import {pickColor, colorFor} from '@/lib/chart-data';
@@ -52,6 +52,8 @@ function newOverlayId(): string {
 
 export function ChartConfigPanel({config, onChange, columns, aliasToTable = {}, fanOutTables = [], fieldMeta = [], data}: ChartConfigPanelProps) {
   const isPie = (config.type ?? 'bar') === 'pie';
+  const isFace = (config.type ?? 'bar') === 'faceoff';
+  const isBar = !isPie && !isFace;
   const update = (patch: Partial<ChartConfig>) => onChange({...config, ...patch});
   const setOverlay = (index: number, patch: Partial<ChartOverlay>) => {
     const next = [...(config.overlays ?? [])];
@@ -126,7 +128,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
     update({legendItems: [...(config.legendItems ?? []), ...added]});
   }, [isPie, config.seriesField, config.colors, config.legendItems, data]);
 
-  const hasSeries = !!config.seriesField && !isPie;
+  const hasSeries = !!config.seriesField && isBar;
   const legendItems = config.legendItems ?? [];
   const isStackedPercent = config.groupMode === 'stacked-percent' || config.groupMode === 'grouped-percent';
 
@@ -230,12 +232,13 @@ const setLegendTextOverride = (label: string, value?: string) => {
             <label className="text-micro font-semibold text-secondary uppercase tracking-widest font-display">
               Tipo de gráfico
             </label>
-            <div className="grid grid-cols-2 gap-1">
+            <div className="grid grid-cols-3 gap-1">
               {([
                 {value: 'bar' as const, label: 'Barras'},
                 {value: 'pie' as const, label: 'Torta'},
+                {value: 'faceoff' as const, label: 'Cara a cara'},
               ] as const).map((m) => {
-                const Icon = m.value === 'pie' ? PieChart : BarChart3;
+                const Icon = m.value === 'pie' ? PieChart : m.value === 'faceoff' ? Swords : BarChart3;
                 const isSelected = (config.type ?? 'bar') === m.value;
                 return (
                   <button
@@ -254,13 +257,15 @@ const setLegendTextOverride = (label: string, value?: string) => {
                 );
               })}
             </div>
-            <p className="text-[10px] text-muted">{isPie ? 'Torta: agrupa por categoría y suma sus valores; sin ejes ni orientación.' : 'Barras: comparación por categoría (agrupadas, apiladas o iconos).'}</p>
+            <p className="text-[10px] text-muted">{isPie ? 'Torta: agrupa por categoría y suma sus valores; sin ejes ni orientación.' : isFace ? 'Cara a cara: compara 2 entidades lado a lado con sus logros/rachas en mini-mosaicos.' : 'Barras: comparación por categoría (agrupadas, apiladas o iconos).'}</p>
           </div>
       {/* ============ DATOS ============ */}
       <Collapsible title="Datos" defaultOpen>
-        {/* Field mappings — bar chart (sin serie/descripción en modo torta) */}
+        {/* Field mappings — bar chart (sin serie/descripción en modo torta, sin ejes en modo cara a cara) */}
+        {!isFace && (
         <FieldSelect label="Eje X / Categoría" value={config.xField ?? ''} options={fieldMeta} fallback={columns} onChange={(v) => update({xField: v})} />
-        {!isPie && (
+        )}
+        {isBar && (
           <FieldSelect
             label="Descripción (opcional)"
             value={config.categoryDescriptionField ?? ''}
@@ -270,7 +275,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
             optional
           />
         )}
-        {!isPie && (
+        {isBar && (
           <FieldSelect
             label="Etiqueta corta (opcional)"
             value={config.categoryLabelField ?? ''}
@@ -280,8 +285,10 @@ const setLegendTextOverride = (label: string, value?: string) => {
             optional
           />
         )}
+        {!isFace && (
         <FieldSelect label="Eje Y / Valor" value={config.yField ?? ''} options={fieldMeta} fallback={columns} role="numeric" onChange={(v) => update({yField: v})} />
-        {!isPie && (
+        )}
+        {isBar && (
           <FieldSelect
             label="Serie (opcional)"
             value={config.seriesField ?? ''}
@@ -291,6 +298,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
             optional
           />
         )}
+        {!isFace && (
         <FieldSelect label="Agregación" value={config.aggregate ?? ''} onChange={(v) => update({aggregate: (v || undefined) as ChartConfig['aggregate']})} optional custom>
           <option value="">Ninguna</option>
           <option value="sum">Suma</option>
@@ -300,7 +308,8 @@ const setLegendTextOverride = (label: string, value?: string) => {
           <option value="min">Mínimo</option>
           <option value="max">Máximo</option>
         </FieldSelect>
-        {showFanOutWarning && (
+        )}
+        {!isFace && showFanOutWarning && (
               <div className="p-2 bg-amber-500/10 border border-amber-500/30 rounded text-[11px] text-amber-600 leading-snug">
                 Hay un fan-out en el JOIN: el campo «{config.yField}» pertenece a «{yTable}», que se repite por cada fila de la tabla más profunda. Con «{config.aggregate}» cada fila se cuenta una vez por repetición. Usá <span className="font-semibold">Conteo distintivo</span> para contar entidades reales de «{yTable}».
               </div>
@@ -379,6 +388,24 @@ const setLegendTextOverride = (label: string, value?: string) => {
             <p className="text-[10px] text-muted mt-0.5">Límite de presentación en el gráfico; no altera los datos capturados.</p>
           </div>
       </Collapsible>
+
+      {/* ============ CARA A CARA (mapeo de datos, solo en modo faceoff) ============ */}
+      {isFace && (
+      <Collapsible title="Cara a cara">
+          <FieldSelect label="Entidad (agrupador)" value={config.faceEntityField ?? ''} options={fieldMeta} fallback={columns} onChange={(v) => update({faceEntityField: v})} />
+          <p className="text-[10px] text-muted -mt-0.5 mb-1">Columna que identifica a cada luchador/entidad. Cada fila es un logro o racha; se comparan las 2 primeras entidades en orden de aparición.</p>
+          <FieldSelect label="Nombre de entidad (opcional)" value={config.faceNameField ?? ''} options={fieldMeta} fallback={columns} onChange={(v) => update({faceNameField: v || undefined})} optional />
+          <FieldSelect label="Foto de entidad (opcional)" value={config.faceImageField ?? ''} options={fieldMeta} fallback={columns} onChange={(v) => update({faceImageField: v || undefined})} optional />
+          <div className="pt-1 border-t border-border-subtle mt-1">
+            <label className="text-xs font-semibold text-muted uppercase tracking-widest font-display">Mosaico de logros</label>
+            <div className="mt-1.5 space-y-1.5">
+            <FieldSelect label="Icono del logro (imagen)" value={config.faceIconField ?? ''} options={fieldMeta} fallback={columns} onChange={(v) => update({faceIconField: v})} />
+            <FieldSelect label="Título del logro (opcional)" value={config.faceTitleField ?? ''} options={fieldMeta} fallback={columns} onChange={(v) => update({faceTitleField: v || undefined})} optional />
+            <FieldSelect label="Valor del logro" value={config.faceValueField ?? ''} options={fieldMeta} fallback={columns} role="numeric" onChange={(v) => update({faceValueField: v})} />
+            </div>
+          </div>
+        </Collapsible>
+      )}
 
             </>
           )}
@@ -487,7 +514,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
         </Collapsible>
 
       {/* ============ VISUALIZACIÓN (barras / iconos) ============ */}
-      {!isPie && (
+      {isBar && (
       <Collapsible title="Visualización">
           {/* Tipo: Barras / Iconos */}
           <div>
@@ -636,8 +663,60 @@ const setLegendTextOverride = (label: string, value?: string) => {
         </Collapsible>
       )}
 
+      {/* ============ CARA A CARA — estilo (solo en modo faceoff) ============ */}
+      {isFace && (
+        <Collapsible title="Cara a cara">
+          <div className="grid grid-cols-2 gap-2">
+            <NumberControl label="Foto (px)" value={config.facePhotoSize ?? 72} min={24} max={160} step={4} onChange={(v) => update({facePhotoSize: v})} />
+            <NumberControl label="Icono del logro (px)" value={config.faceIconSize ?? 18} min={10} max={48} step={2} onChange={(v) => update({faceIconSize: v})} />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Forma de la foto</label>
+            <div className="flex gap-1">
+              {([
+                {value: 'rounded', label: 'Esquinas redondeadas'},
+                {value: 'circle', label: 'Círculo'},
+              ] as {value: AvatarShape; label: string}[]).map((s) => (
+                <button
+                  key={s.value}
+                  onClick={() => update({facePhotoShape: s.value})}
+                  className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                    (config.facePhotoShape ?? 'rounded') === s.value
+                      ? 'bg-amber-500 text-black'
+                      : 'bg-elevated text-secondary hover:bg-card-hover'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {(config.facePhotoShape ?? 'rounded') === 'rounded' && (
+            <NumberControl label="Radio de esquina de la foto" value={config.facePhotoRadius ?? 12} min={0} max={40} step={2} onChange={(v) => update({facePhotoRadius: v})} />
+          )}
+          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border-subtle mt-1">
+            <NumberControl label="Columnas del mosaico" value={config.faceTileColumns ?? 2} min={1} max={4} step={1} onChange={(v) => update({faceTileColumns: v})} />
+            <NumberControl label="Máx. logros / entidad" value={config.faceMaxTiles ?? 4} min={1} max={12} step={1} onChange={(v) => update({faceMaxTiles: v})} />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <NumberControl label="Gap entre mosaicos" value={config.faceTileGap ?? 6} min={0} max={20} step={1} onChange={(v) => update({faceTileGap: v})} />
+            <NumberControl label="Radio de los mosaicos" value={config.faceTileRadius ?? 8} min={0} max={20} step={1} onChange={(v) => update({faceTileRadius: v})} />
+          </div>
+          <SwitchControl label="Intercambiar lados" checked={config.faceSwap ?? false} onChange={(v) => update({faceSwap: v})} />
+          <div>
+            <label className="text-sm font-medium block mb-1">Texto del divisor (vacío = oculto)</label>
+            <input
+              type="text"
+              value={config.faceVsLabel ?? 'VS'}
+              onChange={(e) => update({faceVsLabel: e.target.value || undefined})}
+              className="w-full bg-elevated border border-border-default rounded-lg px-3 py-2 text-sm font-body focus:outline-none focus:ring-1 focus:ring-amber-500"
+            />
+          </div>
+        </Collapsible>
+      )}
+
       {/* ============ BARRAS — estilo (solo en modo barras) ============ */}
-      {!isPie && (config.iconMode ?? 'bars') !== 'icons' && (
+      {isBar && (config.iconMode ?? 'bars') !== 'icons' && (
         <Collapsible title="Barras">
           <NumberControl label="Radio de esquinas" value={config.barRadius} min={0} max={24} onChange={(v) => update({barRadius: v})} />
           {(config.groupMode === 'stacked' || config.groupMode === 'stacked-percent') && (
@@ -691,7 +770,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
         )}
 
       {/* ============ ICONOS (pictograma) ============ */}
-      {!isPie && config.iconMode === 'icons' && (
+      {isBar && config.iconMode === 'icons' && (
         <Collapsible title="Iconos">
           <div>
             <label className="text-sm font-medium mb-1 block">Icono base (SVG)</label>
@@ -777,7 +856,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
       )}
 
       {/* ============ EJE X / CATEGORÍA ============ */}
-      {!isPie && (
+      {isBar && (
       <Collapsible title="Eje X / Categoría">
           <div>
               <label className="text-sm font-medium mb-1 block">Etiquetas de categoría</label>
@@ -875,7 +954,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
       )}
 
       {/* ============ EJE Y / DATOS ============ */}
-      {!isPie && (
+      {isBar && (
       <Collapsible title="Eje Y / Valor">
           {isStackedPercent ? (
             <p className="text-[10px] text-muted py-1">Eje Y fijo en 0%–100% (modo %).</p>
@@ -1005,7 +1084,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
           <SwitchControl label="Mostrar etiquetas de datos" checked={config.showDataLabels ?? true} onChange={(v) => update({showDataLabels: v})} />
           {(config.showDataLabels ?? true) && (
             <>
-              {config.iconMode !== 'icons' && !isPie && (
+              {config.iconMode !== 'icons' && isBar && (
                 <div>
                   <label className="text-sm font-medium mb-1 block">Posición</label>
                   <SelectControl
@@ -1050,7 +1129,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
         </Collapsible>
 
       {/* ============ LEYENDAS ============ */}
-      <Collapsible title="Leyendas">
+      {!isFace && (<Collapsible title="Leyendas">
           <SwitchControl label="Mostrar leyenda" checked={config.showLegend ?? true} onChange={(v) => update({showLegend: v})} />
           {(config.showLegend ?? true) && (
             <>
@@ -1105,6 +1184,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
             </div>
           )}
         </Collapsible>
+        )}
 
       {/* ============ LIENZO (fondo compartido en "Configuración común") ============ */}
       <Collapsible title="Lienzo">
@@ -1166,7 +1246,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
       </Collapsible>
 
       {/* ============ AVATAR ============ */}
-      {!isPie && (
+      {isBar && (
       <Collapsible title="Avatar">
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium block">Avatares (imágenes)</label>

@@ -32,6 +32,7 @@ const CHART_ICONS: Record<string, React.ComponentType<{size?: number; className?
   pie: BarChart3,
   scatter: BarChart3,
   table: BarChart3,
+  faceoff: BarChart3,
 };
 
 const CHART_COLORS: Record<string, string> = {
@@ -41,6 +42,7 @@ const CHART_COLORS: Record<string, string> = {
   pie: '#10b981',
   scatter: '#f97316',
   table: '#6366f1',
+  faceoff: '#ef4444',
 };
 
 // Proper display names per chart type (scalable: any new type extends the
@@ -52,6 +54,7 @@ const CHART_TYPE_LABELS: Record<string, string> = {
   pie: 'Torta',
   scatter: 'Dispersión',
   table: 'Tabla',
+  faceoff: 'Cara a cara',
 };
 
 const STATUS_LABEL: Record<string, string> = {
