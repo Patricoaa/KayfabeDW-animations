@@ -210,35 +210,64 @@ const setLegendTextOverride = (label: string, value?: string) => {
         <div className="space-y-4 pb-12">
           {activeTab === 'data' && (
             <>
+      {/* ============ TIPO DE GRÁFICO ============ */}
+      <div>
+            <label className="text-sm font-medium mb-1 block">Tipo de gráfico</label>
+            <div className="flex gap-1">
+              {([
+                {value: 'bar' as const, label: 'Barras'},
+                {value: 'pie' as const, label: 'Torta'},
+              ] as const).map((m) => (
+                <button
+                  key={m.value}
+                  onClick={() => update({type: m.value})}
+                  className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                    (config.type ?? 'bar') === m.value
+                      ? 'bg-amber-500 text-black'
+                      : 'bg-elevated text-secondary hover:bg-card-hover'
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-muted mt-1.5">{isPie ? 'Torta: agrupa por categoría y suma sus valores; sin ejes ni orientación.' : 'Barras: comparación por categoría (agrupadas, apiladas o iconos).'}</p>
+          </div>
       {/* ============ DATOS ============ */}
       <Collapsible title="Datos" defaultOpen>
-        {/* Field mappings — bar chart */}
+        {/* Field mappings — bar chart (sin serie/descripción en modo torta) */}
         <FieldSelect label="Eje X / Categoría" value={config.xField ?? ''} options={fieldMeta} fallback={columns} onChange={(v) => update({xField: v})} />
-        <FieldSelect
-          label="Descripción (opcional)"
-          value={config.categoryDescriptionField ?? ''}
-          options={fieldMeta}
-          fallback={columns}
-          onChange={(v) => update({categoryDescriptionField: v || undefined})}
-          optional
-        />
-        <FieldSelect
-          label="Etiqueta corta (opcional)"
-          value={config.categoryLabelField ?? ''}
-          options={fieldMeta}
-          fallback={columns}
-          onChange={(v) => update({categoryLabelField: v || undefined})}
-          optional
-        />
+        {!isPie && (
+          <FieldSelect
+            label="Descripción (opcional)"
+            value={config.categoryDescriptionField ?? ''}
+            options={fieldMeta}
+            fallback={columns}
+            onChange={(v) => update({categoryDescriptionField: v || undefined})}
+            optional
+          />
+        )}
+        {!isPie && (
+          <FieldSelect
+            label="Etiqueta corta (opcional)"
+            value={config.categoryLabelField ?? ''}
+            options={fieldMeta}
+            fallback={columns}
+            onChange={(v) => update({categoryLabelField: v || undefined})}
+            optional
+          />
+        )}
         <FieldSelect label="Eje Y / Valor" value={config.yField ?? ''} options={fieldMeta} fallback={columns} role="numeric" onChange={(v) => update({yField: v})} />
-        <FieldSelect
-          label="Serie (opcional)"
-          value={config.seriesField ?? ''}
-          options={fieldMeta}
-          fallback={columns}
-          onChange={(v) => update({seriesField: v || undefined})}
-          optional
-        />
+        {!isPie && (
+          <FieldSelect
+            label="Serie (opcional)"
+            value={config.seriesField ?? ''}
+            options={fieldMeta}
+            fallback={columns}
+            onChange={(v) => update({seriesField: v || undefined})}
+            optional
+          />
+        )}
         <FieldSelect label="Agregación" value={config.aggregate ?? ''} onChange={(v) => update({aggregate: (v || undefined) as ChartConfig['aggregate']})} optional custom>
           <option value="">Ninguna</option>
           <option value="sum">Suma</option>
@@ -333,29 +362,6 @@ const setLegendTextOverride = (label: string, value?: string) => {
           
           {activeTab === 'design' && (
             <>
-      {/* ============ TIPO DE GRÁFICO ============ */}
-      <div>
-            <label className="text-sm font-medium mb-1 block">Tipo de gráfico</label>
-            <div className="flex gap-1">
-              {([
-                {value: 'bar' as const, label: 'Barras'},
-                {value: 'pie' as const, label: 'Torta'},
-              ] as const).map((m) => (
-                <button
-                  key={m.value}
-                  onClick={() => update({type: m.value})}
-                  className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
-                    (config.type ?? 'bar') === m.value
-                      ? 'bg-amber-500 text-black'
-                      : 'bg-elevated text-secondary hover:bg-card-hover'
-                  }`}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
-            <p className="text-[10px] text-muted mt-1.5">{isPie ? 'Torta: agrupa por categoría y suma sus valores; sin ejes ni orientación.' : 'Barras: comparación por categoría (agrupadas, apiladas o iconos).'}</p>
-          </div>
       {/* ============ FUENTE (familia compartida en "Configuración común") ============ */}
       <Collapsible title="Fuente">
           <ColorPickerControl label="Color de la fuente general" value={config.style?.textColor} onChange={(v) => updateStyle({textColor: v || undefined})} />
