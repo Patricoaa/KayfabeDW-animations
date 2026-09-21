@@ -447,6 +447,22 @@ export function preparePie(data: Record<string, unknown>[], config: ChartConfig)
 
   const positives = items.filter((d) => Number.isFinite(d.value) && d.value > 0);
   if (positives.length === 0) return [];
+
+  // Orden manual de los slices (sección Torta del builder). El resto no listado
+  // (incl. "Otros") conserva el orden derivado al final, con "Otros" siempre el
+  // último para no romper la lectura top-N.
+  const order = config.categoryOrder;
+  if (order && order.length > 0) {
+    const pos = new Map(order.map((l, i) => [l, i]));
+    positives.sort((a, b) => {
+      if (b.label === 'Otros') return a.label === 'Otros' ? 0 : -1;
+      if (a.label === 'Otros') return 1;
+      const ia = pos.has(a.label) ? pos.get(a.label)! : order.length;
+      const ib = pos.has(b.label) ? pos.get(b.label)! : order.length;
+      return ia - ib;
+    });
+  }
+
   const total = positives.reduce((a, b) => a + b.value, 0);
   const percents = percentShareParts(positives.map((p) => p.value), 0);
 

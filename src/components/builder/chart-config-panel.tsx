@@ -1,7 +1,7 @@
 'use client';
 
 import React, {useEffect, useState} from 'react';
-import {BarChart3, PieChart} from 'lucide-react';
+import {BarChart3, PieChart, ChevronUp, ChevronDown} from 'lucide-react';
 import type {ChartConfig, ChartOverlay, NumberFormat, SortBy, ChartFilter, ChartFilterOp, ChartStyle, AvatarShape, AvatarCrop, SectionFont, TextLayout} from '@/lib/chart-config';
 import {NUMBER_FORMATS} from '@/lib/chart-config';
 import {pickColor, colorFor} from '@/lib/chart-data';
@@ -147,6 +147,20 @@ const setLegendTextOverride = (label: string, value?: string) => {
   // las categorías del xField. La torta ignora seriesField aunque el config
   // arrastre uno residual (ver "Colores de serie").
   const legendOverrideLabels: string[] = legendOverrideKeys(config, data ?? []);
+
+  // Reordena un slice en `categoryOrder` (sección Torta). Arranca desde el orden
+  // derivado actual y persiste el orden completo, no solo el delta.
+  const moveCategory = (label: string, dir: -1 | 1) => {
+    const base = config.categoryOrder && config.categoryOrder.length > 0
+      ? [...config.categoryOrder]
+      : [...legendOverrideLabels];
+    const idx = base.indexOf(label);
+    const to = idx + dir;
+    if (idx < 0 || to < 0 || to >= base.length) return;
+    const [moved] = base.splice(idx, 1);
+    base.splice(to, 0, moved);
+    update({categoryOrder: base});
+  };
 
   // First valid avatar image URL per category (mirrors the chart's categoryImages
   // so the crop-grid preview thumbnails show the real source image).
@@ -557,10 +571,51 @@ const setLegendTextOverride = (label: string, value?: string) => {
           <p className="text-[10px] text-muted -mt-0.5 mb-1">0 = torta sólida · &gt;0 = donut (porcentaje del radio).</p>
           <NumberControl label="Nº máx. de segmentos" value={config.sliceLimit} min={0} max={50} step={1} onChange={(v) => update({sliceLimit: v})} />
           <p className="text-[10px] text-muted -mt-0.5 mb-1">0 = todos · el exceso se fusiona en un slice «Otros».</p>
-          <div>
+
+          <div className="pt-1 border-t border-border-subtle">
+            <label className="text-sm font-medium mb-1 block">Orden de los slices</label>
+            <p className="text-[10px] text-muted mb-1">Las categorías se derivan del Eje X; usa ▲/▼ para fijar el orden del gráfico.</p>
+            {legendOverrideLabels.map((lab, i) => (
+              <div key={lab} className="flex items-center gap-1.5 mb-1.5">
+                <span className="flex-1 flex items-center gap-2 min-w-0">
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{background: colorFor(config, lab, i)}}
+                  />
+                  <span className="text-xs truncate">{lab}</span>
+                </span>
+                <button
+                  onClick={() => moveCategory(lab, -1)}
+                  disabled={i === 0}
+                  className="p-1 rounded bg-elevated hover:bg-card-hover disabled:opacity-30 text-secondary"
+                  aria-label={`Mover ${lab} arriba`}
+                >
+                  <ChevronUp size={14} />
+                </button>
+                <button
+                  onClick={() => moveCategory(lab, 1)}
+                  disabled={i === legendOverrideLabels.length - 1}
+                  className="p-1 rounded bg-elevated hover:bg-card-hover disabled:opacity-30 text-secondary"
+                  aria-label={`Mover ${lab} abajo`}
+                >
+                  <ChevronDown size={14} />
+                </button>
+              </div>
+            ))}
+            {(config.categoryOrder?.length ?? 0) > 0 && (
+              <button
+                onClick={() => update({categoryOrder: undefined})}
+                className="text-xs text-amber-500 hover:text-amber-400 font-medium"
+              >
+                Restablecer orden por defecto
+              </button>
+            )}
+          </div>
+
+          <div className="pt-1 border-t border-border-subtle">
             <label className="text-sm font-medium mb-1 block">Etiqueta de cada slice</label>
             <div className="flex gap-1">
-              {([{value: 'none' as const, label: 'Nada'}, {value: 'value' as const, label: 'Valor'}, {value: 'percent' as const, label: 'Porcentaje'}, {value: 'both' as const, label: 'Valor + %'}] as const).map((m) => (
+              {([{value: 'none' as const, label: 'Nada'}, {value: 'value' as const, label: 'Valor'}, {value: 'percent' as const, label: 'Porcentaje'}, {value: 'both' as const, label: 'Valor + %'}, {value: 'category' as const, label: 'Cat. + Valor + %'}] as const).map((m) => (
                 <button
                   key={m.value}
                   onClick={() => update({pieLabel: m.value})}

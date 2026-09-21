@@ -300,7 +300,8 @@ export type ChartConfig = {
   // F3: per-chart-type controls.
   innerRadius?: number;        // pie: 0 (tarta) a >0 (donut)
   sliceLimit?: number;         // pie: máx. segmentos a mostrar
-  pieLabel?: 'none' | 'value' | 'percent' | 'both'; // pie: modo de etiqueta
+  pieLabel?: 'none' | 'value' | 'percent' | 'both' | 'category'; // pie: modo de etiqueta
+  categoryOrder?: string[];    // pie: orden manual de los slices (por label)
   trendline?: boolean;         // scatter: línea de tendencia lineal
   lineDash?: boolean;          // line/area: línea discontinua
   tableSearch?: string;        // table: filtro por texto

@@ -88,6 +88,7 @@ export function PieChart({data, config}: Props) {
     const value = formatValue(s.value, numFmt);
     if (labelMode === 'value') return value;
     if (labelMode === 'both') return `${value} · ${s.percentLabel}`;
+    if (labelMode === 'category') return `${s.label} · ${value} · ${s.percentLabel}`;
     return s.percentLabel;
   };
 

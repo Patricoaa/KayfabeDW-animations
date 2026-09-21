@@ -131,4 +131,28 @@ describe('preparePie', () => {
     expect(slices[0].color).toBe('#111111');
     expect(slices[1].color).not.toBe('#111111');
   });
+
+  it('categoryOrder reordena los slices en el orden dado', () => {
+    const slices = preparePie(
+      [{cat: 'A', val: 2}, {cat: 'B', val: 3}, {cat: 'C', val: 1}],
+      cfg({categoryOrder: ['C', 'A']}),
+    );
+    expect(slices.map((s) => s.label)).toEqual(['C', 'A', 'B']);
+  });
+
+  it('categoryOrder deja «Otros» siempre al final', () => {
+    const slices = preparePie(
+      [{cat: 'A', val: 4}, {cat: 'B', val: 2}, {cat: 'C', val: 1}, {cat: 'D', val: 1}],
+      cfg({categoryOrder: ['B'], sliceLimit: 2, sortBy: 'value-desc'}),
+    );
+    expect(slices.map((s) => s.label)).toEqual(['B', 'A', 'Otros']);
+  });
+
+  it('sin categoryOrder conserva el orden derivado', () => {
+    const slices = preparePie(
+      [{cat: 'B', val: 1}, {cat: 'A', val: 3}],
+      cfg(),
+    );
+    expect(slices.map((s) => s.label)).toEqual(['B', 'A']);
+  });
 });
