@@ -5,6 +5,7 @@ import {BarChart3, PieChart} from 'lucide-react';
 import type {ChartConfig, ChartOverlay, NumberFormat, SortBy, ChartFilter, ChartFilterOp, ChartStyle, AvatarShape, AvatarCrop, SectionFont, TextLayout} from '@/lib/chart-config';
 import {NUMBER_FORMATS} from '@/lib/chart-config';
 import {pickColor, colorFor} from '@/lib/chart-data';
+import {legendOverrideKeys} from '@/lib/legend-override';
 import {ICON_GLYPHS, ICON_GLYPH_NAMES} from '@/lib/chart-icons';
 import { Tabs, SelectControl, NumberControl, ColorPickerControl, SwitchControl, Collapsible, TextStyleControls, SliderNumberInput, FieldSelect, OverlayEditor } from '@/components/ui/controls';
 import type {ColumnMeta} from '@/lib/chart-config';
@@ -108,7 +109,7 @@ const setLegendTextOverride = (label: string, value?: string) => {
   // Without this the per-series color pickers never render — the core reason
   // "Colores de serie" appeared dead. Colors come from the current palette.
   useEffect(() => {
-    if (!config.seriesField || !data || data.length === 0) return;
+    if (isPie || !config.seriesField || !data || data.length === 0) return;
     const names: string[] = [];
     for (const row of data) {
       const raw = row[config.seriesField];
@@ -121,10 +122,9 @@ const setLegendTextOverride = (label: string, value?: string) => {
     const base = config.legendItems?.length ?? 0;
     const added = missing.map((n, i) => ({label: n, color: pickColor(config.colors, base + i)}));
     update({legendItems: [...(config.legendItems ?? []), ...added]});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.seriesField, config.colors, config.legendItems, data]);
+  }, [isPie, config.seriesField, config.colors, config.legendItems, data]);
 
-  const hasSeries = !!config.seriesField;
+  const hasSeries = !!config.seriesField && !isPie;
   const legendItems = config.legendItems ?? [];
   const isStackedPercent = config.groupMode === 'stacked-percent' || config.groupMode === 'grouped-percent';
 
@@ -139,13 +139,12 @@ const setLegendTextOverride = (label: string, value?: string) => {
       if (catLabels.length < 50 && !catLabels.includes(lab)) catLabels.push(lab);
     }
   }
-  // Labels shown in the legend, for the "Texto de la leyenda" override block.
-  // Multi-series use the detected series names (legendItems); everything else
-  // (pie slices, scatter categories, single-series bars) uses the categories.
-  const legendOverrideLabels: string[] =
-    config.seriesField && legendItems.length > 0
-      ? legendItems.map((li) => li.label)
-      : catLabels;
+  // Labels mostrados en la leyenda, para el bloque "Texto de la leyenda".
+  // Multi-serie usan los nombres de serie detectados (legendItems); todo lo
+  // demás (slices de torta, categorías de scatter, barras de serie única) usa
+  // las categorías del xField. La torta ignora seriesField aunque el config
+  // arrastre uno residual (ver "Colores de serie").
+  const legendOverrideLabels: string[] = legendOverrideKeys(config, data ?? []);
 
   // First valid avatar image URL per category (mirrors the chart's categoryImages
   // so the crop-grid preview thumbnails show the real source image).
